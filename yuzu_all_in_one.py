@@ -3,8 +3,9 @@ Yuzu, all in one file -- combines the reply pipeline (fix/extract/run/
 strip/speak) with the main loop (listen -> think -> respond) so there's
 nothing to import and nothing to accidentally save in the wrong folder.
 
-The two functions marked STUB are fakes for now -- swap them for real
-Whisper and real Ollama once your hardware's ready.
+listen_and_transcribe() is still a STUB -- swap it for real Whisper
+once a mic is hooked up. The brain is real: it talks to Ollama via
+yuzu_brain.py, and falls back to an echo stub when Ollama isn't up.
 
 This file will run anywhere, including Pydroid on the phone, with no
 hardware and no other files present. If muto_leg_control.py and
@@ -27,6 +28,12 @@ try:
     from yuzu_led_manager import LEDManager
 except ImportError:
     LEDManager = None
+
+try:
+    from yuzu_brain import BrainError, YuzuBrain
+except ImportError:
+    YuzuBrain = None
+    BrainError = Exception
 
 
 # ============================================================================
@@ -295,13 +302,46 @@ def listen_and_transcribe():
     return input("You say: ")
 
 
-# --- STUB 2: swap this for a real Ollama call once it's running -----------
+# --- The brain. Real Ollama when it's reachable, echo stub when it isn't. --
+brain = None
+
+
+def start_brain():
+    """Connect to Ollama once, at boot. Returns a short status string.
+
+    A failure here is NOT fatal: the robot still boots, still parses,
+    still moves, and says so loudly. Better than a stack trace on a
+    machine you're SSH'd into from a Steam Deck.
+    """
+    global brain
+    if YuzuBrain is None:
+        return "echo stub (yuzu_brain.py not found)"
+    try:
+        candidate = YuzuBrain()
+        candidate.check()
+    except BrainError as exc:
+        print(f"\n!! Brain offline, falling back to the echo stub.\n{exc}\n")
+        return "echo stub (Ollama unreachable)"
+    brain = candidate
+    return f"Ollama, model '{brain.model}'"
+
+
 def ask_yuzu_brain(user_text):
-    return f"OMG you said '{user_text}'? [squats] That's so real of you, no cap! [shakes legs]"
+    if brain is None:
+        return (f"OMG you said '{user_text}'? [squats] "
+                f"That's so real of you, no cap! [shakes legs]")
+    try:
+        return brain.ask(user_text)
+    except BrainError as exc:
+        # Mid-conversation dropout: say something rather than freezing.
+        print(f"!! {exc}")
+        return "Ugh, my brain just lagged out for a sec. Say that again?"
 
 
 def run_yuzu_forever():
-    print("Yuzu is listening... (type 'quit' to stop this test)")
+    brain_status = start_brain()
+    print("Yuzu is listening... (type 'quit' to stop)")
+    print(f"brain: {brain_status}")
     print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
           f"leds: {'yuzu_led_manager' if leds else 'off'}\n")
     if legs and g_bot:

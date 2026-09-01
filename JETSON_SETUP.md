@@ -1,0 +1,201 @@
+# Getting Yuzu's brain running
+
+Goal: Llama-3.2-3B Heretic-abliterated answering as Yuzu, through
+Ollama, fully offline. Written to be done in two stages — **stage 1
+needs no Jetson at all**, so the prompt can be tuned before the money
+is spent.
+
+---
+
+## Stage 1 — before the Jetson arrives
+
+Everything in this repo except the servo code runs on any x86 machine.
+Do the prompt work here, on hardware you already own, so the Jetson
+arrives to a finished brain instead of a blank one.
+
+### 1. Install Ollama on a normal PC or laptop
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve          # leave running in one terminal
+```
+
+**On the Steam Deck specifically:** SteamOS has a read-only root
+filesystem, so the install script may not be able to write where it
+wants, and anything in `/usr` gets wiped by a SteamOS update anyway.
+The clean way is a `distrobox` container (ships with SteamOS) and
+installing Ollama inside it. I couldn't test this from here — if the
+Deck fights you, any other PC works just as well for stage 1, and the
+Deck stays what your notes already say it is: the flashing and SSH
+workstation.
+
+### 2. Prove the pipeline with stock Llama first
+
+Do this before hunting down the abliterated weights. It separates
+"my setup works" from "my model works":
+
+```bash
+ollama pull llama3.2:3b
+python build_yuzu_model.py --create        # builds the 'yuzu' model
+python yuzu_brain.py                       # one-shot smoke test
+python yuzu_brain.py --chat                # talk to her
+```
+
+If she answers in character, the whole chain is good — prompt,
+Modelfile, client, parser.
+
+### 3. Measure the prompt
+
+```bash
+python yuzu_prompt_eval.py --runs 3
+```
+
+12 prompts × 3 runs, scored against every mechanically-checkable rule
+in the system prompt: does she always speak, does she use brackets and
+never asterisks, are her actions ones this body can do, does she write
+the user's turn. Deliberately includes the cases that broke before —
+"Do a stretch" (the all-actions freeze) and "Wave at me!" (bait for
+body parts the chassis doesn't have).
+
+Change one thing, re-run, compare. That's the loop. Chasing prompt
+quirks by eyeballing three replies is how you end up fixing a problem
+that was never there.
+
+### 4. Then swap in the abliterated model
+
+Repo: **`DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored`**
+(the "ablitered" misspelling is in the real repo name, not a typo here).
+
+Heads up — I could not open Hugging Face from the sandbox I was working
+in, so **verify this before acting on it**: from the search results,
+that repo looks like full-precision safetensors rather than GGUF, and
+its card mentions needing tokenizer/config files from the source repo
+when running quantized. Which path you take depends on what's actually
+in the repo:
+
+**If a GGUF repo exists** (check `mradermacher` and `bartowski` — they
+quantize a lot of DavidAU's models):
+
+```bash
+ollama pull hf.co/<user>/<gguf-repo>:Q4_K_M
+python build_yuzu_model.py --base hf.co/<user>/<gguf-repo>:Q4_K_M --create
+```
+
+**If only safetensors exist**, convert it yourself. Do this on the PC,
+not the Jetson — it needs ~7GB of RAM for the fp16 intermediate:
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
+pip install -r requirements.txt
+python convert_hf_to_gguf.py /path/to/model --outfile yuzu-f16.gguf
+cmake -B build && cmake --build build --config Release
+./build/bin/llama-quantize yuzu-f16.gguf yuzu-Q4_K_M.gguf Q4_K_M
+```
+
+Then point the Modelfile at the result:
+
+```bash
+python build_yuzu_model.py --base ./yuzu-Q4_K_M.gguf --create
+python yuzu_prompt_eval.py --runs 3          # compare to stock's score
+```
+
+If she comes out sounding scrambled after conversion, suspect the chat
+template — Ollama reads it from GGUF metadata, and converted models
+sometimes lose it. Add an explicit `TEMPLATE` block for Llama 3.2 to
+the Modelfile generator if so.
+
+Q4_K_M is the right quant: ~2GB, and a 3B is small enough that heavier
+quantization starts costing real coherence.
+
+---
+
+## Stage 2 — on the Jetson
+
+### 1. Flash JetPack
+
+Steam Deck in Desktop Mode, NVIDIA SDK Manager or the SD card image.
+microSD boot is officially supported (64GB minimum) — your 128GB or
+256GB card is fine. NVMe is faster and more durable, not required.
+Model load time off SD is the main thing you'll feel.
+
+### 2. Unlock the performance modes
+
+The Orin Nano ships throttled. This is the single biggest free speedup:
+
+```bash
+sudo nvpmodel -m 0     # MAXN / MAXN SUPER — max power mode
+sudo jetson_clocks     # pin clocks to maximum
+sudo pip3 install jetson-stats && jtop     # watch RAM, GPU, temps
+```
+
+`nvpmodel -m 0` is the mode you want for inference. Check `nvpmodel -q`
+to confirm what it landed on.
+
+### 3. Install Ollama
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Ollama supports arm64 and detects JetPack CUDA. Confirm it's on the GPU
+and not CPU — watch `jtop` during a reply, or check `ollama ps` for the
+processor column. CPU-only on a 3B is usable but noticeably slower.
+
+### 4. Copy this repo over and build the model
+
+```bash
+python3 build_yuzu_model.py --base <your model> --create
+python3 yuzu_brain.py --chat
+python3 yuzu_all_in_one.py        # full loop
+```
+
+### 5. Memory — the thing that will actually bite you
+
+8GB shared between CPU and GPU, and eventually three things want it at
+once: Whisper (STT), the 3B (LLM), Piper (TTS). Rough budget:
+
+| Component | Approx |
+|---|---|
+| Llama 3.2 3B Q4_K_M @ 4096 ctx | ~2.5–3 GB |
+| whisper.cpp base/small | ~0.5–1 GB |
+| Piper TTS | ~0.1 GB |
+| JetPack desktop + OS | ~1.5–2.5 GB |
+
+It fits, but not with room to spare. Two things that help:
+
+- **Run headless.** `sudo systemctl set-default multi-user.target` and
+  SSH in from the Deck. The desktop is the biggest easy win.
+- **Swap.** Jetson defaults to zram, which trades CPU for RAM. For LLM
+  work a real swapfile on the SD card is usually the better trade.
+
+Bring them up one at a time — Ollama alone, then add Whisper, then add
+Piper — as your own notes already say. Loading all three on day one
+means an OOM with no idea which one caused it.
+
+`num_ctx` in `yuzu_brain.py` is the dial that most directly trades
+memory for conversation length. 4096 is a starting point, not a law.
+
+### 6. Piper
+
+Piper needs **both** files per voice in the same folder — `.onnx` and
+`.onnx.json` — or it silently won't load. Voice speed is `length_scale`
+in the json; lower is faster. 0.85–0.9 suits the gyaru energy.
+
+---
+
+## When something's wrong
+
+| Symptom | Where to look |
+|---|---|
+| `Can't reach Ollama` | `ollama serve` not running, or `OLLAMA_HOST` wrong |
+| `no model named 'yuzu'` | `python build_yuzu_model.py --create` |
+| She sounds like ChatGPT | `not_an_assistant` in the eval; check SYSTEM survived `ollama create` with `ollama show yuzu --system` |
+| Actions do nothing | Run the eval — `actions_runnable` shows exactly which phrasings got dropped |
+| Replies too long, TTS drags | Lower `num_predict` in `yuzu_brain.py`, rebuild the Modelfile |
+| She writes your lines | `no_puppeteering`; the `stop` params in the Modelfile catch most of it |
+| Very slow on Jetson | Confirm GPU not CPU; `nvpmodel -m 0`; check thermals in `jtop` |
+
+Sources for the model:
+[DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored](https://huggingface.co/DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored)
+· [bartowski GGUF quants](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-uncensored-GGUF)
+· [QuantFactory abliterated GGUF](https://huggingface.co/QuantFactory/Llama-3.2-3B-Instruct-abliterated-GGUF)

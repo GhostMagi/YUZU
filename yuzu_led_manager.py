@@ -3,8 +3,8 @@ Yuzu's LED manager -- the single source of truth for lighting.
 
 It merges two previously-separate, incompatible systems:
 
-  1. yuzu_robot_config.json's PHYSICAL ZONES (underglow, eye_matrix,
-     leg_accents) -- "where are the LEDs and what's their base color"
+  1. yuzu_robot_config.json's PHYSICAL ZONES (underglow, leg_accents)
+     -- "where are the LEDs and what's their base color"
   2. ledsnewestv7.py's STATE PROFILES (idle, moving, alert, ...) --
      "what should the lights do based on what the robot is doing"
 
@@ -36,7 +36,6 @@ DEFAULT_CONFIG = {
     "robot_name": "Yuzu-Spider-V1",
     "led_zones": {
         "underglow":   {"color": "#FF1493", "effect": "neon_pulse", "brightness": 90},
-        "eye_matrix":  {"color": "#00FFFF", "effect": "static",     "brightness": 100},
         "leg_accents": {"color": "#FF007F", "effect": "chase",      "brightness": 75},
     },
     "state_profiles": {
@@ -99,7 +98,7 @@ class LEDManager:
         return list(self.data.get("state_profiles", {}))
 
     def get_zone(self, zone_name):
-        """Static, location-based color -- underglow / eye_matrix / leg_accents."""
+        """Static, location-based color -- underglow / leg_accents."""
         return self.data.get("led_zones", {}).get(zone_name)
 
     def get_state_profile(self, state_name):

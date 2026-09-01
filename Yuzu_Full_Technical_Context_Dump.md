@@ -182,17 +182,29 @@ next AI session to read this dump would have "fixed" it again.
 So: the code lives in the repo, this file explains the reasoning
 behind it. If the two disagree, the code is right.
 
-  yuzu_all_in_one.py    reply pipeline + main loop. The two functions
-                        marked STUB (listen_and_transcribe,
-                        ask_yuzu_brain) are the only things still
-                        needing real Whisper/Ollama calls.
+  yuzu_all_in_one.py    reply pipeline + main loop. Only
+                        listen_and_transcribe() is still a STUB now
+                        (needs Whisper); speak() needs Piper.
+  yuzu_brain.py         real Ollama client. Stdlib only -- urllib, no
+                        pip install. Streaming, capped history,
+                        preflight check, clear errors.
+  yuzu_system_prompt.txt  Yuzu's personality. THE only copy -- the
+                        code, the Modelfile and the docs all read it.
+  build_yuzu_model.py   generates Modelfile.yuzu from that prompt plus
+                        the sampling settings, so they can't drift.
+  Modelfile.yuzu        GENERATED. Never hand-edit.
+  yuzu_prompt_eval.py   scores prompt compliance against the real
+                        model. See Section 10.
+  JETSON_SETUP.md       setup runbook, PC first then Jetson.
   muto_leg_control.py   leg wrapper + tripod gait library + DummyBot
                         simulator. Untested on hardware.
   yuzu_led_manager.py   the one LED loader. Zones + state profiles.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
   readtest.py           smoke test that the config loads. Portable.
-  test_yuzu.py          31 stdlib tests. `python test_yuzu.py`.
+  test_yuzu.py          48 stdlib tests. `python test_yuzu.py`. The
+                        brain tests run against a mock Ollama server,
+                        so no model download is needed to run them.
 
 ======================================================================
 ## 7. BUGS FOUND BY RUNNING THE CODE (all now fixed)
@@ -306,12 +318,63 @@ if either file isn't present, that layer falls back to printing and
 nothing crashes. So yuzu_all_in_one.py still runs alone in Pydroid.
 
 ======================================================================
+## 9b. THE BRAIN, AND MEASURING THE PROMPT
+======================================================================
+ask_yuzu_brain() is no longer a stub. yuzu_brain.py talks to Ollama
+over its HTTP API using only urllib -- deliberately no `pip install
+ollama`, so it runs on the Jetson, a PC, or Pydroid with nothing but
+Ollama itself installed.
+
+Design notes:
+- The system prompt was living in two markdown files and nowhere the
+  code could read it. It is now yuzu_system_prompt.txt, and
+  build_yuzu_model.py stamps it into Modelfile.yuzu. One copy.
+- History is capped at 8 exchanges. A 3B loses the thread long before
+  the context window fills, and every extra token is latency.
+- Sampling: temp 0.8 with min_p 0.05 (personality needs spread; min_p
+  cuts the genuinely bad tokens without flattening her voice),
+  repeat_penalty 1.1 (she loops catchphrases without it), num_predict
+  150 as a hard ceiling so one rambling turn can't stall the robot.
+- The Modelfile adds `stop "User:"` -- Directive 4 (NO PUPPETEERING)
+  is a prompt rule, and a 3B respects it far more reliably when it's
+  also enforced at the decoder.
+- If Ollama is unreachable the robot still boots, prints why, and
+  falls back to the echo stub. A mid-conversation dropout gets an
+  in-character line rather than a freeze.
+
+yuzu_prompt_eval.py is the part worth actually using. It runs 12
+adversarial prompts x N repeats through the real model and scores
+every rule in the system prompt that a machine can check: always
+speaks, brackets never asterisks, balanced brackets, actions the body
+can perform, one action per bracket, never writes the user's turn, no
+generic-assistant phrasing. It also tallies which action phrasings the
+whitelist dropped, which is how ACTION_ALIASES gets extended.
+
+The test prompts deliberately include the known failure cases: "Do a
+stretch" (the all-actions-no-dialogue reply that looked like a freeze)
+and "Wave at me!" / "Give me a high five!" (bait for body parts the
+chassis doesn't have).
+
+This turns prompt tuning into measurement. Change one thing, re-run,
+compare the numbers. It also means the prompt can be finished on a
+laptop BEFORE the $400 Jetson purchase.
+
+======================================================================
 ## 10. WHAT'S LEFT / NEXT STEPS
 ======================================================================
 1. Buy the Jetson Orin Nano Super (~$400 of the ~$450 budget).
 2. Flash JetPack OS (Steam Deck as the flashing workstation).
-3. Install Ollama, pull the 3B Heretic model, verify real inference
-   speed. Then replace ask_yuzu_brain() -- it is a one-function swap.
+3. DONE, pending hardware: ask_yuzu_brain() is real. Remaining is
+   sourcing the actual Heretic weights. The repo appears to be
+   DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored (the
+   "ablitered" misspelling is in the real repo name). UNVERIFIED: it
+   looks like safetensors rather than GGUF, which would mean either
+   finding a GGUF mirror (mradermacher/bartowski quantize many of
+   DavidAU's models) or converting with llama.cpp. Both paths are in
+   JETSON_SETUP.md. Prove the pipeline on stock llama3.2:3b first --
+   it separates "my setup works" from "my model works".
+3b. Run yuzu_prompt_eval.py on a PC and tune the prompt to a number
+   before buying anything.
 4. Install and test Piper TTS + Whisper independently before wiring
    them together. Watch the 8GB memory pool: Whisper + 3B LLM + Piper
    is three things sharing it. Piper needs BOTH files per voice
@@ -322,11 +385,12 @@ nothing crashes. So yuzu_all_in_one.py still runs alone in Pydroid.
    job rather than a blank file. Check Yahboom's own Muto S2 example
    code first in case they ship a working gait to compare against.
 6. Write the camera gimbal wrapper; wire the look_* actions to it.
-7. Decide whether `eye_matrix` is a real planned accessory. It is
-   still an unconfirmed addition that may have drifted in from a lost
-   chat session. If it isn't real, delete the zone from the config --
-   nothing else needs to change, the LED manager reads whatever zones
-   the config lists.
+7. RESOLVED: `eye_matrix` is gone. It was never part of this build --
+   the Muto S2 has no face and no display. It almost certainly drifted
+   in from the face-display lineage (the original Stackchan had a face
+   screen, and Saya's quadruped spec has a 128x64 OLED pixel face).
+   Ghost confirmed it wasn't intentional. Zones are now underglow and
+   leg_accents only.
 8. Swap LEDManager's print for a real driver by passing
    `hardware=` to the constructor. Nothing else needs touching.
 9. Painting (Ghost's dad) comes after chassis purchase -- see

@@ -7,22 +7,48 @@ LLM, local TTS, no cloud.
 Neon lime-green chassis, hot-pink leg struts, pink underglow. Cyberpunk
 watermelon.
 
+**Status:** brain works today on any PC. Chassis and LEDs are later.
+
 ## Try it right now (no hardware needed)
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 31 tests, ~2 seconds
+python test_yuzu.py           # 48 tests, ~3 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
 
-All stdlib. No pip installs. Runs in Pydroid on a phone.
+All stdlib. No pip installs, not even for Ollama. Runs in Pydroid on a phone.
+
+## Getting the brain running
+
+Full runbook in **[JETSON_SETUP.md](JETSON_SETUP.md)**. Short version,
+on any PC — no Jetson needed:
+
+```
+ollama pull llama3.2:3b
+python build_yuzu_model.py --create    # bake the persona into a model
+python yuzu_brain.py --chat            # talk to her
+python yuzu_prompt_eval.py --runs 3    # score how well she follows the prompt
+```
+
+The eval is the important one. It runs 12 prompts through the real
+model and scores every mechanically-checkable rule in the system
+prompt — does she always speak, brackets never asterisks, are her
+actions ones this body can do, does she write your lines. Change one
+thing, re-run, compare. Tune the prompt on a laptop before spending
+$400.
 
 ## What's here
 
 | File | What it does |
 |---|---|
 | `yuzu_all_in_one.py` | Reply pipeline + main loop. **Start here.** |
+| `yuzu_brain.py` | Ollama client. Stdlib only, streaming, history |
+| `yuzu_system_prompt.txt` | Yuzu's personality. The only copy |
+| `build_yuzu_model.py` | Generates `Modelfile.yuzu` from that prompt |
+| `yuzu_prompt_eval.py` | Scores prompt compliance against the model |
+| `JETSON_SETUP.md` | Setup runbook, PC and Jetson |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_led_manager.py` | The one LED config loader (zones + states) |
 | `yuzu_led_controller.py` | Zone dump, front-end over `LEDManager` |
@@ -38,7 +64,7 @@ All stdlib. No pip installs. Runs in Pydroid on a phone.
 ```
 mic -> listen_and_transcribe()      [STUB: swap in Whisper]
     -> LED "thinking"
-    -> ask_yuzu_brain()             [STUB: swap in Ollama]
+    -> ask_yuzu_brain()             REAL: yuzu_brain.py -> Ollama
     -> normalize_actions()          stray *asterisks* -> [brackets]
     -> split_reply()                ordered speech/action parts
          speech -> LED "speaking" -> speak()   [STUB: swap in Piper]
@@ -46,7 +72,8 @@ mic -> listen_and_transcribe()      [STUB: swap in Whisper]
     -> LED "idle"
 ```
 
-Three STUBs are the only fake parts. Everything between them is real.
+Two STUBs left: mic in, audio out. The brain is real. If Ollama isn't
+running, the loop still boots and says so instead of crashing.
 
 ## The action whitelist
 

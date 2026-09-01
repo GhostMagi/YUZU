@@ -43,8 +43,8 @@ it survives independently of any one chat.
 - planned audio pipeline: Whisper (STT) + Piper (TTS), both fully offline; considering a sub-$25 USB conference speaker/mic puck
 - official project designation: "Yuzu-Spider-V1"; budget cap ~$450 total, Jetson targeted ~$400
 - Steam Deck (Desktop Mode) will serve as the primary flashing/debugging/SSH workstation
-- Yuzu's LED setup uses 3 zones (underglow, eye_matrix, leg_accents) — eye_matrix's cyan color is still an unconfirmed addition
-- known open item: readtest.py hardcodes a Pydroid-specific file path that needs to be made portable before running on the Jetson
+- Yuzu's LED setup uses 2 zones (underglow, leg_accents) — an `eye_matrix` zone had drifted in from the face-display lineage (Stackchan/Saya OLED face) and was removed; the Muto S2 has no face
+- RESOLVED: readtest.py's Pydroid-specific hardcoded path is fixed; it and every other script now resolve the config relative to their own file
 
 ## Yuzu's Final Live System Prompt (verbatim)
 

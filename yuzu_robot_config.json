@@ -6,11 +6,6 @@
             "effect": "neon_pulse",
             "brightness": 90
         },
-        "eye_matrix": {
-            "color": "#00FFFF",
-            "effect": "static",
-            "brightness": 100
-        },
         "leg_accents": {
             "color": "#FF007F",
             "effect": "chase",

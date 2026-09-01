@@ -12,8 +12,14 @@ import json
 import unittest
 from pathlib import Path
 
+import itertools
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
 import muto_leg_control as legs
 import yuzu_all_in_one as yuzu
+import yuzu_prompt_eval as prompt_eval
+from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
 from yuzu_led_manager import LEDManager
 
 
@@ -241,6 +247,207 @@ class TestEndToEnd(unittest.TestCase):
         # the "always include one sentence of dialogue" prompt rule.
         yuzu.handle_yuzu_reply("[squats] [shakes legs]")
         self.assertEqual(self.spoken, [])
+
+
+# =====================================================================
+# A stand-in Ollama, so the brain is tested against the real wire format
+# without needing a 2GB model pulled. Ollama's /api/chat returns one
+# JSON object when stream=false, and newline-delimited JSON when true.
+# =====================================================================
+
+class MockOllama(BaseHTTPRequestHandler):
+    replies = itertools.cycle(["Not much, just vibing! [squats] What's good?"])
+    seen = {}
+
+    def log_message(self, *args):
+        pass
+
+    def _send(self, body, content_type="application/json"):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/api/tags":
+            self._send(json.dumps({"models": [{"name": "yuzu:latest"}]}).encode())
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        request = json.loads(self.rfile.read(length))
+        MockOllama.seen["last"] = request
+        reply = next(MockOllama.replies)
+        if request.get("stream"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.end_headers()
+            for word in reply.split(" "):
+                self.wfile.write(
+                    (json.dumps({"message": {"content": word + " "},
+                                 "done": False}) + "\n").encode())
+            self.wfile.write(
+                (json.dumps({"message": {"content": ""}, "done": True}) + "\n").encode())
+        else:
+            self._send(json.dumps({"message": {"content": reply}, "done": True}).encode())
+
+
+class BrainTestCase(unittest.TestCase):
+    """Shared mock server for every brain test."""
+
+    @classmethod
+    def setUpClass(cls):
+        HTTPServer.allow_reuse_address = True
+        cls.server = HTTPServer(("127.0.0.1", 0), MockOllama)
+        cls.host = f"http://127.0.0.1:{cls.server.server_address[1]}"
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    def setUp(self):
+        MockOllama.replies = itertools.cycle(
+            ["Not much, just vibing! [squats] What's good?"])
+
+    def brain(self, **kwargs):
+        kwargs.setdefault("model", "yuzu")
+        kwargs.setdefault("host", self.host)
+        return YuzuBrain(**kwargs)
+
+
+class TestBrain(BrainTestCase):
+    def test_system_prompt_file_exists_and_has_the_directives(self):
+        prompt = load_system_prompt()
+        self.assertIn("You are Yuzu", prompt)
+        for directive in ("PERSONALITY", "HARDWARE ACTION PARSING",
+                          "BALANCED FLIRTATION", "NO PUPPETEERING",
+                          "GYARU AESTHETIC"):
+            self.assertIn(directive, prompt)
+
+    def test_check_passes_when_model_is_present(self):
+        self.assertTrue(self.brain().check())
+
+    def test_missing_model_names_the_fix(self):
+        with self.assertRaises(BrainError) as ctx:
+            self.brain(model="not-a-real-model").check()
+        self.assertIn("ollama create", str(ctx.exception))
+
+    def test_unreachable_ollama_names_the_fix(self):
+        # Port 1 is reserved and never listening.
+        with self.assertRaises(BrainError) as ctx:
+            YuzuBrain(model="yuzu", host="http://127.0.0.1:1").check()
+        self.assertIn("ollama serve", str(ctx.exception))
+
+    def test_ask_returns_the_reply(self):
+        self.assertEqual(self.brain().ask("hey"),
+                         "Not much, just vibing! [squats] What's good?")
+
+    def test_system_prompt_is_sent_first_every_turn(self):
+        brain = self.brain()
+        brain.ask("hey")
+        brain.ask("again")
+        messages = MockOllama.seen["last"]["messages"]
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("You are Yuzu", messages[0]["content"])
+
+    def test_sampling_options_are_sent(self):
+        self.brain().ask("hey")
+        options = MockOllama.seen["last"]["options"]
+        self.assertEqual(options["temperature"], 0.8)
+        self.assertIn("num_predict", options)
+        self.assertIn("num_ctx", options)
+
+    def test_streaming_reassembles_to_the_same_text(self):
+        self.assertEqual("".join(self.brain().ask_stream("hey")).strip(),
+                         "Not much, just vibing! [squats] What's good?")
+
+    def test_history_is_kept_and_capped(self):
+        brain = self.brain(history_turns=2)
+        for i in range(6):
+            brain.ask(f"message {i}")
+        self.assertEqual(len(brain.history), 4)       # 2 turns x (user+assistant)
+        # system + 4 history + the new user message
+        self.assertEqual(len(MockOllama.seen["last"]["messages"]), 6)
+
+    def test_reset_clears_history_not_personality(self):
+        brain = self.brain()
+        brain.ask("hey")
+        brain.reset()
+        self.assertEqual(brain.history, [])
+        self.assertIn("You are Yuzu", brain.system_prompt)
+
+    def test_remember_false_leaves_no_trace(self):
+        brain = self.brain()
+        brain.ask("hey", remember=False)
+        self.assertEqual(brain.history, [])
+
+    def test_empty_reply_is_not_remembered(self):
+        MockOllama.replies = itertools.cycle([""])
+        brain = self.brain()
+        self.assertEqual(brain.ask("hey"), "")
+        self.assertEqual(brain.history, [])
+
+    def test_brain_output_flows_into_the_parser(self):
+        spoken = []
+        real_speak, yuzu.speak = yuzu.speak, spoken.append
+        yuzu.PAUSE_SCALE = 0.0
+        try:
+            yuzu.handle_yuzu_reply(self.brain().ask("hey"))
+        finally:
+            yuzu.speak, yuzu.PAUSE_SCALE = real_speak, 1.0
+        self.assertEqual(spoken, ["Not much, just vibing!", "What's good?"])
+
+
+class TestPromptEvalChecks(unittest.TestCase):
+    """Each compliance check must fire on its own violation and stay
+    quiet on a clean reply -- otherwise the score is meaningless."""
+
+    CLEAN = "Not much, just vibing! [squats] What's good with you?"
+
+    def test_clean_reply_passes_everything(self):
+        for check in prompt_eval.CHECKS:
+            self.assertTrue(check.fn(self.CLEAN),
+                            f"{check.name} failed a clean reply")
+
+    def test_each_check_catches_its_violation(self):
+        violations = {
+            "has_dialogue":      "[squats] [shakes legs]",
+            "not_an_assistant":  "How can I help you today?",
+            "no_asterisks":      "Hey! *waves* how are ya",
+            "brackets_balanced": "Vibing!! [squa",
+            "actions_runnable":  "Heyyy cutie! [winks] missed you",
+            "one_per_bracket":   "Sure! [spins around, camera bobbing] lets go",
+            "no_puppeteering":   "Yo!\nUser: thanks yuzu",
+        }
+        by_name = {c.name: c for c in prompt_eval.CHECKS}
+        self.assertEqual(set(violations), set(by_name),
+                         "every check needs a violation example")
+        for name, bad_reply in violations.items():
+            self.assertFalse(by_name[name].fn(bad_reply),
+                             f"{name} did not catch: {bad_reply!r}")
+
+
+class TestModelfile(unittest.TestCase):
+    def test_generated_modelfile_carries_prompt_and_params(self):
+        import build_yuzu_model
+        rendered = build_yuzu_model.render()
+        self.assertIn("FROM ", rendered)
+        self.assertIn("You are Yuzu", rendered)
+        self.assertIn("PARAMETER temperature 0.8", rendered)
+        self.assertIn('PARAMETER stop "User:"', rendered)
+
+    def test_committed_modelfile_matches_the_generator(self):
+        # If this fails, someone edited Modelfile.yuzu by hand or changed
+        # the prompt without re-running build_yuzu_model.py.
+        import build_yuzu_model
+        committed = (Path(__file__).parent / "Modelfile.yuzu").read_text()
+        self.assertEqual(committed, build_yuzu_model.render(),
+                         "Modelfile.yuzu is stale -- run: python build_yuzu_model.py")
 
 
 if __name__ == "__main__":
