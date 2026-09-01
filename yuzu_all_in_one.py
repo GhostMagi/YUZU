@@ -186,11 +186,22 @@ def _stem_word(word: str) -> str:
     return w
 
 
+# Words the model sprinkles onto real actions as flourish. Observed in
+# live PocketPal output: "[hugs, squeeze, and a little spin]" is a spin
+# wearing decoration. Stripping these turns near-misses into matches.
+_FILLER = {
+    'the', 'a', 'an', 'her', 'his', 'its', 'and', 'then',
+    'little', 'big', 'quick', 'quickly', 'slow', 'slowly',
+    'soft', 'softly', 'gentle', 'gently', 'cute', 'cutely',
+    'happy', 'happily', 'excited', 'excitedly', 'playful', 'playfully',
+}
+
+
 def _stem_phrase(phrase: str) -> str:
     """Normalize an action phrase for whitelist lookup: lowercase, drop
     punctuation and filler words, stem each remaining word."""
     cleaned = re.sub(r'[^\w\s]', ' ', phrase.lower())
-    words = [w for w in cleaned.split() if w not in ('the', 'a', 'an', 'her', 'his', 'its')]
+    words = [w for w in cleaned.split() if w not in _FILLER]
     return ' '.join(_stem_word(w) for w in words)
 
 
@@ -209,6 +220,26 @@ def lookup_action(action_text: str):
     return _STEMMED_WHITELIST.get(key) or _STEMMED_ALIASES.get(key)
 
 
+def lookup_actions(action_text: str) -> list:
+    """Every runnable action inside one bracket, in order.
+
+    The prompt says one action per bracket. Live output disagrees --
+    "[hugs, squeeze, and a little spin]" turned up in real testing, and
+    treating that as a single unknown phrase threw away a spin the robot
+    could actually do. So on a whole-phrase miss, split the bracket on
+    commas / "and" / "then" and keep whatever parts are real.
+
+    The whitelist still gates every part, so the impossible halves
+    ("hugs", "squeeze") are dropped exactly as before -- this only ever
+    recovers motion that was already allowed, never invents any.
+    """
+    whole = lookup_action(action_text)
+    if whole:
+        return [whole]
+    parts = re.split(r',|\band\b|\bthen\b|\[', action_text)
+    return [match for match in (lookup_action(p) for p in parts if p.strip()) if match]
+
+
 # Multiplier on every post-action settle pause. 1.0 is the tuned
 # default; raise it if moves are still finishing when the next one
 # fires, drop it toward 0 to make testing instant.
@@ -216,14 +247,15 @@ PAUSE_SCALE = 1.0
 
 
 def run_action(action_text: str) -> bool:
-    """Run one action. Returns whether it matched."""
-    match = lookup_action(action_text)
-    if not match:
+    """Run everything runnable in one bracket. Returns whether anything
+    matched."""
+    matches = lookup_actions(action_text)
+    if not matches:
         print(f"ROBOT: no match for action '{action_text}' (ignored)")
         return False
-    func, pause_seconds = match
-    func()
-    time.sleep(pause_seconds * PAUSE_SCALE)
+    for func, pause_seconds in matches:
+        func()
+        time.sleep(pause_seconds * PAUSE_SCALE)
     return True
 
 

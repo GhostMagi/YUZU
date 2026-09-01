@@ -13,6 +13,7 @@ import unittest
 from pathlib import Path
 
 import itertools
+import re
 import shutil
 import struct
 import sys
@@ -695,6 +696,112 @@ class TestPersonas(unittest.TestCase):
                     yuzu_personas.scaffold("saki")      # no silent overwrite
             finally:
                 yuzu_personas.PERSONA_DIR = real
+
+
+# Real replies captured from Llama-3.2-3B-heretic in PocketPal. Actual
+# model output beats invented test cases -- every one of these broke a
+# rule the prompt states explicitly.
+LIVE_REPLIES = {
+    "multi_action_bracket":
+        "Awwwwww, that's so sweet of you! [hugs, squeeze, and a little spin] "
+        "My OG granddad is gonna make me come to life and I'm SUPER stoked!",
+    "nested_unclosed_brackets":
+        "[Bounces up and down, [taps hands on thighs, then [shakes hips, and "
+        "[springs up, landing softly]",
+    "impossible_body_parts":
+        "[Smizes] Hiya, cutie! I'm Yuzu! [winks] I'm a Gyaru! [giggles] "
+        "I love fashion!",
+}
+
+
+class TestRealModelOutput(unittest.TestCase):
+    """Whatever the model does, the robot must stay safe and sane."""
+
+    def spoken(self, raw):
+        return yuzu.strip_actions(yuzu.normalize_actions(raw))
+
+    def test_speech_survives_a_mangled_bracket(self):
+        said = self.spoken(LIVE_REPLIES["multi_action_bracket"])
+        self.assertIn("that's so sweet of you", said)
+        self.assertNotIn("[", said)
+        self.assertNotIn("hugs", said)
+
+    def test_multi_action_bracket_recovers_the_real_action(self):
+        # "[hugs, squeeze, and a little spin]" is a spin wearing
+        # decoration. Dropping the whole bracket threw the spin away.
+        actions = yuzu.extract_actions(LIVE_REPLIES["multi_action_bracket"])
+        self.assertEqual(len(actions), 1)
+        matches = yuzu.lookup_actions(actions[0])
+        self.assertEqual(len(matches), 1, "should recover exactly the spin")
+        self.assertIs(matches[0][0], yuzu.ACTION_WHITELIST["spin"][0])
+
+    def test_impossible_halves_are_still_dropped(self):
+        # Splitting must never let an impossible action through.
+        for phrase in ("hugs", "squeeze", "taps hands on thighs",
+                       "shakes hips", "smizes", "winks", "giggles"):
+            self.assertEqual(yuzu.lookup_actions(phrase), [],
+                             f"'{phrase}' must not run on a body without one")
+
+    def test_nested_brackets_never_reach_tts(self):
+        said = self.spoken(LIVE_REPLIES["nested_unclosed_brackets"])
+        self.assertNotIn("[", said)
+        self.assertEqual(said, "", "this reply genuinely has no dialogue")
+
+    def test_nested_brackets_run_nothing(self):
+        raw = LIVE_REPLIES["nested_unclosed_brackets"]
+        for action in yuzu.extract_actions(yuzu.normalize_actions(raw)):
+            self.assertEqual(yuzu.lookup_actions(action), [])
+
+    def test_no_live_reply_crashes_the_pipeline(self):
+        spoken = []
+        real, yuzu.speak = yuzu.speak, spoken.append
+        yuzu.PAUSE_SCALE = 0.0
+        try:
+            for raw in LIVE_REPLIES.values():
+                yuzu.handle_yuzu_reply(raw)
+        finally:
+            yuzu.speak, yuzu.PAUSE_SCALE = real, 1.0
+        self.assertTrue(any("Yuzu" in s or "sweet" in s for s in spoken))
+
+
+class TestHardwareBlocks(unittest.TestCase):
+    def test_a_bracket_line_is_not_mistaken_for_a_section_header(self):
+        # REGRESSION: the action menu line starts with '[' and ends with
+        # ']', so a loose header check swallowed the entire menu and
+        # produced a prompt that never told the model what it could do.
+        blocks = yuzu_personas._parse_hardware("muto_s2")
+        self.assertIn("HARDWARE_MENU", blocks)
+        self.assertIn("[walks forward]", blocks["HARDWARE_MENU"])
+        self.assertIn("[centers camera]", blocks["HARDWARE_MENU"])
+        self.assertNotIn("walks forward] [walks backward", " ".join(blocks))
+
+    def test_every_action_offered_to_the_model_actually_runs(self):
+        """A prompt that offers a move the whitelist drops produces a
+        robot that ignores its own advertised abilities."""
+        for key in yuzu_personas.available():
+            prompt = yuzu_personas.load(key).prompt
+            for line in prompt.splitlines():
+                # "Wrong: [winks]" deliberately shows an invalid action,
+                # so those lines are exempt from this check. (Whether
+                # naming it there is a good idea at all is a separate
+                # question -- see test_v2_does_not_name_forbidden_actions.)
+                if "wrong:" in line.lower():
+                    continue
+                for phrase in set(re.findall(r'\[([a-z][a-z ]*)\]', line)):
+                    self.assertTrue(yuzu.lookup_actions(phrase),
+                                    f"{key}: prompt offers [{phrase}] but "
+                                    f"nothing runs it")
+
+    def test_v2_does_not_name_forbidden_actions(self):
+        """The pink-elephant check. v1 contains the literal string
+        "[winks]" as a Wrong: example, and [winks] is the single most
+        repeated violation in live logs. Naming a forbidden token
+        demonstrates it. v2 names no action it doesn't want back."""
+        prompt = yuzu_personas.load("yuzu2").prompt
+        for forbidden in ("[winks]", "[waves]", "[hugs]", "[giggles]",
+                          "[smizes]", "[nods]"):
+            self.assertNotIn(forbidden, prompt.lower(),
+                             f"v2 demonstrates {forbidden} to the model")
 
 
 class TestPersonaWiring(BrainTestCase):

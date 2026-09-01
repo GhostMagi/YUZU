@@ -37,6 +37,7 @@ Everything above `---` is settings, everything below is the prompt.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -103,15 +104,23 @@ def _parse_hardware(name):
             f"  Available: {', '.join(available) or '(none)'}\n"
             f"  Fix the 'hardware:' line in the persona, or add that file."
         )
+    # A section header is a bare [UPPER_SNAKE] line and nothing else.
+    # This has to be strict: an action menu line reads
+    #     [walks forward] [walks backward] ... [spins]
+    # which also starts with '[' and ends with ']'. A loose check
+    # swallowed the whole menu as a header and silently dropped the
+    # body's action list from the composed prompt -- a prompt that looks
+    # fine and quietly tells the model nothing about what it can do.
+    header = re.compile(r'^\[([A-Z][A-Z0-9_]*)\]$')
     blocks, current = {}, None
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("#") and current is None:
             continue
-        stripped = line.strip()
-        if stripped.startswith("[") and stripped.endswith("]"):
-            current = stripped[1:-1]
+        match = header.match(line.strip())
+        if match:
+            current = match.group(1)
             blocks[current] = []
-        elif current:
+        elif current is not None:
             blocks[current].append(line)
     return {k: "\n".join(v).strip() for k, v in blocks.items()}
 
