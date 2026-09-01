@@ -197,6 +197,17 @@ to bound what she can **do** — six legs, a camera, no hands. Bounding
 what she can **know, want, or picture** is not a servo fact, and it cost
 the gyaru the thing that made her fun.
 
+Two halves of that fix carry very different risk, so they're placed
+differently:
+
+- **What she wants and knows** — Berlin, the mall, snow. Zero action
+  risk: no want can produce a bracket. This lives in the rules at full
+  strength, and it's the half that actually fixes the dodge.
+- **What she looks like** — hair, lashes, nails. This is where the risk
+  is, because it's one token from `[flips hair]`. It lives only in a
+  worked example, never in a rule — the same position rule that made
+  the hug example work and the "never wink" rule backfire.
+
 Now: she's a person driving a chassis. She knows exactly what she is and
 won't claim arms she hasn't got, but she has a self, a look she pictures
 herself with, and places she'd like to go. Movement is still whitelisted

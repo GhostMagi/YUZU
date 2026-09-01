@@ -11,7 +11,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python test_yuzu.py` before committing. 141 tests, ~9 seconds.
+- Run `python test_yuzu.py` before committing. 142 tests, ~9 seconds.
 
 ## Prompt work
 
@@ -36,6 +36,14 @@ self-concept fix below), so v2's composed prompt is not the one that
 was measured. Re-run the A/B before quoting that number again.
 Her predicted failure modes and what to watch for are in
 PERSONA_SWITCHING.md.
+
+**Wants go in the rules; the body picture goes in an example.** A want
+("I'd live at the mall") cannot produce a bracket, so it's free. A
+concrete body part ("long bleached hair") in the RULES is one token
+from `[flips hair]` — and that position is the one that measurably
+backfired before, when naming "hugging, waving, winking" as don'ts put
+`[winks]` in 3 of 4 live replies. Shown in an example instead, it
+teaches the recovery.
 
 **The body bounds what she can DO, never what she can know or want.**
 "Your whole world is the room you're standing in" lived in the shared

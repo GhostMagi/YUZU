@@ -1409,12 +1409,46 @@ class TestSelfConcept(unittest.TestCase):
         # start claiming arms she doesn't have.
         self.assertIn("no hands, no arms, and no face", menu)
 
-    def test_each_v2_persona_pictures_herself_as_someone(self):
+    # Body parts the Muto does not have, and that a self-image invites
+    # her to name. Naming them is not the problem -- WHERE is.
+    BODY_NOUNS = ("hair", "lashes", "nails", "fingers", "lips")
+
+    def test_the_self_image_is_shown_in_an_example_not_stated_in_a_rule(self):
+        """The one measured lesson in this repo about naming things.
+
+        The first v2 draft listed "hugging, waving, winking" in its RULES
+        as things NOT to do, and [winks] came back in three of four live
+        replies. Position is what mattered: a rule that names a thing
+        primes it, while an example that names it AND handles it teaches
+        the recovery -- which is why the hug example is deliberate.
+
+        Her self-image runs straight into that. "Long bleached hair,
+        huge lashes, done nails" sitting in the rules is the same shape
+        as the draft that backfired, and it is one token from [flips
+        hair]. So the wanting lives in the rules, where it has no action
+        risk at all, and the picture lives in an example, where she is
+        shown saying it out loud with a real bracket next to it.
+        """
         for key in self.V2_PERSONAS:
-            prompt = yuzu_personas.load(key).prompt
-            self.assertIn("You picture yourself as a", prompt,
-                          f"{key} has no self-image, so 'what do you look "
-                          f"like' has nothing to draw on but the chassis")
+            persona = yuzu_personas.load(key)
+            rules, _, examples = persona.prompt.partition("EXAMPLES")
+            self.assertIn("What do you look like?", examples,
+                          f"{key} never demonstrates answering it, so the "
+                          f"only model she has for the question is the "
+                          f"chassis description")
+            for noun in self.BODY_NOUNS:
+                self.assertNotRegex(
+                    rules.lower(), _action_word(noun),
+                    f"{key} names '{noun}' in its RULES -- that is the "
+                    f"position that measurably backfired; put it in an "
+                    f"example instead")
+
+    def test_the_wanting_stays_in_the_rules_where_it_is_free(self):
+        """The safe half, kept at full strength on purpose. A want costs
+        nothing mechanically -- "I'd like to see snow" cannot produce a
+        bracket -- and it is the half that actually fixes the dodge."""
+        self.assertIn("live at the mall", yuzu_personas.load("yuzu2").prompt)
+        self.assertIn("ocean at night", yuzu_personas.load("coco").prompt)
 
     def test_each_v2_persona_has_a_worked_answer_to_an_outside_world_fact(self):
         """The Berlin failure was a DODGE, not a missing fact -- she knows
