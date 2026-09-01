@@ -99,10 +99,32 @@ python build_yuzu_model.py --base ./yuzu-Q4_K_M.gguf --create
 python yuzu_prompt_eval.py --runs 3          # compare to stock's score
 ```
 
-If she comes out sounding scrambled after conversion, suspect the chat
-template — Ollama reads it from GGUF metadata, and converted models
-sometimes lose it. Add an explicit `TEMPLATE` block for Llama 3.2 to
-the Modelfile generator if so.
+Before building a model from any GGUF you didn't produce yourself,
+check its header:
+
+```bash
+python gguf_inspect.py yuzu-Q4_K_M.gguf
+python gguf_inspect.py yuzu-Q4_K_M.gguf --template    # print it in full
+python gguf_inspect.py yuzu-Q4_K_M.gguf --json        # paste-friendly
+```
+
+It reads only the front of the file, so it's instant even on a 20GB
+model, and it answers the question that actually causes trouble: is a
+**chat template** present, and does it handle a system role?
+
+This matters more than it sounds. Ollama reads the template out of GGUF
+metadata. If it's missing or wrong, the model still loads and still
+generates — it just ignores the system prompt, or starts writing your
+turn as well as hers. That looks exactly like a bad persona prompt, and
+isn't. If `gguf_inspect` flags it, add an explicit Llama 3.2 `TEMPLATE`
+block to the Modelfile rather than rewriting the prompt.
+
+Cross-check what Ollama actually ended up with:
+
+```bash
+ollama show yuzu --template
+ollama show yuzu --system
+```
 
 Q4_K_M is the right quant: ~2GB, and a 3B is small enough that heavier
 quantization starts costing real coherence.
@@ -189,7 +211,8 @@ in the json; lower is faster. 0.85–0.9 suits the gyaru energy.
 |---|---|
 | `Can't reach Ollama` | `ollama serve` not running, or `OLLAMA_HOST` wrong |
 | `no model named 'yuzu'` | `python build_yuzu_model.py --create` |
-| She sounds like ChatGPT | `not_an_assistant` in the eval; check SYSTEM survived `ollama create` with `ollama show yuzu --system` |
+| She sounds like ChatGPT | Run `gguf_inspect.py` on the model — a template that drops the system role is the usual cause. Then check `ollama show yuzu --system` |
+| `Not a GGUF file` | You got an LFS pointer or an HTML error page, not the model. Re-download |
 | Actions do nothing | Run the eval — `actions_runnable` shows exactly which phrasings got dropped |
 | Replies too long, TTS drags | Lower `num_predict` in `yuzu_brain.py`, rebuild the Modelfile |
 | She writes your lines | `no_puppeteering`; the `stop` params in the Modelfile catch most of it |

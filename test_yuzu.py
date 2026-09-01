@@ -13,11 +13,14 @@ import unittest
 from pathlib import Path
 
 import itertools
+import struct
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import muto_leg_control as legs
 import yuzu_all_in_one as yuzu
+import gguf_inspect
 import yuzu_prompt_eval as prompt_eval
 from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
 from yuzu_led_manager import LEDManager
@@ -430,6 +433,152 @@ class TestPromptEvalChecks(unittest.TestCase):
         for name, bad_reply in violations.items():
             self.assertFalse(by_name[name].fn(bad_reply),
                              f"{name} did not catch: {bad_reply!r}")
+
+
+# ---------------------------------------------------------------------
+# A synthetic GGUF, so the header parser is tested without a 2GB file.
+# ---------------------------------------------------------------------
+
+LLAMA32_TEMPLATE = (
+    "{{- bos_token }}\n{%- for message in messages %}\n"
+    "{{- '<|start_header_id|>' + message['role'] + '<|end_header_id|>' "
+    "+ message['content'] + '<|eot_id|>' }}\n{%- endfor %}"
+)
+
+
+def _gguf_string(text):
+    raw = text.encode()
+    return struct.pack("<Q", len(raw)) + raw
+
+
+def build_gguf(path, template=LLAMA32_TEMPLATE, magic=b"GGUF"):
+    """Minimal but structurally valid GGUF: header + metadata + padding."""
+    def kv_str(key, value):
+        return _gguf_string(key) + struct.pack("<I", 8) + _gguf_string(value)
+
+    def kv_u32(key, value):
+        return _gguf_string(key) + struct.pack("<I", 4) + struct.pack("<I", value)
+
+    def kv_arr_str(key, items):
+        body = struct.pack("<I", 8) + struct.pack("<Q", len(items))
+        body += b"".join(_gguf_string(i) for i in items)
+        return _gguf_string(key) + struct.pack("<I", 9) + body
+
+    kvs = [
+        kv_str("general.architecture", "llama"),
+        kv_str("general.name", "Llama 3.2 3B Instruct heretic ablitered"),
+        kv_u32("general.file_type", 15),                  # Q4_K_M
+        kv_u32("llama.context_length", 131072),
+        kv_u32("llama.block_count", 28),
+        kv_str("tokenizer.ggml.model", "gpt2"),
+        kv_arr_str("tokenizer.ggml.tokens", [f"t{i}" for i in range(64)]),
+        kv_u32("tokenizer.ggml.bos_token_id", 128000),
+        kv_u32("tokenizer.ggml.eos_token_id", 128009),
+    ]
+    if template is not None:
+        kvs.append(kv_str("tokenizer.chat_template", template))
+
+    header = magic + struct.pack("<I", 3) + struct.pack("<Q", 255)
+    header += struct.pack("<Q", len(kvs))
+    Path(path).write_bytes(header + b"".join(kvs) + b"\x00" * 4096)
+
+
+class TestGGUFInspect(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.dir.name) / "model.gguf"
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_reads_metadata_without_reading_the_weights(self):
+        build_gguf(self.path)
+        info = gguf_inspect.read_metadata(self.path)
+        meta = info["meta"]
+        self.assertEqual(info["version"], 3)
+        self.assertEqual(info["tensor_count"], 255)
+        self.assertEqual(meta["general.architecture"], "llama")
+        self.assertEqual(meta["llama.context_length"], 131072)
+        self.assertEqual(meta["tokenizer.ggml.eos_token_id"], 128009)
+
+    def test_quantization_is_named_not_just_numbered(self):
+        build_gguf(self.path)
+        ftype = gguf_inspect.read_metadata(self.path)["meta"]["general.file_type"]
+        self.assertEqual(gguf_inspect.FILE_TYPES[ftype], "Q4_K_M")
+
+    def test_long_arrays_are_sampled_not_held_whole(self):
+        build_gguf(self.path)
+        tokens = gguf_inspect.read_metadata(self.path)["meta"]["tokenizer.ggml.tokens"]
+        self.assertEqual(tokens["count"], 64)
+        self.assertLessEqual(len(tokens["sample"]), 8)
+
+    def test_chat_template_round_trips(self):
+        build_gguf(self.path)
+        meta = gguf_inspect.read_metadata(self.path)["meta"]
+        self.assertEqual(meta["tokenizer.chat_template"], LLAMA32_TEMPLATE)
+
+    def test_missing_template_is_detectable(self):
+        build_gguf(self.path, template=None)
+        meta = gguf_inspect.read_metadata(self.path)["meta"]
+        self.assertNotIn("tokenizer.chat_template", meta)
+
+    def test_a_non_gguf_file_says_so_clearly(self):
+        # What you get when a download returns an HTML error or an LFS
+        # pointer instead of the model.
+        self.path.write_bytes(b"<html>404</html>" + b"\x00" * 200)
+        with self.assertRaises(gguf_inspect.GGUFError) as ctx:
+            gguf_inspect.read_metadata(self.path)
+        self.assertIn("Not a GGUF", str(ctx.exception))
+
+    def test_a_truncated_file_says_so_clearly(self):
+        build_gguf(self.path)
+        head = self.path.read_bytes()[:120]
+        self.path.write_bytes(head)
+        with self.assertRaises(gguf_inspect.GGUFError) as ctx:
+            gguf_inspect.read_metadata(self.path)
+        self.assertIn("truncated", str(ctx.exception).lower())
+
+    def test_report_runs_on_every_shape(self):
+        import contextlib
+        import io
+        for template in (LLAMA32_TEMPLATE, None,
+                         "{% for m in messages %}[INST]{{m.content}}[/INST]{% endfor %}"):
+            build_gguf(self.path, template=template)
+            info = gguf_inspect.read_metadata(self.path)
+            with contextlib.redirect_stdout(io.StringIO()):
+                gguf_inspect.report(self.path, info, show_template=True, show_all=True)
+
+
+class TestChatTemplateHeuristic(unittest.TestCase):
+    """The system-role check must not cry wolf on Llama 3.2's stock
+    template, which handles system fine but never says the word."""
+
+    def verdict(self, template):
+        import contextlib
+        import io
+        path = Path(tempfile.mkdtemp()) / "m.gguf"
+        build_gguf(path, template=template)
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            gguf_inspect.report(path, gguf_inspect.read_metadata(path))
+        return buffer.getvalue()
+
+    def test_generic_role_loop_counts_as_handling_system(self):
+        out = self.verdict(LLAMA32_TEMPLATE)
+        self.assertIn("handles a system role: yes", out)
+        self.assertIn("llama 3.x", out)
+
+    def test_explicit_system_branch_counts(self):
+        out = self.verdict("{% if messages[0]['role'] == 'system' %}sys{% endif %}")
+        self.assertIn("handles a system role: yes", out)
+
+    def test_template_that_drops_system_is_flagged(self):
+        out = self.verdict(
+            "{% for m in messages %}[INST] {{ m.content }} [/INST]{% endfor %}")
+        self.assertIn("handles a system role: NO", out)
+
+    def test_missing_template_is_flagged_loudly(self):
+        self.assertIn("MISSING", self.verdict(None))
 
 
 class TestModelfile(unittest.TestCase):

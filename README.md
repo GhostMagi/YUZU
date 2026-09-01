@@ -13,7 +13,7 @@ watermelon.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 48 tests, ~3 seconds
+python test_yuzu.py           # 60 tests, ~3 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -32,6 +32,17 @@ python yuzu_brain.py --chat            # talk to her
 python yuzu_prompt_eval.py --runs 3    # score how well she follows the prompt
 ```
 
+Before building a model from a GGUF you didn't make yourself:
+
+```
+python gguf_inspect.py path/to/model.gguf
+```
+
+Reads only the header — instant on a 20GB file — and reports the quant,
+context length, and most importantly whether the **chat template** is
+present and handles a system role. A missing or wrong template is the
+top reason a converted GGUF loads fine but ignores the persona entirely.
+
 The eval is the important one. It runs 12 prompts through the real
 model and scores every mechanically-checkable rule in the system
 prompt — does she always speak, brackets never asterisks, are her
@@ -48,6 +59,7 @@ $400.
 | `yuzu_system_prompt.txt` | Yuzu's personality. The only copy |
 | `build_yuzu_model.py` | Generates `Modelfile.yuzu` from that prompt |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the model |
+| `gguf_inspect.py` | Reads a GGUF header — quant, context, chat template |
 | `JETSON_SETUP.md` | Setup runbook, PC and Jetson |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_led_manager.py` | The one LED config loader (zones + states) |

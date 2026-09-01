@@ -195,6 +195,9 @@ behind it. If the two disagree, the code is right.
   Modelfile.yuzu        GENERATED. Never hand-edit.
   yuzu_prompt_eval.py   scores prompt compliance against the real
                         model. See Section 10.
+  gguf_inspect.py       stdlib GGUF header reader. Reports quant,
+                        context length, and whether the chat template
+                        is present and handles a system role.
   JETSON_SETUP.md       setup runbook, PC first then Jetson.
   muto_leg_control.py   leg wrapper + tripod gait library + DummyBot
                         simulator. Untested on hardware.
@@ -202,7 +205,7 @@ behind it. If the two disagree, the code is right.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
   readtest.py           smoke test that the config loads. Portable.
-  test_yuzu.py          48 stdlib tests. `python test_yuzu.py`. The
+  test_yuzu.py          60 stdlib tests. `python test_yuzu.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
 
@@ -354,6 +357,14 @@ The test prompts deliberately include the known failure cases: "Do a
 stretch" (the all-actions-no-dialogue reply that looked like a freeze)
 and "Wave at me!" / "Give me a high five!" (bait for body parts the
 chassis doesn't have).
+
+A note on third-party GGUFs, learned the hard way in general: the
+chat template baked into the file matters more than the prompt. Ollama
+reads it from GGUF metadata; if it's missing or has no system branch,
+the model loads and generates perfectly well while silently ignoring
+Yuzu's personality. That is indistinguishable from a bad prompt unless
+you look. gguf_inspect.py exists to look. Check it BEFORE spending an
+evening rewriting directives that were never the problem.
 
 This turns prompt tuning into measurement. Change one thing, re-run,
 compare the numbers. It also means the prompt can be finished on a
