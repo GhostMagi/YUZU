@@ -71,6 +71,7 @@ $400.
 |---|---|
 | `yuzu_all_in_one.py` | Reply pipeline + main loop. **Start here.** |
 | `yuzu_brain.py` | Ollama client. Stdlib only, streaming, history |
+| `UBUNTU_LAPTOP.md` | Putting Ubuntu on the laptop, phone-readable |
 | `personas/` | One file per character; body rules shared |
 | `yuzu_personas.py` | Persona loader and composer |
 | `build_yuzu_model.py` | Generates `Modelfile.yuzu` from that prompt |

@@ -1,0 +1,173 @@
+# Putting Ubuntu on the Acer
+
+Written to be read off a phone while standing at the laptop.
+
+**Why:** NVIDIA's SDK Manager — the rescue tool if the Jetson's SD card
+route fails — only runs on Ubuntu x86. This laptop becomes that. It
+also runs Ollama on the GTX 960M, so the prompt eval can run for real
+instead of being hand-scored from PocketPal screenshots.
+
+**Use Ubuntu 22.04 LTS.** SDK Manager supports 18.04 / 20.04 / 22.04.
+Not 24.04 — it isn't on that list.
+
+---
+
+## Before you start
+
+- **A USB stick, 8GB or bigger.** Everything on it gets erased. This is
+  the only thing you might not already have.
+- The Acer plugged into power the whole time. Do not let it die during
+  an install.
+- "No Bootable Device" on the Acer is expected. The drive is blank.
+  That's the screen a blank drive makes, and it means there is nothing
+  on there to lose.
+
+---
+
+# Part 1 — On the Steam Deck
+
+### 1. Desktop Mode
+Steam button → Power → Switch to Desktop.
+
+### 2. Download Ubuntu
+Firefox → **releases.ubuntu.com/22.04/**
+
+Get the file ending **`-desktop-amd64.iso`**. It's about 4.7GB, so give
+it time. `amd64` is correct even though the laptop is Intel — it means
+"64-bit PC", not the CPU brand.
+
+### 3. Install balenaEtcher
+Open **Discover** (the app store) → search **balenaEtcher** → Install.
+
+Use Etcher rather than the `dd` command. Etcher refuses to write to your
+system drive; a mistyped `dd` would overwrite the Steam Deck itself and
+there is no undo.
+
+### 4. Write the stick
+Plug the USB stick in, open Etcher:
+
+1. **Flash from file** → pick the `.iso` you downloaded
+2. **Select target** → pick the USB stick (check the size matches!)
+3. **Flash**
+
+It verifies afterwards. When it says done, you're finished with the Deck.
+
+---
+
+# Part 2 — On the Acer
+
+### 5. Boot from the stick
+Plug the USB stick in. Power on and **tap F12 repeatedly** the moment
+you press the power button.
+
+You want a boot menu. Pick the entry with your stick's name — usually
+prefixed **UEFI:**.
+
+**If F12 does nothing** — Acer ships with the boot menu switched off:
+
+1. Power on, tap **F2** to get into BIOS setup
+2. **Main** tab → set **F12 Boot Menu** to **Enabled**
+3. **F10** to save and exit
+4. Try F12 again
+
+### 6. If it still refuses to boot the stick
+Acer's Secure Boot has an odd lock: you can't turn it off until a
+supervisor password exists. In BIOS (F2):
+
+1. **Security** tab → **Set Supervisor Password** → set one.
+   **Write it down.** You will be annoyed later if you don't.
+2. **Boot** tab → **Secure Boot** → **Disabled**
+3. **F10** to save and exit
+
+Try the stick again.
+
+### 7. Try it before you commit
+At the purple screen choose **Try Ubuntu** first. Nothing is written to
+the laptop — it runs entirely off the stick.
+
+Check the things that are annoying to fix later:
+- Does Wi-Fi see your network?
+- Does the trackpad work?
+- Does sound work?
+
+Happy? There's an **Install Ubuntu** icon on the desktop. Double-click it.
+
+### 8. The installer
+Mostly Next, with two answers that matter:
+
+| Screen | Answer |
+|---|---|
+| Keyboard | US (or whatever yours is) |
+| Updates and other software | **Normal installation**, and **tick "Install third-party software for graphics and Wi-Fi hardware"** |
+| Installation type | **Erase disk and install Ubuntu** |
+| Who are you? | Username + password — **write these down** |
+
+That third-party checkbox is the one people skip and regret. It's what
+gets the NVIDIA driver and the Wi-Fi firmware.
+
+"Erase disk" is safe here. The drive is blank — that's what the "No
+Bootable Device" screen was telling you.
+
+### 9. Reboot
+When it asks, **remove the USB stick**, then press Enter.
+
+---
+
+# Part 3 — First ten minutes on Ubuntu
+
+Open a terminal with **Ctrl + Alt + T**. Copy these one line at a time.
+
+### Update everything
+```
+sudo apt update && sudo apt upgrade -y
+```
+`sudo` means "as administrator" — it'll ask for the password you just
+made. The password won't show as you type it, not even dots. That's
+normal, keep typing and hit Enter.
+
+### Check the graphics card
+```
+nvidia-smi
+```
+If it prints a table mentioning the 960M, the driver is in. If it says
+"command not found", open **Software & Updates** → **Additional
+Drivers** → pick the recommended NVIDIA driver → Apply → reboot.
+
+### Get the tools this project needs
+```
+sudo apt install -y git python3 python3-pip
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+### Pull the project and prove it works
+```
+git clone https://github.com/GhostMagi/YUZU.git
+cd YUZU
+python3 test_yuzu.py
+```
+154 tests, about 9 seconds. If they pass, the laptop is ready.
+
+### Run a persona for real
+```
+ollama pull llama3.2:3b
+python3 build_yuzu_model.py --all --create
+python3 yuzu_prompt_eval.py --persona yuzu2
+```
+That last one is the payoff — 12 prompts × 3 runs, scored against the
+same parser the robot uses. A number instead of a vibe.
+
+---
+
+## If something goes wrong
+
+| Symptom | Likely cause |
+|---|---|
+| F12 does nothing | Boot menu disabled — Step 5 |
+| Stick doesn't appear in the boot menu | Secure Boot — Step 6. Or the stick didn't write; re-run Etcher. |
+| Installer can't see the hard drive | The drive may be loose. It is new — reseat it. |
+| Wi-Fi missing after install | Third-party checkbox was skipped. Software & Updates → Additional Drivers |
+| `nvidia-smi` not found | Same — Additional Drivers |
+| Screen tears or won't wake from sleep | Optimus quirk on this era of laptop. Not urgent; nothing here needs the GPU except Ollama. |
+
+Screenshot whatever it says and send it over. Error messages on Linux
+are usually specific and honest, which makes them easy to act on.

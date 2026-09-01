@@ -258,6 +258,10 @@ Three other things it buys, all free:
 - **A second serial-console host.** The Acer has Thunderbolt 3, so it
   can drive the Jetson's first boot just as well as the Deck can.
 
+**Step-by-step for that install is in
+[UBUNTU_LAPTOP.md](UBUNTU_LAPTOP.md)** — written to be read off a phone
+while standing at the laptop.
+
 Practical notes:
 
 - **Use Ubuntu 22.04 LTS.** SDK Manager supports 18.04/20.04/22.04.
