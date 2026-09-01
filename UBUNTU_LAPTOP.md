@@ -112,6 +112,28 @@ prefixed **UEFI:**.
 3. **F10** to save and exit
 4. Try F12 again
 
+### 5b. This particular Acer's quirks (VN7-592G)
+
+Found the hard way, Sept 2026:
+
+- **The F2 window is about one second.** Hold the power button for ten
+  seconds first so the machine is genuinely off, then tap F2 four or
+  five times a second from the instant you press power. Pressing keys
+  once "No Bootable Device" is on screen does nothing at all — POST is
+  over by then and that screen ignores everything.
+- **The main Enter key is dead; the NUMPAD Enter works.** Keyboards are
+  wired as a grid and the two Enters sit on different lines, so one
+  dying doesn't touch the other. If a key seems dead, look for a
+  duplicate of it elsewhere on the board before concluding anything.
+- **The up arrow is dead too.** Down arrow wraps around to the top of a
+  list, and F5/F6 move boot entries, so neither BIOS nor the installer
+  actually needs it. In a terminal later, `Ctrl+P` is up-arrow and
+  `Ctrl+N` is down-arrow for command history.
+- **The built-in SD card reader is not in the boot list.** Boot priority
+  offers the Samsung drive, USB FDD/HDD/CDROM and network — nothing for
+  the internal reader. So the microSD has to arrive over USB: a card
+  reader dongle, or write the image to a plain USB stick instead.
+
 ### 6. If it still refuses to boot the stick
 Acer's Secure Boot has an odd lock: you can't turn it off until a
 supervisor password exists. In BIOS (F2):
