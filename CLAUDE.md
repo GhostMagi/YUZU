@@ -31,9 +31,23 @@ its fixes. First live round (9 replies, Sept 1): **11/11 actions ran**,
 has_dialogue 89% — one all-actions freeze, which was the predicted #1
 risk for the archetype. Small sample; treat it as promising, not proven.
 
-**yuzu2's 78–83% is now STALE.** The shared body file changed (the
-self-concept fix below), so v2's composed prompt is not the one that
-was measured. Re-run the A/B before quoting that number again.
+**yuzu2 v2.1** (self-concept + movement + length fixes) measured Sept 1,
+4 replies: **action hit rate 10/11 = 91%**, moves_at_all 100% (was 50%
+before the movement rule), spoken length 38w avg (was 62w, under the
+45w TTS warning). The old 78–83% is stale — different composed prompt.
+
+Two residuals, both judged to be at the 3B ceiling and deliberately NOT
+chased further:
+- `[laughs]` — a vocalization in brackets. Known category, fails safe
+  (dropped silently, speech survives). ~1 in 4 replies.
+- "Where's Berlin?" gets vibes, not a location. She produces correct
+  Berlin specifics (Spree, Kreuzberg, techno), so it's a "where"→"tell
+  me about" reading, not missing knowledge. The reported bug — "my
+  world is this room" — is gone.
+
+**The prompt grew 2404 → 3719 chars (+55%) over three fixes this
+session.** TTFT on Ghost's phone hit 47s. Every further rule costs
+latency on the Jetson too; weigh that before adding another.
 Her predicted failure modes and what to watch for are in
 PERSONA_SWITCHING.md.
 
