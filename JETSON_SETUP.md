@@ -208,6 +208,11 @@ So **M.2 2280 Key M NVMe** is exactly the right part to buy. Notes:
 microSD boot does work (64GB minimum) if the SSD is delayed — start
 there and migrate later, nothing is blocked.
 
+> **Only have a Steam Deck?** See **[HEADLESS_SETUP.md](HEADLESS_SETUP.md)**
+> — flash the SD card on the Deck, first-boot over a USB-C serial
+> console, then move the root filesystem to the NVMe. No monitor, no
+> keyboard, no DisplayPort adapter, no Ubuntu PC.
+
 ### 1. Flash JetPack
 
 Steam Deck in Desktop Mode, NVIDIA SDK Manager or the SD card image.

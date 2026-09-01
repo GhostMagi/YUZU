@@ -69,6 +69,7 @@ $400.
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
 | `PHONE_START.md` | Phone instructions, no terminal needed |
 | `JETSON_SETUP.md` | Setup runbook, PC and Jetson |
+| `HEADLESS_SETUP.md` | Jetson setup from a Steam Deck, no monitor |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_led_manager.py` | The one LED config loader (zones + states) |
 | `yuzu_led_controller.py` | Zone dump, front-end over `LEDManager` |
