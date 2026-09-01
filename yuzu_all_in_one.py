@@ -1,35 +1,87 @@
 """
-Yuzu, all in one file -- combines the reply pipeline (fix/extract/run/strip/
-speak) with the main loop (listen -> think -> respond) so there's nothing
-to import and nothing to accidentally save in the wrong folder.
+Yuzu, all in one file -- combines the reply pipeline (fix/extract/run/
+strip/speak) with the main loop (listen -> think -> respond) so there's
+nothing to import and nothing to accidentally save in the wrong folder.
 
 The two functions marked STUB are fakes for now -- swap them for real
-Whisper and real Ollama once your hardware's ready. Everything else can
-stay exactly as-is.
+Whisper and real Ollama once your hardware's ready.
+
+This file will run anywhere, including Pydroid on the phone, with no
+hardware and no other files present. If muto_leg_control.py and
+yuzu_led_manager.py ARE sitting next to it, it picks them up
+automatically: bracketed actions drive real gaits, and the LEDs follow
+what Yuzu is doing (thinking / moving / speaking / idle). If they're
+missing it falls back to printing, exactly like it always did.
 """
 
 import re
 import time
 
+# --- Optional siblings. Missing = print-only mode, never a crash. -----
+try:
+    import muto_leg_control as legs
+except ImportError:
+    legs = None
+
+try:
+    from yuzu_led_manager import LEDManager
+except ImportError:
+    LEDManager = None
+
 
 # ============================================================================
-# PART 1: THE REPLY PIPELINE (unchanged from before, just living here now)
+# PART 0: HARDWARE BINDING
 # ============================================================================
 
-# --- Placeholder robot functions -- swap for real Muto S2 SDK calls later ---
-def walk_forward():   print("ROBOT: walking forward")
-def walk_backward():  print("ROBOT: walking backward")
-def turn_action():    print("ROBOT: turning")
-def squat():          print("ROBOT: squatting")
-def stand():          print("ROBOT: standing")
-def shake_legs():     print("ROBOT: shaking legs")
-def stretch():        print("ROBOT: stretching")
-def spin():           print("ROBOT: spinning")
+# g_bot is the real Yahboom robot object once hardware exists:
+#     from muto_lib import Muto_Bot
+#     g_bot = Muto_Bot()
+# Until then muto_leg_control.DummyBot stands in and prints servo traffic.
+g_bot = legs.DummyBot(verbose=False) if legs else None
+
+leds = LEDManager() if LEDManager else None
+
+
+def set_led_state(state):
+    """Nudge the lights. No-op when the LED manager isn't around."""
+    if leds:
+        leds.apply_state(state)
+
+
+# ============================================================================
+# PART 1: THE REPLY PIPELINE
+# ============================================================================
+
+# Each robot function calls the real gait when muto_leg_control is
+# importable, and otherwise prints -- so the pipeline is testable on a
+# phone and correct on the Jetson without touching this file again.
+def _gait(name, printed, **kwargs):
+    def run():
+        if legs and g_bot:
+            getattr(legs, name)(g_bot, **kwargs)
+        else:
+            print(f"ROBOT: {printed}")
+    return run
+
+
+walk_forward  = _gait("walk_forward",  "walking forward")
+walk_backward = _gait("walk_backward", "walking backward")
+turn_action   = _gait("turn",          "turning")
+squat         = _gait("squat",         "squatting")
+stand         = _gait("stand",         "standing")
+shake_legs    = _gait("shake_legs",    "shaking legs")
+stretch       = _gait("stretch",       "stretching")
+spin          = _gait("spin",          "spinning")
+
+
+# The 2DOF gimbal has no wrapper module yet -- these stay prints until
+# the pan/tilt API is confirmed on real hardware.
 def camera_up():      print("ROBOT: camera looking up")
 def camera_down():    print("ROBOT: camera looking down")
 def camera_left():    print("ROBOT: camera looking left")
 def camera_right():   print("ROBOT: camera looking right")
 def camera_center():  print("ROBOT: camera centered")
+
 
 ACTION_WHITELIST = {
     "walk forward":  (walk_forward,  1.0),
@@ -47,51 +99,191 @@ ACTION_WHITELIST = {
     "center camera": (camera_center, 0.3),
 }
 
+# Phrasings the 3B model actually produces that mean a whitelisted
+# action. Testing showed it embellishes past the prompt's vocabulary --
+# "[spins around]" is literally in the prompt's own Wrong: example, so
+# it's guaranteed to show up. These map onto real moves instead of being
+# silently dropped. Keys are matched after stemming, same as above.
+ACTION_ALIASES = {
+    "spin around":       "spin",
+    "spin in a circle":  "spin",
+    "twirl":             "spin",
+    "turn around":       "spin",
+    "turn left":         "turn",
+    "turn right":        "turn",
+    "walk":              "walk forward",
+    "step forward":      "walk forward",
+    "step backward":     "walk backward",
+    "back up":           "walk backward",
+    "crouch":            "squat",
+    "sit":               "squat",
+    "stand up":          "stand",
+    "get up":            "stand",
+    "wiggle legs":       "shake legs",
+    "wiggle":            "shake legs",
+    "shake":             "shake legs",
+    "dance":             "shake legs",
+    "look around":       "center camera",
+    "tilt camera up":    "look up",
+    "tilt camera down":  "look down",
+    "pan camera left":   "look left",
+    "pan camera right":  "look right",
+    "center the camera": "center camera",
+}
+
 
 def normalize_actions(text: str) -> str:
-    return re.sub(r'\*(.*?)\*', r'[\1]', text)
+    """
+    Convert stray markdown emphasis into brackets.
+
+    Careful with the old one-liner `re.sub(r'\*(.*?)\*', r'[\1]', text)`:
+      * "**waves**" became "[]waves[]" -- two empty actions plus the word
+        "waves" leaking into TTS, i.e. the exact opposite of the intent.
+      * "2 * 3 * 4" became "2 [ 3 ] 4" -- a stray pair of asterisks in
+        ordinary speech ate the text between them.
+    So: bold first, single emphasis second, and both require non-empty
+    content with no whitespace against the markers, which is how real
+    markdown emphasis is written and how a bare multiplication sign
+    isn't.
+    """
+    text = re.sub(r'\*\*(\S[^*\n]*?)\*\*', r'[\1]', text)
+    text = re.sub(r'\*(\S[^*\n]*?)\*', r'[\1]', text)
+    return text
 
 
 def extract_actions(text: str) -> list:
     return re.findall(r'\[(.*?)\]', text)
 
 
+def _stem_word(word: str) -> str:
+    """
+    Strip a simple plural/3rd-person ending off one word.
+
+    The old rule was "drop a trailing s if the word is >3 chars and
+    doesn't end in ss". That turned "stretches" into "stretche", which
+    matched nothing -- so a whitelisted action the prompt explicitly
+    teaches Yuzu to use was being silently ignored on the robot. The
+    "-es" case has to come first.
+    """
+    w = word.lower()
+    if len(w) > 4 and w.endswith(('ches', 'shes', 'sses', 'xes', 'zes')):
+        return w[:-2]
+    if len(w) > 3 and w.endswith('s') and not w.endswith('ss'):
+        return w[:-1]
+    return w
+
+
 def _stem_phrase(phrase: str) -> str:
-    words = phrase.lower().strip().split()
-    stemmed = [w[:-1] if len(w) > 3 and w.endswith('s') and not w.endswith('ss') else w
-               for w in words]
-    return ' '.join(stemmed)
+    """Normalize an action phrase for whitelist lookup: lowercase, drop
+    punctuation and filler words, stem each remaining word."""
+    cleaned = re.sub(r'[^\w\s]', ' ', phrase.lower())
+    words = [w for w in cleaned.split() if w not in ('the', 'a', 'an', 'her', 'his', 'its')]
+    return ' '.join(_stem_word(w) for w in words)
 
 
 _STEMMED_WHITELIST = {_stem_phrase(k): v for k, v in ACTION_WHITELIST.items()}
+_STEMMED_ALIASES = {
+    _stem_phrase(k): _STEMMED_WHITELIST[_stem_phrase(v)]
+    for k, v in ACTION_ALIASES.items()
+}
+
+
+def lookup_action(action_text: str):
+    """Return (function, pause) for an action phrase, or None if it isn't
+    something this body can do. No fallback, ever -- an unrecognised
+    action does nothing rather than guessing at a movement."""
+    key = _stem_phrase(action_text)
+    return _STEMMED_WHITELIST.get(key) or _STEMMED_ALIASES.get(key)
+
+
+# Multiplier on every post-action settle pause. 1.0 is the tuned
+# default; raise it if moves are still finishing when the next one
+# fires, drop it toward 0 to make testing instant.
+PAUSE_SCALE = 1.0
+
+
+def run_action(action_text: str) -> bool:
+    """Run one action. Returns whether it matched."""
+    match = lookup_action(action_text)
+    if not match:
+        print(f"ROBOT: no match for action '{action_text}' (ignored)")
+        return False
+    func, pause_seconds = match
+    func()
+    time.sleep(pause_seconds * PAUSE_SCALE)
+    return True
 
 
 def run_actions_in_order(actions: list):
     for action_text in actions:
-        match = _STEMMED_WHITELIST.get(_stem_phrase(action_text))
-        if match:
-            func, pause_seconds = match
-            func()
-            time.sleep(pause_seconds)
-        else:
-            print(f"ROBOT: no match for action '{action_text}' (ignored)")
+        run_action(action_text)
 
 
 def strip_actions(text: str) -> str:
+    """
+    Remove bracketed actions, leaving only what should be spoken.
+
+    Also drops a trailing unclosed bracket. A truncated generation like
+    "Heyyy cutie! [squa" used to send the literal "[squa" to TTS, which
+    Yuzu would then read out loud, brackets and all. Rare, but it only
+    costs one regex to never hear it.
+    """
     no_actions = re.sub(r'\[.*?\]', '', text)
+    no_actions = re.sub(r'\[[^\]]*$', '', no_actions)
     return re.sub(r'\s+', ' ', no_actions).strip()
+
+
+def split_reply(text: str) -> list:
+    """
+    Break a reply into ordered ('speech', str) / ('action', str) parts.
+
+    This is what fixes the silent-beat quirk. The old pipeline ran every
+    action to completion -- pauses included -- before speaking a single
+    word, so "Not much, just vibing! [squats] [shakes legs] What's good?"
+    meant several seconds of silent squatting and then a burst of talk.
+    Keeping written order means she talks and moves like one creature.
+    """
+    parts = []
+    cursor = 0
+    for match in re.finditer(r'\[(.*?)\]', text):
+        speech = strip_actions(text[cursor:match.start()])
+        if speech:
+            parts.append(("speech", speech))
+        parts.append(("action", match.group(1)))
+        cursor = match.end()
+    tail = strip_actions(text[cursor:])
+    if tail:
+        parts.append(("speech", tail))
+    return parts
 
 
 def speak(text: str):
     print(f"TTS SAYS: \"{text}\"")   # <-- swap this line for your real TTS call
 
 
-def handle_yuzu_reply(raw_llm_output: str):
+def handle_yuzu_reply(raw_llm_output: str, interleave=True):
+    """
+    interleave=True  -> speak and move in the order Yuzu wrote them
+    interleave=False -> old behaviour: all movement first, then all speech
+    """
     cleaned = normalize_actions(raw_llm_output)
-    actions = extract_actions(cleaned)
-    run_actions_in_order(actions)
-    speech_only = strip_actions(cleaned)
-    speak(speech_only)
+
+    if not interleave:
+        set_led_state("moving")
+        run_actions_in_order(extract_actions(cleaned))
+        speech = strip_actions(cleaned)
+        if speech:
+            set_led_state("speaking")
+            speak(speech)
+        return
+
+    for kind, value in split_reply(cleaned):
+        if kind == "speech":
+            set_led_state("speaking")
+            speak(value)
+        else:
+            set_led_state("moving")
+            run_action(value)
 
 
 # ============================================================================
@@ -109,14 +301,21 @@ def ask_yuzu_brain(user_text):
 
 
 def run_yuzu_forever():
-    print("Yuzu is listening... (type 'quit' to stop this test)\n")
+    print("Yuzu is listening... (type 'quit' to stop this test)")
+    print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
+          f"leds: {'yuzu_led_manager' if leds else 'off'}\n")
+    if legs and g_bot:
+        legs.stance(g_bot)
+    set_led_state("idle")
     while True:
         user_text = listen_and_transcribe()
-        if user_text.strip().lower() == "quit":
+        if user_text.strip().lower() in ("quit", "exit"):
             print("Shutting down.")
             break
+        set_led_state("thinking")
         raw_reply = ask_yuzu_brain(user_text)
         handle_yuzu_reply(raw_reply)
+        set_led_state("idle")
         print()
 
 

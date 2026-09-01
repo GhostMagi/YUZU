@@ -1,39 +1,35 @@
-import json
-from pathlib import Path
+"""
+Zone dump -- prints every LED zone from yuzu_robot_config.json.
 
-# This locks the search path to the exact folder this script lives in
-CONFIG_FILE = Path(__file__).parent / "yuzu_robot_config.json"
+This used to parse the config itself, which meant two files (this one
+and yuzu_led_manager.py) each had their own copy of "how to find and
+read the config". They'd already drifted: the manager was reading a
+different filename entirely. Now this is a thin front-end over
+LEDManager, so there is exactly one loader and one config path.
+
+Still runs standalone the same way it always did:  python yuzu_led_controller.py
+"""
+
+from yuzu_led_manager import LEDManager
 
 
 def load_yuzu_config():
-  path = Path(CONFIG_FILE)
-  if not path.exists():
-    print(f"Error: Could not find {path.name}! Make sure it's in the folder.")
-    return None
-
-  with open(path, "r") as f:
-    return json.load(f)
+    """Kept for anything that already imports it -- returns the merged
+    config dict, or None if the file is missing."""
+    led = LEDManager()
+    return led.data if led.config_path.exists() else None
 
 
-def apply_led_settings(config):
-  if not config:
-    return
-
-  print(f"Initializing LEDs for: {config['robot_name']}\n")
-  zones = config.get("led_zones", {})
-
-  for zone_name, settings in zones.items():
-    color = settings.get("color")
-    effect = settings.get("effect")
-    brightness = settings.get("brightness")
-
-    print(f"[LED CONTROLLER] Zone: {zone_name.upper()}")
-    print(f"  -> Hex Color: {color}")
-    print(f"  -> Effect Pattern: {effect}")
-    print(f"  -> Brightness: {brightness}%\n")
+def apply_led_settings(led=None):
+    led = led or LEDManager()
+    print(f"Initializing LEDs for: {led.robot_name}\n")
+    for zone_name in led.zone_names():
+        settings = led.get_zone(zone_name)
+        print(f"[LED CONTROLLER] Zone: {zone_name.upper()}")
+        print(f"  -> Hex Color: {settings.get('color')}")
+        print(f"  -> Effect Pattern: {settings.get('effect')}")
+        print(f"  -> Brightness: {settings.get('brightness')}%\n")
 
 
 if __name__ == "__main__":
-  yuzu_config = load_yuzu_config()
-  if yuzu_config:
-    apply_led_settings(yuzu_config)
+    apply_led_settings()

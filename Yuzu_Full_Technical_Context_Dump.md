@@ -84,10 +84,11 @@ limitation, not something to keep chasing via prompt engineering.
   command; `Servo_torque_on()`, `Servo_torque_off()`, `load_leg(leg)`,
   `unload_leg(leg)` as state commands. Leg-to-servo ID mapping: Leg 1 =
   servos 1-3, Leg 2 = 4-6, Leg 3 = 7-9, Leg 4 = 10-12, Leg 5 = 13-15,
-  Leg 6 = 16-18. A helper script `muto_leg_control.py` with a
-  `set_leg(leg_id, coxa, femur, tibia)` wrapper is PLANNED but NOT YET
-  WRITTEN -- this is the single biggest remaining unknown in the whole
-  build (no real gait functions exist yet, only placeholders).
+  Leg 6 = 16-18. `muto_leg_control.py` now wraps this with
+  `set_leg(g_bot, leg_id, coxa, femur, tibia)` plus a tripod gait
+  library and a DummyBot simulator -- see Section 8. It has NEVER
+  touched real hardware, so the angle constants are still guesses and
+  calibration remains the biggest unknown in the build.
 
 ======================================================================
 ## 4. SOFTWARE ARCHITECTURE DECISIONS (with reasoning)
@@ -124,15 +125,14 @@ limitation, not something to keep chasing via prompt engineering.
   - Empty LLM output -> silent, no crash.
   - Unmatched/invalid action -> does NOTHING (there is no default
     fallback action of any kind -- never substitutes a random movement).
-  - Malformed/truncated bracket (missing closing `]`) -> that fragment
-    leaks into spoken TTS output as literal text, brackets included.
-    Rare (only from truncated generation), not dangerous, just sounds
-    janky for one line if it ever happens. Not yet fixed.
-  - Multiple valid actions chained -> there IS a real UX quirk: all
-    actions run to completion (including their pause delays) BEFORE any
-    speech happens, so an action-heavy reply has a noticeable silent
-    beat before Yuzu starts talking. Not a bug, just a design tradeoff
-    worth knowing about.
+  - Malformed/truncated bracket (missing closing `]`) -> used to leak
+    into spoken TTS output as literal text, brackets included. FIXED --
+    strip_actions now drops a trailing unclosed bracket.
+  - Multiple valid actions chained -> used to run every action to
+    completion (pause delays included) BEFORE any speech, giving an
+    action-heavy reply a noticeable silent beat. FIXED -- speech and
+    movement now happen in the order Yuzu wrote them. The old behaviour
+    is still available via handle_yuzu_reply(..., interleave=False).
 - Audio pipeline plan (not yet implemented): Whisper (specifically
   whisper.cpp, a lightweight local model) for fully offline STT running
   on the Jetson; Piper TTS for local TTS. Piper requires TWO files per
@@ -169,319 +169,171 @@ characters. A screenshot showing an unmarked/unbracketed action is very
 likely this rendering quirk, not a genuinely new unformatted-text bug.
 
 ======================================================================
-## 6. CURRENT CODE -- yuzu_all_in_one.py (tested, working)
+## 6. THE FILES THEMSELVES ARE THE SOURCE OF TRUTH
 ======================================================================
-This is the full current pipeline + main loop, combined into one file
-(originally two files, merged after a ModuleNotFoundError on Pydroid
-from them being in different folders). `ask_yuzu_brain()` and
-`listen_and_transcribe()` are the ONLY two functions that need to be
-replaced with real Ollama/Whisper calls -- everything else is final.
+This document used to paste full copies of yuzu_all_in_one.py,
+yuzu_led_manager.py, yuzu_robot_config.json and readtest.py inline.
+That is exactly the failure mode described in Section 1 -- a second
+copy of a file that drifts away from the real one. It already
+happened here: Section 9 described readtest.py's hardcoded Pydroid
+path as an open bug long after the real file had been fixed, and the
+next AI session to read this dump would have "fixed" it again.
 
-```python
-"""
-Yuzu, all in one file -- combines the reply pipeline (fix/extract/run/strip/
-speak) with the main loop (listen -> think -> respond) so there's nothing
-to import and nothing to accidentally save in the wrong folder.
+So: the code lives in the repo, this file explains the reasoning
+behind it. If the two disagree, the code is right.
 
-The two functions marked STUB are fakes for now -- swap them for real
-Whisper and real Ollama once your hardware's ready. Everything else can
-stay exactly as-is.
-"""
-
-import re
-import time
-
-
-# ============================================================================
-# PART 1: THE REPLY PIPELINE (unchanged from before, just living here now)
-# ============================================================================
-
-# --- Placeholder robot functions -- swap for real Muto S2 SDK calls later ---
-def walk_forward():   print("ROBOT: walking forward")
-def walk_backward():  print("ROBOT: walking backward")
-def turn_action():    print("ROBOT: turning")
-def squat():          print("ROBOT: squatting")
-def stand():          print("ROBOT: standing")
-def shake_legs():     print("ROBOT: shaking legs")
-def stretch():        print("ROBOT: stretching")
-def spin():           print("ROBOT: spinning")
-def camera_up():      print("ROBOT: camera looking up")
-def camera_down():    print("ROBOT: camera looking down")
-def camera_left():    print("ROBOT: camera looking left")
-def camera_right():   print("ROBOT: camera looking right")
-def camera_center():  print("ROBOT: camera centered")
-
-ACTION_WHITELIST = {
-    "walk forward":  (walk_forward,  1.0),
-    "walk backward": (walk_backward, 1.0),
-    "turn":          (turn_action,   1.0),
-    "squat":         (squat,         0.8),
-    "stand":         (stand,         0.8),
-    "shake legs":    (shake_legs,    0.8),
-    "stretch":       (stretch,       1.0),
-    "spin":          (spin,          1.2),
-    "look up":       (camera_up,     0.3),
-    "look down":     (camera_down,   0.3),
-    "look left":     (camera_left,   0.3),
-    "look right":    (camera_right,  0.3),
-    "center camera": (camera_center, 0.3),
-}
-
-
-def normalize_actions(text: str) -> str:
-    return re.sub(r'\*(.*?)\*', r'[\1]', text)
-
-
-def extract_actions(text: str) -> list:
-    return re.findall(r'\[(.*?)\]', text)
-
-
-def _stem_phrase(phrase: str) -> str:
-    words = phrase.lower().strip().split()
-    stemmed = [w[:-1] if len(w) > 3 and w.endswith('s') and not w.endswith('ss') else w
-               for w in words]
-    return ' '.join(stemmed)
-
-
-_STEMMED_WHITELIST = {_stem_phrase(k): v for k, v in ACTION_WHITELIST.items()}
-
-
-def run_actions_in_order(actions: list):
-    for action_text in actions:
-        match = _STEMMED_WHITELIST.get(_stem_phrase(action_text))
-        if match:
-            func, pause_seconds = match
-            func()
-            time.sleep(pause_seconds)
-        else:
-            print(f"ROBOT: no match for action '{action_text}' (ignored)")
-
-
-def strip_actions(text: str) -> str:
-    no_actions = re.sub(r'\[.*?\]', '', text)
-    return re.sub(r'\s+', ' ', no_actions).strip()
-
-
-def speak(text: str):
-    print(f"TTS SAYS: \"{text}\"")   # <-- swap this line for your real TTS call
-
-
-def handle_yuzu_reply(raw_llm_output: str):
-    cleaned = normalize_actions(raw_llm_output)
-    actions = extract_actions(cleaned)
-    run_actions_in_order(actions)
-    speech_only = strip_actions(cleaned)
-    speak(speech_only)
-
-
-# ============================================================================
-# PART 2: THE MAIN LOOP (listen -> think -> respond, forever)
-# ============================================================================
-
-# --- STUB 1: swap this for real Whisper once a mic is hooked up ------------
-def listen_and_transcribe():
-    return input("You say: ")
-
-
-# --- STUB 2: swap this for a real Ollama call once it's running -----------
-def ask_yuzu_brain(user_text):
-    return f"OMG you said '{user_text}'? [squats] That's so real of you, no cap! [shakes legs]"
-
-
-def run_yuzu_forever():
-    print("Yuzu is listening... (type 'quit' to stop this test)\n")
-    while True:
-        user_text = listen_and_transcribe()
-        if user_text.strip().lower() == "quit":
-            print("Shutting down.")
-            break
-        raw_reply = ask_yuzu_brain(user_text)
-        handle_yuzu_reply(raw_reply)
-        print()
-
-
-if __name__ == "__main__":
-    run_yuzu_forever()
-```
+  yuzu_all_in_one.py    reply pipeline + main loop. The two functions
+                        marked STUB (listen_and_transcribe,
+                        ask_yuzu_brain) are the only things still
+                        needing real Whisper/Ollama calls.
+  muto_leg_control.py   leg wrapper + tripod gait library + DummyBot
+                        simulator. Untested on hardware.
+  yuzu_led_manager.py   the one LED loader. Zones + state profiles.
+  yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
+  yuzu_robot_config.json  the one config file.
+  readtest.py           smoke test that the config loads. Portable.
+  test_yuzu.py          31 stdlib tests. `python test_yuzu.py`.
 
 ======================================================================
-## 7. CURRENT CODE -- yuzu_led_manager.py (tested, working)
+## 7. BUGS FOUND BY RUNNING THE CODE (all now fixed)
 ======================================================================
-This merges two previously-incompatible LED systems Ghost/Gemini had
-built separately: a zone-based JSON config (colors as hex strings,
-brightness 0-100) and a state-based profile system (colors as [R,G,B]
-lists, brightness 0-1). Standardized on hex + 0-100 throughout.
+Each of these was reproduced before being fixed, and each has a
+regression test in test_yuzu.py named after it.
 
-```python
-"""
-Yuzu's LED manager -- combines two previously-separate, incompatible
-systems into one:
+1. `[stretches]` did nothing. The stemmer dropped a trailing "s" from
+   any word over 3 characters, turning "stretches" into "stretche",
+   which matched no whitelist entry. A move the system prompt
+   explicitly teaches Yuzu to use was silently ignored on the robot.
+   Fixed by handling "-ches/-shes/-sses/-xes/-zes" before the plain
+   "-s" rule.
 
-  1. yuzu_robot_config.json's PHYSICAL ZONES (underglow, eye_matrix,
-     leg_accents) -- "where are the LEDs and what's their base color"
-  2. ledsnewestv7.py's STATE PROFILES (idle, moving, alert) -- "what
-     should the lights do based on what the robot is currently doing"
+2. Markdown bold corrupted replies. normalize_actions used
+   `re.sub(r'\*(.*?)\*', r'[\1]', text)`, so "**waves**" became
+   "[]waves[]" -- two empty actions, and the word "waves" spoken
+   aloud. The bold case now runs first and both patterns require
+   non-empty content.
 
-Both now use the SAME color format (hex strings, matching what the
-JSON config already used) and the SAME brightness scale (0-100).
-Previously ledsnewestv7.py used [R,G,B] lists and a 0-1 brightness
-scale, which couldn't be compared to the JSON file's hex/0-100 format
-at all -- that mismatch is the actual "kink" worth fixing here.
-"""
+3. Stray asterisks ate speech. Same regex meant "it's 2 * 3 * 4"
+   became "it's 2 [ 3 ] 4" -- the middle of the sentence deleted
+   from the TTS line. Fixed by the same change (real markdown
+   emphasis has no space after the marker; a multiplication sign
+   does).
 
-import json
-from pathlib import Path
+4. Truncated brackets reached TTS. A cut-off generation ending in
+   "[squa" was spoken literally, brackets included. Known and
+   accepted before; it cost one regex in strip_actions to fix.
 
-DEFAULT_CONFIG = {
-    "robot_name": "Yuzu-Spider-V1",
-    "led_zones": {
-        "underglow":   {"color": "#FF1493", "effect": "neon_pulse", "brightness": 90},
-        "eye_matrix":  {"color": "#00FFFF", "effect": "static",     "brightness": 100},
-        "leg_accents": {"color": "#FF007F", "effect": "chase",      "brightness": 75},
-    },
-    "state_profiles": {
-        "idle":   {"color": "#00FF00", "brightness": 50,  "effect": "breathing"},
-        "moving": {"color": "#FFA500", "brightness": 80,  "effect": "solid"},
-        "alert":  {"color": "#FF0000", "brightness": 100, "effect": "strobe"},
-    },
-}
+5. The LED manager never read the real config. It defaulted to
+   "led_config.json" on a bare relative path, so it created a
+   SECOND config file next to whatever directory python ran from,
+   and edits to yuzu_robot_config.json had no effect on it. It now
+   resolves yuzu_robot_config.json relative to its own file, the
+   same way readtest.py and yuzu_led_controller.py already did.
 
+Also addressed, not bugs exactly:
 
-class LEDManager:
-    def __init__(self, config_path="led_config.json"):
-        self.config_path = Path(config_path)
-        self.data = self._load()
+- Silent beat before speech. Every action used to run to completion,
+  pauses included, before a single word was spoken. handle_yuzu_reply
+  now walks the reply in written order, so "Not much, just vibing!
+  [squats] [shakes legs] What's good?" talks, moves, then talks.
+  Pass interleave=False for the old behaviour.
+- Model phrasings outside the whitelist. "[spins around]" appears in
+  the prompt's own "Wrong:" example, so the model produces it; it
+  used to be dropped. ACTION_ALIASES maps the common ones onto real
+  moves. Impossible actions ([winks], arm/hair stretches) still match
+  nothing and still do nothing -- there is no fallback action, ever.
+- Duplicate config loaders. yuzu_led_controller.py had its own copy
+  of "find and parse the config"; it now calls LEDManager.
 
-    def _load(self):
-        if not self.config_path.exists():
-            self._save(DEFAULT_CONFIG)
-            return DEFAULT_CONFIG
-        with open(self.config_path, "r") as f:
-            return json.load(f)
-
-    def _save(self, data):
-        with open(self.config_path, "w") as f:
-            json.dump(data, f, indent=4)
-
-    def get_zone(self, zone_name):
-        """Static, location-based color -- underglow / eye_matrix / leg_accents."""
-        return self.data.get("led_zones", {}).get(zone_name)
-
-    def get_state_profile(self, state_name):
-        """Behavior-based lighting -- idle / moving / alert."""
-        return self.data.get("state_profiles", {}).get(
-            state_name, {"color": "#FFFFFF", "brightness": 50, "effect": "solid"}
-        )
-
-    def apply_zone(self, zone_name):
-        """Placeholder -- swap the print for a real LED hardware call later."""
-        zone = self.get_zone(zone_name)
-        if zone:
-            print(f"LED: zone '{zone_name}' -> {zone}")
-        else:
-            print(f"LED: no config found for zone '{zone_name}'")
-
-    def apply_state(self, state_name):
-        """Placeholder -- swap the print for a real LED hardware call later."""
-        profile = self.get_state_profile(state_name)
-        print(f"LED: robot state '{state_name}' -> {profile}")
-
-
-if __name__ == "__main__":
-    led = LEDManager()
-    print("--- Loaded zones (from the JSON config side) ---")
-    led.apply_zone("underglow")
-    led.apply_zone("eye_matrix")
-    led.apply_zone("leg_accents")
-    print()
-    print("--- Loaded state profiles (from the old ledsnewestv7 side) ---")
-    led.apply_state("idle")
-    led.apply_state("moving")
-    led.apply_state("alert")
-```
+Still true, still accepted: Yuzu occasionally emits [winks] or
+arm/back "stretch" language despite explicit prompt rules. The
+whitelist drops these with zero side effects. Not worth more prompt-
+chasing on a 3B model.
 
 ======================================================================
-## 8. REAL CONFIG FILE -- yuzu_robot_config.json (as currently exists)
+## 8. GAITS AND THE SIMULATOR (the big unknown, partially unblocked)
 ======================================================================
-Note: this real file only has `robot_name` and `led_zones` -- it does
-NOT yet have a `state_profiles` section, so calling `get_state_profile()`
-against the real file currently always falls back to the generic
-default (`#FFFFFF`, solid, 50). `eye_matrix`'s cyan color is still an
-unconfirmed addition -- unclear if it's an intentional new accessory or
-drifted in from a different, lost chat session.
+muto_leg_control.py now has a real tripod gait library -- walk
+forward/backward, turn, spin, squat, stand, shake legs, stretch --
+built on set_leg(), plus a DummyBot class with the same method names
+as the real Yahboom object. That means gaits can be written, run and
+timed on the phone today, with no hardware.
 
-```json
-{
-    "robot_name": "Yuzu-Spider-V1",
-    "led_zones": {
-        "underglow": {
-            "color": "#FF1493",
-            "effect": "neon_pulse",
-            "brightness": 90
-        },
-        "eye_matrix": {
-            "color": "#00FFFF",
-            "effect": "static",
-            "brightness": 100
-        },
-        "leg_accents": {
-            "color": "#FF007F",
-            "effect": "chase",
-            "brightness": 75
-        }
-    }
-}
-```
+WHAT THIS DOES NOT PROVE: that the robot balances, that the angles
+are right, or that the legs move the direction they're supposed to.
+The tests prove only that no gait commands a servo outside -90..90
+or addresses a leg that doesn't exist. Every angle constant is an
+educated guess.
 
-======================================================================
-## 9. KNOWN BUG -- readtest.py (not yet fixed)
-======================================================================
-Hardcodes an absolute, Pydroid-on-this-specific-phone file path, which
-will break the moment this code runs anywhere else (e.g. the Jetson).
-Needs to be changed to a path relative to the script's own location
-before it's reused outside of Pydroid testing.
+Calibration order once the chassis is built, body propped up so the
+feet carry no weight:
+  1. calibrate_leg() per leg -> fill in LEG_OFFSETS.
+  2. check_mirroring() -> all six legs should swing the same way
+     together. Flip signs in LEG_SIGN for any that don't.
+  3. check_tripods() -> the body should stay level on each tripod.
+     If it tips, TRIPOD_A/TRIPOD_B are wrong for this leg numbering.
+  4. Then walk(), on the floor, not a table.
 
-```python
-import json
-from pathlib import Path
-
-# Point straight to where we saved Yuzu's file
-CONFIG_FILE = Path(
-    "/data/user/0/iiec.pyramide.python/files/yuzu_robot_config.json"
-)
-
-# Open the JSON file and read it like a book
-with open(CONFIG_FILE, "r") as f:
-  yuzu_data = json.load(f)
-
-# Print out what it finds inside
-print("--- TEST SUCCESSFUL ---")
-print(
-    "Robot Name:", yuzu_data["robot_name"]
-)
-print(
-    "Underglow Color:",
-    yuzu_data["led_zones"]["underglow"]["color"],
-)
-print("Effect Mode:", yuzu_data["led_zones"]["underglow"]["effect"])
-```
+Two things that need the real hardware to settle:
+  - Whether g_bot.motor() blocks or returns immediately. The gaits
+    assume it returns immediately and call settle() to wait out the
+    runtime; if it actually blocks, those waits are doubled and
+    everything just moves at half speed (harmless, but retune).
+  - Whether the bus servos can report their current angle back. If
+    they can, calibrate_leg() should print the offsets instead of
+    Ghost reading them off by eye.
+  - The 2DOF camera gimbal has no wrapper yet; the look_* actions are
+    still prints.
 
 ======================================================================
-## 10. WHAT'S LEFT / NEXT STEPS (as of this export)
+## 9. HOW THE PIECES CONNECT NOW
+======================================================================
+Previously each file was an island. yuzu_all_in_one.py printed
+"ROBOT: squatting" while muto_leg_control.py sat unused, and the LED
+system knew nothing about either. Now:
+
+    mic -> listen_and_transcribe()          [STUB: Whisper]
+        -> LED state "thinking"
+        -> ask_yuzu_brain()                 [STUB: Ollama]
+        -> normalize_actions()              asterisks -> brackets
+        -> split_reply()                    ordered speech/action parts
+             speech -> LED "speaking" -> speak()   [STUB: Piper]
+             action -> LED "moving"   -> whitelist -> muto_leg_control
+        -> LED state "idle"
+
+The imports of muto_leg_control and yuzu_led_manager are optional:
+if either file isn't present, that layer falls back to printing and
+nothing crashes. So yuzu_all_in_one.py still runs alone in Pydroid.
+
+======================================================================
+## 10. WHAT'S LEFT / NEXT STEPS
 ======================================================================
 1. Buy the Jetson Orin Nano Super (~$400 of the ~$450 budget).
 2. Flash JetPack OS (Steam Deck as the flashing workstation).
-3. Install Ollama, pull the 3B Heretic model, verify real inference speed.
-4. Write the REAL `muto_leg_control.py` / gait functions -- biggest
-   unknown left; look for Yahboom's own Muto S2 example code first.
-5. Install and test Piper TTS + Whisper independently before wiring
-   them into the main loop together.
-6. Fix `readtest.py`'s hardcoded path.
-7. Decide/confirm whether `eye_matrix` is a real planned accessory.
-8. Add a `state_profiles` section to the real JSON config if the
-   idle/moving/alert lighting concept is being kept.
-9. Physical chassis purchase is separate and later than the Jetson
-   purchase (by design, ~1-3 months gap) -- chassis assembly, wiring,
-   and painting (Ghost's dad is doing the painting) come after that.
+3. Install Ollama, pull the 3B Heretic model, verify real inference
+   speed. Then replace ask_yuzu_brain() -- it is a one-function swap.
+4. Install and test Piper TTS + Whisper independently before wiring
+   them together. Watch the 8GB memory pool: Whisper + 3B LLM + Piper
+   is three things sharing it. Piper needs BOTH files per voice
+   (.onnx + .onnx.json) in the same folder; tune length_scale to
+   0.85-0.9 for the gyaru energy.
+5. Build the chassis, then run the calibration order in Section 8.
+   This is still the biggest unknown -- but it's now a calibration
+   job rather than a blank file. Check Yahboom's own Muto S2 example
+   code first in case they ship a working gait to compare against.
+6. Write the camera gimbal wrapper; wire the look_* actions to it.
+7. Decide whether `eye_matrix` is a real planned accessory. It is
+   still an unconfirmed addition that may have drifted in from a lost
+   chat session. If it isn't real, delete the zone from the config --
+   nothing else needs to change, the LED manager reads whatever zones
+   the config lists.
+8. Swap LEDManager's print for a real driver by passing
+   `hardware=` to the constructor. Nothing else needs touching.
+9. Painting (Ghost's dad) comes after chassis purchase -- see
+   paintstepslol.txt.
+
+DONE since the last export: readtest.py's hardcoded path (was already
+fixed in the file, this doc was stale); state_profiles added to the
+real config; the five bugs in Section 7.
 
 -- Exported by Claude
