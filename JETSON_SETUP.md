@@ -143,7 +143,43 @@ quantization starts costing real coherence.
 
 ## Stage 2 — on the Jetson
 
-### 0. Storage — get the NVMe
+### 0. What to actually buy
+
+**Board: order from NVIDIA's own marketplace, not Amazon.** Direct was
+$399 when Ghost checked; the Amazon listing for the identical kit was
+$508 and Amazon's own page flagged it "High price". Same product, same
+box. Prices move, so compare both, but check NVIDIA first.
+
+**In the box:** the module on its carrier board, a 19V power supply and
+regional cords. That's it.
+
+**NOT in the box, and needed for first boot:**
+
+- Boot storage — the NVMe below, or a microSD (64GB min)
+- **A DisplayPort cable, or a DP-to-HDMI adapter.** The dev kit outputs
+  DisplayPort. This is the classic gotcha: everyone has HDMI cables and
+  none of them fit. Order it at the same time.
+- USB keyboard and mouse, and a monitor
+- Ethernet is optional but makes setup much easier
+
+There is also a headless path — initial config over USB-C from another
+machine — which would suit the Steam Deck and skip the DP adapter
+entirely. Worth checking before buying the adapter.
+
+**Audio: buy it later, not now.** Everything through Stage 2 works with
+no microphone and no speaker, because listen_and_transcribe() is a
+plain input() and speak() is a print(). You can flash the board, run
+the model, score the prompt and drive the whole pipeline by typing.
+Buying audio up front means it sits in a drawer during the part of the
+project most likely to take a week. When the brain half is proven, a
+USB speakerphone puck is the right category: mic and speaker in one
+device, one USB port, one thing to configure instead of two competing
+for ALSA.
+
+**Budget check:** $399 board + ~$80 SSD is already ~$477 against a $450
+cap, before audio or the adapter. Not fatal, worth watching.
+
+### 0b. Storage — get the NVMe
 
 The dev kit carrier board has two M.2 Key M slots on the underside.
 **J11 is the one you want**: M.2 2280, PCIe Gen3 x4, and it's the boot
@@ -155,8 +191,12 @@ So **M.2 2280 Key M NVMe** is exactly the right part to buy. Notes:
 - Gen4 drives work fine but run at Gen3 speeds here, so there's no
   reason to pay the Gen4 premium. Any reliable Gen3 x4 drive is the
   sweet spot.
-- 500GB is plenty; 1TB if you want room for several models. The 3B
-  Q4_K_M is only ~2GB.
+- 500GB is plenty; don't get talked into 1TB. The 3B Q4_K_M is ~2GB.
+- Budget-brand drives (KingSpec and similar) work and the form factor
+  is what matters, but compare against a WD SN570 or Crucial P3 at the
+  same capacity — often similar money for a better-known controller.
+  Swap is sustained writes, which is exactly where cheap drives
+  struggle.
 - **The real reason this matters isn't boot speed.** It's swap. With
   8GB shared between CPU and GPU, and eventually Whisper + the 3B +
   Piper all wanting a piece, you will lean on swap. Swap on NVMe is
