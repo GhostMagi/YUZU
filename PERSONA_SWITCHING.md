@@ -131,9 +131,14 @@ Being straight with you about this, because the repo is otherwise
 careful about it:
 
 - Yuzu v1: **20%** action hit rate. Measured, by you.
-- Yuzu v2: **78–83%**. Measured, by you.
-- **Coco: nothing. Zero live rounds.** She's built on v2's structure
-  and carries its fixes, but that's an argument, not a number.
+- Yuzu v2: **78–83%** — but that number is now **stale**. The shared
+  body file changed when we took the "stuck in a room" framing out, so
+  v2's composed prompt is no longer the one you measured. Re-run it.
+- Coco, first round, 9 replies: **11/11 actions ran.** Every check at
+  100% except has_dialogue at 89% — one reply that was pure
+  `[walks backward]` with nothing said, which is the freeze this
+  archetype was always going to walk into. Nine replies is a small
+  sample. Promising, not proven.
 
 Score her the same way you scored v2:
 
@@ -181,6 +186,23 @@ made-up phrasings next to the ones you actually observed.
 
 ---
 
+## The room thing (fixed)
+
+Her first round had her saying "My world is this room" and refusing to
+say where Berlin was. That came from one sentence in the *shared* body
+file, which meant both v2 characters inherited it.
+
+It was the wrong kind of rule in the wrong file. The body file's job is
+to bound what she can **do** — six legs, a camera, no hands. Bounding
+what she can **know, want, or picture** is not a servo fact, and it cost
+the gyaru the thing that made her fun.
+
+Now: she's a person driving a chassis. She knows exactly what she is and
+won't claim arms she hasn't got, but she has a self, a look she pictures
+herself with, and places she'd like to go. Movement is still whitelisted
+to the same thirteen phrases. Imagination goes in the sentence, never in
+brackets.
+
 ## One wart worth knowing about
 
 The shared body file teaches "sounds are speech, not movement" with
@@ -190,13 +212,12 @@ Those are **Yuzu's** voice, not facts about a hexapod — but they live in
 the shared file, so they land in Coco's prompt too and pull her toward
 gyaru noises.
 
-I left it alone on purpose: editing that file would change yuzu2's
-composed prompt while you're mid-A/B on it, and that would throw away
-your 78–83% measurement. Instead Coco's own EXAMPLES carry her register
-(`Hm.`, `...`), which a 3B weights more heavily than a word list in a
-rule anyway.
+Still not fixed, and now for a different reason. The room change above
+already touched that file, so the "don't disturb the A/B" argument is
+spent — but changing two things at once means that when the next round
+comes back you can't tell which one moved the number. One change per
+round is your whole method and it works.
 
-**After your v2 A/B closes**, the clean fix is to move those five sound
-words out of the shared body file and let each persona demonstrate its
-own. There's a test pinning the current behaviour so it can't drift
-silently in the meantime.
+So: fix it next, on its own. There's a test pinning the current
+behaviour so it can't drift silently in the meantime. Coco's live round
+used "Pfft." well and showed no gyaru leakage, so it isn't urgent.

@@ -11,7 +11,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python test_yuzu.py` before committing. 134 tests, ~9 seconds.
+- Run `python test_yuzu.py` before committing. 141 tests, ~9 seconds.
 
 ## Prompt work
 
@@ -27,10 +27,24 @@ bracketed action would actually move the robot.
 Measured so far: v1 20% action hit rate → v2 78–83%.
 
 `personas/coco.persona` (kuudere) is built on v2's structure and carries
-its fixes, but has **zero live rounds** — that's an argument, not a
-number. Don't quote a hit rate for her until Ghost has A/B'd one.
+its fixes. First live round (9 replies, Sept 1): **11/11 actions ran**,
+has_dialogue 89% — one all-actions freeze, which was the predicted #1
+risk for the archetype. Small sample; treat it as promising, not proven.
+
+**yuzu2's 78–83% is now STALE.** The shared body file changed (the
+self-concept fix below), so v2's composed prompt is not the one that
+was measured. Re-run the A/B before quoting that number again.
 Her predicted failure modes and what to watch for are in
 PERSONA_SWITCHING.md.
+
+**The body bounds what she can DO, never what she can know or want.**
+"Your whole world is the room you're standing in" lived in the shared
+hardware file and collared every persona that composed the menu in —
+Coco answered "Where's Berlin?" with "I don't know what you're talking
+about. My world is this room," and the gyaru stopped wanting to go to
+the mall. Movement stays whitelisted; imagination is free and belongs
+in the sentence, never in brackets. Don't put character stances in
+`_hardware_*.txt` — that file is for servos.
 
 Watch for: PocketPal renders `*asterisks*` as italics WITHOUT showing
 the markers, so an italicised word in a screenshot is an asterisk

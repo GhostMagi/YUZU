@@ -586,6 +586,19 @@ class TestChatTemplateHeuristic(unittest.TestCase):
         self.assertIn("MISSING", self.verdict(None))
 
 
+def _action_word(stem):
+    """Match a forbidden action word as a WORD, with its ordinary verb
+    endings -- not as a substring.
+
+    A bare `assertNotIn("hug", rules)` fails on "huge lashes", and
+    "nod" hits "node", "wave" hits "wavelength". The point of these
+    checks is that the prompt must not name a MOVEMENT the body can't
+    make; an unrelated word that merely contains those letters is not
+    that, and a false positive here costs a real prompt improvement.
+    """
+    return r'\b' + stem + r'(s|es|ed|ing)?\b'
+
+
 class TestPersonas(unittest.TestCase):
     def test_yuzu_composes_byte_identical_to_the_tested_prompt(self):
         """THE important one. Ghost tested the original prompt
@@ -1032,10 +1045,10 @@ class TestHardwareBlocks(unittest.TestCase):
         # example is deliberate.
         rules = prompt.split("examples—")[0]
         for word in ("wink", "hug", "wave", "smize", "nod"):
-            self.assertNotIn(word, rules,
-                             f"v2 names '{word}' in its rules -- an "
-                             f"impossible movement has no instead-do-X "
-                             f"there, so naming it only demonstrates it")
+            self.assertNotRegex(rules, _action_word(word),
+                                f"v2 names '{word}' in its rules -- an "
+                                f"impossible movement has no instead-do-X "
+                                f"there, so naming it only demonstrates it")
 
 
 class TestPersonaWiring(BrainTestCase):
@@ -1316,10 +1329,10 @@ class TestCoco(unittest.TestCase):
         lowered = self.rules.lower()
         for word in ("stare", "blink", "smirk", "shrug", "eyebrow",
                      "wink", "nod", "hug", "wave", "tilt"):
-            self.assertNotIn(word, lowered,
-                             f"Coco's rules name '{word}' -- an impossible "
-                             f"movement with no instead-do-X there is pure "
-                             f"demonstration and it comes back in output")
+            self.assertNotRegex(lowered, _action_word(word),
+                                f"Coco's rules name '{word}' -- an impossible "
+                                f"movement with no instead-do-X there is pure "
+                                f"demonstration and it comes back in output")
 
     def test_her_sound_register_is_her_own_not_the_gyaru_one(self):
         """KNOWN WART, deliberately handled here rather than in the
@@ -1348,6 +1361,87 @@ class TestCoco(unittest.TestCase):
         self.assertGreater(self.coco.settings["piper_length_scale"],
                            yuzu_personas.load("yuzu").settings["piper_length_scale"])
         self.assertNotIn("piper_length_scale", self.coco.options())
+
+
+class TestSelfConcept(unittest.TestCase):
+    """She is a person driving a chassis, not a chassis that talks.
+
+    REGRESSION, found in Coco's first live round. The shared body file
+    said "your whole world is the room you're standing in", which is a
+    character stance wearing a hardware fact's clothes. It shipped in
+    the file every persona composes in, so both v2 characters inherited
+    it, and asked "Where's Berlin?" Coco answered "I don't know what
+    you're talking about. I've never been there. My world is this room."
+
+    That is the movement whitelist leaking out of the servos and into
+    her mind. The body's job is to bound what she can DO. Bounding what
+    she can know, want, or picture is not the body's job, and it cost
+    the gyaru the thing that made her fun -- she stopped wanting to go
+    to the mall.
+    """
+
+    V2_PERSONAS = ("yuzu2", "coco")
+
+    def test_no_persona_shrinks_her_world_to_one_room(self):
+        for key in yuzu_personas.available():
+            prompt = yuzu_personas.load(key).prompt.lower()
+            for phrase in ("whole world is the room",
+                           "go places on your own",
+                           "world is this room"):
+                self.assertNotIn(phrase, prompt,
+                                 f"{key} tells her her world is one room")
+
+    def test_the_body_file_separates_doing_from_imagining(self):
+        """The firewall, stated where the action menu is stated: the
+        vocabulary limit is on movement only."""
+        menu = yuzu_personas._parse_hardware("muto_s2")["HARDWARE_MENU"].lower()
+        self.assertIn("the limit is on what your body can do", menu)
+        self.assertIn("never a limit on what you can think", menu)
+        # ...and the instead-do-X for a move the chassis can't make:
+        # say it in the sentence rather than swallowing the thought.
+        self.assertIn("belongs in your sentence, never in brackets", menu)
+
+    def test_she_is_told_she_is_a_person_driving_a_body(self):
+        menu = yuzu_personas._parse_hardware("muto_s2")["HARDWARE_MENU"]
+        self.assertIn("You are a person", menu)
+        self.assertIn("driving a six-legged robot body", menu)
+        # Still honest about the chassis -- the fix must not make her
+        # start claiming arms she doesn't have.
+        self.assertIn("no hands, no arms, and no face", menu)
+
+    def test_each_v2_persona_pictures_herself_as_someone(self):
+        for key in self.V2_PERSONAS:
+            prompt = yuzu_personas.load(key).prompt
+            self.assertIn("You picture yourself as a", prompt,
+                          f"{key} has no self-image, so 'what do you look "
+                          f"like' has nothing to draw on but the chassis")
+
+    def test_each_v2_persona_has_a_worked_answer_to_an_outside_world_fact(self):
+        """The Berlin failure was a DODGE, not a missing fact -- she knows
+        where Berlin is. One example of answering a geography question
+        plainly is what stops the dodge."""
+        for key in self.V2_PERSONAS:
+            prompt = yuzu_personas.load(key).prompt
+            self.assertIn("What's the capital of France?", prompt)
+            self.assertIn("Paris", prompt)
+
+    def test_the_frozen_v1_prompt_is_untouched_by_all_of_this(self):
+        """v1 composes {HARDWARE}, not {HARDWARE_MENU}, so it never had
+        the room line and must not gain anything now. Ghost's 20%
+        baseline has to stay comparable."""
+        golden = (Path(__file__).parent / "personas" /
+                  "_golden_yuzu_v1.txt").read_text(encoding="utf-8").strip()
+        self.assertEqual(yuzu_personas.load("yuzu").prompt.strip(), golden)
+        self.assertNotIn("You are a person", golden)
+
+    def test_imagining_a_body_still_cannot_move_the_robot(self):
+        """The whole bet: her self-image is free in SPEECH and still
+        gated at the brackets. If any of this leaked into the action
+        vocabulary, the robot would try to run it."""
+        for phrase in ("flips hair", "flutters lashes", "checks nails",
+                       "goes to the mall", "puts on boots"):
+            self.assertEqual(yuzu.lookup_actions(phrase), [],
+                             f"[{phrase}] must never resolve to a movement")
 
 
 class TestPersonaSwitching(BrainTestCase):
