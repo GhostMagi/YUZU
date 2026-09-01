@@ -131,8 +131,18 @@ Found the hard way, Sept 2026:
   `Ctrl+N` is down-arrow for command history.
 - **The built-in SD card reader is not in the boot list.** Boot priority
   offers the Samsung drive, USB FDD/HDD/CDROM and network — nothing for
-  the internal reader. So the microSD has to arrive over USB: a card
-  reader dongle, or write the image to a plain USB stick instead.
+  the internal reader.
+- **The USB-C / Thunderbolt 3 port is dead during POST.** A USB-C card
+  reader in it is invisible to the firmware: the Boot Option Menu comes
+  up completely empty and nothing new appears in the BIOS boot priority
+  list either. The controller isn't initialised until an OS loads, and
+  there's no BIOS setting to change that. Tested Sept 2026, ruled out.
+
+  **So it has to be USB-A.** The machine has three Type-A ports and they
+  work fine. Either a plain USB-A flash drive with the image written
+  straight to it, or a USB-C-female-to-USB-A-male adapter so a USB-C
+  reader can reach a Type-A port. Anything that only speaks USB-C is a
+  dead end here no matter what's on the card.
 
 ### 6. If it still refuses to boot the stick
 Acer's Secure Boot has an odd lock: you can't turn it off until a
