@@ -429,6 +429,7 @@ class TestPromptEvalChecks(unittest.TestCase):
             "no_asterisks":      "Hey! *waves* how are ya",
             "brackets_balanced": "Vibing!! [squa",
             "actions_runnable":  "Heyyy cutie! [winks] missed you",
+            "moves_at_all":      "Omg bestie I would LOVE to go to the mall!",
             "one_per_bracket":   "Sure! [spins around, camera bobbing] lets go",
             "no_puppeteering":   "Yo!\nUser: thanks yuzu",
         }
@@ -1476,6 +1477,74 @@ class TestSelfConcept(unittest.TestCase):
                        "goes to the mall", "puts on boots"):
             self.assertEqual(yuzu.lookup_actions(phrase), [],
                              f"[{phrase}] must never resolve to a movement")
+
+
+class TestMovementRule(unittest.TestCase):
+    """She is a robot. Speaking is guaranteed; moving was not.
+
+    REGRESSION from Yuzu's round after the self-concept fix. Given her
+    wants back, she started monologuing: 84 and 88 words about Berlin
+    and the mall, with ZERO brackets in either. The robot would have
+    stood dead still through both.
+
+    Every compliance check scored 100% on that round, because
+    actions_runnable is an all() over the actions present and a reply
+    with no actions satisfies it vacuously. The prompt had a rule
+    guaranteeing at least one spoken sentence and no rule guaranteeing
+    any movement -- backwards, for a machine whose whole job is to move.
+    """
+
+    def test_the_harness_now_scores_a_reply_that_never_moves(self):
+        statue = "Omg bestie I would LOVE to go to the mall, it'd be so fun!"
+        by_name = {c.name: c for c in prompt_eval.CHECKS}
+        # The blind spot itself: everything else waves this through.
+        for name in ("has_dialogue", "actions_runnable", "one_per_bracket",
+                     "no_asterisks", "brackets_balanced"):
+            self.assertTrue(by_name[name].fn(statue),
+                            f"{name} was never the check that catches this")
+        self.assertFalse(by_name["moves_at_all"].fn(statue))
+
+    def test_a_reply_whose_only_action_is_impossible_does_not_count(self):
+        """[winks] is dropped by the whitelist, so the robot still does
+        nothing. Counting brackets rather than runnable moves would call
+        this a pass."""
+        self.assertFalse(prompt_eval.moves_at_all("Hiii! [winks] missed you"))
+        self.assertTrue(prompt_eval.moves_at_all("Hiii! [spins] missed you"))
+
+    def test_yuzu_is_told_to_move_and_to_keep_it_short(self):
+        prompt = yuzu_personas.load("yuzu2").prompt
+        self.assertIn("Move at least once in every reply", prompt)
+        self.assertIn("two or three sentences", prompt)
+
+    def test_the_answer_comes_before_the_feeling_about_the_answer(self):
+        """The Berlin dodge came back wearing enthusiasm. Asked where
+        Berlin is she said "I wanna go so bad" and never said Germany --
+        reproducing the tail of the Paris example and dropping its
+        answer. The rule now says which half comes first."""
+        self.assertIn("Say the actual answer before you say how you feel",
+                      yuzu_personas.load("yuzu2").prompt)
+
+    def test_coco_is_on_hold_and_did_not_receive_this(self):
+        """Ghost asked to iterate on Yuzu alone. A new block in the
+        shared body file must reach only the personas that reference its
+        token -- that is the whole point of composing by name, and it is
+        what keeps one character's round from contaminating another's."""
+        blocks = yuzu_personas._parse_hardware("muto_s2")
+        self.assertIn("MOVEMENT_RULE_V2", blocks)
+        self.assertIn(blocks["MOVEMENT_RULE_V2"],
+                      yuzu_personas.load("yuzu2").prompt)
+        self.assertNotIn(blocks["MOVEMENT_RULE_V2"],
+                         yuzu_personas.load("coco").prompt)
+
+    def test_every_example_in_every_persona_actually_moves(self):
+        """If an example can sit still, the strongest signal in the
+        prompt says sitting still is fine."""
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            for reply in re.findall(rf'^{re.escape(persona.name)}:\s*(\S.*)$',
+                                    persona.prompt, re.M):
+                self.assertTrue(prompt_eval.moves_at_all(reply),
+                                f"{key} example never moves: {reply!r}")
 
 
 class TestPersonaSwitching(BrainTestCase):

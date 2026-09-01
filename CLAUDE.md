@@ -11,7 +11,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python test_yuzu.py` before committing. 142 tests, ~9 seconds.
+- Run `python test_yuzu.py` before committing. 148 tests, ~9 seconds.
 
 ## Prompt work
 
@@ -36,6 +36,13 @@ self-concept fix below), so v2's composed prompt is not the one that
 was measured. Re-run the A/B before quoting that number again.
 Her predicted failure modes and what to watch for are in
 PERSONA_SWITCHING.md.
+
+**Speaking was guaranteed; moving was not.** The prompt had a dialogue
+rule and no movement rule, and once Yuzu got her wants back she
+monologued about the mall in 84-word replies with zero brackets. Every
+eval check read 100% — `actions_runnable` is an `all()` over the actions
+present, so a reply with none passes vacuously. `moves_at_all` now
+scores it. When a whole round looks perfect, suspect the harness.
 
 **Wants go in the rules; the body picture goes in an example.** A want
 ("I'd live at the mall") cannot produce a bracket, so it's free. A
