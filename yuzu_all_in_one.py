@@ -378,10 +378,21 @@ def start_brain(persona_key=None):
         print(f"\n!! Brain offline, falling back to the echo stub.\n{exc}\n")
         return "echo stub (Ollama unreachable)"
     brain = candidate
+    brain.on_recover = _announce_recovery
     current_persona = candidate.persona
     apply_persona_look(current_persona)
     who = current_persona.name if current_persona else "custom prompt"
     return f"{who} via Ollama, model '{brain.model}'"
+
+
+def _announce_recovery(kind, health):
+    """Say out loud when the drift monitor trims history, so a weird
+    stretch of conversation has a visible cause instead of looking like
+    the robot randomly forgot things."""
+    what = ("kept the last exchange" if kind == "soft"
+            else "cleared the conversation")
+    print(f"   ~ format drifting ({health}); {what}. "
+          f"She still knows who she is.")
 
 
 def switch_persona(key):
@@ -399,6 +410,7 @@ def switch_persona(key):
         print(f"{exc}")
         return False
     brain = candidate
+    brain.on_recover = _announce_recovery
     current_persona = candidate.persona
     apply_persona_look(current_persona)
     print(f"Now talking to {current_persona.name} "
@@ -420,8 +432,8 @@ def ask_yuzu_brain(user_text):
 
 def run_yuzu_forever():
     brain_status = start_brain()
-    print("Listening... ('quit' to stop, '/persona <name>' to switch, "
-          "'/personas' to list)")
+    print("Listening... 'quit' to stop. Commands: /personas /persona <name> "
+          "/reset /health")
     print(f"brain: {brain_status}")
     print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
           f"leds: {'yuzu_led_manager' if leds else 'off'}\n")
@@ -450,6 +462,21 @@ def run_yuzu_forever():
         if command.startswith("/persona "):
             switch_persona(command.split(None, 1)[1].strip())
             print()
+            continue
+        if command in ("/reset", "/clear"):
+            if brain:
+                brain.reset()
+                print("Conversation cleared. Personality untouched.\n")
+            else:
+                print("Nothing to reset -- running on the echo stub.\n")
+            continue
+        if command == "/health":
+            if brain and brain.last_health:
+                print(f" last reply: {brain.last_health}")
+                print(f" history: {len(brain.history)//2} exchanges, "
+                      f"auto-recoveries so far: {brain.recoveries}\n")
+            else:
+                print("No replies scored yet.\n")
             continue
         set_led_state("thinking")
         raw_reply = ask_yuzu_brain(user_text)

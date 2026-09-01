@@ -835,6 +835,112 @@ class TestHistoryCanonicalisation(unittest.TestCase):
                             f"'{phrase}' appeared live and should run")
 
 
+class TestReplyHealth(unittest.TestCase):
+    """Scoring reuses the robot's own parser, so 'healthy' means
+    literally 'this reply would have worked'."""
+
+    def health(self, raw):
+        from yuzu_brain import ReplyHealth
+        return ReplyHealth(raw)
+
+    def test_a_good_reply_is_ok(self):
+        h = self.health("Not much, just vibing! [squats] What's good?")
+        self.assertTrue(h.ok)
+        self.assertEqual((h.ran, h.total, h.asterisks), (1, 1, 0))
+
+    def test_asterisks_are_wonky(self):
+        self.assertFalse(self.health("Okay! *wriggles legs* see? *giggles*").ok)
+
+    def test_no_dialogue_is_wonky(self):
+        self.assertFalse(self.health("[squats] [shakes legs]").ok)
+
+    def test_actions_the_body_cannot_do_are_wonky(self):
+        self.assertFalse(self.health("Sure! [winks] [smizes] love it").ok)
+
+    def test_pure_conversation_is_fine(self):
+        # No actions at all is not a failure -- she's allowed to just talk.
+        self.assertTrue(self.health("Hey cutie, no actions here at all!").ok)
+
+
+class TestDriftRecovery(BrainTestCase):
+    def drifting_brain(self, **kwargs):
+        MockOllama.replies = itertools.cycle(
+            ["Aw! *opens legs slightly* robot hug! *giggles*"])
+        return self.brain(system_prompt="test", **kwargs)
+
+    def test_one_bad_reply_does_not_trigger_a_reset(self):
+        """A single odd reply is noise. Resetting on it would make her
+        feel amnesiac for no reason."""
+        brain = self.drifting_brain()
+        brain.ask("hi")
+        self.assertEqual(brain.recoveries, 0)
+        self.assertEqual(len(brain.history), 2)
+
+    def test_two_in_a_row_triggers_recovery(self):
+        brain = self.drifting_brain()
+        brain.ask("hi")
+        brain.ask("again")
+        self.assertEqual(brain.recoveries, 1)
+
+    def test_recovery_keeps_the_most_recent_exchange(self):
+        """Soft reset: the thread survives, the accumulated bad examples
+        don't."""
+        brain = self.drifting_brain()
+        for i in range(4):
+            brain.ask(f"message {i}")
+        self.assertLessEqual(len(brain.history), 4)
+        self.assertEqual(brain.history[-2]["content"], "message 3")
+
+    def test_history_stays_bounded_under_sustained_drift(self):
+        brain = self.drifting_brain()
+        for i in range(12):
+            brain.ask(f"message {i}")
+        self.assertLessEqual(len(brain.history) // 2, 2,
+                             "drift must not let context grow unbounded")
+
+    def test_recovery_can_be_switched_off(self):
+        brain = self.drifting_brain(auto_recover=False)
+        for i in range(6):
+            brain.ask(f"message {i}")
+        self.assertEqual(brain.recoveries, 0)
+        self.assertGreater(len(brain.history) // 2, 2)
+
+    def test_good_replies_never_trigger_recovery(self):
+        MockOllama.replies = itertools.cycle(
+            ["Not much, just vibing! [squats] What's good?"])
+        brain = self.brain(system_prompt="test")
+        for i in range(8):
+            brain.ask(f"message {i}")
+        self.assertEqual(brain.recoveries, 0)
+
+    def test_a_streak_resets_after_one_good_reply(self):
+        MockOllama.replies = itertools.cycle([
+            "Aw! *giggles* hug!",                       # wonky
+            "Not much, vibing! [squats] What's good?",   # good
+            "Aw! *giggles* hug!",                       # wonky again
+        ])
+        brain = self.brain(system_prompt="test")
+        for i in range(3):
+            brain.ask(f"message {i}")
+        self.assertEqual(brain.recoveries, 0,
+                         "alternating replies aren't a drift pattern")
+
+    def test_personality_survives_a_full_reset(self):
+        brain = self.brain(persona="yuzu2")
+        brain.reset()
+        self.assertIn("pink-obsessed Gyaru", brain.system_prompt)
+        self.assertEqual(brain.history, [])
+
+    def test_callback_reports_what_happened(self):
+        brain = self.drifting_brain()
+        seen = []
+        brain.on_recover = lambda kind, health: seen.append((kind, health.ok))
+        brain.ask("hi"); brain.ask("again")
+        self.assertEqual(len(seen), 1)
+        self.assertIn(seen[0][0], ("soft", "full"))
+        self.assertFalse(seen[0][1])
+
+
 class TestVocalizations(unittest.TestCase):
     """Laughs and squeals are speech, not movement. They were 8 of the 9
     dropped actions in the latest live round -- the single biggest

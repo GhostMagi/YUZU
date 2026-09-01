@@ -58,6 +58,52 @@ DEFAULT_OPTIONS = {
 }
 
 
+class ReplyHealth:
+    """How well one reply followed the format rules.
+
+    Cheap and local -- no second model call, which matters on a Jetson
+    already running Whisper and Piper. It reuses the same parser the
+    robot uses, so "healthy" means literally "this would have worked".
+    """
+
+    def __init__(self, raw):
+        try:
+            from yuzu_all_in_one import (extract_actions, lookup_actions,
+                                         normalize_actions, strip_actions)
+        except ImportError:
+            self.usable = None          # no parser; can't judge
+            self.asterisks = self.total = self.ran = 0
+            self.has_dialogue = True
+            return
+        self.asterisks = raw.count("*") // 2
+        cleaned = normalize_actions(raw)
+        actions = extract_actions(cleaned)
+        self.total = len(actions)
+        self.ran = sum(1 for a in actions if lookup_actions(a))
+        self.has_dialogue = bool(strip_actions(cleaned).strip())
+        self.usable = True
+
+    @property
+    def ok(self):
+        """A reply is wonky if she wrote actions in the wrong format, or
+        wrote actions the body can't do, or said nothing at all."""
+        if self.usable is None:
+            return True
+        if not self.has_dialogue:
+            return False                # the freeze case
+        if self.asterisks:
+            return False                # format drift, the snowball starter
+        if self.total and not self.ran:
+            return False                # moved in ways the robot can't
+        return True
+
+    def __repr__(self):
+        return (f"<{'ok' if self.ok else 'WONKY'} "
+                f"actions {self.ran}/{self.total} "
+                f"asterisks {self.asterisks} "
+                f"dialogue {'y' if self.has_dialogue else 'n'}>")
+
+
 class BrainError(RuntimeError):
     """Ollama is unreachable, or the model isn't there. Raised with a
     message that says what to actually do about it."""
@@ -85,12 +131,14 @@ def _post(url, payload, timeout):
 class YuzuBrain:
     def __init__(self, model=DEFAULT_MODEL, host=DEFAULT_HOST,
                  system_prompt=None, options=None, timeout=120,
-                 history_turns=8, persona=None):
+                 history_turns=8, persona=None, auto_recover=True):
         """
         model         : Ollama model name (see Modelfile.yuzu)
         persona       : key from personas/ -- supplies both the system
                         prompt and any sampling overrides that character
                         wants (a kuudere can run colder than a gyaru)
+        auto_recover  : watch replies for format drift and trim history
+                        when she goes wonky (see below)
         history_turns : how many past exchanges to keep. A 3B loses the
                         thread long before the context window fills, and
                         every extra token is latency on the Jetson, so
@@ -120,6 +168,22 @@ class YuzuBrain:
         self.timeout = timeout
         self.history_turns = history_turns
         self.history = []
+
+        # Drift recovery. Measured on a real 7-turn chat: format held on
+        # turn 1 and had fully collapsed by turn 3, because her own
+        # replies outweigh the system prompt once they pile up.
+        #
+        # A blind periodic reset would throw away the conversation at
+        # random. This watches the replies instead and only acts when
+        # she's actually gone wonky, and even then keeps the most recent
+        # exchange so the thread survives. Her personality is in the
+        # system prompt, which is re-sent every turn -- that's what
+        # continuity actually rests on, not the transcript.
+        self.auto_recover = auto_recover
+        self.wonky_streak = 0
+        self.recoveries = 0
+        self.last_health = None
+        self.on_recover = None          # optional callback(kind, health)
 
     # -- preflight ------------------------------------------------------
 
@@ -185,6 +249,7 @@ class YuzuBrain:
         reply = (data.get("message") or {}).get("content", "").strip()
         if remember:
             self._remember(user_text, reply)
+        self._check_drift(reply)
         return reply
 
     def ask_stream(self, user_text, remember=True):
@@ -258,9 +323,40 @@ class YuzuBrain:
         # long session.
         self.history = self.history[-self.history_turns * 2:]
 
+    def _check_drift(self, reply):
+        """Score the reply and recover if she's drifting.
+
+        Two strikes, not one -- a single odd reply is noise, and
+        resetting on it would make her feel amnesiac. Two in a row is a
+        pattern, and in the measured chat the pattern never
+        self-corrected once it started.
+        """
+        if not reply:
+            return
+        health = ReplyHealth(reply)
+        self.last_health = health
+        if health.ok:
+            self.wonky_streak = 0
+            return
+
+        self.wonky_streak += 1
+        if not self.auto_recover or self.wonky_streak < 2:
+            return
+
+        # Soft first: keep the last exchange so the thread survives.
+        # If that didn't take, clear the lot -- the personality is in
+        # the system prompt and comes back regardless.
+        kind = "soft" if len(self.history) > 2 else "full"
+        self.history = self.history[-2:] if kind == "soft" else []
+        self.wonky_streak = 0
+        self.recoveries += 1
+        if self.on_recover:
+            self.on_recover(kind, health)
+
     def reset(self):
         """Forget the conversation, keep the personality."""
         self.history = []
+        self.wonky_streak = 0
 
 
 # ---------------------------------------------------------------------
