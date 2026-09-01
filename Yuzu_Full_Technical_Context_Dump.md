@@ -76,7 +76,10 @@ limitation, not something to keep chasing via prompt engineering.
   with embedded RGB tips on the top deck, blinged-out phone charms/
   lanyards on front mounting points, a potential laser pointer clip on
   the camera gimbal.
-- Budget: ~$450 total procurement cap, Jetson itself targeted at ~$400.
+- Budget: ~$500 procurement cap (raised from $450). Board $399 direct
+  from NVIDIA's marketplace, ~$78 for a 512GB M.2 2280 NVMe, leaving
+  ~$23 — enough for the DisplayPort adapter, not for audio. Audio is
+  deliberately deferred; the whole pipeline runs on typed input.
 - Workstation: a Steam Deck (in Desktop Mode) will serve as the primary
   device for flashing media, remote debugging, and SSH terminal work.
 - Low-level servo API reference (from Yahboom docs, not yet wrapped in

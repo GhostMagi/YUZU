@@ -176,8 +176,9 @@ USB speakerphone puck is the right category: mic and speaker in one
 device, one USB port, one thing to configure instead of two competing
 for ALSA.
 
-**Budget check:** $399 board + ~$80 SSD is already ~$477 against a $450
-cap, before audio or the adapter. Not fatal, worth watching.
+**Budget check:** $500 cap. $399 board + ~$78 SSD = $477, leaving ~$23
+for the DisplayPort adapter. Audio does not fit and does not need to —
+see above.
 
 ### 0b. Storage — get the NVMe
 
