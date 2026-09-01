@@ -14,13 +14,41 @@ Not 24.04 — it isn't on that list.
 
 ## Before you start
 
-- **A USB stick, 8GB or bigger.** Everything on it gets erased. This is
-  the only thing you might not already have.
+- **Something to boot from, 8GB or bigger.** A USB stick works. So does
+  **a microSD in a USB card reader** — the reader looks like a plain USB
+  drive to the BIOS, so it boots the same way. See the note below.
 - The Acer plugged into power the whole time. Do not let it die during
   an install.
 - "No Bootable Device" on the Acer is expected. The drive is blank.
   That's the screen a blank drive makes, and it means there is nothing
   on there to lose.
+
+### Using the Deck's microSD instead of a flash drive
+
+Works fine, with three things worth knowing:
+
+**It erases the card, games included.** A card that's been living in the
+Steam Deck holds installed games. Writing Ubuntu to it wipes them. They
+are not gone-gone — they redownload from Steam for free — but it's hours
+of bandwidth, so check nothing on there is precious first.
+
+**Don't format it first.** Natural instinct, wasted step: Etcher
+overwrites the whole card regardless of what was on it. Flash straight
+over the top.
+
+**Write it in the Deck, boot it from the dongle.** The Deck has its own
+microSD slot, so the card can stay in the Deck for the writing half. The
+dongle is only needed to plug it into the Acer. Use the dongle rather
+than the Acer's built-in SD slot — built-in card readers on laptops this
+age often can't be booted from. (If it does show up in the F12 menu,
+fine, use it.)
+
+Afterwards the card will look broken — SteamOS or Windows may show a
+tiny unreadable partition and offer to format it. That's just what an
+installer image looks like. Ignore it until you're done with it.
+
+**To make it a Steam card again:** Steam Deck → Settings → System →
+Format SD Card. Undoes all of this in about a minute.
 
 ---
 
@@ -43,11 +71,12 @@ Use Etcher rather than the `dd` command. Etcher refuses to write to your
 system drive; a mistyped `dd` would overwrite the Steam Deck itself and
 there is no undo.
 
-### 4. Write the stick
-Plug the USB stick in, open Etcher:
+### 4. Write the card (or stick)
+Card in the Deck's own microSD slot. Open Etcher:
 
 1. **Flash from file** → pick the `.iso` you downloaded
-2. **Select target** → pick the USB stick (check the size matches!)
+2. **Select target** → pick the card. **Check the size says ~128GB.**
+   This is the one step with no undo, so read it twice.
 3. **Flash**
 
 It verifies afterwards. When it says done, you're finished with the Deck.
