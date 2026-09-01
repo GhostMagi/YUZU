@@ -11,7 +11,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python test_yuzu.py` before committing. 97 tests, ~8 seconds.
+- Run `python test_yuzu.py` before committing. 134 tests, ~9 seconds.
 
 ## Prompt work
 
@@ -25,6 +25,12 @@ It works. Score them against the real parser rather than eyeballing —
 bracketed action would actually move the robot.
 
 Measured so far: v1 20% action hit rate → v2 78–83%.
+
+`personas/coco.persona` (kuudere) is built on v2's structure and carries
+its fixes, but has **zero live rounds** — that's an argument, not a
+number. Don't quote a hit rate for her until Ghost has A/B'd one.
+Her predicted failure modes and what to watch for are in
+PERSONA_SWITCHING.md.
 
 Watch for: PocketPal renders `*asterisks*` as italics WITHOUT showing
 the markers, so an italicised word in a screenshot is an asterisk

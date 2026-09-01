@@ -212,8 +212,7 @@ def main(argv):
 
     persona = args.persona.lower() if args.persona else None
     try:
-        brain = (YuzuBrain(model=args.model, persona=persona) if args.model
-                 else YuzuBrain(persona=persona))
+        brain = YuzuBrain(model=args.model, persona=persona)
     except BrainError as exc:
         print(f"\n{exc}\n")
         return 1

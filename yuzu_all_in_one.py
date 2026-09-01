@@ -404,7 +404,12 @@ def switch_persona(key):
         print("Persona switching needs yuzu_personas.py and yuzu_brain.py.")
         return False
     try:
+        # Keep whatever model/host the running brain is on. When the
+        # brain never came up these are None, which YuzuBrain reads as
+        # "use the defaults" -- switching characters must not depend on
+        # Ollama having been reachable at boot.
         candidate = YuzuBrain(model=brain.model if brain else None,
+                              host=brain.host if brain else None,
                               persona=key)
     except BrainError as exc:
         print(f"{exc}")

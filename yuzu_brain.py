@@ -144,8 +144,14 @@ class YuzuBrain:
                         every extra token is latency on the Jetson, so
                         this is deliberately short.
         """
-        self.model = model
-        self.host = host.rstrip("/")
+        # model=None means "the default", not "no model". Callers pass
+        # it through from an unset --model flag or from a brain that
+        # never came up (switch_persona does exactly that when Ollama
+        # was down at boot). Leaving it None sent {"model": null} to
+        # Ollama and every turn after the switch failed, with nothing
+        # naming the switch as the cause.
+        self.model = model or DEFAULT_MODEL
+        self.host = (host or DEFAULT_HOST).rstrip("/")
         self.persona = None
         persona_options = {}
         if system_prompt is None:

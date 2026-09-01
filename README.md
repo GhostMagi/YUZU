@@ -18,7 +18,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 82 tests, ~3 seconds
+python test_yuzu.py           # 134 tests, ~9 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -93,7 +93,14 @@ python build_yuzu_model.py --all --create   # one Ollama model each
 python yuzu_brain.py --persona saya --chat
 ```
 
-In the main loop, `/personas` lists and `/persona saya` switches live.
+In the main loop, `/personas` lists and `/persona coco` switches live.
+
+Two characters are built on the Muto S2 today: **Yuzu** (gyaru, hot
+pink, hype) and **Coco** (kuudere, cold blue, deadpan). Switching
+between them at runtime costs nothing — the system prompt is re-sent
+every turn, so a persona is just the first message. Baking one model
+per persona instead costs a second model resident in RAM. Which to use
+when is in **[PERSONA_SWITCHING.md](PERSONA_SWITCHING.md)**.
 
 **Why the split.** The bracket format, the action vocabulary, the
 "always say something out loud" rule — none of that is personality,

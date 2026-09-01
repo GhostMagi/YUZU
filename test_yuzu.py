@@ -24,6 +24,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import muto_leg_control as legs
 import yuzu_all_in_one as yuzu
 import gguf_inspect
+import yuzu_brain
 import yuzu_personas
 import yuzu_prompt_eval as prompt_eval
 from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
@@ -1182,13 +1183,222 @@ class TestModelfile(unittest.TestCase):
         self.assertIn("PARAMETER temperature 0.8", rendered)
         self.assertIn('PARAMETER stop "User:"', rendered)
 
-    def test_committed_modelfile_matches_the_generator(self):
-        # If this fails, someone edited Modelfile.yuzu by hand or changed
-        # the prompt without re-running build_yuzu_model.py.
+    def test_every_committed_modelfile_matches_the_generator(self):
+        # If this fails, someone edited a Modelfile by hand or changed a
+        # persona without re-running build_yuzu_model.py.
+        #
+        # This globs rather than naming Modelfile.yuzu, because the whole
+        # point of one model per persona is that there will be several,
+        # and a stale Modelfile.coco is a robot answering in a voice the
+        # persona file no longer describes -- silently, since Ollama
+        # baked the old SYSTEM block in at create time.
         import build_yuzu_model
-        committed = (Path(__file__).parent / "Modelfile.yuzu").read_text()
-        self.assertEqual(committed, build_yuzu_model.render(),
-                         "Modelfile.yuzu is stale -- run: python build_yuzu_model.py")
+        found = sorted(Path(__file__).parent.glob("Modelfile.*"))
+        self.assertTrue(found, "no Modelfiles committed at all")
+        for path in found:
+            key = path.suffix.lstrip(".")
+            self.assertIn(key, yuzu_personas.available(),
+                          f"{path.name} has no persona behind it")
+            self.assertEqual(
+                path.read_text(), build_yuzu_model.render(persona_key=key),
+                f"{path.name} is stale -- run: python build_yuzu_model.py "
+                f"--persona {key}")
+
+    def test_each_persona_renders_its_own_prompt_and_sampling(self):
+        """Two characters on one box must not collapse into one model."""
+        import build_yuzu_model
+        yuzu_mf = build_yuzu_model.render(persona_key="yuzu")
+        coco_mf = build_yuzu_model.render(persona_key="coco")
+        self.assertIn("You are Yuzu", yuzu_mf)
+        self.assertIn("You are Coco", coco_mf)
+        self.assertNotIn("You are Coco", yuzu_mf)
+        self.assertIn("PARAMETER temperature 0.8", yuzu_mf)
+        self.assertIn("PARAMETER temperature 0.7", coco_mf)
+        # Same base weights -- that's what makes a second persona cost
+        # kilobytes on disk instead of another few gigabytes.
+        base = lambda t: [l for l in t.splitlines() if l.startswith("FROM ")][0]
+        self.assertEqual(base(yuzu_mf), base(coco_mf))
+
+
+class TestPersonaExamples(unittest.TestCase):
+    """A persona's own EXAMPLES are the strongest signal a 3B gets --
+    stronger than any rule above them. So they have to pass the same
+    scoring the live replies do. An example that would fail the eval is
+    a prompt teaching the model to fail it."""
+
+    def example_replies(self, persona):
+        """The 'Name: ...' lines in a persona's EXAMPLES section."""
+        return [m.group(1) for m in re.finditer(
+            rf'^{re.escape(persona.name)}:\s*(\S.*)$', persona.prompt, re.M)]
+
+    def test_every_persona_shows_at_least_one_example(self):
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            self.assertTrue(self.example_replies(persona),
+                            f"{key} has no example reply to imitate")
+
+    def test_every_example_passes_every_compliance_check(self):
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            for reply in self.example_replies(persona):
+                for check in prompt_eval.CHECKS:
+                    self.assertTrue(
+                        check.fn(reply),
+                        f"{key} example fails {check.name} "
+                        f"({check.rule}): {reply!r}")
+
+    def test_no_example_demonstrates_an_action_the_robot_drops(self):
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            for reply in self.example_replies(persona):
+                for action in yuzu.extract_actions(yuzu.normalize_actions(reply)):
+                    self.assertTrue(
+                        yuzu.lookup_actions(action),
+                        f"{key} example shows [{action}], which the "
+                        f"whitelist drops -- she'd say it and not move")
+
+
+class TestCoco(unittest.TestCase):
+    """Coco is the kuudere on the same chassis as Yuzu. Everything here
+    is a failure mode this ARCHETYPE walks into, not a matter of taste."""
+
+    def setUp(self):
+        self.coco = yuzu_personas.load("coco")
+        self.prompt = self.coco.prompt
+        self.rules = self.prompt.split("EXAMPLES")[0]
+
+    def test_she_is_a_kuudere_on_the_hexapod(self):
+        self.assertEqual(self.coco.name, "Coco")
+        self.assertEqual(self.coco.archetype, "Kuudere")
+        self.assertEqual(self.coco.hardware, "muto_s2")
+
+    def test_she_runs_cooler_than_yuzu_but_above_the_flat_cliff(self):
+        """The trap: a low-affect character invites a low temperature,
+        and yuzu_brain's own notes say below ~0.6 the model goes flat
+        and starts sounding like a generic assistant -- which is the
+        exact check a kuudere is already closest to failing."""
+        coco_temp = self.coco.options()["temperature"]
+        yuzu_temp = yuzu_personas.load("yuzu").options()["temperature"]
+        self.assertLess(coco_temp, yuzu_temp)
+        self.assertGreater(coco_temp, 0.6)
+
+    def test_the_freeze_rule_is_stated_twice_for_her(self):
+        """has_dialogue is the #1 risk for this archetype: a reply of
+        '[squats]' and nothing else is perfectly in character and
+        completely broken, because the robot just looks frozen. The
+        shared rule is not enough on its own -- her own rules have to
+        say that terse is fine and silent is not."""
+        lowered = self.prompt.lower()
+        self.assertIn("full sentence", lowered)        # {DIALOGUE_RULE_V2}
+        self.assertIn("silent is not", lowered)        # her own restatement
+
+    def test_she_is_told_not_to_sound_like_an_assistant(self):
+        self.assertIn("never a generic AI assistant", self.prompt)
+
+    def test_her_examples_answer_a_help_offer_without_assistant_phrasing(self):
+        """'Can you help me with something?' is the prompt that pulls a
+        flat character straight into 'How can I help you today?'. She
+        gets a worked example of the answer instead."""
+        self.assertIn("Can you help me with something?", self.prompt)
+
+    def test_she_is_given_the_camera_instead_of_a_face(self):
+        """A kuudere's whole expressive register is facial -- the flat
+        stare, the glance away. This chassis has no face, so that
+        channel is empty and she will invent moves for it. The camera is
+        the replacement, named positively."""
+        self.assertIn("camera is how you pay attention", self.prompt)
+
+    def test_she_does_not_name_movements_she_cannot_make(self):
+        """The pink-elephant rule, carried over from yuzu2: naming a
+        forbidden action in the RULES demonstrates it. [winks] is the
+        single most repeated violation in live logs and v1 names it.
+        A kuudere's temptations are different words, same mistake."""
+        lowered = self.rules.lower()
+        for word in ("stare", "blink", "smirk", "shrug", "eyebrow",
+                     "wink", "nod", "hug", "wave", "tilt"):
+            self.assertNotIn(word, lowered,
+                             f"Coco's rules name '{word}' -- an impossible "
+                             f"movement with no instead-do-X there is pure "
+                             f"demonstration and it comes back in output")
+
+    def test_her_sound_register_is_her_own_not_the_gyaru_one(self):
+        """KNOWN WART, deliberately handled here rather than in the
+        shared body file: {HARDWARE_MENU} illustrates 'sounds are speech,
+        not movement' with 'Ehehe~, Haha!, Pfft' -- which is Yuzu's
+        voice, not a fact about a hexapod, and it lands in every persona
+        that composes the menu in. Editing the shared file would change
+        yuzu2's composed prompt mid-A/B, so instead Coco's EXAMPLES
+        carry her own register, which a 3B weights more heavily anyway."""
+        self.assertIn("Ehehe~", self.prompt)          # inherited from the body
+        examples = self.prompt.split("EXAMPLES")[1]
+        self.assertNotIn("Ehehe~", examples)
+        self.assertIn("Hm.", examples)                # a sound, typed inline
+        self.assertEqual(yuzu.lookup_actions("Hm"), [],
+                         "a sound must never resolve to a movement")
+
+    def test_she_does_not_glow_like_a_gyaru(self):
+        cold = self.coco.led_states()
+        warm = yuzu_personas.load("yuzu").led_states()
+        self.assertEqual(set(cold), set(warm))
+        for state, colour in cold.items():
+            self.assertNotEqual(colour, warm[state],
+                                f"Coco's {state} LED is Yuzu's pink")
+
+    def test_her_voice_is_slower_than_the_gyaru_and_is_not_a_sampling_option(self):
+        self.assertGreater(self.coco.settings["piper_length_scale"],
+                           yuzu_personas.load("yuzu").settings["piper_length_scale"])
+        self.assertNotIn("piper_length_scale", self.coco.options())
+
+
+class TestPersonaSwitching(BrainTestCase):
+    """Two characters, one box. Switching between them must not depend
+    on anything having gone right earlier."""
+
+    def test_model_none_means_the_default_not_no_model(self):
+        # REGRESSION: switch_persona passed `brain.model if brain else
+        # None`, and when Ollama was down at boot there was no brain --
+        # so the new brain carried model=None and posted {"model": null}
+        # to Ollama. Every turn after the switch failed, and nothing in
+        # the error named the switch as the cause.
+        brain = YuzuBrain(model=None, host=None, persona="coco")
+        self.assertEqual(brain.model, yuzu_brain.DEFAULT_MODEL)
+        self.assertEqual(brain.host, yuzu_brain.DEFAULT_HOST.rstrip("/"))
+
+    def test_switching_replaces_the_prompt_and_the_sampling(self):
+        gyaru = self.brain(persona="yuzu")
+        kuudere = self.brain(persona="coco")
+        self.assertIn("Gyaru", gyaru.system_prompt)
+        self.assertIn("kuudere", kuudere.system_prompt)
+        self.assertNotIn("kuudere", gyaru.system_prompt)
+        self.assertNotEqual(gyaru.options["temperature"],
+                            kuudere.options["temperature"])
+
+    def test_switching_keeps_the_model_and_host_it_was_running_on(self):
+        """The cheap switch: same weights, new system prompt. If the new
+        brain went back to the default model, switching persona would
+        silently load a second copy of a 3B on an 8GB Jetson."""
+        running = self.brain(persona="yuzu", model="llama3.2:3b")
+        switched = YuzuBrain(model=running.model, host=running.host,
+                             persona="coco")
+        self.assertEqual(switched.model, "llama3.2:3b")
+        self.assertEqual(switched.host, running.host)
+
+    def test_a_switch_starts_the_new_character_with_no_history(self):
+        """Carrying a gyaru's banter into a kuudere's context makes the
+        new persona imitate the old one for several turns."""
+        gyaru = self.brain(persona="yuzu")
+        gyaru.ask("hey")
+        self.assertTrue(gyaru.history)
+        switched = YuzuBrain(model=gyaru.model, host=gyaru.host, persona="coco")
+        self.assertEqual(switched.history, [])
+
+    def test_the_body_rules_are_identical_across_both_characters(self):
+        """Same chassis, so the action vocabulary must be the same text
+        in both prompts. If it ever isn't, the split has failed and one
+        character is being taught moves the other isn't."""
+        menu = yuzu_personas._parse_hardware("muto_s2")["HARDWARE_MENU"]
+        for key in ("yuzu2", "coco"):
+            self.assertIn(menu, yuzu_personas.load(key).prompt)
 
 
 if __name__ == "__main__":
