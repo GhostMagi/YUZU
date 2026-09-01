@@ -64,12 +64,25 @@ Get the file ending **`-desktop-amd64.iso`**. It's about 4.7GB, so give
 it time. `amd64` is correct even though the laptop is Intel — it means
 "64-bit PC", not the CPU brand.
 
-### 3. Install balenaEtcher
-Open **Discover** (the app store) → search **balenaEtcher** → Install.
+### 3. Install a disk writer
+Open **Discover** (the app store) and install **Impression**. It's a
+Flatpak, it installs to your home directory, and it survives SteamOS
+updates.
 
-Use Etcher rather than the `dd` command. Etcher refuses to write to your
-system drive; a mistyped `dd` would overwrite the Steam Deck itself and
-there is no undo.
+**balenaEtcher may not show up in Discover** — it didn't in Sept 2026.
+Impression does the same job (pick image, pick drive, write) and is
+less hassle. `ISO Image Writer` is a third option. Any of them is fine.
+
+If you end up on balena's website instead, the one you want is **ETCHER
+FOR LINUX X64 (64-BIT) (ZIP)** — not the LEGACY 32 BIT one, and not the
+`.deb` (that's for Debian/Ubuntu; SteamOS is Arch-based). Unzip it,
+right-click the `.AppImage` → Properties → Permissions → tick **"Is
+executable"**, then double-click. That permission tick is the step
+everyone misses, and without it double-clicking does nothing at all.
+
+Use one of these rather than the `dd` command. They refuse to write to
+your system drive; a mistyped `dd` would overwrite the Steam Deck itself
+and there is no undo.
 
 ### 4. Write the card (or stick)
 Card in the Deck's own microSD slot. Open Etcher:
