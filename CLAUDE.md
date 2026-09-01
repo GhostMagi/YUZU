@@ -11,7 +11,15 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python test_yuzu.py` before committing. 148 tests, ~9 seconds.
+- Run `python test_yuzu.py` before committing. 154 tests, ~9 seconds.
+
+**Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
+throttled and forgetting it makes everything slow with no visible cause.
+He asked to be reminded, and a chat reminder dies with the session, so
+it lives in three places he actually lands: the README above the fold,
+`yuzu_doctor.py`'s SUMMARY, and the robot's own boot line — the last two
+gated on Jetson detection so they stay quiet on the phone. Tests pin all
+three. If you touch any of them, keep the reminder.
 
 ## Prompt work
 

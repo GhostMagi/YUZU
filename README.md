@@ -9,6 +9,16 @@ watermelon.
 
 **Status:** brain works today on any PC. Chassis and LEDs are later.
 
+> ### On a fresh Jetson, run this FIRST
+> ```
+> sudo nvpmodel -m 0     # MAXN / MAXN SUPER -- the board ships throttled
+> sudo jetson_clocks     # lock the clocks at maximum
+> ```
+> Biggest free speedup on the box, and easy to forget after a flash —
+> at which point everything just feels slow for no visible reason.
+> `yuzu_doctor.py` and the robot's own boot message both reprint it when
+> they detect a Jetson. More in [JETSON_SETUP.md](JETSON_SETUP.md).
+
 ## On your phone?
 
 **[PHONE_START.md](PHONE_START.md)** — download one file, open it in
@@ -18,7 +28,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 134 tests, ~9 seconds
+python test_yuzu.py           # 148 tests, ~9 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```

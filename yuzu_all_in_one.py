@@ -435,7 +435,26 @@ def ask_yuzu_brain(user_text):
         return "Ugh, my brain just lagged out for a sec. Say that again?"
 
 
+def _on_a_jetson():
+    """Deliberately duplicated from yuzu_doctor.py, which has to run as
+    a lone download and so may not import anything from this project."""
+    try:
+        if os.path.exists("/etc/nv_tegra_release"):
+            return True
+        model = "/sys/firmware/devicetree/base/model"
+        if os.path.exists(model):
+            with open(model, "rb") as handle:
+                name = handle.read().decode("utf-8", "replace").lower()
+            return "jetson" in name or "orin" in name
+    except OSError:
+        pass
+    return False
+
+
 def run_yuzu_forever():
+    if _on_a_jetson():
+        print("\n!! Jetson ships THROTTLED -- if she feels slow, run:")
+        print("     sudo nvpmodel -m 0 && sudo jetson_clocks\n")
     brain_status = start_brain()
     print("Listening... 'quit' to stop. Commands: /personas /persona <name> "
           "/reset /health")

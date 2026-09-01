@@ -1188,6 +1188,63 @@ class TestDoctor(unittest.TestCase):
                              "a phone-side search must not hang")
 
 
+class TestThrottleReminder(unittest.TestCase):
+    """Ghost asked to be reminded of `nvpmodel -m 0` -- the Orin ships
+    throttled, and forgetting it makes everything slow for no visible
+    reason. A chat reminder dies with the session, so it lives in the
+    three places he actually lands instead."""
+
+    def render_summary(self, on_jetson):
+        import contextlib
+        import io
+
+        import yuzu_doctor
+        real = yuzu_doctor.on_a_jetson
+        yuzu_doctor.on_a_jetson = lambda: on_jetson
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer):
+                yuzu_doctor.summary({})
+        finally:
+            yuzu_doctor.on_a_jetson = real
+        return buffer.getvalue()
+
+    def test_the_doctor_prints_it_on_a_jetson(self):
+        output = self.render_summary(True)
+        self.assertIn("nvpmodel -m 0", output)
+        self.assertIn("jetson_clocks", output)
+        self.assertIn("THROTTLED", output)
+
+    def test_the_doctor_stays_quiet_on_a_phone(self):
+        self.assertNotIn("nvpmodel", self.render_summary(False))
+
+    def test_detection_never_raises_off_a_jetson(self):
+        import yuzu_doctor
+        self.assertIs(yuzu_doctor.on_a_jetson(), False)
+        self.assertIs(yuzu.__dict__["_on_a_jetson"](), False)
+
+    def test_the_readme_leads_with_it(self):
+        readme = (Path(__file__).parent / "README.md").read_text()
+        self.assertIn("sudo nvpmodel -m 0", readme)
+        # Above the fold: before the first "## " section heading, so it
+        # is on screen without scrolling on a phone.
+        above_fold = readme.split("\n## ")[0]
+        self.assertIn("nvpmodel -m 0", above_fold,
+                      "the reminder scrolled below the first heading")
+
+    def test_the_setup_guide_still_carries_the_detail(self):
+        guide = (Path(__file__).parent / "JETSON_SETUP.md").read_text()
+        self.assertIn("nvpmodel -m 0", guide)
+
+    def test_the_robot_reminds_him_at_every_boot(self):
+        """The 'here and there' he asked for: this one prints every time
+        the robot starts, not just when he goes looking."""
+        source = (Path(__file__).parent / "yuzu_all_in_one.py").read_text()
+        boot = source.split("def run_yuzu_forever")[1][:400]
+        self.assertIn("nvpmodel -m 0", boot)
+        self.assertIn("_on_a_jetson()", boot)
+
+
 class TestModelfile(unittest.TestCase):
     def test_generated_modelfile_carries_prompt_and_params(self):
         import build_yuzu_model
