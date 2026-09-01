@@ -33,6 +33,29 @@ anything else on top.
 
 ---
 
+## The DisplayPort cable you forgot
+
+You don't need it. That's what this whole guide is for — first boot
+happens over USB-C serial, then SSH forever after. Skip the adapter and
+don't spend the money.
+
+The cable that *does* matter is a **USB-C data cable**, and you very
+likely already own one:
+
+| cable | data? |
+|---|---|
+| Z Flip 6's charging cable | **Yes** — Samsung ships data-capable C-to-C (it's what Smart Switch uses) |
+| Steam Deck's power brick | Usually **no** — the bundled PSU cable is commonly charge-only |
+| Anything that has ever moved files between two devices | Yes, by definition |
+
+**Free test, do it before buying anything:** plug the phone into the
+Deck with the cable. If the Deck sees the phone's storage, it's a data
+cable and you're done. If it only charges, try another.
+
+If nothing you own works, a USB-C data cable is a few dollars — still
+much cheaper than the DisplayPort adapter, and it's the only thing on
+this list you might have to buy.
+
 ## What you need
 
 - Steam Deck in Desktop Mode
@@ -208,6 +231,46 @@ That's typically 1–1.5GB back — a meaningful fraction of 8GB.
 Now continue with **JETSON_SETUP.md** from "Install Ollama".
 
 ---
+
+## The laptop changes the plan — install Ubuntu on it, not Windows
+
+An Acer Aspire V15 Nitro Black Edition (i7, GTX 960M, DDR4, a fresh 1TB
+drive) is a bigger deal for this project than any cable, for one
+specific reason:
+
+**NVIDIA's SDK Manager only runs on Ubuntu x86_64.** It is the escape
+hatch named in three of the five rows of the troubleshooting table
+below — pre-JetPack-6 factory firmware, missing Super QSPI firmware,
+true NVMe-only boot. Right now there is no machine in the house that
+can run it. SteamOS is Arch-based with a read-only filesystem and is
+the wrong tool; that laptop with Ubuntu on it is exactly the right one.
+
+Three other things it buys, all free:
+
+- **Ollama on the 960M.** Compute capability 5.0, which Ollama supports.
+  Check whether the card is the 2GB or 4GB variant — a 3B at Q4_K_M is
+  roughly 2GB, so it fits comfortably in 4GB and is tight in 2GB.
+- **The real eval harness.** `python yuzu_prompt_eval.py --persona yuzu2`
+  scores 12 prompts × 3 runs against the same parser the robot uses.
+  That is a far better instrument than hand-testing in PocketPal and
+  screenshotting, and it's the thing that turns "feels good" into a
+  number.
+- **A second serial-console host.** The Acer has Thunderbolt 3, so it
+  can drive the Jetson's first boot just as well as the Deck can.
+
+Practical notes:
+
+- **Use Ubuntu 22.04 LTS.** SDK Manager supports 18.04/20.04/22.04.
+  Do not reach for 24.04 — it is not on that list.
+- Make the installer with balenaEtcher on the Deck, same tool and same
+  steps as flashing the microSD above.
+- Installing Windows *from* Linux is genuinely awkward (the install.wim
+  is over FAT32's 4GB file limit). Ubuntu is a straight ISO write. If
+  you want Windows as well, the 1TB drive has room to dual-boot it
+  later, from inside Ubuntu, with much less hassle.
+- Optimus laptops of this era occasionally need the proprietary NVIDIA
+  driver selected by hand after install. Well-trodden ground for this
+  exact model, just don't be surprised by it.
 
 ## If it goes wrong
 
