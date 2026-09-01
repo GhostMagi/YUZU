@@ -764,6 +764,58 @@ class TestRealModelOutput(unittest.TestCase):
         self.assertTrue(any("Yuzu" in s or "sweet" in s for s in spoken))
 
 
+class TestAsteriskFormatting(unittest.TestCase):
+    """PocketPal renders *asterisks* as italics without showing the
+    markers, so this failure is invisible in a screenshot. The model
+    mixes both formats in one reply; the pipeline must not care."""
+
+    MIXED = ("Say less, bestie! *spins* [turns] [stretches] [shakes legs] "
+             "*winks* I just can't help myself! *giggles* Pink sparkles?")
+
+    def test_asterisk_actions_are_converted_and_run(self):
+        cleaned = yuzu.normalize_actions(self.MIXED)
+        actions = yuzu.extract_actions(cleaned)
+        self.assertIn("spins", actions)
+        self.assertTrue(yuzu.lookup_actions("spins"))
+
+    def test_no_asterisk_ever_reaches_tts(self):
+        said = yuzu.strip_actions(yuzu.normalize_actions(self.MIXED))
+        self.assertNotIn("*", said)
+        self.assertNotIn("winks", said)
+        self.assertNotIn("giggles", said)
+
+    def test_mixed_formats_in_one_reply_both_work(self):
+        cleaned = yuzu.normalize_actions(self.MIXED)
+        ran = [a for a in yuzu.extract_actions(cleaned) if yuzu.lookup_actions(a)]
+        self.assertEqual(sorted(ran), ["shakes legs", "spins", "stretches", "turns"])
+
+    def test_prompt_still_forbids_asterisks(self):
+        # REGRESSION: v1 carried an explicit anti-asterisk rule and its
+        # live output was all brackets. The first v2 draft dropped that
+        # rule while simplifying, and asterisks came straight back.
+        for key in yuzu_personas.available():
+            prompt = yuzu_personas.load(key).prompt.lower()
+            self.assertIn("asterisk", prompt,
+                          f"{key}: no anti-asterisk rule -- v2 proved the "
+                          f"model reverts to *actions* without one")
+
+
+class TestVocalizations(unittest.TestCase):
+    """Laughs and squeals are speech, not movement. They were 8 of the 9
+    dropped actions in the latest live round -- the single biggest
+    remaining category."""
+
+    def test_vocalizations_never_run_as_movements(self):
+        for sound in ("giggles", "laughs", "squeals", "sighs", "gasps"):
+            self.assertEqual(yuzu.lookup_actions(sound), [],
+                             f"'{sound}' is a sound, not a leg movement")
+
+    def test_prompt_tells_her_where_sounds_go(self):
+        prompt = yuzu_personas.load("yuzu2").prompt.lower()
+        self.assertIn("laughing", prompt)
+        self.assertIn("dialogue as words", prompt)
+
+
 class TestHardwareBlocks(unittest.TestCase):
     def test_a_bracket_line_is_not_mistaken_for_a_section_header(self):
         # REGRESSION: the action menu line starts with '[' and ends with
@@ -785,7 +837,11 @@ class TestHardwareBlocks(unittest.TestCase):
                 # so those lines are exempt from this check. (Whether
                 # naming it there is a good idea at all is a separate
                 # question -- see test_v2_does_not_name_forbidden_actions.)
-                if "wrong:" in line.lower():
+                lowered = line.lower()
+                if "wrong:" in lowered or "bracket" in lowered:
+                    # "Wrong: [winks]" shows an invalid action on purpose,
+                    # and "Movements go in [square brackets]" is talking
+                    # about the format, not offering a move.
                     continue
                 for phrase in set(re.findall(r'\[([a-z][a-z ]*)\]', line)):
                     self.assertTrue(yuzu.lookup_actions(phrase),
@@ -807,10 +863,22 @@ class TestHardwareBlocks(unittest.TestCase):
         # draft leaked. It said "hugging, waving, winking, dancing" as
         # things NOT to do, and [winks] then showed up in three of four
         # live replies. Naming it at all is naming it.
-        for word in ("wink", "hug", "wave", "giggl", "smize", "nod"):
+        # Only MOVEMENTS she cannot make. There is no alternative to
+        # offer for a wink on a faceless robot, so naming it is pure
+        # demonstration and it comes back in the output.
+        #
+        # Sounds are deliberately different. "laughing, giggling" IS
+        # named in the prompt, because it's paired with a concrete
+        # replacement -- write "Haha!" in the dialogue instead. That's
+        # the specific-negative-plus-instead-do-X pattern the research
+        # endorses, and the vague version that named nothing measurably
+        # failed to land: vocalizations were 8 of 9 dropped actions in
+        # the following live round.
+        for word in ("wink", "hug", "wave", "smize", "nod"):
             self.assertNotIn(word, prompt,
                              f"v2 names '{word}' -- the pink-elephant trap; "
-                             f"describe what she CAN do instead")
+                             f"an impossible movement has no instead-do-X, "
+                             f"so naming it only demonstrates it")
 
 
 class TestPersonaWiring(BrainTestCase):
