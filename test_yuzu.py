@@ -800,6 +800,41 @@ class TestAsteriskFormatting(unittest.TestCase):
                           f"model reverts to *actions* without one")
 
 
+class TestHistoryCanonicalisation(unittest.TestCase):
+    """Measured over a real 7-turn chat: turn 1 was 100% brackets,
+    turn 2 leaked one asterisk, turns 3-7 were 100% asterisks and 0%
+    runnable. The conversation outweighs the system prompt on a 3B, so
+    her own stored replies must show the format we want back."""
+
+    def test_asterisks_are_rewritten_before_going_into_history(self):
+        drifted = "Okay okay! *wriggles legs around* See? *giggles*"
+        stored = YuzuBrain._canonicalise(drifted)
+        self.assertNotIn("*", stored)
+        self.assertIn("[wriggles legs around]", stored)
+
+    def test_already_correct_replies_are_untouched(self):
+        clean = "Not much, just vibing! [squats] What's good?"
+        self.assertEqual(YuzuBrain._canonicalise(clean), clean)
+
+    def test_a_stray_asterisk_cannot_snowball(self):
+        """The actual failure: one drifted turn teaching every later
+        turn. After canonicalisation the history holds no asterisk for
+        her to copy."""
+        brain = YuzuBrain(persona="yuzu2", host="http://127.0.0.1:1",
+                          system_prompt="test")
+        brain._remember("hi", "Hey! *spins* cute, huh?")
+        brain._remember("again", "Sure! *shakes legs* there ya go")
+        for message in brain.history:
+            self.assertNotIn("*", message["content"])
+        self.assertIn("[spins]", brain.history[1]["content"])
+
+    def test_recovered_phrasings_from_live_output(self):
+        for phrase in ("wriggles legs around", "bounces up and down",
+                       "shakes legs some more", "twirls"):
+            self.assertTrue(yuzu.lookup_actions(phrase),
+                            f"'{phrase}' appeared live and should run")
+
+
 class TestVocalizations(unittest.TestCase):
     """Laughs and squeals are speech, not movement. They were 8 of the 9
     dropped actions in the latest live round -- the single biggest
@@ -813,7 +848,14 @@ class TestVocalizations(unittest.TestCase):
     def test_prompt_tells_her_where_sounds_go(self):
         prompt = yuzu_personas.load("yuzu2").prompt.lower()
         self.assertIn("laughing", prompt)
-        self.assertIn("dialogue as words", prompt)
+        self.assertIn("plain words", prompt)
+        # She was asterisking sounds even while the rule only banned
+        # brackets around them, so both wrappers must be named.
+        sounds_rule = [l for l in prompt.splitlines() if "laughing" in l][0]
+        self.assertIn("no brackets", sounds_rule)
+        self.assertIn("no asterisks", sounds_rule)
+        # And an example must SHOW a sound typed inline.
+        self.assertIn("ehehe~ okay okay", prompt)
 
 
 class TestHardwareBlocks(unittest.TestCase):
@@ -874,11 +916,19 @@ class TestHardwareBlocks(unittest.TestCase):
         # endorses, and the vague version that named nothing measurably
         # failed to land: vocalizations were 8 of 9 dropped actions in
         # the following live round.
+        # Scope matters. Naming an impossible action in the RULES is a
+        # pink elephant -- "never wink" demonstrates winking. Naming it
+        # in an EXAMPLE where the user asks for it and she redirects is
+        # the opposite: it teaches the recovery. She regressed on hugs
+        # (inventing "gently wraps legs around you") once the earlier
+        # high-five example was the only redirect she had, so the hug
+        # example is deliberate.
+        rules = prompt.split("examples—")[0]
         for word in ("wink", "hug", "wave", "smize", "nod"):
-            self.assertNotIn(word, prompt,
-                             f"v2 names '{word}' -- the pink-elephant trap; "
-                             f"an impossible movement has no instead-do-X, "
-                             f"so naming it only demonstrates it")
+            self.assertNotIn(word, rules,
+                             f"v2 names '{word}' in its rules -- an "
+                             f"impossible movement has no instead-do-X "
+                             f"there, so naming it only demonstrates it")
 
 
 class TestPersonaWiring(BrainTestCase):

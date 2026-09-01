@@ -225,11 +225,35 @@ class YuzuBrain:
         if remember:
             self._remember(user_text, "".join(collected).strip())
 
+    @staticmethod
+    def _canonicalise(reply):
+        """Rewrite *asterisk* actions as [bracket] actions before the
+        reply goes into history.
+
+        This fixes a drift measured over a real 7-turn chat: turn 1 was
+        100% brackets, turn 2 leaked one asterisk, and turns 3-7 were
+        100% asterisks. Nothing about the prompt changed between them.
+        What changed is that the conversation itself became the
+        strongest set of examples in context, and a 3B follows its own
+        recent output over a system prompt sitting further back.
+
+        So her history is stored in the format we want her to keep
+        using. She still SEES what she said, but she sees the corrected
+        form, and every turn reinforces brackets instead of eroding
+        them. One stray asterisk can no longer snowball.
+        """
+        try:
+            from yuzu_all_in_one import normalize_actions
+        except ImportError:
+            return reply          # parser not present; store as-is
+        return normalize_actions(reply)
+
     def _remember(self, user_text, reply):
         if not reply:
             return
         self.history.append({"role": "user", "content": user_text})
-        self.history.append({"role": "assistant", "content": reply})
+        self.history.append({"role": "assistant",
+                             "content": self._canonicalise(reply)})
         # Trim eagerly so history can't creep past the window over a
         # long session.
         self.history = self.history[-self.history_turns * 2:]
