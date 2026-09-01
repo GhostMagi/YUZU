@@ -194,6 +194,7 @@ _FILLER = {
     'little', 'big', 'quick', 'quickly', 'slow', 'slowly',
     'soft', 'softly', 'gentle', 'gently', 'cute', 'cutely',
     'happy', 'happily', 'excited', 'excitedly', 'playful', 'playfully',
+    'some', 'more', 'again', 'bit', 'too', 'around',
 }
 
 

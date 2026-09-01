@@ -797,11 +797,20 @@ class TestHardwareBlocks(unittest.TestCase):
         "[winks]" as a Wrong: example, and [winks] is the single most
         repeated violation in live logs. Naming a forbidden token
         demonstrates it. v2 names no action it doesn't want back."""
-        prompt = yuzu_personas.load("yuzu2").prompt
+        prompt = yuzu_personas.load("yuzu2").prompt.lower()
+        # Bracketed is the obvious form...
         for forbidden in ("[winks]", "[waves]", "[hugs]", "[giggles]",
                           "[smizes]", "[nods]"):
-            self.assertNotIn(forbidden, prompt.lower(),
+            self.assertNotIn(forbidden, prompt,
                              f"v2 demonstrates {forbidden} to the model")
+        # ...but the bare word counts too, and this is how the first
+        # draft leaked. It said "hugging, waving, winking, dancing" as
+        # things NOT to do, and [winks] then showed up in three of four
+        # live replies. Naming it at all is naming it.
+        for word in ("wink", "hug", "wave", "giggl", "smize", "nod"):
+            self.assertNotIn(word, prompt,
+                             f"v2 names '{word}' -- the pink-elephant trap; "
+                             f"describe what she CAN do instead")
 
 
 class TestPersonaWiring(BrainTestCase):
