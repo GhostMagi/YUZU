@@ -44,6 +44,24 @@ python yuzu_brain.py --chat                # talk to her
 If she answers in character, the whole chain is good — prompt,
 Modelfile, client, parser.
 
+### 2b. A note if you're testing in PocketPal first
+
+PocketPal supplies its own chat template and system prompt on top of
+whatever is in the GGUF. So when you test there, you are testing
+**PocketPal's** template, not necessarily the model's. Two things to
+confirm in the app's per-model settings before blaming the prompt:
+
+- the **system prompt** field actually contains Yuzu's prompt
+  (`yuzu_system_prompt.txt`), not a leftover default
+- the **chat template** is a Llama 3 / Llama 3.2 one, not ChatML or
+  Mistral
+
+A mismatch here produces exactly the "she ignores her personality"
+symptom, and no amount of prompt rewriting fixes it. Ollama on the
+Jetson reads the template from the GGUF instead, so the two setups can
+behave differently on the same file — worth knowing when a reply that
+was fine on the phone gets weird on the robot.
+
 ### 3. Measure the prompt
 
 ```bash
@@ -63,41 +81,33 @@ that was never there.
 
 ### 4. Then swap in the abliterated model
 
-Repo: **`DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored`**
+**CONFIRMED — the file already exists and Ghost already has it:**
+
+```
+Llama-3.2-3B-Instruct-heretic-ablitered-uncensored.Q4_K_M.gguf
+```
+
+Source model is
+`DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored`
 (the "ablitered" misspelling is in the real repo name, not a typo here).
+The `.Q4_K_M` naming — a **dot** before the quant rather than a hyphen —
+is mradermacher's convention, so the GGUF almost certainly comes from
+`mradermacher/...-GGUF`. Bartowski names his `-Q4_K_M`.
 
-Heads up — I could not open Hugging Face from the sandbox I was working
-in, so **verify this before acting on it**: from the search results,
-that repo looks like full-precision safetensors rather than GGUF, and
-its card mentions needing tokenizer/config files from the source repo
-when running quantized. Which path you take depends on what's actually
-in the repo:
-
-**If a GGUF repo exists** (check `mradermacher` and `bartowski` — they
-quantize a lot of DavidAU's models):
+**No conversion needed.** An earlier draft of this file walked through
+converting safetensors with llama.cpp; that's unnecessary. A GGUF was
+already published, it's ~2GB, and it's already on the phone. Copy that
+same file to the Jetson — no re-download, no llama.cpp build.
 
 ```bash
-ollama pull hf.co/<user>/<gguf-repo>:Q4_K_M
-python build_yuzu_model.py --base hf.co/<user>/<gguf-repo>:Q4_K_M --create
-```
-
-**If only safetensors exist**, convert it yourself. Do this on the PC,
-not the Jetson — it needs ~7GB of RAM for the fp16 intermediate:
-
-```bash
-git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
-pip install -r requirements.txt
-python convert_hf_to_gguf.py /path/to/model --outfile yuzu-f16.gguf
-cmake -B build && cmake --build build --config Release
-./build/bin/llama-quantize yuzu-f16.gguf yuzu-Q4_K_M.gguf Q4_K_M
-```
-
-Then point the Modelfile at the result:
-
-```bash
-python build_yuzu_model.py --base ./yuzu-Q4_K_M.gguf --create
+python build_yuzu_model.py \
+  --base ./Llama-3.2-3B-Instruct-heretic-ablitered-uncensored.Q4_K_M.gguf \
+  --create
 python yuzu_prompt_eval.py --runs 3          # compare to stock's score
 ```
+
+Q4_K_M is the right pick for a 3B: ~2GB, and small models lose real
+coherence below Q4.
 
 Before building a model from any GGUF you didn't produce yourself,
 check its header:

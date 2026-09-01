@@ -364,6 +364,13 @@ stretch" (the all-actions-no-dialogue reply that looked like a freeze)
 and "Wave at me!" / "Give me a high five!" (bait for body parts the
 chassis doesn't have).
 
+PocketPal vs Ollama, worth knowing: PocketPal supplies its own chat
+template and system prompt on top of the GGUF, so testing there tests
+PocketPal's template. Ollama reads the template from the GGUF metadata
+instead. The same model file can therefore behave differently on the
+phone and on the Jetson, and a reply that was fine in testing can get
+weird on the robot without the prompt having changed at all.
+
 A note on third-party GGUFs, learned the hard way in general: the
 chat template baked into the file matters more than the prompt. Ollama
 reads it from GGUF metadata; if it's missing or has no system branch,
@@ -381,15 +388,17 @@ laptop BEFORE the $400 Jetson purchase.
 ======================================================================
 1. Buy the Jetson Orin Nano Super (~$400 of the ~$450 budget).
 2. Flash JetPack OS (Steam Deck as the flashing workstation).
-3. DONE, pending hardware: ask_yuzu_brain() is real. Remaining is
-   sourcing the actual Heretic weights. The repo appears to be
-   DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored (the
-   "ablitered" misspelling is in the real repo name). UNVERIFIED: it
-   looks like safetensors rather than GGUF, which would mean either
-   finding a GGUF mirror (mradermacher/bartowski quantize many of
-   DavidAU's models) or converting with llama.cpp. Both paths are in
-   JETSON_SETUP.md. Prove the pipeline on stock llama3.2:3b first --
-   it separates "my setup works" from "my model works".
+3. DONE: ask_yuzu_brain() is real, and the weights question is
+   settled. Ghost is already running
+   Llama-3.2-3B-Instruct-heretic-ablitered-uncensored.Q4_K_M.gguf
+   in PocketPal on the phone. Source model is DavidAU's repo (the
+   "ablitered" misspelling is genuinely in the repo name); the dotted
+   .Q4_K_M filename is mradermacher's quant naming convention. No
+   llama.cpp conversion needed -- an earlier draft of JETSON_SETUP.md
+   said it might be, that was wrong and has been corrected. The same
+   ~2GB file copies straight to the Jetson.
+   Still worth proving the pipeline on stock llama3.2:3b first -- it
+   separates "my setup works" from "my model works".
 3b. Run yuzu_prompt_eval.py on a PC and tune the prompt to a number
    before buying anything.
 4. Install and test Piper TTS + Whisper independently before wiring
