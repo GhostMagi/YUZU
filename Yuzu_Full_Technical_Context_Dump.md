@@ -433,6 +433,60 @@ from the memory export: which speech style survives the format
 constraints best.
 
 ======================================================================
+## 9d. PROMPT A/B RESULTS (measured, not estimated)
+======================================================================
+Method: Ghost A/B tests in PocketPal on the phone and sends
+screenshots. Replies are scored against the REAL parser -- an action
+"counts" only if yuzu_all_in_one.lookup_actions() would actually move
+the robot. Eyeballing was replaced with numbers because several
+"obvious" conclusions turned out wrong.
+
+  v1, short exchanges     1/5   actions run  (20%),  2/3 replies spoke
+  v2, short exchanges    18/23  actions run  (78%),  4/4 replies spoke
+  v2 after parser fixes  19/23               (83%)
+  v2, one 7-turn chat     3/14               (21%),  7/7 replies spoke
+
+That last row is the important one. Broken down by turn:
+
+  turn 1     2/2 run, all bracketed
+  turn 2     1/2 run, one asterisk leaks
+  turns 3-7  0/12 run, every action asterisked
+
+She does not start broken -- she DEGRADES. Nothing about the prompt
+changed between turn 1 and turn 7. The conversation itself becomes the
+strongest set of examples in context, and a 3B follows its own recent
+output over a system prompt sitting further back. One stray asterisk in
+turn 2 taught every turn after it.
+
+This is not fixable by prompt wording, because the prompt was already
+correct on turn 1. Two code-side mitigations now exist:
+  * YuzuBrain._canonicalise() rewrites *asterisks* to [brackets] before
+    a reply enters history, so her own transcript always models the
+    right format.
+  * ReplyHealth + auto_recover trims history after two consecutive
+    wonky replies, soft first (keeps the last exchange).
+
+Neither runs in PocketPal -- both are the Jetson path. In PocketPal the
+only lever is starting a new chat, and turn 2 is where to watch.
+
+Findings that cost real time and are worth not rediscovering:
+  * "Never do X" tends to teach X. v1's own "Wrong: [winks]" example is
+    the best available explanation for [winks] being the single most
+    repeated violation. Naming a forbidden MOVEMENT in a rule
+    demonstrates it. Naming one in an EXAMPLE where she redirects
+    teaches the recovery -- that distinction is real and tested.
+  * The exception is sounds. Naming them works BECAUSE there's a
+    concrete replacement to offer ("type Ehehe~ instead"). The vague
+    version that named nothing measurably failed.
+  * She obeys the letter of a rule. Banning brackets around sounds made
+    her asterisk them instead. Both wrappers have to be named.
+  * The anti-asterisk rule from v1 earned its place. Cutting it as
+    redundant caused an immediate regression.
+  * PocketPal renders *asterisks* as italics WITHOUT the markers, so
+    this whole failure mode is invisible in a screenshot. Ask before
+    scoring if it's ambiguous.
+
+======================================================================
 ## 10. WHAT'S LEFT / NEXT STEPS
 ======================================================================
 1. Buy the Jetson Orin Nano Super (~$400 of the ~$450 budget).
@@ -470,6 +524,10 @@ constraints best.
    `hardware=` to the constructor. Nothing else needs touching.
 9. Painting (Ghost's dad) comes after chassis purchase -- see
    paintstepslol.txt.
+10. Storage decided: M.2 2280 Key M NVMe into slot J11 (Gen3 x4, the
+   boot slot). Bought for swap headroom more than boot speed -- 8GB
+   shared across Whisper + 3B + Piper means swap gets used, and
+   sustained swap writes would wear out a microSD.
 
 DONE since the last export: readtest.py's hardcoded path (was already
 fixed in the file, this doc was stale); state_profiles added to the
