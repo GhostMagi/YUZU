@@ -1,0 +1,17 @@
+{                                                              "robot_name": "Yuzu-Spider-V1",                            "led_zones": {                                                 "underglow": {
+            "color": "#FF1493",
+            "effect": "neon_pulse",
+            "brightness": 90
+        },
+        "eye_matrix": {
+            "color": "#00FFFF",
+            "effect": "static",
+            "brightness": 100
+        },
+        "leg_accents": {
+            "color": "#FF007F",
+            "effect": "chase",
+            "brightness": 75
+        }
+    }
+}
