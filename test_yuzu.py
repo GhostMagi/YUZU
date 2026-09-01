@@ -14,6 +14,7 @@ from pathlib import Path
 
 import itertools
 import struct
+import sys
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -579,6 +580,108 @@ class TestChatTemplateHeuristic(unittest.TestCase):
 
     def test_missing_template_is_flagged_loudly(self):
         self.assertIn("MISSING", self.verdict(None))
+
+
+class TestDoctor(unittest.TestCase):
+    """yuzu_doctor.py is the one file that gets tapped by someone who
+    can't read a traceback, so it must never raise -- on any input."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.dir.name) / "m.gguf"
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_it_stands_alone(self):
+        # Downloading ONLY this file to a phone has to work, so nothing
+        # at module level may import another project file. Imports
+        # nested inside a function are fine -- check_parser() imports
+        # yuzu_all_in_one deliberately, but only after confirming the
+        # file is actually there.
+        import ast
+        tree = ast.parse((Path(__file__).parent / "yuzu_doctor.py").read_text())
+        top_level = set()
+        for node in tree.body:                      # module level only
+            if isinstance(node, ast.Import):
+                top_level.update(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                top_level.add(node.module.split(".")[0])
+        project = {p.stem for p in Path(__file__).parent.glob("*.py")}
+        self.assertEqual(top_level & project, set(),
+                         "yuzu_doctor.py must not import project files at "
+                         "module level -- it has to run as a lone download")
+        self.assertTrue(top_level <= {"json", "os", "struct", "sys",
+                                      "time", "pathlib"},
+                        f"unexpected top-level imports: {top_level}")
+
+    def test_runs_with_no_other_project_files_present(self):
+        # The actual guarantee: copy it somewhere empty, run it, no crash.
+        import contextlib
+        import io
+        import shutil
+        import subprocess
+        lone = Path(self.dir.name) / "yuzu_doctor.py"
+        shutil.copy(Path(__file__).parent / "yuzu_doctor.py", lone)
+        result = subprocess.run([sys.executable, str(lone)],
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("SUMMARY", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_reads_a_healthy_gguf(self):
+        import yuzu_doctor
+        build_gguf(self.path)
+        version, meta = yuzu_doctor.read_gguf_header(self.path)
+        self.assertEqual(version, 3)
+        self.assertEqual(meta["general.architecture"], "llama")
+        self.assertEqual(yuzu_doctor.QUANTS[meta["general.file_type"]], "Q4_K_M")
+
+    def test_rejects_a_non_gguf_without_crashing(self):
+        import yuzu_doctor
+        self.path.write_bytes(b"<html>404</html>" + b"\x00" * 200)
+        with self.assertRaises(ValueError):
+            yuzu_doctor.read_gguf_header(self.path)
+
+    def test_describe_never_raises(self):
+        import contextlib
+        import io
+
+        import yuzu_doctor
+        cases = [
+            LLAMA32_TEMPLATE,                                    # healthy
+            None,                                                # no template
+            "{% for m in messages %}[INST]{{m.content}}[/INST]{% endfor %}",
+        ]
+        verdicts = []
+        for template in cases:
+            build_gguf(self.path, template=template)
+            with contextlib.redirect_stdout(io.StringIO()):
+                verdicts.append(yuzu_doctor.describe_gguf(self.path)["template"])
+        self.assertEqual(verdicts, ["ok", "missing", "no-system"])
+
+        # A corrupt file must be reported, not raised.
+        self.path.write_bytes(b"garbage" * 500)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertIsNone(yuzu_doctor.describe_gguf(self.path))
+
+    def test_full_run_completes_and_summarises(self):
+        import contextlib
+        import io
+
+        import yuzu_doctor
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = yuzu_doctor.main()
+        output = buffer.getvalue()
+        self.assertEqual(code, 0)
+        self.assertIn("SUMMARY", output)
+        self.assertIn("What to do next", output)
+
+    def test_search_is_time_bounded(self):
+        import yuzu_doctor
+        self.assertLessEqual(yuzu_doctor.SEARCH_BUDGET, 60,
+                             "a phone-side search must not hang")
 
 
 class TestModelfile(unittest.TestCase):

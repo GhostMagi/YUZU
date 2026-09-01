@@ -9,11 +9,16 @@ watermelon.
 
 **Status:** brain works today on any PC. Chassis and LEDs are later.
 
+## On your phone?
+
+**[PHONE_START.md](PHONE_START.md)** — download one file, open it in
+Pydroid, press Run. No commands.
+
 ## Try it right now (no hardware needed)
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 60 tests, ~3 seconds
+python test_yuzu.py           # 67 tests, ~3 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -60,6 +65,8 @@ $400.
 | `build_yuzu_model.py` | Generates `Modelfile.yuzu` from that prompt |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the model |
 | `gguf_inspect.py` | Reads a GGUF header — quant, context, chat template |
+| `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
+| `PHONE_START.md` | Phone instructions, no terminal needed |
 | `JETSON_SETUP.md` | Setup runbook, PC and Jetson |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_led_manager.py` | The one LED config loader (zones + states) |

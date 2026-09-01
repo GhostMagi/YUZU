@@ -195,6 +195,12 @@ behind it. If the two disagree, the code is right.
   Modelfile.yuzu        GENERATED. Never hand-edit.
   yuzu_prompt_eval.py   scores prompt compliance against the real
                         model. See Section 10.
+  yuzu_doctor.py        tap-to-run checkup for Pydroid. STANDALONE --
+                        imports no other project file at module level,
+                        so it can be downloaded on its own. Ghost works
+                        from a phone; anything needing typed commands
+                        or file paths is a dead end there.
+  PHONE_START.md        phone-first instructions, no terminal.
   gguf_inspect.py       stdlib GGUF header reader. Reports quant,
                         context length, and whether the chat template
                         is present and handles a system role.
@@ -205,7 +211,7 @@ behind it. If the two disagree, the code is right.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
   readtest.py           smoke test that the config loads. Portable.
-  test_yuzu.py          60 stdlib tests. `python test_yuzu.py`. The
+  test_yuzu.py          67 stdlib tests. `python test_yuzu.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
 
