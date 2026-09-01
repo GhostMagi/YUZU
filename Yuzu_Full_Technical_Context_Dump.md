@@ -188,8 +188,14 @@ behind it. If the two disagree, the code is right.
   yuzu_brain.py         real Ollama client. Stdlib only -- urllib, no
                         pip install. Streaming, capped history,
                         preflight check, clear errors.
-  yuzu_system_prompt.txt  Yuzu's personality. THE only copy -- the
-                        code, the Modelfile and the docs all read it.
+  personas/             one file per character. yuzu.persona is the
+                        live one. _hardware_*.txt hold the body rules
+                        every persona on that chassis composes in.
+                        _golden_yuzu_v1.txt is a frozen copy of the
+                        prompt Ghost tested; not read at runtime, the
+                        test suite asserts the composed persona still
+                        equals it byte for byte.
+  yuzu_personas.py      persona loader/composer + CLI.
   build_yuzu_model.py   generates Modelfile.yuzu from that prompt plus
                         the sampling settings, so they can't drift.
   Modelfile.yuzu        GENERATED. Never hand-edit.
@@ -211,7 +217,7 @@ behind it. If the two disagree, the code is right.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
   readtest.py           smoke test that the config loads. Portable.
-  test_yuzu.py          67 stdlib tests. `python test_yuzu.py`. The
+  test_yuzu.py          82 stdlib tests. `python test_yuzu.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
 
@@ -382,6 +388,49 @@ evening rewriting directives that were never the problem.
 This turns prompt tuning into measurement. Change one thing, re-run,
 compare the numbers. It also means the prompt can be finished on a
 laptop BEFORE the $400 Jetson purchase.
+
+======================================================================
+## 9c. SWAPPABLE PERSONAS
+======================================================================
+Ghost has built six personas across this project (Pixie, Saya, Yuno,
+Saki, Coco, Yuzu) and wants to switch between them. Each is now one
+file in personas/.
+
+The design decision worth keeping: a persona file holds ONLY the
+character. The bracket format, the action vocabulary and the
+must-speak rule are properties of the BODY, so they live in
+personas/_hardware_<body>.txt and get substituted into {HARDWARE} and
+{DIALOGUE_RULE} at load time.
+
+Reason: this project has already been bitten twice by the same file
+existing in two places and diverging. Six personas x hand-copied
+hardware rules is that failure waiting to happen -- an action-vocabulary
+fix would need six identical edits, and missing one would produce a
+persona that commands moves the robot can't do.
+
+The split also makes personas portable across robots. Saya's planned
+quadruped has four legs and an OLED face, so face expressions are legal
+there and banned on the Muto. Same character file, different body file.
+personas/_hardware_saya_quad.txt is a DRAFT of that -- built from the
+notes, not from a confirmed action list, and marked as needing Ghost's
+edit before use.
+
+A persona file also carries its own sampling settings (a kuudere can
+run colder than a gyaru) and its own LED palette (only the color is
+overridden; effect and brightness stay with the hardware config).
+Precedence is explicit options > persona settings > defaults.
+
+The refactor is proven lossless: a test asserts the composed Yuzu
+prompt is byte-for-byte identical to _golden_yuzu_v1.txt, the prompt
+Ghost actually tested. That mattered more than elegance -- silently
+changing one character of a tested prompt would have been a real
+regression with no visible cause.
+
+Because every compliance check in yuzu_prompt_eval.py tests a hardware
+rule rather than a character trait, the same scoring applies to all
+personas. Running it per persona is a fair way to answer the question
+from the memory export: which speech style survives the format
+constraints best.
 
 ======================================================================
 ## 10. WHAT'S LEFT / NEXT STEPS

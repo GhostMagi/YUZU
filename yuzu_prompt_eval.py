@@ -9,7 +9,14 @@ edit, sampling change, or model swap:
     python yuzu_prompt_eval.py                    # 12 prompts x 3 runs
     python yuzu_prompt_eval.py --runs 5
     python yuzu_prompt_eval.py --model llama3.2:3b
+    python yuzu_prompt_eval.py --persona saya
     python yuzu_prompt_eval.py --verbose          # show every failure
+
+Every check here tests a HARDWARE rule, not a character trait, so the
+same scoring applies to every persona -- which makes it a fair way to
+compare them. If the tsundere scores 60% on has_dialogue and the gyaru
+scores 95%, that's a real finding about which speech style survives the
+format constraints, not a matter of taste.
 
 This is the thing to run on the Steam Deck BEFORE the Jetson arrives.
 It answers "is this prompt good enough" with a number, and it tells you
@@ -23,6 +30,7 @@ import sys
 from collections import Counter
 
 import yuzu_all_in_one as yuzu
+import yuzu_personas
 from yuzu_brain import BrainError, YuzuBrain
 
 # Chosen to poke at the rules most likely to break, not to be friendly.
@@ -194,14 +202,23 @@ def report(results, verbose=False):
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default=None)
+    parser.add_argument("--persona", default=None,
+                        help=f"persona key (default {yuzu_personas.DEFAULT_PERSONA})")
     parser.add_argument("--runs", type=int, default=3,
                         help="repeats per prompt (default 3; sampling is "
                              "random, so one run per prompt proves nothing)")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
-    brain = YuzuBrain(model=args.model) if args.model else YuzuBrain()
-    print(f"model: {brain.model}   host: {brain.host}")
+    persona = args.persona.lower() if args.persona else None
+    try:
+        brain = (YuzuBrain(model=args.model, persona=persona) if args.model
+                 else YuzuBrain(persona=persona))
+    except BrainError as exc:
+        print(f"\n{exc}\n")
+        return 1
+    who = brain.persona.name if brain.persona else "custom"
+    print(f"persona: {who}   model: {brain.model}   host: {brain.host}")
     print(f"temp {brain.options['temperature']}  "
           f"top_p {brain.options['top_p']}  "
           f"min_p {brain.options['min_p']}  "

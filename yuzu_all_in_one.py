@@ -15,6 +15,7 @@ what Yuzu is doing (thinking / moving / speaking / idle). If they're
 missing it falls back to printing, exactly like it always did.
 """
 
+import os
 import re
 import time
 
@@ -34,6 +35,11 @@ try:
 except ImportError:
     YuzuBrain = None
     BrainError = Exception
+
+try:
+    import yuzu_personas
+except ImportError:
+    yuzu_personas = None
 
 
 # ============================================================================
@@ -304,26 +310,63 @@ def listen_and_transcribe():
 
 # --- The brain. Real Ollama when it's reachable, echo stub when it isn't. --
 brain = None
+current_persona = None
+
+# Which character boots by default. Override with:  export YUZU_PERSONA=saya
+PERSONA = os.environ.get("YUZU_PERSONA")
 
 
-def start_brain():
+def apply_persona_look(persona):
+    """Let the loaded character tint her own LED states."""
+    if leds and persona is not None:
+        colors = persona.led_states()
+        if colors:
+            leds.apply_persona_colors(colors)
+
+
+def start_brain(persona_key=None):
     """Connect to Ollama once, at boot. Returns a short status string.
 
     A failure here is NOT fatal: the robot still boots, still parses,
     still moves, and says so loudly. Better than a stack trace on a
     machine you're SSH'd into from a Steam Deck.
     """
-    global brain
+    global brain, current_persona
     if YuzuBrain is None:
         return "echo stub (yuzu_brain.py not found)"
     try:
-        candidate = YuzuBrain()
+        candidate = YuzuBrain(persona=persona_key or PERSONA)
         candidate.check()
     except BrainError as exc:
         print(f"\n!! Brain offline, falling back to the echo stub.\n{exc}\n")
         return "echo stub (Ollama unreachable)"
     brain = candidate
-    return f"Ollama, model '{brain.model}'"
+    current_persona = candidate.persona
+    apply_persona_look(current_persona)
+    who = current_persona.name if current_persona else "custom prompt"
+    return f"{who} via Ollama, model '{brain.model}'"
+
+
+def switch_persona(key):
+    """Swap character mid-conversation. History is dropped on purpose --
+    carrying a gyaru's banter into a kuudere's context makes the new
+    persona imitate the old one for several turns."""
+    global brain, current_persona
+    if yuzu_personas is None or YuzuBrain is None:
+        print("Persona switching needs yuzu_personas.py and yuzu_brain.py.")
+        return False
+    try:
+        candidate = YuzuBrain(model=brain.model if brain else None,
+                              persona=key)
+    except BrainError as exc:
+        print(f"{exc}")
+        return False
+    brain = candidate
+    current_persona = candidate.persona
+    apply_persona_look(current_persona)
+    print(f"Now talking to {current_persona.name} "
+          f"({current_persona.archetype}). History cleared.")
+    return True
 
 
 def ask_yuzu_brain(user_text):
@@ -340,7 +383,8 @@ def ask_yuzu_brain(user_text):
 
 def run_yuzu_forever():
     brain_status = start_brain()
-    print("Yuzu is listening... (type 'quit' to stop)")
+    print("Listening... ('quit' to stop, '/persona <name>' to switch, "
+          "'/personas' to list)")
     print(f"brain: {brain_status}")
     print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
           f"leds: {'yuzu_led_manager' if leds else 'off'}\n")
@@ -349,9 +393,27 @@ def run_yuzu_forever():
     set_led_state("idle")
     while True:
         user_text = listen_and_transcribe()
-        if user_text.strip().lower() in ("quit", "exit"):
+        command = user_text.strip().lower()
+        if command in ("quit", "exit"):
             print("Shutting down.")
             break
+        if command == "/personas":
+            if yuzu_personas:
+                for key in yuzu_personas.available():
+                    try:
+                        who = yuzu_personas.load(key)
+                        mark = "*" if current_persona and key == current_persona.key else " "
+                        print(f" {mark} {key:<10} {who.name} -- {who.archetype}")
+                    except yuzu_personas.PersonaError as exc:
+                        print(f"   {key:<10} BROKEN: {str(exc).splitlines()[0]}")
+            else:
+                print("yuzu_personas.py isn't here.")
+            print()
+            continue
+        if command.startswith("/persona "):
+            switch_persona(command.split(None, 1)[1].strip())
+            print()
+            continue
         set_led_state("thinking")
         raw_reply = ask_yuzu_brain(user_text)
         handle_yuzu_reply(raw_reply)

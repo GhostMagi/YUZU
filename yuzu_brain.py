@@ -13,9 +13,10 @@ Quick check that everything's alive:
     python yuzu_brain.py --chat          # interactive, brain only
     python yuzu_brain.py --model llama3.2:3b
 
-The system prompt lives in yuzu_system_prompt.txt so the code, the
-Modelfile and the docs all read the same copy instead of three that
-drift apart.
+    python yuzu_brain.py --persona saya --chat
+
+Personas live in personas/ -- one file per character, with the body
+rules composed in from a shared hardware file. See yuzu_personas.py.
 """
 
 import json
@@ -25,8 +26,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import yuzu_personas
+
 HERE = Path(__file__).parent
-PROMPT_FILE = HERE / "yuzu_system_prompt.txt"
 
 # Override with:  export YUZU_MODEL=...   /  export OLLAMA_HOST=...
 DEFAULT_MODEL = os.environ.get("YUZU_MODEL", "yuzu")
@@ -61,13 +63,13 @@ class BrainError(RuntimeError):
     message that says what to actually do about it."""
 
 
-def load_system_prompt(path=PROMPT_FILE):
-    if not Path(path).exists():
-        raise BrainError(
-            f"Missing {path}. That file is Yuzu's personality -- without "
-            f"it she's just a stock assistant."
-        )
-    return Path(path).read_text(encoding="utf-8").strip()
+def load_system_prompt(persona=yuzu_personas.DEFAULT_PERSONA):
+    """The composed system prompt for one persona: her character text
+    with the body's action rules substituted in."""
+    try:
+        return yuzu_personas.load(persona).prompt
+    except yuzu_personas.PersonaError as exc:
+        raise BrainError(str(exc)) from exc
 
 
 def _post(url, payload, timeout):
@@ -83,9 +85,12 @@ def _post(url, payload, timeout):
 class YuzuBrain:
     def __init__(self, model=DEFAULT_MODEL, host=DEFAULT_HOST,
                  system_prompt=None, options=None, timeout=120,
-                 history_turns=8):
+                 history_turns=8, persona=None):
         """
         model         : Ollama model name (see Modelfile.yuzu)
+        persona       : key from personas/ -- supplies both the system
+                        prompt and any sampling overrides that character
+                        wants (a kuudere can run colder than a gyaru)
         history_turns : how many past exchanges to keep. A 3B loses the
                         thread long before the context window fills, and
                         every extra token is latency on the Jetson, so
@@ -93,8 +98,25 @@ class YuzuBrain:
         """
         self.model = model
         self.host = host.rstrip("/")
-        self.system_prompt = system_prompt or load_system_prompt()
-        self.options = dict(DEFAULT_OPTIONS, **(options or {}))
+        self.persona = None
+        persona_options = {}
+        if system_prompt is None:
+            key = persona or yuzu_personas.DEFAULT_PERSONA
+            try:
+                self.persona = yuzu_personas.load(key)
+            except yuzu_personas.PersonaError as exc:
+                raise BrainError(str(exc)) from exc
+            system_prompt = self.persona.prompt
+            persona_options = self.persona.options()
+        self.system_prompt = system_prompt
+        # Precedence: explicit options > persona settings > defaults.
+        # Layered rather than dict(a, **b, **c) -- that form raises
+        # TypeError the moment two layers set the same key, which is
+        # precisely when an override is being used.
+        merged = dict(DEFAULT_OPTIONS)
+        merged.update(persona_options)
+        merged.update(options or {})
+        self.options = merged
         self.timeout = timeout
         self.history_turns = history_turns
         self.history = []
@@ -223,20 +245,28 @@ class YuzuBrain:
 
 def _cli(argv):
     model = DEFAULT_MODEL
+    persona = None
     chat = False
     args = list(argv)
     while args:
         arg = args.pop(0)
         if arg == "--model" and args:
             model = args.pop(0)
+        elif arg == "--persona" and args:
+            persona = args.pop(0).lower()
         elif arg == "--chat":
             chat = True
         elif arg in ("-h", "--help"):
             print(__doc__)
             return 0
 
-    brain = YuzuBrain(model=model)
-    print(f"model: {brain.model}   host: {brain.host}")
+    try:
+        brain = YuzuBrain(model=model, persona=persona)
+    except BrainError as exc:
+        print(f"\n{exc}\n")
+        return 1
+    who = brain.persona.name if brain.persona else "custom prompt"
+    print(f"persona: {who}   model: {brain.model}   host: {brain.host}")
     try:
         brain.check()
     except BrainError as exc:
@@ -245,9 +275,9 @@ def _cli(argv):
     print("Ollama is up and the model is there.\n")
 
     if not chat:
-        greeting = "Hey Yuzu, what's up?"
+        greeting = f"Hey {who}, what's up?"
         print(f"You: {greeting}")
-        print(f"Yuzu: {brain.ask(greeting)}")
+        print(f"{who}: {brain.ask(greeting)}")
         return 0
 
     print("Interactive. 'quit' to exit, 'reset' to clear history.\n")
@@ -265,7 +295,7 @@ def _cli(argv):
             continue
         if not text:
             continue
-        print("Yuzu: ", end="", flush=True)
+        print(f"{who}: ", end="", flush=True)
         try:
             for piece in brain.ask_stream(text):
                 print(piece, end="", flush=True)

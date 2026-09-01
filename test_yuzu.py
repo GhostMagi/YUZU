@@ -13,6 +13,7 @@ import unittest
 from pathlib import Path
 
 import itertools
+import shutil
 import struct
 import sys
 import tempfile
@@ -22,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import muto_leg_control as legs
 import yuzu_all_in_one as yuzu
 import gguf_inspect
+import yuzu_personas
 import yuzu_prompt_eval as prompt_eval
 from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
 from yuzu_led_manager import LEDManager
@@ -325,7 +327,7 @@ class BrainTestCase(unittest.TestCase):
 
 
 class TestBrain(BrainTestCase):
-    def test_system_prompt_file_exists_and_has_the_directives(self):
+    def test_system_prompt_composes_with_the_directives(self):
         prompt = load_system_prompt()
         self.assertIn("You are Yuzu", prompt)
         for directive in ("PERSONALITY", "HARDWARE ACTION PARSING",
@@ -580,6 +582,153 @@ class TestChatTemplateHeuristic(unittest.TestCase):
 
     def test_missing_template_is_flagged_loudly(self):
         self.assertIn("MISSING", self.verdict(None))
+
+
+class TestPersonas(unittest.TestCase):
+    def test_yuzu_composes_byte_identical_to_the_tested_prompt(self):
+        """THE important one. Ghost tested the original prompt
+        extensively; splitting it into persona + hardware must not have
+        changed a single character of what the model receives."""
+        golden = (Path(__file__).parent / "personas" /
+                  "_golden_yuzu_v1.txt").read_text(encoding="utf-8").strip()
+        self.assertEqual(yuzu_personas.load("yuzu").prompt.strip(), golden)
+
+    def test_every_persona_loads(self):
+        keys = yuzu_personas.available()
+        self.assertIn("yuzu", keys)
+        for key in keys:
+            persona = yuzu_personas.load(key)
+            self.assertTrue(persona.name)
+            self.assertTrue(persona.prompt)
+
+    def test_no_persona_leaves_an_unsubstituted_token(self):
+        for key in yuzu_personas.available():
+            prompt = yuzu_personas.load(key).prompt
+            self.assertNotIn("{HARDWARE}", prompt)
+            self.assertNotIn("{DIALOGUE_RULE}", prompt)
+
+    def test_hardware_rules_are_not_duplicated_into_persona_files(self):
+        """The point of the split: the action vocabulary must live in
+        the hardware file only. A persona that inlines it will drift."""
+        for key in yuzu_personas.available():
+            raw = (Path(__file__).parent / "personas" /
+                   f"{key}.persona").read_text(encoding="utf-8")
+            self.assertNotIn("square brackets", raw,
+                             f"{key}.persona inlines hardware rules -- "
+                             f"use {{HARDWARE}} instead")
+
+    def test_settings_parse_with_the_right_types(self):
+        persona = yuzu_personas.load("yuzu")
+        self.assertEqual(persona.name, "Yuzu")
+        self.assertEqual(persona.archetype, "Gyaru")
+        self.assertEqual(persona.hardware, "muto_s2")
+        self.assertIsInstance(persona.options()["temperature"], float)
+        self.assertNotIn("piper_length_scale", persona.options(),
+                         "voice settings are not Ollama sampling options")
+        self.assertEqual(persona.led_states()["idle"], "#FF69B4")
+
+    def test_a_body_swap_changes_the_rules_not_the_character(self):
+        """Same persona text against two robots must yield two prompts
+        that each describe only their own body."""
+        with tempfile.TemporaryDirectory() as tmp:
+            real = yuzu_personas.PERSONA_DIR
+            staged = Path(tmp) / "personas"
+            shutil.copytree(real, staged)
+            character = (staged / "yuzu.persona").read_text(encoding="utf-8")
+            (staged / "onquad.persona").write_text(
+                character.replace("hardware: muto_s2", "hardware: saya_quad"),
+                encoding="utf-8")
+            yuzu_personas.PERSONA_DIR = staged
+            try:
+                hexapod = yuzu_personas.load("yuzu").prompt
+                quadruped = yuzu_personas.load("onquad").prompt
+            finally:
+                yuzu_personas.PERSONA_DIR = real
+
+        self.assertIn("camera gimbal", hexapod)
+        self.assertNotIn("camera gimbal", quadruped)
+        self.assertIn("four legs", quadruped)
+        self.assertNotIn("four legs", hexapod)
+        # the character half is untouched by the body swap
+        for prompt in (hexapod, quadruped):
+            self.assertIn("pink-obsessed Gyaru companion", prompt)
+
+    def test_unknown_persona_lists_what_exists(self):
+        with self.assertRaises(yuzu_personas.PersonaError) as ctx:
+            yuzu_personas.load("nope")
+        self.assertIn("Available:", str(ctx.exception))
+
+    def test_broken_persona_files_say_what_is_wrong(self):
+        cases = {
+            "no prompt below the marker": "name: X\n---\n",
+            "no --- separator":           "name: X\nhello there\n",
+            "bad setting line":           "name: X\nthis is not a pair\n---\nbody\n",
+            "non-numeric temperature":    "name: X\ntemperature: hot\n---\nbody\n",
+            "missing hardware file":      "name: X\nhardware: nosuchbot\n---\nbody\n",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            staged = Path(tmp) / "personas"
+            shutil.copytree(yuzu_personas.PERSONA_DIR, staged)
+            real = yuzu_personas.PERSONA_DIR
+            yuzu_personas.PERSONA_DIR = staged
+            try:
+                for label, content in cases.items():
+                    (staged / "broken.persona").write_text(content, encoding="utf-8")
+                    with self.assertRaises(yuzu_personas.PersonaError, msg=label):
+                        yuzu_personas.load("broken")
+            finally:
+                yuzu_personas.PERSONA_DIR = real
+
+    def test_scaffold_produces_a_loadable_persona(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staged = Path(tmp) / "personas"
+            shutil.copytree(yuzu_personas.PERSONA_DIR, staged)
+            real = yuzu_personas.PERSONA_DIR
+            yuzu_personas.PERSONA_DIR = staged
+            try:
+                yuzu_personas.scaffold("saki")
+                persona = yuzu_personas.load("saki")
+                self.assertEqual(persona.name, "Saki")
+                self.assertNotIn("{HARDWARE}", persona.prompt)
+                self.assertIn("square brackets", persona.prompt)
+                with self.assertRaises(yuzu_personas.PersonaError):
+                    yuzu_personas.scaffold("saki")      # no silent overwrite
+            finally:
+                yuzu_personas.PERSONA_DIR = real
+
+
+class TestPersonaWiring(BrainTestCase):
+    def test_brain_uses_the_named_persona(self):
+        brain = self.brain(persona="yuzu")
+        self.assertEqual(brain.persona.name, "Yuzu")
+        self.assertIn("pink-obsessed Gyaru", brain.system_prompt)
+
+    def test_persona_settings_override_defaults(self):
+        brain = self.brain(persona="yuzu")
+        self.assertEqual(brain.options["temperature"], 0.8)
+        self.assertIn("num_ctx", brain.options)      # default still present
+
+    def test_explicit_options_beat_persona_settings(self):
+        brain = self.brain(persona="yuzu", options={"temperature": 0.2})
+        self.assertEqual(brain.options["temperature"], 0.2)
+
+    def test_unknown_persona_is_a_brain_error(self):
+        with self.assertRaises(BrainError):
+            self.brain(persona="nope")
+
+    def test_explicit_system_prompt_still_wins(self):
+        brain = self.brain(system_prompt="You are a test.")
+        self.assertEqual(brain.system_prompt, "You are a test.")
+        self.assertIsNone(brain.persona)
+
+    def test_led_palette_overrides_color_but_not_effect(self):
+        led = LEDManager()
+        before = led.get_state_profile("idle")
+        led.apply_persona_colors({"idle": "#123456", "nosuchstate": "#000000"})
+        after = led.get_state_profile("idle")
+        self.assertEqual(after["color"], "#123456")
+        self.assertEqual(after["effect"], before["effect"])
+        self.assertEqual(after["brightness"], before["brightness"])
 
 
 class TestDoctor(unittest.TestCase):

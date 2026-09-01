@@ -122,6 +122,20 @@ class LEDManager:
                 f"{profile.get('effect')}  {profile.get('brightness')}%"
             )
 
+    def apply_persona_colors(self, colors):
+        """Tint the behavior states for whichever persona is loaded.
+
+        A kuudere shouldn't glow the same hot pink as a gyaru. Only the
+        COLOR is overridden -- the effect and brightness stay whatever
+        the config says, because those are about the hardware and the
+        room, not the character. Unknown state names are ignored.
+        """
+        profiles = self.data.setdefault("state_profiles", {})
+        for state, color in colors.items():
+            if state in profiles:
+                profiles[state] = dict(profiles[state], color=color)
+        self.current_state = None       # force the next push through
+
     def apply_zone(self, zone_name):
         """Light one zone with its own configured base color."""
         zone = self.get_zone(zone_name)

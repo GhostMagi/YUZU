@@ -36,7 +36,7 @@ Do this before hunting down the abliterated weights. It separates
 
 ```bash
 ollama pull llama3.2:3b
-python build_yuzu_model.py --create        # builds the 'yuzu' model
+python build_yuzu_model.py --all --create  # one model per persona
 python yuzu_brain.py                       # one-shot smoke test
 python yuzu_brain.py --chat                # talk to her
 ```

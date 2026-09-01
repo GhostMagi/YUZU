@@ -18,7 +18,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 67 tests, ~3 seconds
+python test_yuzu.py           # 82 tests, ~3 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -61,7 +61,8 @@ $400.
 |---|---|
 | `yuzu_all_in_one.py` | Reply pipeline + main loop. **Start here.** |
 | `yuzu_brain.py` | Ollama client. Stdlib only, streaming, history |
-| `yuzu_system_prompt.txt` | Yuzu's personality. The only copy |
+| `personas/` | One file per character; body rules shared |
+| `yuzu_personas.py` | Persona loader and composer |
 | `build_yuzu_model.py` | Generates `Modelfile.yuzu` from that prompt |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the model |
 | `gguf_inspect.py` | Reads a GGUF header — quant, context, chat template |
@@ -77,6 +78,33 @@ $400.
 | `Yuzu_Full_Technical_Context_Dump.md` | Full project context and reasoning |
 | `Claude_Memory_Export_StackchanBuild.md` | Project history, Stackchan → now |
 | `paintstepslol.txt` | Paint prep steps for the chassis |
+
+## Swappable personas
+
+Each character is one file in `personas/`. The rules about what the
+*body* can do live separately and get composed in:
+
+```
+python yuzu_personas.py                 # list them
+python yuzu_personas.py --new saki      # scaffold a new one
+python yuzu_personas.py --show yuzu     # see the composed prompt
+python build_yuzu_model.py --all --create   # one Ollama model each
+python yuzu_brain.py --persona saya --chat
+```
+
+In the main loop, `/personas` lists and `/persona saya` switches live.
+
+**Why the split.** The bracket format, the action vocabulary, the
+"always say something out loud" rule — none of that is personality,
+it's facts about a Yahboom Muto S2. Copy it into five persona files and
+you get five copies that drift, and one day you fix an action rule in
+four of them and miss the fifth. So a persona file says
+`{HARDWARE}` and the real text comes from
+`personas/_hardware_muto_s2.txt`.
+
+It also means a persona can move between robots. Saya's quadruped has
+four legs and an OLED face — different body file, same character file,
+no rewriting. `personas/_hardware_saya_quad.txt` is a draft of that.
 
 ## How a turn flows
 
