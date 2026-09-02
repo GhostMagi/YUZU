@@ -21,6 +21,16 @@ it lives in three places he actually lands: the README above the fold,
 gated on Jetson detection so they stay quiet on the phone. Tests pin all
 three. If you touch any of them, keep the reminder.
 
+**The laptop works now and it is the eval machine.** Acer Aspire
+VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
+via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
+(that repo path is confirmed working). 154 tests pass on it. Getting it
+to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
+**locked NVRAM**, so it only boots via a firmware-registered trusted
+file, and only from **F12 → entry 3 `ubuntu`**. Its keyboard has no
+**k, l, m, Enter or up-arrow**; numpad Enter works, `Ctrl+P` is up-arrow
+in a terminal, and Tab completion covers the dead letters.
+
 ## Prompt work
 
 `personas/yuzu.persona` is the ORIGINAL, extensively tested by Ghost.
@@ -38,6 +48,43 @@ Measured so far: v1 20% action hit rate → v2 78–83%.
 its fixes. First live round (9 replies, Sept 1): **11/11 actions ran**,
 has_dialogue 89% — one all-actions freeze, which was the predicted #1
 risk for the archetype. Small sample; treat it as promising, not proven.
+
+**FIRST MACHINE-SCORED RUN — Sept 2, on Ghost's own laptop.** Not
+PocketPal screenshots: `yuzu_prompt_eval.py --persona yuzu2`, 36 replies,
+heretic-abliterated Q4_K_M via Ollama on a GTX 960M.
+
+    moves_at_all      80.6%   <- the number that matters
+    has_dialogue      94.4%
+    one_per_bracket   94.4%
+    brackets_balanced 97.2%
+    not_an_assistant  100%
+    no_puppeteering   100%
+    actions_runnable  55.6%   <- see below, misleading
+    no_asterisks      52.8%   <- see below, misleading
+    spoken length     26w avg (brevity rule holding)
+
+Two reasons this is NOT comparable to the 91% from the PocketPal round,
+and both matter:
+
+1. **The eval is harsher.** It calls `brain.reset()` before every prompt,
+   so each of the 36 turns is cold. In a real chat Ghost's own earlier
+   bracketed replies accumulate and act as extra examples — the format
+   reinforces itself. This measures the prompt standing alone.
+2. **`no_asterisks` and `actions_runnable` overstate the damage.**
+   `normalize_actions` rescues `*shakes legs*` → `[shakes legs]` → runs.
+   Only impossible actions actually fail, and `actions_runnable` is an
+   `all()`, so a single `*wink*` fails a reply where three real moves
+   ran. `moves_at_all` is the honest robot-facing number.
+
+**OPEN LEAD, not yet tested: the asterisk rule is written in asterisks.**
+`_hardware_muto_s2.txt` line 31 says *"Never write a movement between
+\*asterisks\*"* — the ban demonstrates the format, which is the exact
+pattern already measured in this repo when naming "hugging, waving,
+winking" put `[winks]` in 3 of 4 live replies. `[wink]` is still the top
+drop here (3 of 21). The experiment: a `yuzu3` identical to yuzu2 except
+that one line rewritten to forbid the format without showing it, then
+`--persona yuzu2` vs `--persona yuzu3`. One variable, minutes not
+screenshots. **Ghost has not green-lit this yet.**
 
 **yuzu2 v2.1** (self-concept + movement + length fixes) measured Sept 1,
 4 replies: **action hit rate 10/11 = 91%**, moves_at_all 100% (was 50%
