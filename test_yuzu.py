@@ -207,6 +207,57 @@ class TestGaits(unittest.TestCase):
         self.assertEqual(len(set(legs.TRIPOD_A) & {2, 5}), 1)
         self.assertEqual(len(set(legs.TRIPOD_B) & {2, 5}), 1)
 
+    def _coxa_sequence(self, fn, **kw):
+        """Ordered raw coxa commands per leg, preserving phase."""
+        bot = legs.DummyBot(verbose=False)
+        fn(bot, runtime=1, **kw)
+        coxa_of = {ids[0]: leg for leg, ids in legs.LEG_SERVO_MAP.items()}
+        seq = {}
+        for servo_id, angle, _ in bot.calls:
+            if servo_id in coxa_of:
+                seq.setdefault(coxa_of[servo_id], []).append(angle)
+        return seq
+
+    def test_turn_survives_calibration(self):
+        """REGRESSION: turn() hardcoded `side = 1 if leg <= 3 else -1`,
+        a second copy of what LEG_SIGN already knows. check_mirroring()
+        tells you to flip LEG_SIGN entries during calibration, and doing
+        so made that leg turn against the rest of its tripod while
+        walk() kept working -- silent, partial, and caused by following
+        the documented procedure."""
+        original = dict(legs.LEG_SIGN)
+        try:
+            for flipped in (None, 5, 2, 4, 1):
+                if flipped:
+                    old_sign = legs.LEG_SIGN[flipped]
+                    legs.LEG_SIGN[flipped] = (-old_sign[0],) + old_sign[1:]
+                seq = self._coxa_sequence(legs.turn, steps=1)
+                # A turn rotates the body only if every leg in a tripod
+                # hits the same RAW angle at the same instant.
+                for group in (legs.TRIPOD_A, legs.TRIPOD_B):
+                    for leg in group[1:]:
+                        self.assertEqual(
+                            seq[leg], seq[group[0]],
+                            f"leg {leg} turns against its tripod after "
+                            f"flipping LEG_SIGN[{flipped}]")
+        finally:
+            legs.LEG_SIGN.clear()
+            legs.LEG_SIGN.update(original)
+
+    def test_walk_mirrors_across_sides(self):
+        """The counterpart to the above: walk() must KEEP the mirroring,
+        so legs on opposite sides get opposite raw angles and the body
+        translates instead of spinning."""
+        seq = self._coxa_sequence(legs.walk_forward, steps=1)
+        self.assertEqual(seq[3], [-angle for angle in seq[5]],
+                         "walk must mirror across sides, unlike turn")
+
+    def test_turn_and_walk_are_not_the_same_motion(self):
+        turning = self._coxa_sequence(legs.turn, steps=1)
+        walking = self._coxa_sequence(legs.walk_forward, steps=1)
+        self.assertNotEqual(turning[5], walking[5],
+                            "if these match, one of them is wrong")
+
     def test_bad_leg_id_raises(self):
         with self.assertRaises(ValueError):
             legs.set_leg(legs.DummyBot(verbose=False), 7, 0, 0, 0)
@@ -222,6 +273,168 @@ class TestGaits(unittest.TestCase):
             self.assertIn(leg_id, legs.LEG_SIGN)
         flat = [s for ids in legs.LEG_SERVO_MAP.values() for s in ids]
         self.assertEqual(sorted(flat), list(range(1, 19)), "servo IDs 1-18 must be unique")
+
+
+class TestHardwareBoundary(unittest.TestCase):
+    """Simulation must never be a silent fallback. A loose cable looking
+    identical to working code is the worst failure mode available."""
+
+    def test_simulation_is_the_explicit_default(self):
+        bot, mode = legs.connect(False)
+        self.assertIsInstance(bot, legs.DummyBot)
+        self.assertIn("SIMULATION", mode)
+
+    def test_asking_for_hardware_without_it_raises(self):
+        with self.assertRaises(legs.HardwareError) as ctx:
+            legs.connect(True)
+        message = str(ctx.exception)
+        self.assertIn("NOT falling back", message)
+        self.assertIn("YUZU_HARDWARE", message)
+
+    def test_hardware_failure_does_not_return_a_dummy(self):
+        try:
+            bot, _ = legs.connect(True)
+        except legs.HardwareError:
+            return                      # correct
+        self.fail(f"connect(True) quietly returned {bot!r}")
+
+
+class TestAngleLimit(unittest.TestCase):
+    def setUp(self):
+        self.original = legs.MAX_ANGLE
+
+    def tearDown(self):
+        legs.set_angle_limit(self.original)
+
+    def test_limit_clamps_every_command(self):
+        legs.set_angle_limit(15)
+        bot = legs.DummyBot(verbose=False)
+        legs.set_leg(bot, 1, 90, -90, 45, runtime=1)
+        for _, angle, _ in bot.calls:
+            self.assertLessEqual(abs(angle), 15)
+
+    def test_limit_cannot_exceed_servo_range(self):
+        legs.set_angle_limit(500)
+        self.assertEqual(legs.MAX_ANGLE, 90)
+
+    def test_set_angle_limit_returns_previous(self):
+        legs.set_angle_limit(90)
+        self.assertEqual(legs.set_angle_limit(20), 90)
+
+    def test_a_whole_gait_respects_the_limit(self):
+        legs.set_angle_limit(20)
+        bot = legs.DummyBot(verbose=False)
+        legs.walk_forward(bot, steps=1, runtime=1)
+        legs.turn(bot, steps=1, runtime=1)
+        for _, angle, _ in bot.calls:
+            self.assertLessEqual(abs(angle), 20)
+
+
+class TestSafeShutdown(unittest.TestCase):
+    """18x 35KG servos hold their last commanded angle while powered.
+    Exiting mid-gait leaves them straining against a half-finished pose
+    indefinitely, and nothing in the code notices."""
+
+    def test_rest_squats_before_releasing_torque(self):
+        # Order matters: releasing torque while standing drops the
+        # chassis from full ride height.
+        bot = legs.DummyBot(verbose=False)
+        legs.stance(bot, runtime=1)
+        before = len(bot.calls)
+        legs.rest(bot, runtime=1)
+        femur_ids = {ids[1] for ids in legs.LEG_SERVO_MAP.values()}
+        femurs = [a for sid, a, _ in bot.calls[before:] if sid in femur_ids]
+        self.assertTrue(femurs, "rest() must command the femurs")
+        self.assertEqual(femurs[-1], legs.SQUAT_FEMUR * 1)
+        self.assertFalse(bot.torque, "torque must end up released")
+
+    def test_rest_survives_a_completely_dead_bus(self):
+        class DeadBot(legs.DummyBot):
+            def motor(self, *a, **k):
+                raise OSError("bus down")
+
+            def Servo_torque_off(self):
+                raise OSError("bus down")
+
+        legs.rest(DeadBot(verbose=False))       # must not raise
+
+    def test_shutdown_is_idempotent(self):
+        yuzu.shutdown()
+        yuzu.shutdown()
+
+
+class TestMotorFaultTolerance(unittest.TestCase):
+    """A servo bus hiccup must not end the conversation."""
+
+    def setUp(self):
+        self.real_bot = yuzu.g_bot
+        yuzu.motor_faults.clear()
+        self.spoken = []
+        self.real_speak, yuzu.speak = yuzu.speak, self.spoken.append
+        yuzu.PAUSE_SCALE = 0.0
+
+    def tearDown(self):
+        yuzu.g_bot = self.real_bot
+        yuzu.speak, yuzu.PAUSE_SCALE = self.real_speak, 1.0
+        yuzu.motor_faults.clear()
+
+    def test_a_dead_leg_does_not_stop_her_talking(self):
+        class BrokenBot(legs.DummyBot):
+            def motor(self, servo_id, angle, runtime=100):
+                if servo_id in (13, 14, 15):        # leg 5 unplugged
+                    raise OSError("serial timeout")
+                super().motor(servo_id, angle, runtime)
+
+        yuzu.g_bot = BrokenBot(verbose=False)
+        yuzu.handle_yuzu_reply("Say less! [spins] Tell me that wasn't iconic.")
+        self.assertEqual(self.spoken, ["Say less!", "Tell me that wasn't iconic."])
+        self.assertEqual(len(yuzu.motor_faults), 1)
+        self.assertEqual(yuzu.motor_faults[0][0], "spin")
+
+
+class TestFirstContact(unittest.TestCase):
+    """The bring-up script is the only thing standing between an
+    uncalibrated chassis and eighteen 35KG servos at full range."""
+
+    def run_script(self, answers, timeout=60):
+        import os
+        import subprocess
+        env = dict(os.environ, MUTO_PAUSE_MS="1")   # skip real servo timing
+        return subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "muto_firstcontact.py")],
+            input=answers, capture_output=True, text=True,
+            timeout=timeout, env=env)
+
+    def test_saying_no_at_the_start_moves_nothing_further(self):
+        result = self.run_script("n\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("STOPPED", result.stdout)
+        self.assertNotIn("STAGE 2", result.stdout)
+
+    def test_a_failed_mirroring_check_names_the_fix(self):
+        # 21st question is the mirroring one in simulation mode.
+        result = self.run_script("y\n" * 20 + "n\n" + "y\n" * 10)
+        self.assertIn("STOPPED at: mirroring", result.stdout)
+        self.assertIn("LEG_SIGN", result.stdout)
+        self.assertNotIn("STAGE 4", result.stdout,
+                         "must not reach standing after a mirroring failure")
+
+    def test_a_clean_run_completes_and_parks(self):
+        result = self.run_script("y\n" * 40)
+        self.assertIn("BRING-UP COMPLETE", result.stdout)
+        self.assertIn("Parking legs", result.stdout)
+        self.assertEqual(result.returncode, 0)
+
+    def test_it_starts_at_a_timid_angle_limit(self):
+        import muto_firstcontact
+        self.assertLessEqual(muto_firstcontact.BRINGUP_LIMIT, 20)
+        self.assertLess(muto_firstcontact.BRINGUP_LIMIT,
+                        muto_firstcontact.STANCE_LIMIT)
+
+    def test_it_restores_the_angle_limit_afterwards(self):
+        before = legs.MAX_ANGLE
+        self.run_script("n\n")
+        self.assertEqual(legs.MAX_ANGLE, before)
 
 
 class TestEndToEnd(unittest.TestCase):
@@ -924,6 +1137,21 @@ class TestDriftRecovery(BrainTestCase):
             brain.ask(f"message {i}")
         self.assertEqual(brain.recoveries, 0,
                          "alternating replies aren't a drift pattern")
+
+    def test_streaming_also_scores_drift(self):
+        """REGRESSION: ask() scored drift and ask_stream() didn't, so
+        streaming silently disabled the entire recovery mechanism --
+        and streaming is what the robot uses, to start speaking before
+        the reply finishes."""
+        MockOllama.replies = itertools.cycle(
+            ["Aw! *opens legs slightly* robot hug! *giggles*"])
+        brain = self.brain(system_prompt="test")
+        list(brain.ask_stream("hi"))
+        self.assertIsNotNone(brain.last_health)
+        self.assertFalse(brain.last_health.ok)
+        list(brain.ask_stream("again"))
+        self.assertEqual(brain.recoveries, 1,
+                         "streaming must recover from drift like ask() does")
 
     def test_personality_survives_a_full_reset(self):
         brain = self.brain(persona="yuzu2")

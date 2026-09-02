@@ -46,11 +46,26 @@ except ImportError:
 # PART 0: HARDWARE BINDING
 # ============================================================================
 
-# g_bot is the real Yahboom robot object once hardware exists:
-#     from muto_lib import Muto_Bot
-#     g_bot = Muto_Bot()
-# Until then muto_leg_control.DummyBot stands in and prints servo traffic.
-g_bot = legs.DummyBot(verbose=False) if legs else None
+# Simulation vs real servos is an EXPLICIT choice, never auto-detected:
+#
+#     python yuzu_all_in_one.py                 # simulation
+#     YUZU_HARDWARE=1 python yuzu_all_in_one.py # real servos
+#
+# Auto-detecting by probing a serial port sounds convenient and is a
+# trap: a loose cable then looks exactly like working code, and you
+# spend an evening debugging a gait that was never reaching a motor.
+# Asking for hardware and not getting it is a hard failure here.
+USE_HARDWARE = os.environ.get("YUZU_HARDWARE", "").lower() in (
+    "1", "true", "yes", "real", "on")
+
+g_bot = None
+BOT_MODE = "no muto_leg_control.py"
+if legs:
+    try:
+        g_bot, BOT_MODE = legs.connect(USE_HARDWARE)
+    except legs.HardwareError as exc:
+        print(f"\n{exc}\n")
+        raise SystemExit(1)
 
 leds = LEDManager() if LEDManager else None
 
@@ -68,12 +83,27 @@ def set_led_state(state):
 # Each robot function calls the real gait when muto_leg_control is
 # importable, and otherwise prints -- so the pipeline is testable on a
 # phone and correct on the Jetson without touching this file again.
+# Counts hardware faults so a flaky serial bus is visible rather than
+# mysterious. Reset per session; surfaced by /health.
+motor_faults = []
+
+
 def _gait(name, printed, **kwargs):
     def run():
-        if legs and g_bot:
-            getattr(legs, name)(g_bot, **kwargs)
-        else:
+        if not (legs and g_bot):
             print(f"ROBOT: {printed}")
+            return
+        try:
+            getattr(legs, name)(g_bot, **kwargs)
+        except Exception as exc:                # noqa: BLE001
+            # A servo bus hiccup must not end the conversation. She
+            # keeps talking; the robot just doesn't move that beat.
+            # Bare Exception is deliberate -- the Yahboom library's
+            # error types aren't documented, and a serial timeout
+            # killing the whole loop mid-sentence is worse than any
+            # error we might swallow here.
+            motor_faults.append((name, repr(exc)))
+            print(f"[robot] '{name}' failed: {exc} (continuing)")
     return run
 
 
@@ -436,7 +466,16 @@ def run_yuzu_forever():
           "/reset /health")
     print(f"brain: {brain_status}")
     print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
-          f"leds: {'yuzu_led_manager' if leds else 'off'}\n")
+          f"leds: {'yuzu_led_manager' if leds else 'off'}")
+    banner = "!" * 58 if USE_HARDWARE else ""
+    if banner:
+        print(banner)
+        print(f"  MODE: {BOT_MODE}")
+        print("  Clear the area. Ctrl-C parks the legs safely.")
+        print(banner)
+    else:
+        print(f"mode:  {BOT_MODE}")
+    print()
     if legs and g_bot:
         legs.stance(g_bot)
     set_led_state("idle")
@@ -474,7 +513,8 @@ def run_yuzu_forever():
             if brain and brain.last_health:
                 print(f" last reply: {brain.last_health}")
                 print(f" history: {len(brain.history)//2} exchanges, "
-                      f"auto-recoveries so far: {brain.recoveries}\n")
+                      f"auto-recoveries so far: {brain.recoveries}")
+                print(f" motor faults: {len(motor_faults)}\n")
             else:
                 print("No replies scored yet.\n")
             continue
@@ -485,5 +525,31 @@ def run_yuzu_forever():
         print()
 
 
+def shutdown():
+    """Park the robot and the lights. Safe to call twice."""
+    if legs and g_bot:
+        print("Parking legs...")
+        legs.rest(g_bot)
+    set_led_state("idle")
+    if motor_faults:
+        print(f"({len(motor_faults)} motor fault(s) this session)")
+
+
+def main():
+    """Wrapper that guarantees shutdown() runs on EVERY exit path.
+
+    Without this, Ctrl-C during a gait leaves 18 servos energised
+    against a half-finished pose until someone pulls the power. The
+    finally block is the only thing standing between a normal
+    interruption and a stalled, overheating leg.
+    """
+    try:
+        run_yuzu_forever()
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+    finally:
+        shutdown()
+
+
 if __name__ == "__main__":
-    run_yuzu_forever()
+    main()

@@ -97,9 +97,26 @@ SQUAT_TIBIA = -60      # tibia angle for a low squat
 STEP_MS = 180          # servo travel time per gait phase, milliseconds
 
 
+# Bring-up safety limit. Every angle is clamped to +/- this before it
+# reaches a servo. The servos accept +/-90, but during first contact
+# with an uncalibrated chassis a wrong sign at full range is the
+# difference between a leg twitching and a leg driving itself into the
+# frame under 35kg of torque. muto_firstcontact.py lowers this while
+# checking, and nothing else should raise it.
+MAX_ANGLE = 90
+
+
+def set_angle_limit(degrees):
+    """Clamp every future command to +/- degrees. Returns the old limit
+    so a caller can restore it."""
+    global MAX_ANGLE
+    previous, MAX_ANGLE = MAX_ANGLE, max(1, min(90, int(degrees)))
+    return previous
+
+
 def _clamp(angle):
-    """Keep angle within the servo's valid -90 to 90 range."""
-    return max(-90, min(90, angle))
+    """Keep angle inside the servo range AND the current safety limit."""
+    return max(-MAX_ANGLE, min(MAX_ANGLE, angle))
 
 
 def set_leg(g_bot, leg_id, coxa, femur, tibia, runtime=100):
@@ -157,6 +174,31 @@ def load_all(g_bot):
 def unload_all(g_bot):
     """Turn off torque for all 18 servos (legs go limp, posable by hand)."""
     g_bot.Servo_torque_off()
+
+
+def rest(g_bot, runtime=400):
+    """Park the robot safely. Call this on EVERY exit path.
+
+    Order matters and is the whole point: lower the body to a squat
+    FIRST, then release torque. Releasing torque while standing drops
+    the full chassis onto its knees from ride height.
+
+    Why this exists: 18x 35KG serial bus servos hold their last
+    commanded angle as long as they're powered. Exiting mid-gait --
+    Ctrl-C, a crash, an SSH drop -- leaves them straining against a
+    half-finished pose indefinitely, drawing stall current and heating
+    up. Nothing in the code path noticed, because from Python's point of
+    view the process simply ended.
+    """
+    try:
+        squat(g_bot, runtime)
+        time.sleep(0.2)
+    except Exception as exc:                    # noqa: BLE001
+        print(f"[muto] couldn't squat before resting: {exc}")
+    try:
+        unload_all(g_bot)
+    except Exception as exc:                    # noqa: BLE001
+        print(f"[muto] couldn't release torque: {exc}")
 
 
 def calibrate_leg(g_bot, leg_id):
@@ -268,26 +310,37 @@ def turn(g_bot, steps=2, direction=1, runtime=STEP_MS):
 
     Same tripod timing as walk(), except both sides swing their coxas
     the SAME rotational way instead of mirroring, which spins the body
-    rather than translating it. That's why it bypasses set_legs' sign
-    handling and pushes a raw sign per side.
+    rather than translating it.
+
+    It does that by CANCELLING each leg's own coxa mirroring: passing
+    `stride * LEG_SIGN[leg][0]` means set_leg multiplies by that sign
+    again, and sign * sign is always +1, so every leg lands on the same
+    raw angle whatever its configured mirroring.
+
+    This used to read `side = 1 if leg <= 3 else -1`, a hardcoded second
+    copy of what LEG_SIGN already knows. The moment calibration flipped
+    a sign -- which check_mirroring() explicitly tells you to do -- that
+    leg turned against the others while walk() carried on working fine.
+    Silent, partial, and triggered by following the documented
+    procedure. Derive it, never restate it.
     """
     stride = STRIDE_COXA * direction
     stance(g_bot, runtime)
     for _ in range(steps):
         for swing, planted in ((TRIPOD_A, TRIPOD_B), (TRIPOD_B, TRIPOD_A)):
             for leg in swing:
-                side = 1 if leg <= 3 else -1
+                side = LEG_SIGN[leg][0]
                 set_leg(g_bot, leg, -stride * side, LIFT_FEMUR, STANCE_TIBIA, runtime)
             settle(runtime)
             for leg in swing:
-                side = 1 if leg <= 3 else -1
+                side = LEG_SIGN[leg][0]
                 set_leg(g_bot, leg, stride * side, LIFT_FEMUR, STANCE_TIBIA, runtime)
             for leg in planted:
-                side = 1 if leg <= 3 else -1
+                side = LEG_SIGN[leg][0]
                 set_leg(g_bot, leg, -stride * side, STANCE_FEMUR, STANCE_TIBIA, runtime)
             settle(runtime)
             for leg in swing:
-                side = 1 if leg <= 3 else -1
+                side = LEG_SIGN[leg][0]
                 set_leg(g_bot, leg, stride * side, STANCE_FEMUR, STANCE_TIBIA, runtime)
             settle(runtime)
     stance(g_bot, runtime)
@@ -339,6 +392,39 @@ def stretch(g_bot, runtime=500):
 # Same method names as the real Yahboom object, so the gaits above run
 # unmodified against either one.
 # =====================================================================
+
+class HardwareError(RuntimeError):
+    """Raised when real hardware was ASKED for and couldn't be reached.
+
+    Deliberately never falls back to the simulator. Silently simulating
+    when someone expected real servos is the worst outcome available:
+    the code looks like it works, the robot doesn't move, and there's
+    nothing on screen to explain why.
+    """
+
+
+def connect(use_hardware, verbose=False):
+    """Return (bot, mode_label).
+
+    use_hardware is an EXPLICIT choice, never auto-detected. Probing a
+    serial port and quietly picking simulation when it doesn't answer
+    means a loose cable looks identical to working code.
+    """
+    if not use_hardware:
+        return DummyBot(verbose=verbose), "SIMULATION (no servos will move)"
+    try:
+        # Confirm the real import path against Yahboom's library once
+        # the hardware is in hand -- see the module docstring.
+        from muto_lib import Muto_Bot            # noqa: F401
+    except ImportError as exc:
+        raise HardwareError(
+            "YUZU_HARDWARE is set, but Yahboom's library isn't importable.\n"
+            f"  {exc}\n"
+            "  Install it, or unset YUZU_HARDWARE to run in simulation.\n"
+            "  NOT falling back to the simulator -- you asked for servos."
+        ) from exc
+    return Muto_Bot(), "REAL HARDWARE (18 servos live)"
+
 
 class DummyBot:
     """Stand-in for the real Muto bot. Prints (or silently records)

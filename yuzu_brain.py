@@ -287,8 +287,13 @@ class YuzuBrain:
                 f"Can't reach Ollama at {self.host} ({exc.reason}). "
                 f"Start it with: ollama serve"
             ) from exc
+        full_reply = "".join(collected).strip()
         if remember:
-            self._remember(user_text, "".join(collected).strip())
+            self._remember(user_text, full_reply)
+        # ask() scored drift and ask_stream() didn't, so streaming
+        # silently disabled the whole recovery mechanism. Both paths
+        # score now.
+        self._check_drift(full_reply)
 
     @staticmethod
     def _canonicalise(reply):
