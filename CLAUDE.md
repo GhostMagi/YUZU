@@ -27,9 +27,11 @@ via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-unce
 (that repo path is confirmed working). 154 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
-file, and only from **F12 → entry 3 `ubuntu`**. Its keyboard has no
-**k, l, m, Enter or up-arrow**; numpad Enter works, `Ctrl+P` is up-arrow
-in a terminal, and Tab completion covers the dead letters.
+file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
+paired to it now and typing is normal.** The built-in keyboard is still
+missing **k, l, m, Enter and up-arrow**, so if the Bluetooth one is ever
+flat or absent: numpad Enter works, `Ctrl+P` is up-arrow in a terminal,
+and Tab completion covers the dead letters.
 
 ## Prompt work
 

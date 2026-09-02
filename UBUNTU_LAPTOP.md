@@ -121,6 +121,9 @@ Found the hard way, Sept 2026:
   five times a second from the instant you press power. Pressing keys
   once "No Bootable Device" is on screen does nothing at all — POST is
   over by then and that screen ignores everything.
+- **A Bluetooth keyboard fixes all of the below.** One is paired now and
+  typing is normal. The workarounds still matter for the BIOS (which
+  usually won't see a Bluetooth keyboard) and for any time it's flat.
 - **The main Enter key is dead; the NUMPAD Enter works.** Keyboards are
   wired as a grid and the two Enters sit on different lines, so one
   dying doesn't touch the other. If a key seems dead, look for a
