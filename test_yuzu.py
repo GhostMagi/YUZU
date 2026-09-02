@@ -1280,6 +1280,79 @@ class TestHardwareBlocks(unittest.TestCase):
                                 f"there, so naming it only demonstrates it")
 
 
+class TestAsteriskExperiment(unittest.TestCase):
+    """yuzu3 tests one hypothesis: that the asterisk ban demonstrating
+    an asterisk is why *actions* keep coming back. Same pattern already
+    measured twice in this repo -- naming "hugging, waving, winking" put
+    [winks] in 3 of 4 live replies. For the A/B to mean anything, v2 and
+    v3 must differ by exactly that one line."""
+
+    def test_v2_and_v3_differ_by_exactly_one_line(self):
+        v2 = yuzu_personas.load("yuzu2").prompt.splitlines()
+        v3 = yuzu_personas.load("yuzu3").prompt.splitlines()
+        self.assertEqual(len(v2), len(v3))
+        differing = [i for i, (a, b) in enumerate(zip(v2, v3)) if a != b]
+        self.assertEqual(len(differing), 1,
+                         f"one variable only; {len(differing)} lines differ")
+        self.assertIn("brackets", v3[differing[0]].lower())
+
+    def test_v3_shows_no_asterisk_at_all(self):
+        self.assertEqual(yuzu_personas.load("yuzu3").prompt.count("*"), 0)
+
+    def test_v2_still_shows_one_so_the_test_is_meaningful(self):
+        # If this ever hits zero the experiment has no control arm.
+        self.assertGreater(yuzu_personas.load("yuzu2").prompt.count("*"), 0)
+
+    def test_v3_still_forbids_the_format(self):
+        prompt = yuzu_personas.load("yuzu3").prompt.lower()
+        self.assertIn("only thing you ever put around a movement", prompt)
+
+
+class TestBlockSubstitution(unittest.TestCase):
+    """Hardware blocks can reference other blocks."""
+
+    def staged(self, contents):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        staged = Path(tmp.name) / "personas"
+        shutil.copytree(yuzu_personas.PERSONA_DIR, staged)
+        (staged / "_hardware_test.txt").write_text(contents, encoding="utf-8")
+        (staged / "probe.persona").write_text(
+            "name: Probe\nhardware: test\n---\n{OUTER}\n", encoding="utf-8")
+        return staged
+
+    def load_with(self, contents):
+        staged = self.staged(contents)
+        real = yuzu_personas.PERSONA_DIR
+        yuzu_personas.PERSONA_DIR = staged
+        try:
+            return yuzu_personas.load("probe").prompt
+        finally:
+            yuzu_personas.PERSONA_DIR = real
+
+    def test_a_block_can_reference_a_later_block(self):
+        self.assertIn("hello", self.load_with(
+            "[OUTER]\nsays {INNER}\n\n[INNER]\nhello\n"))
+
+    def test_a_block_can_reference_an_earlier_block(self):
+        # REGRESSION: substitution was a single pass, so this direction
+        # silently left a raw {INNER} in the composed prompt.
+        self.assertIn("hello", self.load_with(
+            "[INNER]\nhello\n\n[OUTER]\nsays {INNER}\n"))
+
+    def test_an_undefined_token_names_what_is_available(self):
+        with self.assertRaises(yuzu_personas.PersonaError) as ctx:
+            self.load_with("[OUTER]\nsays {NOSUCHBLOCK}\n")
+        message = str(ctx.exception)
+        self.assertIn("NOSUCHBLOCK", message)
+        self.assertIn("Defined there", message)
+
+    def test_a_circular_reference_errors_instead_of_hanging(self):
+        with self.assertRaises(yuzu_personas.PersonaError) as ctx:
+            self.load_with("[OUTER]\n{INNER}\n\n[INNER]\n{OUTER}\n")
+        self.assertIn("loop", str(ctx.exception))
+
+
 class TestPersonaWiring(BrainTestCase):
     def test_brain_uses_the_named_persona(self):
         brain = self.brain(persona="yuzu")
@@ -1878,9 +1951,22 @@ class TestPersonaSwitching(BrainTestCase):
         """Same chassis, so the action vocabulary must be the same text
         in both prompts. If it ever isn't, the split has failed and one
         character is being taught moves the other isn't."""
-        menu = yuzu_personas._parse_hardware("muto_s2")["HARDWARE_MENU"]
-        for key in ("yuzu2", "coco"):
-            self.assertIn(menu, yuzu_personas.load(key).prompt)
+        # Compare the COMPOSED prompts, not the raw block. Blocks can
+        # now reference other blocks (see BRACKET_RULE), so the raw text
+        # legitimately contains unexpanded tokens and would never appear
+        # verbatim in a finished prompt. What matters is that the body
+        # section comes out identical for every character on the chassis.
+        def body_section(key):
+            prompt = yuzu_personas.load(key).prompt
+            start = prompt.index("You are a person, and right now")
+            end = prompt.index("Brackets are only ever for the movements")
+            return prompt[start:end]
+
+        reference = body_section("yuzu2")
+        self.assertIn("[walks forward]", reference)
+        for key in ("coco",):
+            self.assertEqual(body_section(key), reference,
+                             f"{key} is being taught a different body")
 
 
 if __name__ == "__main__":

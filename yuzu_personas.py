@@ -169,16 +169,44 @@ def load(key=DEFAULT_PERSONA):
     if not prompt:
         raise PersonaError(f"{path.name} has no prompt text below '---'.")
 
-    blocks = _parse_hardware(settings.get("hardware", "muto_s2"))
-    for token, text in blocks.items():
-        prompt = prompt.replace("{" + token + "}", text)
+    body = settings.get("hardware", "muto_s2")
+    blocks = _parse_hardware(body)
 
-    leftover = [t for t in ("{HARDWARE}", "{DIALOGUE_RULE}") if t in prompt]
-    if leftover:
+    # Blocks may reference other blocks, so substitute repeatedly until
+    # the text stops changing. A single pass only worked while the
+    # referenced block happened to be defined AFTER the one using it --
+    # reordering the file would have silently left a raw {TOKEN} in the
+    # prompt. The cap turns a circular reference into an error instead
+    # of a hang.
+    for _ in range(10):
+        expanded = prompt
+        for token, text in blocks.items():
+            expanded = expanded.replace("{" + token + "}", text)
+        if expanded == prompt:
+            break
+        prompt = expanded
+    else:
         raise PersonaError(
-            f"{path.name} uses {', '.join(leftover)} but the hardware file "
-            f"'_hardware_{settings.get('hardware', 'muto_s2')}.txt' doesn't "
-            f"define it."
+            f"_hardware_{body}.txt: blocks reference each other in a loop."
+        )
+
+    leftover = sorted(set(re.findall(r'\{([A-Z][A-Z0-9_]*)\}', prompt)))
+    if leftover:
+        # A token that survived expansion but IS defined can only mean
+        # the blocks reference each other in a cycle -- expansion
+        # reaches a fixed point instead of running away, so the loop
+        # above exits without ever hitting its cap.
+        circular = [t for t in leftover if t in blocks]
+        if circular:
+            raise PersonaError(
+                f"_hardware_{body}.txt: {', '.join(circular)} reference each "
+                f"other in a loop, so they never expand."
+            )
+        raise PersonaError(
+            f"{path.name} uses {', '.join('{' + t + '}' for t in leftover)} "
+            f"but '_hardware_{body}.txt' doesn't define "
+            f"{'them' if len(leftover) > 1 else 'it'}.\n"
+            f"  Defined there: {', '.join(sorted(blocks)) or '(none)'}"
         )
     return Persona(key, settings, prompt, path)
 
