@@ -238,8 +238,16 @@ def main(argv):
     except BrainError as exc:
         print(f"\n{exc}\n")
         return 1
-    who = brain.persona.name if brain.persona else "custom"
-    print(f"persona: {who}   model: {brain.model}   host: {brain.host}")
+    # Print the persona KEY, not just the name. yuzu, yuzu2 and yuzu3
+    # are all NAMED "Yuzu", so a header saying "persona: Yuzu" makes an
+    # A/B unattributable -- you cannot tell from the output which arm
+    # you actually ran, which is the one thing the header exists for.
+    if brain.persona:
+        who = f"{brain.persona.key} ({brain.persona.name}, {brain.persona.archetype})"
+    else:
+        who = "custom prompt"
+    print(f"persona: {who}")
+    print(f"model:   {brain.model}   host: {brain.host}")
     print(f"temp {brain.options['temperature']}  "
           f"top_p {brain.options['top_p']}  "
           f"min_p {brain.options['min_p']}  "

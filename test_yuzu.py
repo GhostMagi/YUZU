@@ -1308,6 +1308,23 @@ class TestAsteriskExperiment(unittest.TestCase):
         self.assertIn("only thing you ever put around a movement", prompt)
 
 
+class TestEvalLabelling(unittest.TestCase):
+    def test_the_header_names_the_persona_key(self):
+        """REGRESSION: the header printed persona.name, and yuzu, yuzu2
+        and yuzu3 are all named "Yuzu" -- so an A/B run produced two
+        outputs that were identical in the one line meant to tell them
+        apart."""
+        import contextlib
+        import io
+        for key in ("yuzu2", "yuzu3"):
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                prompt_eval.main(["--persona", key, "--runs", "1"])
+            header = buffer.getvalue().splitlines()[0]
+            self.assertIn(key, header,
+                          f"header must name the key, got: {header!r}")
+
+
 class TestBlockSubstitution(unittest.TestCase):
     """Hardware blocks can reference other blocks."""
 
