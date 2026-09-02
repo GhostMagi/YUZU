@@ -78,7 +78,66 @@ and both matter:
    `all()`, so a single `*wink*` fails a reply where three real moves
    ran. `moves_at_all` is the honest robot-facing number.
 
-**OPEN LEAD, not yet tested: the asterisk rule is written in asterisks.**
+**CLOSED — the asterisk hypothesis is NOT supported. Sept 2, measured.**
+yuzu3 was yuzu2 with one line changed: the bracket rule rewritten to
+forbid asterisks without displaying one. 12 replies each on the laptop.
+
+    check              yuzu2    yuzu3    counts      diff
+    no_asterisks       58.3%    50.0%    7/12 vs 6/12   -1 reply
+    moves_at_all       83.3%    75.0%   10/12 vs 9/12   -1 reply
+    one_per_bracket    91.7%   100.0%   11/12 vs 12/12  +1 reply
+    has_dialogue       91.7%    91.7%   identical
+    actions_runnable   66.7%    66.7%   identical
+    not_an_assistant  100.0%   100.0%   identical
+    brackets_balanced 100.0%   100.0%   identical
+
+Every difference is ONE reply. At n=12 a single reply is 8.3 points, so
+58.3 vs 50.0 is a coin flip. Pooling yuzu2 across both its runs gives
+26/48 = 54.2% on no_asterisks, and yuzu3's 50.0% sits inside that
+spread. **No detectable effect. Don't re-run it, don't re-theorise it.**
+
+Same verdict as `[winks]`: asterisks are a prior the 3B brings with it,
+not something the prompt teaches. And they cost nothing on the robot --
+`normalize_actions` rescues `*spins*` to `[spins]` and it runs. Three
+of yuzu3's six "no_asterisks failures" moved perfectly well.
+
+Keep the anti-asterisk rule anyway: removing it entirely (not just
+rewording it) DID measurably regress, back in the PocketPal rounds.
+Rewording it is what does nothing.
+
+**THE REAL FINDING FROM THAT RUN — a bare command produces no
+movement, reproducibly, in BOTH arms:**
+
+    ask: "Walk forward."
+    yuzu2: "I'm heading straight for the mall, wanna come with?"
+    yuzu3: "I'm literally walking towards you right now! Ehehe~"
+
+Zero brackets in either. Told to move, she NARRATES moving instead.
+This is the one failure that repeated across arms, so it is signal
+rather than noise, and it is worse than the statue case: it's ignoring
+a direct instruction.
+
+Diagnosis: every example in the prompt is a question or a social
+request ("what's up?", "do a little robot dance for me!", "can I have
+a hug?"). Not one is a bare imperative. Given a flat command with no
+social content, she supplies the missing conversation and describes
+the action in prose.
+
+`personas/yuzu4.persona` is the test: yuzu2 plus ONE example,
+
+    User: Walk forward.
+    Yuzu: On it! [walks forward] Where are we headed, cutie?
+
++78 chars, one variable. Run `--persona yuzu2` vs `--persona yuzu4`
+and watch `moves_at_all` and that specific prompt.
+
+**Eval cost on the laptop is real.** 36 replies took long enough that
+Ghost abandoned a run. Use `--runs 1` (12 replies) for direction; the
+12-reply numbers tracked the 36-reply ones closely (58.3 vs 52.8 on
+no_asterisks, 83.3 vs 80.6 on moves_at_all). Save `--runs 3` for
+confirming something that already looks real.
+
+**Superseded note, kept for the reasoning:**
 `_hardware_muto_s2.txt` line 31 says *"Never write a movement between
 \*asterisks\*"* — the ban demonstrates the format, which is the exact
 pattern already measured in this repo when naming "hugging, waving,

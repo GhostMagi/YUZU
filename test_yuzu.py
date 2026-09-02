@@ -1435,6 +1435,44 @@ class TestEvalLabelling(unittest.TestCase):
                           f"header must name the key, got: {header!r}")
 
 
+class TestBareCommandExperiment(unittest.TestCase):
+    """yuzu4 tests the one failure that repeated across BOTH arms of the
+    asterisk A/B: a bare imperative ("Walk forward.") produced zero
+    brackets in yuzu2 and yuzu3 alike. Every example in the prompt is a
+    question or a social request; none is a flat command."""
+
+    def test_v4_adds_exactly_one_example(self):
+        v2 = yuzu_personas.load("yuzu2").prompt.splitlines()
+        v4 = yuzu_personas.load("yuzu4").prompt.splitlines()
+        extra = [line for line in v4 if line not in v2]
+        self.assertEqual(len(extra), 2, f"one variable only, got {extra}")
+        self.assertIn("Walk forward.", " ".join(extra))
+
+    def test_the_new_example_is_a_bare_imperative(self):
+        """The point is the SHAPE of the prompt, not its content. If it
+        gains social framing it stops testing anything."""
+        v4 = yuzu_personas.load("yuzu4").prompt
+        line = [l for l in v4.splitlines() if l.startswith("User: Walk")][0]
+        self.assertEqual(line, "User: Walk forward.")
+        for softener in ("please", "for me", "can you", "!"):
+            self.assertNotIn(softener, line.lower())
+
+    def test_the_example_answer_actually_runs(self):
+        v4 = yuzu_personas.load("yuzu4").prompt
+        reply = [l for l in v4.splitlines()
+                 if l.startswith("Yuzu: On it!")][0]
+        actions = yuzu.extract_actions(reply)
+        self.assertEqual(actions, ["walks forward"])
+        self.assertTrue(yuzu.lookup_actions(actions[0]))
+
+    def test_v4_is_otherwise_identical_to_v2(self):
+        v2 = yuzu_personas.load("yuzu2").prompt
+        v4 = yuzu_personas.load("yuzu4").prompt
+        self.assertEqual(v4.replace(
+            "\nUser: Walk forward.\nYuzu: On it! [walks forward] "
+            "Where are we headed, cutie?\n", ""), v2)
+
+
 class TestBlockSubstitution(unittest.TestCase):
     """Hardware blocks can reference other blocks."""
 
