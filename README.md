@@ -19,6 +19,10 @@ watermelon.
 > `yuzu_doctor.py` and the robot's own boot message both reprint it when
 > they detect a Jetson. More in [JETSON_SETUP.md](JETSON_SETUP.md).
 
+## Moving it to the Jetson?
+
+**[DEPLOY.md](DEPLOY.md)** — `git clone`, run the tests, done. The whole repo is standard library; there is nothing to install.
+
 ## On your phone?
 
 **[PHONE_START.md](PHONE_START.md)** — download one file, open it in
@@ -79,6 +83,7 @@ $400.
 | `gguf_inspect.py` | Reads a GGUF header — quant, context, chat template |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
 | `PHONE_START.md` | Phone instructions, no terminal needed |
+| `DEPLOY.md` | Moving the brain onto the Jetson |
 | `JETSON_SETUP.md` | Setup runbook, PC and Jetson |
 | `HEADLESS_SETUP.md` | Jetson setup from a Steam Deck, no monitor |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
