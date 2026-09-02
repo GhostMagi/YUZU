@@ -259,6 +259,77 @@ same parser the robot uses. A number instead of a vibe.
 
 ---
 
+---
+
+# Locked NVRAM — the reason this took a whole night
+
+**Read this before troubleshooting any boot failure on this laptop.**
+
+The VN7-592G's firmware refuses to let an operating system write UEFI
+boot entries. Boot-Repair names it outright:
+
+    Locked-NVram detected.
+    ...
+    EFI variables are not supported on this system.
+
+Everything downstream follows from that:
+
+- The Ubuntu installer wrote a boot entry; the firmware discarded it.
+- `fbx64.efi` (shim's fallback helper) noticed the entry was missing,
+  re-created it, and reset the machine so the firmware would pick it
+  up. The firmware discarded it again. **Infinite reset loop**, with
+  "Reset System" flashing on the Acer logo forever.
+- Nothing done from inside Linux could fix it, because nothing done
+  from inside Linux is allowed to persist.
+
+## The fix that worked
+
+The one storage the firmware *will* accept is its own trusted-file
+list, reachable only from the BIOS itself.
+
+1. **Live USB → Try Ubuntu**, install and run Boot-Repair
+   (`sudo add-apt-repository ppa:yannubuntu/boot-repair`,
+   `sudo apt install -y boot-repair`, `boot-repair`) →
+   **Recommended repair**. This rebuilds a clean, correct
+   `EFI/ubuntu/`, which the later steps depend on.
+2. **F2 → Boot tab → Secure Boot → Enabled → F10.**
+   Counterintuitive, but the next option is greyed out unless Secure
+   Boot is on. (It also needs a Supervisor Password to already be set.)
+3. **F2 → Security tab → "Select an UEFI file as trusted for
+   executing"** → browse **EMMC → `<EFI>` → `<ubuntu>` →
+   `grubx64.efi`** → give it a Boot Description → **[Yes] → F10.**
+4. **F2 → Boot tab → Secure Boot → Disabled → F10.**
+   With Secure Boot on, GRUB launched directly fails with
+   `shim_lock protocol not found` — it expects shim to load it first.
+   With Secure Boot off it doesn't look for shim at all.
+5. **F12 → pick the entry you named.** GRUB menu → Ubuntu → login.
+
+The working combination is specifically **grubx64.efi registered as a
+trusted file, with Secure Boot switched back OFF**.
+
+## Dead ends, so nobody retries them
+
+| Tried | Result |
+|---|---|
+| `mokutil --revoke-import` | No effect — MOK was a symptom, not the cause |
+| Disabling Secure Boot alone | No effect — loop is the fallback helper, not Secure Boot |
+| Reinstalling without "Configure Secure Boot" | Still looped — the locked NVRAM doesn't care |
+| Copying `grubx64.efi` over `EFI/BOOT/BOOTX64.EFI` | `Boot Failed` — Ubuntu's GRUB expects to be launched by shim |
+| Restoring shim and deleting `fbx64.efi` | `Invalid image / Failed to read header: Unsupported` |
+| Registering **shimx64.efi** as the trusted file | Reset loop returned |
+
+## ⛔ Never accept the 24.04 upgrade prompt
+
+Two reasons, both hard:
+
+- **SDK Manager supports 18.04 / 20.04 / 22.04 only.** Upgrading breaks
+  the one job this laptop exists to do for the Jetson.
+- **A release upgrade rewrites the bootloader**, which would destroy the
+  hand-registered firmware entry above and put the machine straight back
+  into the reset loop.
+
+22.04.5 LTS is supported to 2027. Click **Don't Upgrade**, every time.
+
 ## If something goes wrong
 
 | Symptom | Likely cause |
