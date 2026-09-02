@@ -34,6 +34,12 @@ HERE = Path(__file__).parent
 DEFAULT_MODEL = os.environ.get("YUZU_MODEL", "yuzu")
 DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
+# Seconds to wait for one reply. Generous on purpose: a 3B on an older
+# laptop GPU (or worse, spilled to CPU) can take minutes for a long
+# reply, and an eval run that dies two thirds of the way through has
+# wasted twenty minutes of someone's evening.
+DEFAULT_TIMEOUT = int(os.environ.get("YUZU_TIMEOUT", "300"))
+
 # Sampling. Tuned for a companion persona on a small model, not for
 # factual accuracy -- Section 2 of the context dump already accepts that
 # a 3B gets local facts confidently wrong.
@@ -130,8 +136,9 @@ def _post(url, payload, timeout):
 
 class YuzuBrain:
     def __init__(self, model=DEFAULT_MODEL, host=DEFAULT_HOST,
-                 system_prompt=None, options=None, timeout=120,
-                 history_turns=8, persona=None, auto_recover=True):
+                 system_prompt=None, options=None,
+                 history_turns=8, persona=None, auto_recover=True,
+                 timeout=None):
         """
         model         : Ollama model name (see Modelfile.yuzu)
         persona       : key from personas/ -- supplies both the system
@@ -171,7 +178,7 @@ class YuzuBrain:
         merged.update(persona_options)
         merged.update(options or {})
         self.options = merged
-        self.timeout = timeout
+        self.timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
         self.history_turns = history_turns
         self.history = []
 
@@ -203,6 +210,10 @@ class YuzuBrain:
                 f"Can't reach Ollama at {self.host} ({exc.reason}).\n"
                 f"  Is it running?   ollama serve\n"
                 f"  Different host?  export OLLAMA_HOST=http://...:11434"
+            ) from exc
+        except (TimeoutError, OSError) as exc:
+            raise BrainError(
+                f"Ollama at {self.host} didn't answer in time ({exc})."
             ) from exc
         return [m.get("name", "") for m in data.get("models", [])]
 
@@ -251,6 +262,17 @@ class YuzuBrain:
                 f"Can't reach Ollama at {self.host} ({exc.reason}). "
                 f"Start it with: ollama serve"
             ) from exc
+        except (TimeoutError, OSError) as exc:
+            # A slow generation raises a bare socket TimeoutError from
+            # the READ, and TimeoutError is not a URLError -- so this
+            # used to escape every handler and abort a whole eval run
+            # mid-way. Caught explicitly, with the dial to turn.
+            raise BrainError(
+                f"No reply within {self.timeout}s ({exc}).\n"
+                f"  A 3B on a weak GPU, or spilled to CPU, can exceed this.\n"
+                f"  Check placement:  ollama ps      (want GPU, not CPU)\n"
+                f"  Or allow longer:  export YUZU_TIMEOUT=600"
+            ) from exc
 
         reply = (data.get("message") or {}).get("content", "").strip()
         if remember:
@@ -292,6 +314,11 @@ class YuzuBrain:
             raise BrainError(
                 f"Can't reach Ollama at {self.host} ({exc.reason}). "
                 f"Start it with: ollama serve"
+            ) from exc
+        except (TimeoutError, OSError) as exc:
+            raise BrainError(
+                f"Stream stalled after {self.timeout}s ({exc}). "
+                f"Try: export YUZU_TIMEOUT=600"
             ) from exc
         full_reply = "".join(collected).strip()
         if remember:

@@ -10,6 +10,7 @@ behaviour worth locking down so a future edit can't quietly break it.
 
 import json
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import itertools
@@ -19,6 +20,8 @@ import struct
 import sys
 import tempfile
 import threading
+import time
+from collections import Counter
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import muto_leg_control as legs
@@ -27,6 +30,7 @@ import gguf_inspect
 import yuzu_brain
 import yuzu_personas
 import yuzu_prompt_eval as prompt_eval
+import yuzu_brain as yuzu_brain_module
 from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
 from yuzu_led_manager import LEDManager
 
@@ -1306,6 +1310,112 @@ class TestAsteriskExperiment(unittest.TestCase):
     def test_v3_still_forbids_the_format(self):
         prompt = yuzu_personas.load("yuzu3").prompt.lower()
         self.assertIn("only thing you ever put around a movement", prompt)
+
+
+class TestTimeoutHandling(unittest.TestCase):
+    """REGRESSION: a slow generation raises a bare socket TimeoutError
+    from the READ, and TimeoutError is not a urllib URLError -- so it
+    escaped every handler, crashed with a traceback, and destroyed a
+    36-reply eval run two thirds of the way through."""
+
+    def slow_server(self, delay):
+        import http.server
+        import threading
+
+        class Slow(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                body = json.dumps({"models": [{"name": "yuzu:latest"}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                time.sleep(delay)
+                body = json.dumps({"message": {"content": "hi"},
+                                   "done": True}).encode()
+                try:
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                except OSError:
+                    pass
+
+        http.server.HTTPServer.allow_reuse_address = True
+        server = http.server.HTTPServer(("127.0.0.1", 0), Slow)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        return f"http://127.0.0.1:{server.server_address[1]}"
+
+    def test_a_slow_reply_raises_brainerror_not_timeouterror(self):
+        host = self.slow_server(delay=2)
+        brain = YuzuBrain(model="yuzu", host=host, system_prompt="t", timeout=1)
+        with self.assertRaises(BrainError) as ctx:
+            brain.ask("hi")
+        message = str(ctx.exception)
+        self.assertIn("YUZU_TIMEOUT", message, "must name the dial to turn")
+        self.assertIn("ollama ps", message, "must suggest checking placement")
+
+    def test_the_streaming_path_is_covered_too(self):
+        host = self.slow_server(delay=2)
+        brain = YuzuBrain(model="yuzu", host=host, system_prompt="t", timeout=1)
+        with self.assertRaises(BrainError):
+            list(brain.ask_stream("hi"))
+
+    def test_the_default_timeout_is_generous(self):
+        # 120s was too short for a 3B on an older laptop GPU.
+        self.assertGreaterEqual(yuzu_brain_module.DEFAULT_TIMEOUT, 300)
+
+
+class TestEvalResilience(BrainTestCase):
+    """A 36-reply run is ~20 minutes. Losing all of it to one slow
+    generation is not acceptable."""
+
+    def test_a_failed_reply_does_not_destroy_the_run(self):
+        calls = {"n": 0}
+        real_ask = YuzuBrain.ask
+
+        def flaky(self, prompt, remember=True):
+            calls["n"] += 1
+            if calls["n"] % 3 == 0:
+                raise BrainError("No reply within 1s (timed out).")
+            return real_ask(self, prompt, remember=remember)
+
+        MockOllama.replies = itertools.cycle(
+            ["Vibing! [squats] What's good?"])
+        brain = self.brain(system_prompt="test")
+        with unittest.mock.patch.object(YuzuBrain, "ask", flaky):
+            results = prompt_eval.evaluate(brain, prompt_eval.TEST_PROMPTS[:9],
+                                           runs=1)
+        self.assertIsNotNone(results, "must not abort on partial failures")
+        self.assertEqual(results["total"], 6)
+        self.assertEqual(len(results["unanswered"]), 3)
+
+    def test_the_report_flags_missing_replies(self):
+        import contextlib
+        import io
+        results = {"total": 2, "passes": Counter(), "failures":
+                   {c.name: [] for c in prompt_eval.CHECKS},
+                   "dropped": Counter(), "lengths": [10],
+                   "unanswered": [("p", "timed out")]}
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            prompt_eval.report(results)
+        self.assertIn("never arrived", buffer.getvalue())
+
+    def test_total_failure_still_stops(self):
+        def always_fail(self, prompt, remember=True):
+            raise BrainError("No reply within 1s (timed out).")
+
+        brain = self.brain(system_prompt="test")
+        with unittest.mock.patch.object(YuzuBrain, "ask", always_fail):
+            self.assertIsNone(
+                prompt_eval.evaluate(brain, prompt_eval.TEST_PROMPTS, runs=1))
 
 
 class TestEvalLabelling(unittest.TestCase):

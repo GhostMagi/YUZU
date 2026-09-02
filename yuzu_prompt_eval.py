@@ -31,7 +31,7 @@ from collections import Counter
 
 import yuzu_all_in_one as yuzu
 import yuzu_personas
-from yuzu_brain import BrainError, YuzuBrain
+from yuzu_brain import DEFAULT_TIMEOUT, BrainError, YuzuBrain
 
 # Chosen to poke at the rules most likely to break, not to be friendly.
 TEST_PROMPTS = [
@@ -136,7 +136,8 @@ CHECKS = [
 
 def evaluate(brain, prompts, runs, verbose=False):
     passes = Counter()
-    failures = {c.name: [] for c in CHECKS}
+    failures = []                       # replies that never arrived
+    check_failures = {c.name: [] for c in CHECKS}
     dropped_actions = Counter()
     total = 0
     spoken_lengths = []
@@ -147,15 +148,25 @@ def evaluate(brain, prompts, runs, verbose=False):
             try:
                 reply = brain.ask(prompt, remember=False)
             except BrainError as exc:
-                print(f"\n{exc}")
-                return None
+                # One slow or failed reply must not destroy the run.
+                # A 36-reply eval is ~20 minutes on a laptop GPU, and
+                # aborting at reply 24 because one generation ran long
+                # throws away 23 perfectly good measurements.
+                failures.append((prompt, str(exc).splitlines()[0]))
+                print(f"  !! reply failed ({len(failures)}): "
+                      f"{str(exc).splitlines()[0]}")
+                if len(failures) >= 5 and not passes:
+                    print("\n  Five failures and nothing scored -- stopping.")
+                    print(f"  {exc}")
+                    return None
+                continue
             total += 1
 
             for check in CHECKS:
                 if check.fn(reply):
                     passes[check.name] += 1
                 else:
-                    failures[check.name].append((prompt, reply))
+                    check_failures[check.name].append((prompt, reply))
 
             cleaned = yuzu.normalize_actions(reply)
             for action in yuzu.extract_actions(cleaned):
@@ -167,13 +178,22 @@ def evaluate(brain, prompts, runs, verbose=False):
                 print(f"  [{run + 1}] {prompt}\n      {reply}")
 
     return {
-        "total": total, "passes": passes, "failures": failures,
+        "total": total, "passes": passes, "failures": check_failures,
         "dropped": dropped_actions, "lengths": spoken_lengths,
+        "unanswered": failures,
     }
 
 
 def report(results, verbose=False):
     total = results["total"]
+    if not total:
+        print("\nNo replies were scored.")
+        return
+    unanswered = results.get("unanswered") or []
+    if unanswered:
+        print(f"\n!! {len(unanswered)} repl{'y' if len(unanswered) == 1 else 'ies'}"
+              f" never arrived and are excluded from the percentages below.")
+        print(f"   First: {unanswered[0][1]}")
     print(f"\n{'=' * 66}\nPROMPT COMPLIANCE -- {total} replies\n{'=' * 66}")
 
     worst = []
@@ -230,6 +250,9 @@ def main(argv):
                         help="repeats per prompt (default 3; sampling is "
                              "random, so one run per prompt proves nothing)")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--timeout", type=int, default=None,
+                        help=f"seconds to wait per reply (default "
+                             f"{DEFAULT_TIMEOUT}, or set $YUZU_TIMEOUT)")
     args = parser.parse_args(argv)
 
     persona = args.persona.lower() if args.persona else None
@@ -248,6 +271,7 @@ def main(argv):
         who = "custom prompt"
     print(f"persona: {who}")
     print(f"model:   {brain.model}   host: {brain.host}")
+    print(f"timeout: {brain.timeout}s per reply")
     print(f"temp {brain.options['temperature']}  "
           f"top_p {brain.options['top_p']}  "
           f"min_p {brain.options['min_p']}  "
