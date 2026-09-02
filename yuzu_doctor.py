@@ -322,8 +322,45 @@ def check_gguf():
 # 5. SUMMARY -- screenshot this part
 # =====================================================================
 
+def on_a_jetson():
+    """True on Jetson hardware. Two well-known markers, both plain files
+    so nothing has to be executed. Wrapped because this runs on a phone
+    too, where none of these paths exist."""
+    try:
+        if Path("/etc/nv_tegra_release").exists():
+            return True
+        model = Path("/sys/firmware/devicetree/base/model")
+        if model.exists():
+            name = model.read_bytes().decode("utf-8", "replace").lower()
+            return "jetson" in name or "orin" in name
+    except OSError:
+        pass
+    return False
+
+
+def throttle_reminder():
+    """The one command Ghost asked to be reminded of.
+
+    The Orin Nano ships in a low power mode. nvpmodel -m 0 is the single
+    biggest free speedup on the box and it is easy to forget after a
+    flash -- at which point everything just feels slow for no visible
+    reason, which is the worst kind of problem to debug.
+
+    Printed here, at the robot's boot, and at the top of the README:
+    three places he actually lands, rather than one he has to remember
+    to go looking for.
+    """
+    print("\n  !! JETSON: the board ships THROTTLED. Run this once:")
+    print("       sudo nvpmodel -m 0     # MAXN / MAXN SUPER, max power")
+    print("       sudo jetson_clocks     # lock the clocks up there")
+    print("     Details in JETSON_SETUP.md.")
+
+
 def summary(models):
     header("SUMMARY  <-- screenshot from here down")
+    if on_a_jetson():
+        throttle_reminder()
+        print()
     counts = {GOOD: 0, WARN: 0, BAD: 0, INFO: 0}
     for status, message in notes:
         counts[status] += 1

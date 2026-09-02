@@ -87,6 +87,21 @@ def actions_are_runnable(reply):
     return all(yuzu.lookup_action(a) for a in actions)
 
 
+def moves_at_all(reply):
+    """She is a ROBOT. A reply with no runnable action in it is a
+    machine standing perfectly still while it talks.
+
+    This exists because every other check missed it. actions_runnable
+    is an all() over the actions in the reply, so a reply containing
+    NO actions passes it vacuously -- and in a live round where half
+    the replies had zero brackets, the scoreboard read 100% across the
+    board. A blind spot in the harness is worse than a low score,
+    because it ends an investigation early.
+    """
+    actions = yuzu.extract_actions(yuzu.normalize_actions(reply))
+    return any(yuzu.lookup_actions(a) for a in actions)
+
+
 def one_action_per_bracket(reply):
     """Directive 2: no combining actions with 'and', no descriptions."""
     actions = yuzu.extract_actions(yuzu.normalize_actions(reply))
@@ -113,6 +128,7 @@ CHECKS = [
     Check("no_asterisks",       "2: brackets only, never asterisks", no_asterisk_actions),
     Check("brackets_balanced",  "2: no truncated bracket",          brackets_balanced),
     Check("actions_runnable",   "2: actions this body can do",      actions_are_runnable),
+    Check("moves_at_all",       "2: at least one runnable movement", moves_at_all),
     Check("one_per_bracket",    "2: one simple action per bracket", one_action_per_bracket),
     Check("no_puppeteering",    "4: never writes the user's turn",  no_puppeteering),
 ]
@@ -179,6 +195,12 @@ def report(results, verbose=False):
             print("  ^ long for a companion robot -- TTS will drag. Consider "
                   "tightening the short-reply rule or lowering num_predict.")
 
+    still = total - results["passes"]["moves_at_all"]
+    if still:
+        print(f"\n{still}/{total} replies moved nothing at all. On a robot "
+              f"that is a statue talking,\nand no other check above sees it "
+              f"-- they all pass vacuously when there are no actions.")
+
     dropped = results["dropped"]
     if dropped:
         print(f"\nactions the whitelist dropped ({sum(dropped.values())} total):")
@@ -212,8 +234,7 @@ def main(argv):
 
     persona = args.persona.lower() if args.persona else None
     try:
-        brain = (YuzuBrain(model=args.model, persona=persona) if args.model
-                 else YuzuBrain(persona=persona))
+        brain = YuzuBrain(model=args.model, persona=persona)
     except BrainError as exc:
         print(f"\n{exc}\n")
         return 1
