@@ -185,6 +185,33 @@ Bootable Device" screen was telling you.
 ### 9. Reboot
 When it asks, **remove the USB stick**, then press Enter.
 
+### 9b. The blue MOK screen — do not let it time out
+
+Ticking the third-party software box makes the installer ask you to
+**"Configure Secure Boot"** and set a password. That password is not
+your login password. It is a one-time key, and it gets used on the
+**first reboot after the install**, not before.
+
+What you'll see is a blue screen saying *"Press any key to perform MOK
+management."* It is not an error, and **it times out in about ten
+seconds**. If it does time out, the NVIDIA driver silently never loads
+and the only fix is doing the whole enrolment again.
+
+So press a key the moment the screen goes blue, then:
+
+1. **Enroll MOK** → Enter
+2. **Continue** → Enter
+3. **Yes** → Enter
+4. Type the Secure Boot password from the installer
+5. **Reboot**
+
+MOK stands for Machine Owner Key. Secure Boot only runs drivers signed
+by a key the firmware trusts, and NVIDIA's proprietary driver isn't
+signed by anyone it trusts out of the box — so Ubuntu generates a key,
+signs the driver with it, and this screen is you telling the firmware
+to trust that key. Doing it once is what makes `nvidia-smi` work at
+all under Secure Boot.
+
 ---
 
 # Part 3 — First ten minutes on Ubuntu
