@@ -132,6 +132,51 @@ the mall. Movement stays whitelisted; imagination is free and belongs
 in the sentence, never in brackets. Don't put character stances in
 `_hardware_*.txt` — that file is for servos.
 
+## Before anyone adds vision / follow-me
+
+Gemini gave Ghost a strategy note for this transition (Sept 2) and most
+of it is right: build a DummyCamera before touching real hardware, keep
+the PID as a pure numbers-in-numbers-out function, decide the
+concurrency model before writing implementation, and define what
+happens when the LLM and an autonomous vision loop disagree.
+
+**The blocker it doesn't know about: the gait API is blocking, by
+seconds.** Measured against DummyBot:
+
+    walk_forward(steps=2)   2.53s
+    turn(steps=2)           2.52s
+    spin(steps=4)           4.69s
+
+At 30fps that is 75-140 camera frames with no control input. `settle()`
+sleeps on purpose -- it's the fix for the conflicting-motor-trajectory
+risk -- so this is not a bug to remove. But it does mean a follow-me
+controller CANNOT be layered on top of the current gait functions. They
+are fire-and-forget animations, not a control interface. Vision needs a
+step-level, non-blocking API underneath them (something like
+`begin_step()` / `update()` polled from the control loop), with the
+existing gaits rewritten as callers of it. Budget for that refactor;
+don't discover it halfway in.
+
+Three more constraints for that work:
+
+- **Memory.** Vision makes it four models on 8GB shared: detector +
+  3B LLM + Whisper + Piper. Check the budget before designing, not
+  after. A detector may simply not fit alongside the rest.
+- **Safety changes category.** A turn-based robot that moves only when
+  spoken to is very different from one that walks at you on its own.
+  An autonomous loop needs a watchdog that calls `rest()` when vision
+  goes stale, plus a hard stop -- `Ctrl-C` is not enough once the thing
+  moves without being asked.
+- **Order.** Track with the 2DOF gimbal FIRST. Pan/tilt tracking needs
+  the same PID, exercises the same DummyCamera, and the chassis never
+  moves, so a wrong sign costs a twitchy camera instead of a hexapod
+  walking into furniture. Body-follow only after that works and after
+  the gaits are calibrated on real hardware.
+
+The stdlib-only property ends when vision lands. Keep it anyway for the
+brain: isolate camera and inference deps behind their own module so
+`yuzu_all_in_one.py` still runs on a phone with nothing installed.
+
 Watch for: PocketPal renders `*asterisks*` as italics WITHOUT showing
 the markers, so an italicised word in a screenshot is an asterisk
 action, not plain text. Ask before scoring if it's ambiguous.
