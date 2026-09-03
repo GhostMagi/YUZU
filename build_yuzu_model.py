@@ -13,9 +13,25 @@ persona, re-run this, and the code and the model agree.
 
     python build_yuzu_model.py                    # Modelfile.yuzu
     python build_yuzu_model.py --create           # ...and ollama create
-    python build_yuzu_model.py --persona saya --create
+    python build_yuzu_model.py --persona yuzu4 --create
     python build_yuzu_model.py --all --create     # every persona at once
     python build_yuzu_model.py --base ./model-Q4_K_M.gguf --create
+
+A NOTE ON WHICH PERSONA THIS BAKES. With no --persona it uses
+yuzu_personas.DEFAULT_PERSONA, which is the frozen v1 archive, because
+the Modelfile and the Ollama model are NAMED off that key and renaming
+them would break every setup that already ran this.
+
+That is not the prompt the robot uses. Ollama's /api/chat takes a
+system message per request and yuzu_brain.py sends one every turn, from
+yuzu_personas.LIVE_PERSONA -- so the Modelfile's SYSTEM block only
+decides what a bare `ollama run yuzu` sounds like. The parts of the
+Modelfile that DO matter at runtime are the sampling PARAMETERs and the
+stop tokens, and those are the same for every arm of the lineage.
+
+Want `ollama run <name>` to sound like the live prompt too?
+`--all --create` gives you a model per persona, so `ollama run yuzu4`
+is exactly what the robot runs.
 """
 
 import subprocess

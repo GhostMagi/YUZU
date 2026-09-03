@@ -7,11 +7,13 @@
   the chat as a copy-paste block**, without being asked. Ghost tests in
   PocketPal on a phone, so a file path or a command is useless to him —
   he needs the text itself. Get it with:
-      python yuzu_personas.py --show yuzu2
+      python yuzu_personas.py --show yuzu4
+  (that key is `yuzu_personas.LIVE_PERSONA`; `python yuzu_personas.py`
+  on its own marks which one is live.)
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 193 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 230 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -24,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 193 tests pass on it. Getting it
+(that repo path is confirmed working). 230 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -67,6 +69,28 @@ Current lineage and status:
 So the base to build on is **yuzu4** until yuzu5 is scored, then
 whichever wins. When one is clearly ahead, say so here and retire the
 losers rather than leaving five files that all look current.
+
+**The promotion rule now has one line to move: `LIVE_PERSONA` in
+`yuzu_personas.py`.** It is `yuzu4`. The robot loop, `yuzu_brain
+--chat` and the eval all boot from it.
+
+It is separate from `DEFAULT_PERSONA` (still `"yuzu"`) on purpose, and
+that separation fixed a live bug: everything with no `--persona`
+argument was booting the FROZEN v1 archive, measured at a 20% action
+hit rate, purely because that file owns the short name that
+`Modelfile.yuzu` and the Ollama model `yuzu` are built off. Renaming
+those would break every setup that already ran `build_yuzu_model.py`,
+so the pointer moved instead. A test asserts `LIVE_PERSONA` is never
+the frozen archive, that it loads, and that it is what an un-argued
+brain picks up.
+
+**Run A/Bs with `python YUZU_AB.py`.** No arguments needed -- it runs
+`LIVE_PERSONA` against the candidate in `YUZU_AB.ARMS`, 12 prompts
+each, and prints ONE table instead of two runs to hand-transcribe.
+`moves_at_all` is forced to the top row, and it prints what one reply
+is worth in points, because every difference in the yuzu2-vs-yuzu3
+round was a single reply and read like a result until it was counted.
+Tests cover the arithmetic and the "that's a coin flip" verdict.
 
 Ghost's method is A/B testing in PocketPal and sending screenshots.
 It works. Score them against the real parser rather than eyeballing —
@@ -133,6 +157,21 @@ of yuzu3's six "no_asterisks failures" moved perfectly well.
 Keep the anti-asterisk rule anyway: removing it entirely (not just
 rewording it) DID measurably regress, back in the PocketPal rounds.
 Rewording it is what does nothing.
+
+**Follow-on, Sept 3: the drift monitor was acting on that finding
+backwards.** `ReplyHealth.ok` failed any reply containing an asterisk,
+and two failures in a row trim the conversation. But pooled yuzu2 is
+54.2% on no_asterisks while moving on 80-83% of replies, so about a
+third of replies were asterisked AND completely fine -- and at a ~46%
+per-reply rate, two in a row lands roughly every fifth turn. She was
+being made to feel amnesiac by a metric, not by a fault.
+
+The asterisk veto is gone. `_canonicalise` already rewrites them to
+brackets before they enter history, which is what actually stops the
+snowball; the veto was a second guard on a risk already handled. What
+still fails a reply is unchanged and robot-facing: said nothing at all,
+or moved only in ways this body can't. Asterisks are still counted and
+still show in `last_health` and `/health`.
 
 **THE REAL FINDING FROM THAT RUN — a bare command produces no
 movement, reproducibly, in BOTH arms:**
@@ -286,6 +325,64 @@ about. My world is this room," and the gyaru stopped wanting to go to
 the mall. Movement stays whitelisted; imagination is free and belongs
 in the sentence, never in brackets. Don't put character stances in
 `_hardware_*.txt` — that file is for servos.
+
+## Bring-up safety
+
+`muto_firstcontact.py` clamps every angle to 15 degrees while it checks
+servos one at a time. Its cleanup used to restore the limit to 90
+BEFORE parking, so aborting at stage 2 -- the stage that exists to
+catch servo IDs wired differently from `LEG_SERVO_MAP` -- commanded 60
+degrees into a chassis that had just proven it moves the wrong joints.
+Measured on DummyBot: 60 before the fix, 15 after.
+
+**Park first, restore the limit after.** A test drives a stage-2 abort
+and asserts no servo was commanded past 15, parsing DummyBot's own
+output, so it checks the whole process from the outside rather than
+trusting the ordering to stay right.
+
+If you touch that `finally` block, keep the order.
+
+## Optimising the Nano Orin Super
+
+`nvpmodel -m 0` is the headline and it already lives in three places.
+Below it there is a second tier, all of it about the same fact: the
+Orin has ONE pool of 8GB and everything shares it. Written up in
+JETSON_SETUP.md 5b; the short version and the reasoning:
+
+- **`OLLAMA_NUM_PARALLEL=1`.** Ollama sizes the KV cache as
+  `num_ctx x num_parallel`. Left to choose for itself it reserves slots
+  for concurrent requests a robot with one mouth will never make, and
+  each slot is real memory out of the pool Whisper and Piper want next.
+- **`OLLAMA_MAX_LOADED_MODELS=1`.** Two resident models on 8GB shared
+  is how you land in swap.
+- **`OLLAMA_KEEP_ALIVE=-1`.** Ollama unloads an idle model after five
+  minutes. For a companion robot that is backwards: she sits quiet in a
+  corner, someone walks up and speaks, and the 3B has to be read back
+  off disk first -- so the very first thing anyone says to her is the
+  slowest reply she ever gives. `yuzu_brain.py` now sends `keep_alive`
+  on every request too (`YUZU_KEEP_ALIVE`, default `30m`), so this
+  works even without editing the service. Set it to `0` while bringing
+  Whisper up alongside her and you need the memory back between turns.
+- **`OLLAMA_FLASH_ATTENTION=1` + `OLLAMA_KV_CACHE_TYPE=q8_0`.** Roughly
+  halves what context costs in memory. The second needs the first.
+- **Swap belongs on the NVMe, not the microSD.** Swap is sustained
+  writes, which is where a card is slowest and what wears it out.
+  JETSON_SETUP said "SD card" in one place and "get the NVMe" in
+  another; the NVMe is right and it says so now.
+
+**`python3 yuzu_doctor.py` on the Jetson checks all of it** -- power
+mode (read from `/var/lib/nvpmodel/status`, so no `sudo` and nothing
+that can hang), RAM, what the swap actually sits on, and which of those
+settings are really set in the systemd unit. It reads the UNIT, not
+`os.environ`: those variables are set for the ollama service and the
+shell running the doctor does not inherit them, so checking the
+environment would confidently report "not set" on a correctly tuned
+box. The whole section is gated on Jetson detection and stays silent on
+the phone. Fixtures for every parse are in `TestJetsonChecks`.
+
+What is NOT worth tuning yet: `num_ctx`. 4096 with `history_turns=8`
+fits comfortably and is the dial to reach for only once something
+actually runs out.
 
 ## Before anyone adds vision / follow-me
 

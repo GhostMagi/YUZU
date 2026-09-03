@@ -27,11 +27,10 @@ BEFORE YOU RUN IT
   * Nothing fragile within a leg's reach.
 """
 
+import os
 import sys
 
 import muto_leg_control as legs
-
-import os
 
 BRINGUP_LIMIT = 15      # degrees; deliberately timid
 STANCE_LIMIT = 40       # once individual legs are confirmed
@@ -136,7 +135,7 @@ def run(bot, mode):
         legs.set_legs(bot, group, 0, legs.LIFT_FEMUR, legs.STANCE_TIBIA,
                       runtime=PAUSE)
         legs.settle(PAUSE)
-        stable = ask(f"Did the body stay level on the other three legs?")
+        stable = ask("Did the body stay level on the other three legs?")
         legs.set_legs(bot, group, 0, legs.STANCE_FEMUR, legs.STANCE_TIBIA,
                       runtime=PAUSE)
         legs.settle(PAUSE)
@@ -187,10 +186,25 @@ def main():
         print("\n\nInterrupted.")
         return 1
     finally:
-        legs.set_angle_limit(original_limit)
+        # Park FIRST, at whatever limit the run had reached, and only
+        # then restore the original.
+        #
+        # This used to restore the limit before parking, which meant an
+        # abort at stage 2 -- the stage that exists to catch servo IDs
+        # wired differently from LEG_SERVO_MAP -- lifted the clamp from
+        # a timid 15 degrees back to a full 90 and then drove a 55-degree
+        # squat into a chassis that had just proven it moves the wrong
+        # joints. The one path where the limit matters most is the one
+        # where it was being dropped.
+        #
+        # Parking at the current limit is safe at both ends: after an
+        # early abort the legs are near neutral and the clamped squat is
+        # a small move before torque comes off, and after stage 6 the
+        # limit is already 90 so rest() does its full squat as intended.
         if bot is not None:
             print("Parking legs...")
             legs.rest(bot)
+        legs.set_angle_limit(original_limit)
 
 
 if __name__ == "__main__":

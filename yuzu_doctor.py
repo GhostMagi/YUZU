@@ -13,6 +13,7 @@ Yuzu files happen to be in the same folder, it checks those too.
 
 import json
 import os
+import re
 import struct
 import sys
 import time
@@ -64,14 +65,21 @@ def check_environment():
 # 2. WHICH YUZU FILES ARE HERE
 # =====================================================================
 
+# Kept in step with what the repo actually ships. This listed
+# "yuzu_system_prompt.txt" long after personas/ replaced it, so every
+# run on every machine reported one permanent missing file and could
+# never say "all present" -- a warning that is always on teaches you to
+# ignore warnings, which is the opposite of what this script is for.
 EXPECTED = {
     "yuzu_all_in_one.py":     "the main loop -- talk to Yuzu",
     "yuzu_brain.py":          "the Ollama client",
-    "yuzu_system_prompt.txt": "Yuzu's personality",
+    "yuzu_personas.py":       "persona loader (Yuzu's personality)",
+    "personas":               "the persona + body files",
     "yuzu_robot_config.json": "LED config",
     "muto_leg_control.py":    "leg gaits + simulator",
+    "muto_firstcontact.py":   "guided first bring-up on real servos",
     "yuzu_led_manager.py":    "LED manager",
-    "YUZU_TESTER.py":           "the test suite",
+    "YUZU_TESTER.py":         "the test suite",
     "yuzu_prompt_eval.py":    "prompt scoring",
 }
 
@@ -319,6 +327,199 @@ def check_gguf():
 
 
 # =====================================================================
+# 5. JETSON TUNING  (skipped everywhere else, including the phone)
+# =====================================================================
+
+# What the Orin Nano Super wants, and why. Every one of these is about
+# the same 8GB shared between CPU and GPU -- there is no separate VRAM
+# to spill into, so anything that reserves memory reserves it from the
+# same pool Whisper and Piper will want later.
+OLLAMA_TUNING = {
+    "OLLAMA_NUM_PARALLEL": (
+        "1",
+        "Ollama sizes the KV cache as num_ctx x num_parallel. Left to "
+        "pick for itself it can reserve several slots you will never "
+        "use, and each one costs real memory out of the 8GB.",
+    ),
+    "OLLAMA_MAX_LOADED_MODELS": (
+        "1",
+        "Stops a second model being held resident alongside the 3B. On "
+        "8GB shared, two models is how you land in swap.",
+    ),
+    "OLLAMA_KEEP_ALIVE": (
+        "-1",
+        "Keeps her loaded instead of unloading after 5 idle minutes. "
+        "Otherwise the first thing anyone says to her after a quiet "
+        "spell is the slowest reply she ever gives.",
+    ),
+    "OLLAMA_FLASH_ATTENTION": (
+        "1",
+        "Cheaper attention, less memory per token of context.",
+    ),
+    "OLLAMA_KV_CACHE_TYPE": (
+        "q8_0",
+        "Quantises the KV cache, roughly halving what the context costs "
+        "in memory. Needs flash attention on.",
+    ),
+}
+
+
+def _read_text(path):
+    """Read a system file, or None. Everything in this section is a
+    plain file read -- no subprocess, no sudo, nothing that can hang or
+    need a password on a box you are SSH'd into from a Steam Deck."""
+    try:
+        return Path(path).read_text(errors="replace")
+    except (OSError, PermissionError):
+        return None
+
+
+def jetson_power_mode():
+    """(mode_number, raw_line) from nvpmodel's own status file.
+
+    /var/lib/nvpmodel/status is where nvpmodel records the mode it last
+    applied, as e.g. 'pmode:0000 fmode:fanmode_quiet'. Mode 0 is
+    MAXN / MAXN SUPER. Anything else means the board is still throttled.
+    Returns None if the file isn't there or doesn't parse, and the
+    caller falls back to just printing the reminder.
+    """
+    raw = _read_text("/var/lib/nvpmodel/status")
+    if not raw:
+        return None
+    for token in raw.split():
+        if token.startswith("pmode:"):
+            try:
+                return int(token.split(":", 1)[1]), raw.strip()
+            except ValueError:
+                return None
+    return None
+
+
+def memory_picture():
+    """Total RAM and swap in GiB, plus what the swap actually sits on."""
+    totals = {}
+    for line in (_read_text("/proc/meminfo") or "").splitlines():
+        key, _, rest = line.partition(":")
+        parts = rest.split()
+        if parts and parts[0].isdigit():
+            totals[key] = int(parts[0]) / (1024.0 * 1024.0)
+
+    devices = []
+    for line in (_read_text("/proc/swaps") or "").splitlines()[1:]:
+        parts = line.split()
+        if parts:
+            devices.append((parts[0], parts[1] if len(parts) > 1 else "?"))
+    return totals, devices
+
+
+def ollama_service_env():
+    """Environment= lines from Ollama's systemd unit and its drop-ins.
+
+    Reading the unit, not os.environ: these are set for the ollama
+    SERVICE, and the shell running this script does not inherit them.
+    Checking os.environ would confidently report 'not set' on a box
+    where they are set correctly, which is worse than not checking.
+    """
+    paths = [Path("/etc/systemd/system/ollama.service")]
+    drop_in = Path("/etc/systemd/system/ollama.service.d")
+    if drop_in.is_dir():
+        try:
+            paths.extend(sorted(drop_in.glob("*.conf")))
+        except OSError:
+            pass
+
+    found, seen_any = {}, False
+    for path in paths:
+        raw = _read_text(path)
+        if raw is None:
+            continue
+        seen_any = True
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line.startswith("Environment="):
+                continue
+            for pair in re.findall(r'([A-Z_][A-Z0-9_]*)=("[^"]*"|\S+)',
+                                   line[len("Environment="):]):
+                found[pair[0]] = pair[1].strip('"')
+    return (found if seen_any else None)
+
+
+def check_jetson():
+    """Everything in this section is Jetson-only. On the phone, on the
+    laptop, on the Steam Deck it does not run at all."""
+    if not on_a_jetson():
+        return
+    header("5. JETSON TUNING")
+
+    board = (_read_text("/sys/firmware/devicetree/base/model") or "").strip("\x00\n ")
+    release = (_read_text("/etc/nv_tegra_release") or "").splitlines()
+    if board:
+        print(f" board    {board}")
+    if release:
+        print(f" L4T      {release[0].strip()}")
+
+    # --- power mode ---------------------------------------------------
+    mode = jetson_power_mode()
+    if mode is None:
+        say(INFO, "Couldn't read the power mode -- check it with: nvpmodel -q")
+    elif mode[0] == 0:
+        say(GOOD, "Power mode 0 (MAXN) -- not throttled")
+    else:
+        say(BAD, f"Power mode {mode[0]}, NOT 0. The board is throttled. "
+                 f"Run: sudo nvpmodel -m 0 && sudo jetson_clocks")
+
+    # --- memory -------------------------------------------------------
+    totals, swap_devices = memory_picture()
+    if totals.get("MemTotal"):
+        print(f" RAM      {totals['MemTotal']:.1f} GiB total, "
+              f"{totals.get('MemAvailable', 0):.1f} GiB available")
+    if not swap_devices:
+        say(WARN, "No swap. On 8GB shared, swap is the difference between "
+                  "a slow reply and an out-of-memory kill.")
+    else:
+        for device, kind in swap_devices:
+            size = totals.get("SwapTotal", 0)
+            if "nvme" in device:
+                say(GOOD, f"Swap on NVMe ({device}, {size:.1f} GiB) -- "
+                          f"the right place for it")
+            elif "zram" in device:
+                say(WARN, f"Swap is zram ({device}) -- it trades CPU for "
+                          f"RAM, which is the wrong trade under an LLM. "
+                          f"A swapfile on the NVMe is better.")
+            elif "mmcblk" in device:
+                say(WARN, f"Swap on the SD card ({device}) -- miserable "
+                          f"under sustained writes, and it wears the card "
+                          f"out. Move it to the NVMe.")
+            else:
+                say(INFO, f"Swap on {device} ({kind}, {size:.1f} GiB)")
+
+    # --- Ollama service settings --------------------------------------
+    env = ollama_service_env()
+    if env is None:
+        say(INFO, "No Ollama systemd unit found -- install it, or you're "
+                  "running `ollama serve` by hand")
+        return
+    print("\n Ollama service settings (from its systemd unit):")
+    unset = []
+    for name, (want, why) in OLLAMA_TUNING.items():
+        have = env.get(name)
+        if have is None:
+            unset.append((name, want, why))
+            print(f"   {name:<26} not set   (want {want})")
+        else:
+            flag = "" if have == want else f"   <-- want {want}"
+            print(f"   {name:<26} {have}{flag}")
+    if unset:
+        say(WARN, f"{len(unset)} Ollama memory setting(s) not set -- see "
+                  f"JETSON_SETUP.md, 'Ollama on 8GB'")
+        for name, want, why in unset:
+            print(f"\n   {name}={want}")
+            print(f"     {why}")
+    else:
+        say(GOOD, "Ollama's memory settings are all tuned for 8GB")
+
+
+# =====================================================================
 # 5. SUMMARY -- screenshot this part
 # =====================================================================
 
@@ -392,6 +593,7 @@ def main():
     present = check_project_files()
     check_parser(present)
     models = check_gguf()
+    check_jetson()
     summary(models)
     return 0
 

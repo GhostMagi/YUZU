@@ -43,7 +43,24 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 PERSONA_DIR = HERE / "personas"
+
+# The archive. yuzu.persona is v1, frozen, byte-pinned to
+# _golden_yuzu_v1.txt by a test, and measured at a 20% action hit rate.
+# It keeps the plain "yuzu" name because Modelfile.yuzu and the Ollama
+# model called "yuzu" are named off it; renaming those would break every
+# setup that already ran build_yuzu_model.py.
 DEFAULT_PERSONA = "yuzu"
+
+# The one that actually boots -- the robot loop, yuzu_brain --chat, and
+# the eval all start here unless told otherwise.
+#
+# CLAUDE.md's promotion rule: the measured winner becomes the base. That
+# is yuzu4 today (yuzu2 + the bare-command example; held live 4/4). When
+# an A/B says something else won, THIS LINE is the only one that moves.
+# It is separate from DEFAULT_PERSONA on purpose: booting the frozen 20%
+# archive because it happens to own the short name is how the lineage
+# quietly regresses.
+LIVE_PERSONA = "yuzu4"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",
@@ -125,7 +142,7 @@ def _parse_hardware(name):
     return {k: "\n".join(v).strip() for k, v in blocks.items()}
 
 
-def load(key=DEFAULT_PERSONA):
+def load(key=LIVE_PERSONA):
     """Load one persona and compose its full system prompt."""
     path = PERSONA_DIR / f"{key}.persona"
     if not path.exists():
@@ -299,7 +316,8 @@ def _cli(argv):
             failures += 1
             print(f"  {key:<10} BROKEN -- {str(exc).splitlines()[0]}")
             continue
-        marker = " (default)" if key == DEFAULT_PERSONA else ""
+        marker = ("  <- LIVE, this is what boots" if key == LIVE_PERSONA
+                  else "  (frozen archive)" if key == DEFAULT_PERSONA else "")
         print(f"  {key:<10} {persona.name} -- {persona.archetype}{marker}")
         if persona.description:
             print(f"             {persona.description}")

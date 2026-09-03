@@ -80,6 +80,31 @@ class TestActionMatching(unittest.TestCase):
         self.assert_matches("shakes her legs", "shake legs")
         self.assert_matches("centers the camera", "center camera")
 
+    def test_no_alias_is_shadowed_by_the_whitelist(self):
+        """Every ACTION_ALIASES entry must actually be able to fire.
+
+        Found live: "turn around": "spin" never once ran. _stem_phrase
+        drops "around" as a filler word, so the phrase arrives at
+        lookup_action as "turn", and lookup_action checks the whitelist
+        FIRST -- it answered with turn() and the alias was never
+        consulted. The table said one thing and the robot did another,
+        with nothing anywhere to say so.
+
+        This is a whole class of bug, not one entry: any alias whose
+        stem collapses onto a whitelist key is dead on arrival.
+        """
+        for alias, target in yuzu.ACTION_ALIASES.items():
+            stem = yuzu._stem_phrase(alias)
+            shadow = yuzu._STEMMED_WHITELIST.get(stem)
+            if shadow is None:
+                continue
+            self.assertIs(
+                shadow, yuzu._STEMMED_WHITELIST[yuzu._stem_phrase(target)],
+                f"alias '{alias}' -> '{target}' can never fire: after "
+                f"stemming it reads '{stem}', which the whitelist answers "
+                f"first with a different action. Either drop the alias or "
+                f"stop stemming that word away.")
+
     def test_impossible_actions_still_match_nothing(self):
         # The whole point of a whitelist: no fallback, no guessing.
         for phrase in ["winks", "waves hand", "smiles", "stretches her arms",
@@ -416,6 +441,43 @@ class TestFirstContact(unittest.TestCase):
         self.assertIn("STOPPED", result.stdout)
         self.assertNotIn("STAGE 2", result.stdout)
 
+    def commanded_angles(self, stdout):
+        """Every angle DummyBot was actually told to go to. It prints
+        one line per servo command in simulation, so the whole run can
+        be checked from the outside."""
+        return [int(a) for a in
+                re.findall(r'servo\s+\d+ -> \s*(-?\d+)deg', stdout)]
+
+    def test_an_early_abort_parks_inside_the_limit_it_was_running_at(self):
+        """The angle limit has to still apply on the way out.
+
+        Measured: aborting at stage 2 -- the stage whose whole job is to
+        catch servo IDs wired differently from LEG_SERVO_MAP -- used to
+        command 60 degrees. The cleanup restored the limit from a timid
+        15 back to 90 and THEN called rest(), so it drove a full squat
+        into a chassis that had just proven it moves the wrong joints.
+        The one exit path where the clamp matters most was the one that
+        dropped it. Park first, restore after.
+        """
+        result = self.run_script("y\ny\nn\n")
+        self.assertIn("STOPPED at:", result.stdout)
+        angles = self.commanded_angles(result.stdout)
+        self.assertTrue(angles, "no servo commands seen at all")
+        self.assertLessEqual(
+            max(abs(a) for a in angles), 15,
+            "parking exceeded the 15-degree bring-up limit that was in "
+            "force when the run aborted")
+
+    def test_the_limit_is_left_where_it_was_found(self):
+        # The script lowers a module global. Leaving it lowered would
+        # silently clamp every gait in the next process that imports
+        # muto_leg_control in the same session.
+        before = legs.MAX_ANGLE
+        import muto_firstcontact
+        muto_firstcontact.legs.set_angle_limit(15)
+        muto_firstcontact.legs.set_angle_limit(before)
+        self.assertEqual(legs.MAX_ANGLE, before)
+
     def test_a_failed_mirroring_check_names_the_fix(self):
         # 21st question is the mirroring one in simulation mode.
         result = self.run_script("y\n" * 20 + "n\n" + "y\n" * 10)
@@ -547,12 +609,64 @@ class BrainTestCase(unittest.TestCase):
 
 class TestBrain(BrainTestCase):
     def test_system_prompt_composes_with_the_directives(self):
-        prompt = load_system_prompt()
+        # Named explicitly. This used to call load_system_prompt() bare
+        # and assert v1's headings, which quietly made "the default
+        # persona" and "the frozen archive" the same test -- so the day
+        # the default moved to the measured winner, a passing test would
+        # have been the only thing arguing for keeping the 20% prompt.
+        prompt = load_system_prompt(yuzu_personas.DEFAULT_PERSONA)
         self.assertIn("You are Yuzu", prompt)
         for directive in ("PERSONALITY", "HARDWARE ACTION PARSING",
                           "BALANCED FLIRTATION", "NO PUPPETEERING",
                           "GYARU AESTHETIC"):
             self.assertIn(directive, prompt)
+
+    def test_the_live_persona_is_the_measured_winner_not_the_archive(self):
+        """CLAUDE.md's promotion rule, enforced.
+
+        yuzu.persona is v1: frozen, byte-pinned, and measured at a 20%
+        action hit rate. It owns the short key because Modelfile.yuzu
+        and the Ollama model called 'yuzu' are named off it. Booting it
+        because of that naming accident is the exact silent regression
+        the promotion rule exists to prevent.
+        """
+        live = yuzu_personas.LIVE_PERSONA
+        self.assertNotEqual(live, yuzu_personas.DEFAULT_PERSONA,
+                            "LIVE_PERSONA must not be the frozen v1 archive")
+        self.assertIn(live, yuzu_personas.available())
+        # It has to actually compose, or the robot boots into a traceback.
+        self.assertIn("You are Yuzu", yuzu_personas.load(live).prompt)
+        # And it is what an un-argued brain picks up.
+        self.assertEqual(YuzuBrain(model="yuzu", host=self.host).persona.key,
+                         live)
+
+    def test_keep_alive_is_sent_so_she_is_not_reloaded_mid_conversation(self):
+        """Ollama unloads an idle model after 5 minutes by default.
+
+        On a companion robot that is exactly backwards: she sits quiet
+        in a corner, someone walks up and says hi, and the 3B has to be
+        read back off disk before she can answer -- so the first thing
+        anyone ever says to her is the slowest reply she gives.
+        """
+        brain = self.brain()
+        brain.ask("hey")
+        self.assertEqual(MockOllama.seen["last"]["keep_alive"], "30m")
+
+    def test_keep_alive_is_sent_on_the_streaming_path_too(self):
+        brain = self.brain(keep_alive="-1")
+        list(brain.ask_stream("hey"))
+        # -1 as a NUMBER. Go cannot parse "-1" as a duration string, so
+        # sending it quoted comes back a 400 naming neither this setting
+        # nor the fix.
+        self.assertEqual(MockOllama.seen["last"]["keep_alive"], -1)
+
+    def test_keep_alive_numbers_go_as_numbers_durations_as_strings(self):
+        from yuzu_brain import _keep_alive
+        self.assertEqual(_keep_alive("-1"), -1)
+        self.assertEqual(_keep_alive("0"), 0)
+        self.assertEqual(_keep_alive(" 300 "), 300)
+        self.assertEqual(_keep_alive("30m"), "30m")
+        self.assertEqual(_keep_alive("1h"), "1h")
 
     def test_check_passes_when_model_is_present(self):
         self.assertTrue(self.brain().check())
@@ -1091,8 +1205,24 @@ class TestReplyHealth(unittest.TestCase):
         self.assertTrue(h.ok)
         self.assertEqual((h.ran, h.total, h.asterisks), (1, 1, 0))
 
-    def test_asterisks_are_wonky(self):
-        self.assertFalse(self.health("Okay! *wriggles legs* see? *giggles*").ok)
+    def test_asterisks_alone_no_longer_condemn_a_reply_that_moved(self):
+        """Measured: yuzu2 pooled 54.2% on no_asterisks while moving on
+        80-83% of replies, so about a third of replies were asterisked
+        AND fine. normalize_actions rescues *wriggles legs* to a real
+        gait, and _canonicalise stores the corrected form, so the
+        snowball is already handled. Vetoing here on top of that wiped
+        the conversation roughly every fifth turn for nothing the robot
+        could see.
+        """
+        health = self.health("Okay! *wriggles legs* see? *giggles*")
+        self.assertTrue(health.ok)
+        self.assertEqual(health.asterisks, 2)   # still counted, still shown
+        self.assertGreaterEqual(health.ran, 1)  # and it really did move
+
+    def test_asterisks_around_something_impossible_are_still_wonky(self):
+        # The rule that survived: nothing the body can do, in a reply
+        # that claimed to move. Format is irrelevant to that judgement.
+        self.assertFalse(self.health("Sure thing! *winks* *smizes*").ok)
 
     def test_no_dialogue_is_wonky(self):
         self.assertFalse(self.health("[squats] [shakes legs]").ok)
@@ -1765,7 +1895,7 @@ class TestDoctor(unittest.TestCase):
         self.assertEqual(top_level & project, set(),
                          "yuzu_doctor.py must not import project files at "
                          "module level -- it has to run as a lone download")
-        self.assertTrue(top_level <= {"json", "os", "struct", "sys",
+        self.assertTrue(top_level <= {"json", "os", "re", "struct", "sys",
                                       "time", "pathlib"},
                         f"unexpected top-level imports: {top_level}")
 
@@ -2316,6 +2446,192 @@ class TestPersonaSwitching(BrainTestCase):
         for key in ("coco",):
             self.assertEqual(body_section(key), reference,
                              f"{key} is being taught a different body")
+
+
+class TestABRunner(unittest.TestCase):
+    """YUZU_AB's arithmetic. The model half needs a GPU; this half is
+    where a wrong conclusion actually gets drawn, and it is pure
+    numbers, so it gets tested."""
+
+    def setUp(self):
+        import YUZU_AB
+        self.ab = YUZU_AB
+
+    def arm(self, **passes):
+        """A fake results dict: {check_name: how many of 12 passed}."""
+        counts = Counter()
+        for check in prompt_eval.CHECKS:
+            counts[check.name] = passes.get(check.name, 12)
+        return {"total": 12, "passes": counts, "lengths": [20] * 12,
+                "dropped": Counter(), "failures": {}, "unanswered": []}
+
+    def render(self, left, right):
+        import contextlib
+        import io
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.ab.compare("armA", left, "armB", right,
+                            {"armA": 3797, "armB": 3134})
+        return buffer.getvalue()
+
+    def test_one_reply_of_difference_is_called_a_coin_flip(self):
+        """The yuzu2-vs-yuzu3 lesson, enforced. Every difference in that
+        round was one reply, which at n=12 is 8.3 points, and it read
+        like a result until it was counted."""
+        out = self.render(self.arm(moves_at_all=10), self.arm(moves_at_all=9))
+        self.assertIn("ONE REPLY IS 8.3 POINTS", out)
+        self.assertIn("coin flip", out)
+        self.assertNotIn("favours", out)
+
+    def test_a_real_gap_names_the_winner_and_the_next_step(self):
+        out = self.render(self.arm(moves_at_all=6), self.arm(moves_at_all=11))
+        self.assertIn("favours armB", out)
+        self.assertIn("--runs 3", out)
+        self.assertIn("LIVE_PERSONA", out)
+
+    def test_movement_leads_the_table_whatever_else_moved(self):
+        # actions_runnable is an all() and no_asterisks measures a model
+        # prior that normalize_actions rescues. Neither may headline.
+        out = self.render(self.arm(no_asterisks=3), self.arm(no_asterisks=11))
+        rows = [line.split()[0] for line in out.splitlines()
+                if line.split() and line.split()[0] in
+                {c.name for c in prompt_eval.CHECKS}]
+        self.assertEqual(rows[0], "moves_at_all")
+
+    def test_a_big_swing_elsewhere_does_not_declare_a_winner(self):
+        # no_asterisks jumping 8 replies while movement is level is not
+        # a reason to promote anything.
+        out = self.render(self.arm(no_asterisks=3), self.arm(no_asterisks=11))
+        self.assertIn("level", out)
+        self.assertNotIn("favours", out)
+
+    def test_the_default_arms_both_exist(self):
+        for key in self.ab.ARMS:
+            self.assertIn(key, yuzu_personas.available(),
+                          f"YUZU_AB.ARMS names '{key}', which isn't a persona")
+
+    def test_the_left_arm_is_whatever_is_live(self):
+        # Otherwise the default A/B silently stops testing against the
+        # thing the robot actually runs.
+        self.assertEqual(self.ab.ARMS[0], yuzu_personas.LIVE_PERSONA)
+
+
+class TestSourceHygiene(unittest.TestCase):
+    """Things that are fine today and break on a newer Python.
+
+    The Jetson ships JetPack's Python, Pydroid ships its own, and the
+    laptop has whatever Ubuntu gave it. They are not the same version
+    and they will not stay the same version.
+    """
+
+    def test_no_module_has_an_invalid_escape_sequence(self):
+        r"""A backslash-star inside a normal (non-raw) string.
+
+        normalize_actions' docstring quoted its own old regex,
+        `re.sub(r'\*(.*?)\*', ...)`, inside a plain triple-quoted
+        docstring. Python 3.11 accepts it silently. 3.12 prints a
+        SyntaxWarning on every single import -- on a robot that is noise
+        in front of Yuzu's dialogue, and in Pydroid it is a wall of
+        yellow at someone who just tapped Run. In 3.14 it is a
+        SyntaxError and nothing imports at all.
+        """
+        import py_compile
+        import warnings
+        here = Path(__file__).parent
+        for path in sorted(here.glob("*.py")):
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", SyntaxWarning)
+                warnings.simplefilter("error", DeprecationWarning)
+                try:
+                    py_compile.compile(str(path), cfile=None, doraise=True)
+                except (SyntaxWarning, DeprecationWarning,
+                        py_compile.PyCompileError) as exc:
+                    self.fail(f"{path.name}: {exc}")
+
+
+class TestJetsonChecks(unittest.TestCase):
+    """yuzu_doctor's Jetson section. It runs on the box Ghost cannot
+    easily poke at from a phone, so its parsing has to be right the
+    first time -- and every one of these is a plain file read, so they
+    can all be tested against fixtures."""
+
+    def setUp(self):
+        import yuzu_doctor
+        self.doctor = yuzu_doctor
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+
+    def fake_read(self, files):
+        """Patch _read_text to serve a dict of {path: contents}."""
+        return unittest.mock.patch.object(
+            self.doctor, "_read_text", lambda path: files.get(str(path)))
+
+    def test_power_mode_zero_is_the_unthrottled_one(self):
+        with self.fake_read({"/var/lib/nvpmodel/status":
+                             "pmode:0000 fmode:fanmode_quiet\n"}):
+            self.assertEqual(self.doctor.jetson_power_mode()[0], 0)
+
+    def test_a_throttled_board_reads_nonzero(self):
+        with self.fake_read({"/var/lib/nvpmodel/status":
+                             "pmode:0001 fmode:fanmode_quiet\n"}):
+            self.assertEqual(self.doctor.jetson_power_mode()[0], 1)
+
+    def test_no_status_file_is_not_a_crash(self):
+        # Every other machine this script runs on -- the phone, the
+        # laptop, the Deck -- has no such file.
+        with self.fake_read({}):
+            self.assertIsNone(self.doctor.jetson_power_mode())
+
+    def test_garbage_status_file_is_not_a_crash(self):
+        with self.fake_read({"/var/lib/nvpmodel/status": "pmode:MAXN\n"}):
+            self.assertIsNone(self.doctor.jetson_power_mode())
+
+    def test_memory_picture_reads_totals_and_swap_devices(self):
+        meminfo = ("MemTotal:        7629512 kB\n"
+                   "MemAvailable:    5120000 kB\n"
+                   "SwapTotal:       8388604 kB\n")
+        swaps = ("Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n"
+                 "/mnt/nvme/swapfile                      file            "
+                 "8388604 0       -2\n")
+        with self.fake_read({"/proc/meminfo": meminfo, "/proc/swaps": swaps}):
+            totals, devices = self.doctor.memory_picture()
+        self.assertAlmostEqual(totals["MemTotal"], 7.276, places=2)
+        self.assertEqual(devices[0][0], "/mnt/nvme/swapfile")
+
+    def test_ollama_settings_are_read_from_the_unit_not_the_shell(self):
+        """These are set for the ollama SERVICE. Reading os.environ
+        would report 'not set' on a box where they are set correctly,
+        which is a worse answer than not checking at all."""
+        unit = ('[Service]\n'
+                'Environment="OLLAMA_KEEP_ALIVE=-1"\n'
+                'Environment="OLLAMA_NUM_PARALLEL=1" "OLLAMA_FLASH_ATTENTION=1"\n')
+        with self.fake_read({"/etc/systemd/system/ollama.service": unit}):
+            env = self.doctor.ollama_service_env()
+        self.assertEqual(env["OLLAMA_KEEP_ALIVE"], "-1")
+        self.assertEqual(env["OLLAMA_NUM_PARALLEL"], "1")
+        self.assertEqual(env["OLLAMA_FLASH_ATTENTION"], "1")
+
+    def test_no_ollama_unit_reads_as_none_not_as_empty(self):
+        # None means "couldn't look"; {} would mean "looked, nothing
+        # set", and reporting five missing settings on a box with no
+        # Ollama installed is just noise.
+        with self.fake_read({}):
+            self.assertIsNone(self.doctor.ollama_service_env())
+
+    def test_the_whole_section_is_skipped_off_a_jetson(self):
+        before = len(self.doctor.notes)
+        with unittest.mock.patch.object(self.doctor, "on_a_jetson",
+                                        lambda: False):
+            self.doctor.check_jetson()
+        self.assertEqual(len(self.doctor.notes), before,
+                         "check_jetson must be silent on the phone")
+
+    def test_every_tuning_setting_says_why(self):
+        # A checklist of env vars with no reasoning is a cargo cult.
+        for name, (want, why) in self.doctor.OLLAMA_TUNING.items():
+            self.assertTrue(want, f"{name} has no recommended value")
+            self.assertGreater(len(why), 40,
+                               f"{name} doesn't explain itself")
 
 
 if __name__ == "__main__":

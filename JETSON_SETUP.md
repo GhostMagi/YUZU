@@ -266,8 +266,11 @@ It fits, but not with room to spare. Two things that help:
 
 - **Run headless.** `sudo systemctl set-default multi-user.target` and
   SSH in from the Deck. The desktop is the biggest easy win.
-- **Swap.** Jetson defaults to zram, which trades CPU for RAM. For LLM
-  work a real swapfile on the SD card is usually the better trade.
+- **Swap, on the NVMe.** Jetson defaults to zram, which trades CPU for
+  RAM — the wrong trade when the CPU is already busy. A real swapfile
+  is better, and it belongs on the SSD, not the microSD: swap is
+  sustained writes, which is exactly what wears a card out and exactly
+  where a card is slowest. `HEADLESS_SETUP.md` step 7 has the commands.
 
 Bring them up one at a time — Ollama alone, then add Whisper, then add
 Piper — as your own notes already say. Loading all three on day one
@@ -275,6 +278,48 @@ means an OOM with no idea which one caused it.
 
 `num_ctx` in `yuzu_brain.py` is the dial that most directly trades
 memory for conversation length. 4096 is a starting point, not a law.
+
+### 5b. Ollama on 8GB — the settings that are not in the docs
+
+Ollama's defaults are written for a desktop with its own graphics card.
+Every one of these is about the fact that the Orin has one pool of
+memory and everything shares it.
+
+```bash
+sudo systemctl edit ollama        # opens a drop-in; paste the block below
+```
+
+```ini
+[Service]
+Environment="OLLAMA_NUM_PARALLEL=1"
+Environment="OLLAMA_MAX_LOADED_MODELS=1"
+Environment="OLLAMA_KEEP_ALIVE=-1"
+Environment="OLLAMA_FLASH_ATTENTION=1"
+Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl restart ollama
+```
+
+| Setting | Why |
+|---|---|
+| `OLLAMA_NUM_PARALLEL=1` | Ollama sizes the KV cache as `num_ctx × num_parallel`. Left to choose for itself it reserves slots for concurrent requests a robot with one mouth will never make, and every slot is real memory out of the 8GB |
+| `OLLAMA_MAX_LOADED_MODELS=1` | Stops a second model being held alongside the 3B. On a shared 8GB, two resident models is how you land in swap |
+| `OLLAMA_KEEP_ALIVE=-1` | Never unload. The default is 5 minutes, which for a companion robot is backwards: she sits quiet in a corner, someone walks up and speaks, and the model has to be read back off disk first — so the first thing anyone ever says to her is the slowest reply she gives |
+| `OLLAMA_FLASH_ATTENTION=1` | Cheaper attention, less memory per token of context |
+| `OLLAMA_KV_CACHE_TYPE=q8_0` | Quantises the KV cache, roughly halving what context costs. Needs flash attention on |
+
+`yuzu_brain.py` also sends `keep_alive` per request, so if you can't
+edit the service you can get the same effect with
+`export YUZU_KEEP_ALIVE=-1` before starting the robot. Set it to `0`
+instead when you're bringing Whisper up alongside her and need the
+memory back between turns.
+
+**Check all of this with the doctor.** `python3 yuzu_doctor.py` on the
+Jetson prints a Jetson-only section: power mode, RAM, what the swap is
+sitting on, and which of the settings above are actually set in the
+service. It reads files only — no `sudo`, nothing that can hang.
 
 ### 6. Piper
 
@@ -296,6 +341,7 @@ in the json; lower is faster. 0.85–0.9 suits the gyaru energy.
 | Replies too long, TTS drags | Lower `num_predict` in `yuzu_brain.py`, rebuild the Modelfile |
 | She writes your lines | `no_puppeteering`; the `stop` params in the Modelfile catch most of it |
 | Very slow on Jetson | Confirm GPU not CPU; `nvpmodel -m 0`; check thermals in `jtop` |
+| First reply after a quiet spell is slow, then fine | Ollama unloaded her. `OLLAMA_KEEP_ALIVE=-1`, or `export YUZU_KEEP_ALIVE=-1`. See 5b |
 
 Sources for the model:
 [DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored](https://huggingface.co/DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored)

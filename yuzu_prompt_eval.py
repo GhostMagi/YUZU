@@ -6,8 +6,8 @@ Every rule in the prompt that can be checked mechanically is checked
 here, against the SAME parser the robot uses. Run it after any prompt
 edit, sampling change, or model swap:
 
-    python yuzu_prompt_eval.py                    # 12 prompts x 3 runs
-    python yuzu_prompt_eval.py --runs 5
+    python yuzu_prompt_eval.py                    # 12 prompts, one pass
+    python yuzu_prompt_eval.py --runs 3           # 36 replies, to confirm
     python yuzu_prompt_eval.py --model llama3.2:3b
     python yuzu_prompt_eval.py --persona saya
     python yuzu_prompt_eval.py --verbose          # show every failure
@@ -245,10 +245,16 @@ def main(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default=None)
     parser.add_argument("--persona", default=None,
-                        help=f"persona key (default {yuzu_personas.DEFAULT_PERSONA})")
-    parser.add_argument("--runs", type=int, default=3,
-                        help="repeats per prompt (default 3; sampling is "
-                             "random, so one run per prompt proves nothing)")
+                        help=f"persona key (default {yuzu_personas.LIVE_PERSONA})")
+    # Default 1, not 3. A 3-run pass is 36 replies, which measured out
+    # at long enough on a GTX 960M that Ghost abandoned a run -- and the
+    # 12-reply numbers tracked the 36-reply ones closely (58.3 vs 52.8
+    # on no_asterisks, 83.3 vs 80.6 on moves_at_all). So one run for
+    # direction, --runs 3 only to confirm something that already looks
+    # real. A harness nobody finishes measures nothing.
+    parser.add_argument("--runs", type=int, default=1,
+                        help="repeats per prompt (default 1 = 12 replies, "
+                             "enough for direction; --runs 3 to confirm)")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--timeout", type=int, default=None,
                         help=f"seconds to wait per reply (default "

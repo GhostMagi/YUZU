@@ -40,6 +40,41 @@ DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 # wasted twenty minutes of someone's evening.
 DEFAULT_TIMEOUT = int(os.environ.get("YUZU_TIMEOUT", "300"))
 
+# How long Ollama keeps the model resident in memory after a reply.
+#
+# Ollama's own default is 5 minutes, which is the wrong shape for a
+# companion robot. She sits quietly in a corner for six minutes, someone
+# walks up and says hi, and the 3B has to be read back off disk before
+# she can answer -- so the very first thing anyone says to her is the
+# slowest reply she ever gives. On the Orin, off NVMe, that reload is
+# seconds; off a microSD it is worse.
+#
+# 30m is the compromise for a laptop or phone that has other uses for
+# its memory. On the Jetson, where nothing else wants the 8GB yet, pin
+# her there for good:
+#
+#     export YUZU_KEEP_ALIVE=-1
+#
+# Set it to 0 to go back to unloading immediately after every reply,
+# which is what you want if you're bringing up Whisper alongside her and
+# need the memory back between turns.
+DEFAULT_KEEP_ALIVE = os.environ.get("YUZU_KEEP_ALIVE", "30m")
+
+
+def _keep_alive(raw):
+    """Ollama takes either a Go duration string ("30m", "1h") or a plain
+    number of seconds, where -1 means never unload.
+
+    Numbers have to be sent as JSON numbers, not strings: "-1" and "0"
+    are not valid Go durations, so a string would come back a 400 with a
+    parse error that names neither this setting nor the fix.
+    """
+    text = str(raw).strip()
+    try:
+        return int(text)
+    except ValueError:
+        return text
+
 # Sampling. Tuned for a companion persona on a small model, not for
 # factual accuracy -- Section 2 of the context dump already accepts that
 # a 3B gets local facts confidently wrong.
@@ -91,14 +126,33 @@ class ReplyHealth:
 
     @property
     def ok(self):
-        """A reply is wonky if she wrote actions in the wrong format, or
-        wrote actions the body can't do, or said nothing at all."""
+        """A reply is wonky if she said nothing at all, or moved only in
+        ways this body can't.
+
+        Asterisks used to fail a reply on their own, as "format drift,
+        the snowball starter". Measurement retired that:
+
+          * pooled across both of its runs, yuzu2 scored 54.2% on
+            no_asterisks (26/48) while moving on 80-83% of replies. So
+            roughly a third of replies were asterisked AND moved fine.
+          * _canonicalise() already rewrites them to brackets before
+            they enter history, which is what actually stops the
+            snowball -- the veto here was a second guard on a risk that
+            was already handled.
+          * normalize_actions() rescues *spins* to [spins] and it runs.
+            Three of yuzu3's six "no_asterisks failures" moved perfectly.
+
+        Vetoing on them meant two asterisked-but-fine replies in a row
+        tripped the two-strike rule and wiped the conversation -- at a
+        ~46% per-reply rate, about every fifth turn, for no reason the
+        robot could see. She felt amnesiac because of a metric, not a
+        fault. Asterisks are still counted and still show in the repr;
+        they just no longer condemn a reply that worked.
+        """
         if self.usable is None:
             return True
         if not self.has_dialogue:
             return False                # the freeze case
-        if self.asterisks:
-            return False                # format drift, the snowball starter
         if self.total and not self.ran:
             return False                # moved in ways the robot can't
         return True
@@ -115,7 +169,7 @@ class BrainError(RuntimeError):
     message that says what to actually do about it."""
 
 
-def load_system_prompt(persona=yuzu_personas.DEFAULT_PERSONA):
+def load_system_prompt(persona=yuzu_personas.LIVE_PERSONA):
     """The composed system prompt for one persona: her character text
     with the body's action rules substituted in."""
     try:
@@ -138,7 +192,7 @@ class YuzuBrain:
     def __init__(self, model=DEFAULT_MODEL, host=DEFAULT_HOST,
                  system_prompt=None, options=None,
                  history_turns=8, persona=None, auto_recover=True,
-                 timeout=None):
+                 timeout=None, keep_alive=None):
         """
         model         : Ollama model name (see Modelfile.yuzu)
         persona       : key from personas/ -- supplies both the system
@@ -162,7 +216,10 @@ class YuzuBrain:
         self.persona = None
         persona_options = {}
         if system_prompt is None:
-            key = persona or yuzu_personas.DEFAULT_PERSONA
+            # LIVE_PERSONA, not DEFAULT_PERSONA: the plain "yuzu" key is
+            # the frozen v1 archive (20% action hit rate). Booting it
+            # because it owns the short name is a silent regression.
+            key = persona or yuzu_personas.LIVE_PERSONA
             try:
                 self.persona = yuzu_personas.load(key)
             except yuzu_personas.PersonaError as exc:
@@ -179,6 +236,8 @@ class YuzuBrain:
         merged.update(options or {})
         self.options = merged
         self.timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
+        self.keep_alive = _keep_alive(
+            keep_alive if keep_alive is not None else DEFAULT_KEEP_ALIVE)
         self.history_turns = history_turns
         self.history = []
 
@@ -248,6 +307,7 @@ class YuzuBrain:
             "messages": self._messages(user_text),
             "stream": False,
             "options": self.options,
+            "keep_alive": self.keep_alive,
         }
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as r:
@@ -293,6 +353,7 @@ class YuzuBrain:
             "messages": self._messages(user_text),
             "stream": True,
             "options": self.options,
+            "keep_alive": self.keep_alive,
         }
         collected = []
         try:

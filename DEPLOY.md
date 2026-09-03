@@ -26,7 +26,7 @@ That's the whole list. **Nothing in this project needs pip.**
 ```bash
 git clone https://github.com/GhostMagi/YUZU.git
 cd YUZU
-python3 YUZU_TESTER.py          # 193 tests. If this passes, the code is fine.
+python3 YUZU_TESTER.py          # 230 tests. If this passes, the code is fine.
 python3 yuzu_all_in_one.py    # talk to her
 ```
 

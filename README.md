@@ -33,7 +33,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py           # 193 tests, ~18 seconds
+python YUZU_TESTER.py         # 230 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -49,7 +49,7 @@ on any PC — no Jetson needed:
 ollama pull llama3.2:3b
 python build_yuzu_model.py --create    # bake the persona into a model
 python yuzu_brain.py --chat            # talk to her
-python yuzu_prompt_eval.py --runs 3    # score how well she follows the prompt
+python yuzu_prompt_eval.py             # score how well she follows the prompt
 ```
 
 Before building a model from a GGUF you didn't make yourself:
@@ -74,25 +74,33 @@ $400.
 
 | File | What it does |
 |---|---|
+| **Talk to her** | |
 | `yuzu_all_in_one.py` | Reply pipeline + main loop. **Start here.** |
 | `yuzu_brain.py` | Ollama client. Stdlib only, streaming, history |
-| `UBUNTU_LAPTOP.md` | Putting Ubuntu on the laptop, phone-readable |
-| `personas/` | One file per character; body rules shared |
 | `yuzu_personas.py` | Persona loader and composer |
-| `build_yuzu_model.py` | Generates `Modelfile.yuzu` from that prompt |
-| `yuzu_prompt_eval.py` | Scores prompt compliance against the model |
-| `gguf_inspect.py` | Reads a GGUF header — quant, context, chat template |
+| `personas/` | One file per character; body rules shared |
+| **Measure her** | |
+| `YUZU_TESTER.py` | Test suite. 230 tests, ~18s |
+| `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
+| `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
-| `PHONE_START.md` | Phone instructions, no terminal needed |
-| `DEPLOY.md` | Moving the brain onto the Jetson |
-| `JETSON_SETUP.md` | Setup runbook, PC and Jetson |
-| `HEADLESS_SETUP.md` | Jetson setup from a Steam Deck, no monitor |
+| `gguf_inspect.py` | Reads a GGUF header — quant, context, chat template |
+| `build_yuzu_model.py` | Generates a `Modelfile` per persona |
+| **The body** | |
+| `muto_firstcontact.py` | **Run this before any gait.** Guided bring-up, one joint at a time |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_led_manager.py` | The one LED config loader (zones + states) |
 | `yuzu_led_controller.py` | Zone dump, front-end over `LEDManager` |
 | `yuzu_robot_config.json` | The one config file |
-| `readtest.py` | Smoke test that the config loads |
-| `YUZU_TESTER.py` | Test suite |
+| **Read these** | |
+| `PHONE_START.md` | Phone instructions, no terminal needed |
+| `DEPLOY.md` | Moving the brain onto the Jetson |
+| `JETSON_SETUP.md` | Setup runbook, PC and Jetson, plus the 8GB tuning |
+| `HEADLESS_SETUP.md` | Jetson setup from a Steam Deck, no monitor |
+| `UBUNTU_LAPTOP.md` | Putting Ubuntu on the laptop, phone-readable |
+| `PERSONA_SWITCHING.md` | Two characters on one robot, and the tradeoffs |
+| `HANDOFF.md` | Pasteable catch-up for a fresh AI chat |
+| `CLAUDE.md` | Working notes: every measured result, and what's settled |
 | `Yuzu_Full_Technical_Context_Dump.md` | Full project context and reasoning |
 | `Claude_Memory_Export_StackchanBuild.md` | Project history, Stackchan → now |
 | `paintstepslol.txt` | Paint prep steps for the chassis |
@@ -111,6 +119,35 @@ python yuzu_brain.py --persona saya --chat
 ```
 
 In the main loop, `/personas` lists and `/persona coco` switches live.
+
+### Which prompt is actually running
+
+`yuzu_personas.LIVE_PERSONA` — one line, currently `yuzu4`. That is what
+the robot, `yuzu_brain --chat` and the eval all boot with when nothing
+says otherwise.
+
+It is deliberately *not* `yuzu.persona`. That file is v1: frozen, pinned
+byte-for-byte by a test, and measured at a 20% action hit rate. It keeps
+the short `yuzu` name because `Modelfile.yuzu` and the Ollama model
+called `yuzu` are named off it — but booting the worst-measured prompt
+because it owns the nicest filename is exactly the regression the
+promotion rule exists to stop.
+
+**The promotion rule: the measured winner becomes the base.** To try a
+new variant against the live one:
+
+```
+python YUZU_AB.py               # runs LIVE_PERSONA vs the candidate
+python YUZU_AB.py yuzu4 yuzu5   # or name both arms
+```
+
+Twelve prompts through each arm, scored with the robot's own parser,
+printed as one table with `moves_at_all` at the top — the honest
+robot-facing number. It also prints what one reply is worth in
+percentage points, because every difference in the yuzu2-vs-yuzu3 round
+turned out to be a single reply and looked like a result until it was
+counted. If a candidate wins, move `LIVE_PERSONA` and record it in
+`CLAUDE.md`.
 
 Two characters are built on the Muto S2 today: **Yuzu** (gyaru, hot
 pink, hype) and **Coco** (kuudere, cold blue, deadpan). Switching
@@ -161,13 +198,28 @@ face should produce silence, not a random movement.
 ## Hardware status
 
 Nothing here has run on a real Muto S2. The gaits are structurally sound
-and range-safe, but every angle is a guess. Before walking it, run the
-calibration order in Section 8 of the context dump:
-`calibrate_leg()` → `check_mirroring()` → `check_tripods()` → `walk()`.
+and range-safe, but every angle is a guess.
 
-Swap `DummyBot` for the real object in `yuzu_all_in_one.py`:
+**Real servos are an environment variable, not a code edit.** There is
+nothing to swap in `yuzu_all_in_one.py` — `muto_leg_control.connect()`
+picks the simulator or the real bus, and asking for hardware and not
+getting it is a hard failure rather than a silent fall back to the
+simulator.
 
-```python
-from muto_lib import Muto_Bot   # confirm the real import name
-g_bot = Muto_Bot()
 ```
+python yuzu_all_in_one.py                  # simulation
+YUZU_HARDWARE=1 python yuzu_all_in_one.py  # 18 real servos
+```
+
+Before the first `YUZU_HARDWARE=1` of the robot's life:
+
+```
+python muto_firstcontact.py                # rehearse the whole thing dry
+YUZU_HARDWARE=1 python muto_firstcontact.py
+```
+
+Six stages — comms, each joint alone, mirroring, standing, tripods, one
+walk cycle — with a yes/no after every movement and the angle limit
+starting at 15°. You cannot reach a walk cycle without having watched
+every leg move by itself first. Record what you learn into `LEG_OFFSETS`
+and `LEG_SIGN` in `muto_leg_control.py`.

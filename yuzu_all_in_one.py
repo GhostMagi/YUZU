@@ -151,7 +151,12 @@ ACTION_ALIASES = {
     "spin around":       "spin",
     "spin in a circle":  "spin",
     "twirl":             "spin",
-    "turn around":       "spin",
+    # "turn around" is deliberately NOT here. _stem_phrase drops
+    # "around" as filler, so it arrives as "turn" and the whitelist
+    # answers first -- which is the closer motion anyway (a half turn,
+    # not four steps of spin). An entry here would look like it worked
+    # and never once fire. test_no_alias_is_shadowed_by_the_whitelist
+    # keeps that from being reintroduced.
     "turn left":         "turn",
     "turn right":        "turn",
     "walk":              "walk forward",
@@ -195,7 +200,7 @@ ACTION_ALIASES = {
 
 
 def normalize_actions(text: str) -> str:
-    """
+    r"""
     Convert stray markdown emphasis into brackets.
 
     Careful with the old one-liner `re.sub(r'\*(.*?)\*', r'[\1]', text)`:
@@ -394,7 +399,9 @@ def listen_and_transcribe():
 brain = None
 current_persona = None
 
-# Which character boots by default. Override with:  export YUZU_PERSONA=saya
+# Which character boots by default. Override with:  export YUZU_PERSONA=coco
+# Unset means yuzu_personas.LIVE_PERSONA -- the measured winner, not the
+# frozen v1 archive that happens to own the "yuzu" key.
 PERSONA = os.environ.get("YUZU_PERSONA")
 
 
@@ -549,13 +556,21 @@ def run_yuzu_forever():
                 print("Nothing to reset -- running on the echo stub.\n")
             continue
         if command == "/health":
+            # Motor faults are reported unconditionally. They used to be
+            # printed only inside the "brain is up and has scored a
+            # reply" branch, so on the echo stub -- which is exactly the
+            # mode you use to shake down a new servo bus -- a flaky bus
+            # was invisible in the one command that exists to show it.
             if brain and brain.last_health:
                 print(f" last reply: {brain.last_health}")
                 print(f" history: {len(brain.history)//2} exchanges, "
                       f"auto-recoveries so far: {brain.recoveries}")
-                print(f" motor faults: {len(motor_faults)}\n")
             else:
-                print("No replies scored yet.\n")
+                print(" no replies scored yet (echo stub, or nothing said)")
+            print(f" motor faults: {len(motor_faults)}")
+            for name, err in motor_faults[-3:]:
+                print(f"   {name}: {err}")
+            print()
             continue
         set_led_state("thinking")
         raw_reply = ask_yuzu_brain(user_text)

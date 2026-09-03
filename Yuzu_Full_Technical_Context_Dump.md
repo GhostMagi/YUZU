@@ -192,19 +192,23 @@ behind it. If the two disagree, the code is right.
   yuzu_brain.py         real Ollama client. Stdlib only -- urllib, no
                         pip install. Streaming, capped history,
                         preflight check, clear errors.
-  personas/             one file per character. yuzu.persona is the
-                        live one. _hardware_*.txt hold the body rules
-                        every persona on that chassis composes in.
+  personas/             one file per character. yuzu.persona is v1,
+                        FROZEN -- the live one is whichever key
+                        yuzu_personas.LIVE_PERSONA names (yuzu4 today).
+                        _hardware_*.txt hold the body rules every
+                        persona on that chassis composes in.
                         _golden_yuzu_v1.txt is a frozen copy of the
                         prompt Ghost tested; not read at runtime, the
-                        test suite asserts the composed persona still
-                        equals it byte for byte.
+                        test suite asserts yuzu.persona still equals it
+                        byte for byte.
   yuzu_personas.py      persona loader/composer + CLI.
   build_yuzu_model.py   generates Modelfile.yuzu from that prompt plus
                         the sampling settings, so they can't drift.
   Modelfile.yuzu        GENERATED. Never hand-edit.
   yuzu_prompt_eval.py   scores prompt compliance against the real
                         model. See Section 10.
+  YUZU_AB.py            runs two personas head to head and prints one
+                        comparison table. No arguments needed.
   yuzu_doctor.py        tap-to-run checkup for Pydroid. STANDALONE --
                         imports no other project file at module level,
                         so it can be downloaded on its own. Ghost works
@@ -217,13 +221,21 @@ behind it. If the two disagree, the code is right.
   JETSON_SETUP.md       setup runbook, PC first then Jetson.
   muto_leg_control.py   leg wrapper + tripod gait library + DummyBot
                         simulator. Untested on hardware.
+  muto_firstcontact.py  guided six-stage bring-up on real servos. Run
+                        this before any gait touches the chassis.
   yuzu_led_manager.py   the one LED loader. Zones + state profiles.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
-  readtest.py           smoke test that the config loads. Portable.
-  YUZU_TESTER.py          193 stdlib tests. `python YUZU_TESTER.py`. The
+  YUZU_TESTER.py        230 stdlib tests. `python YUZU_TESTER.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
+
+  (readtest.py is gone. It was a 20-line "does the JSON load" script
+  from before yuzu_led_controller.py existed, which now does the same
+  thing properly through the one loader. Nothing imported it and no
+  test covered it. Sections 7 and 9 below still describe fixing its
+  hardcoded Pydroid path -- that happened, and it is kept as the
+  record of the class of bug, not as a claim the file is still here.)
 
 ======================================================================
 ## 7. BUGS FOUND BY RUNNING THE CODE (all now fixed)
@@ -260,6 +272,33 @@ regression test in YUZU_TESTER.py named after it.
    and edits to yuzu_robot_config.json had no effect on it. It now
    resolves yuzu_robot_config.json relative to its own file, the
    same way readtest.py and yuzu_led_controller.py already did.
+
+6. The bring-up script raised its own safety limit on the way out.
+   muto_firstcontact.py clamps every angle to 15 degrees while it
+   checks servos one at a time, but its cleanup restored the limit to
+   90 BEFORE parking the legs. So aborting at stage 2 -- the stage
+   whose entire job is catching servo IDs wired differently from
+   LEG_SERVO_MAP -- commanded 60 degrees into a chassis that had just
+   proven it moves the wrong joints. Measured on DummyBot: 60 before,
+   15 after. Park first, restore after. The one exit path where the
+   clamp matters most was the one dropping it.
+
+7. Aliases that could never fire. ACTION_ALIASES mapped
+   "turn around" -> spin, but _stem_phrase drops "around" as filler,
+   so the phrase reached lookup_action as "turn" and the whitelist
+   answered first with a different gait. The table said one thing and
+   the robot did another, with nothing to say so. The dead entry is
+   gone and a test now walks the whole alias table asserting every
+   entry can actually be reached.
+
+8. Half the healthy replies were scored as drift. ReplyHealth failed
+   any reply containing an asterisk, and two in a row trim the
+   conversation -- but measurement put the asterisk rate at ~46% while
+   80-83% of replies moved fine, so history was being wiped roughly
+   every fifth turn over replies the robot handled perfectly.
+   _canonicalise already rewrites asterisks to brackets before they
+   enter history, which is what actually stops the drift snowball.
+   The veto is gone; asterisks are still counted and reported.
 
 Also addressed, not bugs exactly:
 

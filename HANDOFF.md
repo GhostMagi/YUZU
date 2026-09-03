@@ -36,8 +36,7 @@ Everything else she says goes to text-to-speech.
   hardware attached
 - Swappable personas: character text and body rules are separate files,
   composed at load time
-- 193 tests, ~18 seconds, all passing
-- 42 commits
+- 230 tests, ~18 seconds, all passing
 
 **Model:** `Llama-3.2-3B-Instruct-heretic-ablitered-uncensored` Q4_K_M
 (the "ablitered" misspelling is genuinely in the repo name), pulled via
@@ -76,11 +75,28 @@ works. Don't replace it with theory.
 
 ## What's left, in order
 
-**1. Test `yuzu4` (can be done on a phone, right now)**
-`personas/yuzu4.persona` is `yuzu2` plus one example. It tests a
-reproducible bug: a bare command like "Walk forward." produces zero
-movement — she *narrates* walking instead of doing it. Every example in
-the prompt is a question or a polite request; none is a flat order.
+**1. Score `yuzu5` against `yuzu4` on the laptop**
+```
+cd YUZU && git pull
+python3 YUZU_AB.py          # yuzu4 vs yuzu5, 12 replies each, one table
+```
+`yuzu4` is `yuzu2` plus one bare-command example, and it is what boots
+today (`LIVE_PERSONA` in `yuzu_personas.py`). It fixed a reproducible
+bug — told "Walk forward." she used to *narrate* walking instead of
+doing it, because every example in the prompt was a question or a
+polite request and none was a flat order. It held live, 4/4 replies
+moved.
+
+`yuzu5` is `yuzu4` trimmed 17% for latency, with the three character
+rules cut because the examples already demonstrate them. It has never
+been run against a model. If it wins, move `LIVE_PERSONA` and note it
+in `CLAUDE.md`; if it loses, `yuzu4` stays and yuzu5 is the record of
+what the trim cost.
+
+Watch `moves_at_all` and ignore a difference of one or two replies —
+at 12 replies each, one reply is 8.3 percentage points, and that is
+what made the yuzu2-vs-yuzu3 round look like a result when it wasn't.
+`YUZU_AB.py` prints that number under the table.
 
 **2. When the Jetson arrives** — follow `DEPLOY.md`. It's a `git clone`;
 the whole repo is standard library, nothing to install.
