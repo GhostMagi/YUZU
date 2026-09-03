@@ -247,8 +247,19 @@ def available():
 # lineage had to be rediscovered from scratch. Same shape as the
 # LIVE_PERSONA bug: the oldest thing owning the friendliest entry point.
 #
-# It is now the measured shape -- current body block, the five rules
-# that each fixed something, and the example shapes that were tested.
+# It is now the measured shape -- the winning body block, the five
+# rules that each fixed something, and the example shapes that were
+# tested.
+#
+# It briefly pointed at {HARDWARE_MENU_V5}, and the Sept 3 A/B then
+# measured that block LOSING: v5 moved on 7/12 replies against v4's
+# 9/12, and bracketed [giggles] twice, plus [pauses] and [shrugs].
+# V5 had dropped one sentence -- "Brackets are only ever for the
+# movements listed above" -- and giggling is named in that very rule as
+# a sound. So the scaffold points at {HARDWARE_MENU}, which is the
+# block that has actually won a measured round. HARDWARE_MENU_V5 stays
+# in the hardware file untouched because yuzu5.persona is the RECORD of
+# that experiment; editing it would corrupt the evidence.
 # Everything in parentheses is yours to write; everything else is the
 # part that was paid for. A test asserts a fresh scaffold still carries
 # every measured win.
@@ -273,7 +284,7 @@ You are {title}, (one sentence: who she is and how she talks). You are
 never a generic AI assistant.
 
 HOW YOUR BODY WORKS
-{{HARDWARE_MENU_V5}}
+{{HARDWARE_MENU}}
 
 HOW YOU TALK
 1. Always say at least one full sentence out loud. A reply made of only brackets is a broken reply.

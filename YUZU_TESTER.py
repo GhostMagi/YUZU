@@ -1084,6 +1084,11 @@ class TestPersonas(unittest.TestCase):
         self.assertNotIn("[winks]", prompt,
                          "the scaffold names the action that naming "
                          "measurably teaches")
+        # And the sentence whose absence measurably cost yuzu5 the
+        # round. The scaffold briefly pointed at the losing body block.
+        self.assertIn(TestYuzu5.SOUNDS_ENFORCEMENT, prompt,
+                      "a fresh persona would start from the body block "
+                      "that lost the Sept 3 A/B")
 
     def test_a_new_persona_is_addressed_by_its_own_name(self):
         # The eval's persona-baseline prompt used to be the literal
@@ -1703,6 +1708,26 @@ class TestYuzu5(unittest.TestCase):
             "User: Walk forward.",
     }
 
+    # Measured Sept 3, and NOT present in yuzu5 -- which is why yuzu5
+    # lost. It is pinned separately so TestYuzu5 can keep testing the
+    # arm as it was actually run, while everything built afterwards
+    # (yuzu6, and every scaffolded persona) is held to it.
+    SOUNDS_ENFORCEMENT = "Brackets are only ever for the movements listed above."
+
+    def test_v5_is_the_arm_that_lacked_the_sounds_enforcement_line(self):
+        """The record of why v5 lost, pinned so it can't be quietly
+        'fixed' and stop being evidence.
+
+        v5 rewrote the sounds rule and dropped its closing sentence.
+        Its dropped-action list came back [giggles] x2, [pauses],
+        [shrugs] -- and giggling is named in that very rule as a sound.
+        moves_at_all 58.3% vs v4's 75.0%, actions_runnable 33.3% vs
+        83.3%.
+        """
+        self.assertNotIn(self.SOUNDS_ENFORCEMENT, self.prompt())
+        self.assertIn(self.SOUNDS_ENFORCEMENT,
+                      yuzu_personas.load("yuzu4").prompt)
+
     def test_no_measured_win_was_lost_in_the_trim(self):
         prompt = self.prompt()
         for name, needle in self.MEASURED_WINS.items():
@@ -1772,6 +1797,59 @@ class TestYuzu5(unittest.TestCase):
         for word in ("wink", "hug", "wave", "smize", "nod"):
             self.assertNotIn(word, head,
                              f"'{word}' named in the rules -- pink-elephant trap")
+
+
+class TestYuzu6(unittest.TestCase):
+    """v6 = v5's rule trim with v4's BODY block put back. One variable
+    against v5, so if v6 scores like v4 the body rewrite is proven to
+    be what cost v5 the round."""
+
+    def prompt(self):
+        return yuzu_personas.load("yuzu6").prompt
+
+    def test_it_differs_from_v5_only_in_the_body_block(self):
+        """The whole point. Any other difference and the comparison
+        stops isolating anything."""
+        def split(p):
+            return (p[p.index("HOW YOUR BODY WORKS"):p.index("HOW YOU TALK")],
+                    p[p.index("HOW YOU TALK"):])
+        v5_body, v5_rest = split(yuzu_personas.load("yuzu5").prompt)
+        v6_body, v6_rest = split(self.prompt())
+        self.assertEqual(v5_rest, v6_rest,
+                         "v6 changed something outside the body block")
+        self.assertNotEqual(v5_body, v6_body)
+
+    def test_its_body_is_exactly_v4s(self):
+        def body(p):
+            return p[p.index("HOW YOUR BODY WORKS"):p.index("HOW YOU TALK")]
+        self.assertEqual(body(self.prompt()),
+                         body(yuzu_personas.load("yuzu4").prompt))
+
+    def test_the_sentence_v5_dropped_is_back(self):
+        self.assertIn(TestYuzu5.SOUNDS_ENFORCEMENT, self.prompt())
+
+    def test_no_measured_win_was_lost(self):
+        prompt = self.prompt()
+        for name, needle in TestYuzu5.MEASURED_WINS.items():
+            self.assertIn(needle, prompt, f"v6 dropped: {name}")
+
+    def test_it_still_buys_most_of_the_latency_win(self):
+        """Restoring the body gives back 259 of the 663 characters v5
+        cut. If the remainder isn't worth having, there's no reason to
+        run the arm at all."""
+        v4 = len(yuzu_personas.load("yuzu4").prompt)
+        v6 = len(self.prompt())
+        self.assertLess(v6, v4)
+        self.assertGreater((v4 - v6) / v4, 0.10,
+                           "less than a 10% cut isn't worth an eval run")
+
+    def test_it_is_the_candidate_arm(self):
+        self.assertEqual(YUZU_AB_ARMS()[1], "yuzu6")
+
+
+def YUZU_AB_ARMS():
+    import YUZU_AB
+    return YUZU_AB.ARMS
 
 
 class TestHistoricalCorpus(unittest.TestCase):
@@ -2522,12 +2600,15 @@ class TestABRunner(unittest.TestCase):
                 "dropped": Counter(), "failures": {}, "unanswered": []}
 
     def render(self, left, right):
+        return self.render_named("armA", left, "armB", right)
+
+    def render_named(self, left_key, left, right_key, right):
         import contextlib
         import io
         buffer = io.StringIO()
         with contextlib.redirect_stdout(buffer):
-            self.ab.compare("armA", left, "armB", right,
-                            {"armA": 3797, "armB": 3134})
+            self.ab.compare(left_key, left, right_key, right,
+                            {left_key: 3797, right_key: 3134})
         return buffer.getvalue()
 
     def test_one_reply_of_difference_is_called_a_coin_flip(self):
@@ -2565,6 +2646,41 @@ class TestABRunner(unittest.TestCase):
         for key in self.ab.ARMS:
             self.assertIn(key, yuzu_personas.available(),
                           f"YUZU_AB.ARMS names '{key}', which isn't a persona")
+
+    def test_a_win_for_the_live_arm_does_not_ask_for_a_confirm_run(self):
+        """Measured Sept 3: yuzu4 beat yuzu5 and the tool still said
+        "Confirm with --runs 3 before promoting it". The outcome was
+        "change nothing" -- there was nothing to promote, and following
+        that advice costs 72 replies to confirm the status quo. A
+        harness that wastes an hour is a harness that stops getting
+        run, which is the one failure this whole file guards against.
+        """
+        live = yuzu_personas.LIVE_PERSONA
+        buffer = self.render_named(live, self.arm(moves_at_all=11),
+                                   "candidate", self.arm(moves_at_all=6))
+        self.assertIn("CHANGE NOTHING", buffer)
+        self.assertNotIn("--runs 3", buffer)
+
+    def test_a_win_for_the_challenger_still_asks_for_a_confirm_run(self):
+        live = yuzu_personas.LIVE_PERSONA
+        buffer = self.render_named(live, self.arm(moves_at_all=6),
+                                   "candidate", self.arm(moves_at_all=11))
+        self.assertIn("--runs 3", buffer)
+        self.assertIn("LIVE_PERSONA", buffer)
+        self.assertNotIn("CHANGE NOTHING", buffer)
+
+    def test_both_arms_dropped_actions_are_shown(self):
+        """Printing only the challenger's dropped list made the
+        yuzu4-vs-yuzu5 round half-blind: yuzu5's list named the
+        mechanism but there was nothing to compare it against."""
+        left, right = self.arm(), self.arm()
+        left["dropped"] = Counter({"laughs": 1})
+        right["dropped"] = Counter({"giggles": 2, "shrugs": 1})
+        out = self.render(left, right)
+        self.assertIn("[laughs]", out, "the left arm's drops are invisible")
+        self.assertIn("[giggles]", out)
+        self.assertIn("armA: 1 action", out)
+        self.assertIn("armB: 3 action", out)
 
     def test_the_left_arm_is_whatever_is_live(self):
         # Otherwise the default A/B silently stops testing against the

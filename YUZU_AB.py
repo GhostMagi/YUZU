@@ -37,7 +37,7 @@ from yuzu_prompt_eval import (CHECKS, TEST_PROMPTS, evaluate,
 # winner becomes the base, so the left arm should normally be
 # yuzu_personas.LIVE_PERSONA and the right arm whatever is being tried
 # against it.
-ARMS = (yuzu_personas.LIVE_PERSONA, "yuzu5")
+ARMS = (yuzu_personas.LIVE_PERSONA, "yuzu6")
 
 # moves_at_all is the honest robot-facing number and everything else is
 # context. actions_runnable is an all() and no_asterisks measures a
@@ -118,14 +118,34 @@ def compare(left_key, left, right_key, right, chars):
             winner = right_key if headline > 0 else left_key
             print(f"{HEADLINE} favours {winner} by {abs(headline):.1f} points "
                   f"({abs(headline) / point:.1f} replies).")
-            print("Confirm with --runs 3 before promoting it. Then move")
-            print("LIVE_PERSONA in yuzu_personas.py and say so in CLAUDE.md.")
+            # Only a PROMOTION needs confirming. When the arm that
+            # already boots wins, the outcome is "change nothing", and
+            # telling someone to spend 72 more replies confirming the
+            # status quo is how a harness stops being run at all.
+            if winner == yuzu_personas.LIVE_PERSONA:
+                print(f"{winner} is already LIVE_PERSONA, so the outcome is")
+                print("CHANGE NOTHING -- no confirmation run needed. Record")
+                print(f"why {right_key} lost in CLAUDE.md and move on.")
+            else:
+                print("Confirm with --runs 3 before promoting it. Then move")
+                print("LIVE_PERSONA in yuzu_personas.py and say so in CLAUDE.md.")
 
-    dropped = right["dropped"]
-    if dropped:
-        print(f"\nactions {right_key} wrote that the whitelist dropped:")
+    # BOTH arms. Printing only the right one made the yuzu4-vs-yuzu5
+    # round half-blind: yuzu5's dropped list named the mechanism
+    # ([giggles], [pauses], [shrugs]) but there was nothing to compare
+    # it against, so "is that worse than normal?" needed another run.
+    # A comparison tool that shows one side is a comparison tool with a
+    # blind spot, which is the failure mode this whole file exists for.
+    for key, results in ((left_key, left), (right_key, right)):
+        dropped = results["dropped"]
+        total_dropped = sum(dropped.values())
+        print(f"\n{key}: {total_dropped} action(s) the whitelist dropped"
+              f"{' -- none' if not dropped else ':'}")
         for action, count in dropped.most_common(6):
             print(f"  {count:>3}x  [{action}]")
+    print("\nVocalizations ([giggles], [laughs]) and invented moves are the")
+    print("two categories here. Both fail safe -- speech survives -- but a")
+    print("rising count means the prompt stopped holding them back.")
 
 
 def main(argv):

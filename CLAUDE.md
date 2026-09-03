@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 232 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 242 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 232 tests pass on it. Getting it
+(that repo path is confirmed working). 242 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -63,12 +63,14 @@ Current lineage and status:
     yuzu    ORIGINAL, frozen, byte-pinned by a test. Never edit.
     yuzu2   measured base. 36 + 12 replies. moves_at_all 80.6-83.3%.
     yuzu3   asterisk experiment. CLOSED, no effect. Keep as the record.
-    yuzu4   yuzu2 + bare-command example. Held live, 4/4 moved.
-    yuzu5   yuzu4 trimmed 17% for latency. NOT yet run against a model.
+    yuzu4   yuzu2 + bare-command example. LIVE. Beat yuzu5 head to head.
+    yuzu5   the 17% trim. SCORED AND LOST, one sentence too far.
+    yuzu6   yuzu5's rule trim, yuzu4's body block back. NOT yet scored.
 
-So the base to build on is **yuzu4** until yuzu5 is scored, then
-whichever wins. When one is clearly ahead, say so here and retire the
-losers rather than leaving five files that all look current.
+So the base to build on is **yuzu4**. Scored against yuzu5 on Sept 3
+and won; yuzu6 is the next challenger. Losing arms stay as the record
+of what was tried -- that is what stopped yuzu5 being re-attempted from
+scratch and what will stop yuzu6 being mis-read later.
 
 **The promotion rule now has one line to move: `LIVE_PERSONA` in
 `yuzu_personas.py`.** It is `yuzu4`. The robot loop, `yuzu_brain
@@ -235,7 +237,7 @@ now the strongest argument against adding ANY further prompt rules.
 Every new line costs seconds on every turn, forever. If something must
 be added, take something else out.
 
-**yuzu5 — the trim, built Sept 3, NOT yet run against the model.**
+**yuzu5 — the trim, built Sept 3. SCORED AND LOST; see below.**
 3797 -> 3134 chars, a 17% cut, motivated entirely by the latency wall
 above. What changed:
 
@@ -257,14 +259,90 @@ Every one of the nine measured wins is kept and pinned by
 both wrappers, always-speak, always-move, brevity, answer-first,
 no-puppeteering, bare-command example.
 
+**yuzu5 SCORED AND LOST — Sept 3, laptop, 12 replies each. The trim
+took one sentence too many.**
+
+    check              yuzu4    yuzu5    counts        diff
+    moves_at_all       75.0%    58.3%    9/12 vs 7/12   -2 replies
+    actions_runnable   83.3%    33.3%   10/12 vs 4/12   -6 replies
+    no_asterisks       50.0%    25.0%    6/12 vs 3/12   -3 replies
+    one_per_bracket   100.0%    91.7%   12/12 vs 11/12  -1 reply
+    not_an_assistant   91.7%   100.0%   11/12 vs 12/12  +1 reply
+    has_dialogue      100.0%   100.0%   identical
+    brackets_balanced 100.0%   100.0%   identical
+    no_puppeteering   100.0%   100.0%   identical
+    spoken length      24w      26w
+
+**Do not read this the way yuzu3 was read.** There the whole result was
+ONE reply on one check and it was correctly called a coin flip. Here
+FOUR checks all move the same way, and there is a mechanism in the
+dropped-action list rather than just a number:
+
+    yuzu5 dropped: [giggles] x2, [pauses], [shrugs], [wink],
+                   [bounces up slightly], [jiggles legs back and forth]
+
+**The cause is one sentence.** HARDWARE_MENU_V5 rewrote the sounds rule
+and dropped its closing line:
+
+    "Brackets are only ever for the movements listed above."
+
+Giggling is named in that very rule as a sound. Without the closing
+line she bracketed it anyway, twice. `[pauses]` and `[shrugs]` are the
+same class: brackets used for things that are not movements.
+
+The trim was three separate cuts and only one was harmful. Of the 663
+characters, 493 came out of the RULES (the flirty / pink / mall rules,
+cut because the examples already teach them) and 259 out of the BODY.
+Nothing suggests the rule cut hurt. The body rewrite is the suspect and
+it is the only thing yuzu6 changes back.
+
+**REVISES AN EARLIER "SETTLED" CALL.** `[laughs]` / `[giggles]` in
+brackets was written up above as "a vocalization... judged to be at the
+3B ceiling and deliberately NOT chased further". That is now wrong. The
+rate is prompt-controllable: one sentence suppresses it, and removing
+that sentence roughly doubled it. Do not re-shelve this as a model
+limit.
+
+**yuzu6 — built Sept 3, NOT yet scored.** `sed` of yuzu5 with
+`{HARDWARE_MENU_V5}` swapped back to `{HARDWARE_MENU}`. Literally one
+token, so it differs from yuzu5 in the body block and nothing else, and
+a test asserts exactly that. 3393 chars: still an 11% cut on yuzu4, so
+404 of the 663 characters of latency win survive.
+
+If yuzu6 scores like yuzu4, the body rewrite is proven to be the whole
+cost and the rule trim is free. If yuzu6 also loses, the rule cut was
+not free either and yuzu4 stands as the end of the line.
+
+**A loss needs no confirmation run.** The promotion rule says confirm
+before PROMOTING. yuzu4 already boots, so the outcome here is "change
+nothing" and a `--runs 3` confirm would spend 72 replies proving the
+status quo. YUZU_AB.py said "confirm before promoting" anyway when the
+live arm won; that was a bug in the tool and it is fixed.
+
+**Two tool bugs this round exposed, both fixed:**
+
+- Only the CHALLENGER's dropped-action list was printed, so yuzu5's
+  `[giggles]` had nothing to be compared against. A comparison tool
+  with a one-sided view is the exact failure this file exists to
+  prevent. Both arms now print, with totals.
+- The scaffold for new personas pointed at `{HARDWARE_MENU_V5}` -- the
+  block that just lost. Every character created with `--new` would have
+  inherited the regression. Repointed at `{HARDWARE_MENU}`, and the
+  scaffold test now pins the sounds sentence. `HARDWARE_MENU_V5` itself
+  is left untouched in the hardware file: yuzu5.persona is the RECORD
+  of this experiment and editing it would corrupt the evidence.
+
 **What "tested in a sim" does and does not mean here.** Verified by
 machine: every example both speaks and moves, every phrase offered
 actually runs, all 13 whitelist entries are exposed, no impossible
 action is named in the rules, and the whole historical corpus -- 23
 real replies spanning v1 to v4 plus five pathological cases -- runs
 through the pipeline with zero crashes and zero markup reaching TTS.
-NOT verified: how the model responds to v5. Only the laptop or the
-Jetson can answer that. Run `--persona yuzu4` vs `--persona yuzu5`.
+NOT verified: how the model responds. Only the laptop or the Jetson
+can answer that -- and when it did, v5 lost. Every one of those
+machine checks passed on v5 and it still dropped 2 replies of movement,
+because none of them can see what a sentence's ABSENCE does to a 3B.
+That is the standing limit of "tested in a sim" here.
 
 **Eval cost on the laptop is real.** 36 replies took long enough that
 Ghost abandoned a run. Use `--runs 1` (12 replies) for direction; the
