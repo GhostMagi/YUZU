@@ -333,6 +333,20 @@ pip install piper-tts          # gives you a `piper` command
 sudo apt install -y alsa-utils # `aplay`, to actually hear it
 ```
 
+**If pip says site-packages isn't writable**, it quietly does a `--user`
+install instead and puts `piper` in `~/.local/bin`, which is often not
+on PATH. It warns about that in the middle of thirty lines of download
+output, so nobody sees it. Fix it once:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+`yuzu_voice.py` looks in `~/.local/bin` anyway, so it works either way
+— but other things you install with pip will hit the same wall, so it
+is worth doing properly.
+
 Then a voice. A voice is **two files** with the same stem, and Piper's
 error when the `.json` is missing does not mention the `.json`:
 

@@ -2845,13 +2845,48 @@ class TestVoice(unittest.TestCase):
 
     def test_saying_something_with_nothing_installed_is_false_not_a_crash(self):
         v = self.voice.Voice(model=None, piper=None)
+        v.piper, v.model = None, None       # regardless of this machine
         self.assertFalse(v.ready)
         self.assertFalse(v.say("Hey cutie!"))       # must not raise
         self.assertIn("piper", v.why_not())
 
+    def test_piper_is_found_where_a_user_pip_install_puts_it(self):
+        """pip falls back to --user whenever site-packages isn't
+        writable, drops the script in ~/.local/bin, and warns about
+        PATH in the middle of thirty lines of download output. Nobody
+        reads that. Reporting "piper isn't installed" when it is
+        sitting right there is a worse failure than looking harder."""
+        import os
+        import stat
+        fake_bin = Path(self.dir_for_bin()) / "bin"
+        fake_bin.mkdir(parents=True, exist_ok=True)
+        binary = fake_bin / "piper"
+        binary.write_text("#!/bin/sh\n")
+        binary.chmod(binary.stat().st_mode | stat.S_IXUSR)
+
+        with unittest.mock.patch.object(self.voice, "shutil") as shim:
+            shim.which.return_value = None       # not on PATH at all
+            with unittest.mock.patch.object(
+                    self.voice, "EXTRA_BIN_DIRS", (fake_bin,)):
+                self.assertEqual(self.voice.find_piper(), str(binary))
+
+    def test_a_genuinely_absent_piper_still_reads_as_none(self):
+        with unittest.mock.patch.object(self.voice, "shutil") as shim:
+            shim.which.return_value = None
+            with unittest.mock.patch.object(
+                    self.voice, "EXTRA_BIN_DIRS", (Path("/nope/nowhere"),)):
+                self.assertIsNone(self.voice.find_piper())
+
+    def dir_for_bin(self):
+        import tempfile
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        return holder.name
+
     def test_why_not_names_the_first_missing_piece(self):
         v = self.voice.Voice(model="/tmp/x.onnx", piper=None)
-        self.assertIn("piper isn't on PATH", v.why_not())
+        v.piper = None                      # even if one was found here
+        self.assertIn("pip install piper-tts", v.why_not())
 
     def test_a_bad_voice_override_says_both_files_are_needed(self):
         # Piper's own error when the .json is missing does not mention

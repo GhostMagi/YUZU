@@ -126,9 +126,36 @@ def for_speech(text: str) -> str:
 # Finding Piper and a voice
 # ---------------------------------------------------------------------
 
+# Where pip puts a script when it does a --user install, which is what
+# it silently falls back to whenever site-packages isn't writable. It
+# prints a warning about PATH in the middle of thirty lines of download
+# output, so in practice nobody sees it and the binary looks missing
+# when it is sitting right there.
+EXTRA_BIN_DIRS = (
+    Path.home() / ".local/bin",
+    Path("/usr/local/bin"),
+    Path("/opt/piper"),
+)
+
+
 def find_piper():
-    """The piper executable, or None."""
-    return shutil.which("piper")
+    """The piper executable, or None.
+
+    PATH first, then the places a --user pip install actually lands.
+    Telling someone piper isn't installed when it is, is a worse
+    failure than not looking hard enough.
+    """
+    found = shutil.which("piper")
+    if found:
+        return found
+    for directory in EXTRA_BIN_DIRS:
+        candidate = directory / "piper"
+        try:
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+        except OSError:
+            continue
+    return None
 
 
 def find_voice():
@@ -223,8 +250,9 @@ class Voice:
     def why_not(self):
         """One line saying what's missing, and how to get it."""
         if not self.piper:
-            return ("piper isn't on PATH -- see JETSON_SETUP.md, "
-                    "'Giving her a voice'")
+            return ("piper isn't installed, or isn't anywhere findable. "
+                    "Try:  pip install piper-tts  "
+                    "(then check ~/.local/bin is on your PATH)")
         if not self.model:
             return (f"no Piper voice found. Download one (.onnx AND "
                     f".onnx.json) into {HERE / 'voices'}, or set "
