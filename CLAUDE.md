@@ -48,7 +48,25 @@ her. The rule is about the CHASSIS FINISH, not her taste.
 
 `personas/yuzu.persona` is the ORIGINAL, extensively tested by Ghost.
 Do not edit it — a test asserts it stays byte-identical to
-`personas/_golden_yuzu_v1.txt`. Iterate on `personas/yuzu2.persona`.
+`personas/_golden_yuzu_v1.txt`.
+
+**Promotion rule: the measured winner becomes the base.** Ghost's call,
+Sept 3, and it should stay the policy. Build the next variant on
+whichever version last scored best, don't keep forking from an old one.
+That instruction used to say "iterate on yuzu2" and was already stale
+by two versions -- following it would have forked the lineage.
+
+Current lineage and status:
+
+    yuzu    ORIGINAL, frozen, byte-pinned by a test. Never edit.
+    yuzu2   measured base. 36 + 12 replies. moves_at_all 80.6-83.3%.
+    yuzu3   asterisk experiment. CLOSED, no effect. Keep as the record.
+    yuzu4   yuzu2 + bare-command example. Held live, 4/4 moved.
+    yuzu5   yuzu4 trimmed 17% for latency. NOT yet run against a model.
+
+So the base to build on is **yuzu4** until yuzu5 is scored, then
+whichever wins. When one is clearly ahead, say so here and retire the
+losers rather than leaving five files that all look current.
 
 Ghost's method is A/B testing in PocketPal and sending screenshots.
 It works. Score them against the real parser rather than eyeballing —
