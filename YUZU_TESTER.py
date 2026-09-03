@@ -674,7 +674,16 @@ class TestBrain(BrainTestCase):
     def test_missing_model_names_the_fix(self):
         with self.assertRaises(BrainError) as ctx:
             self.brain(model="not-a-real-model").check()
-        self.assertIn("ollama create", str(ctx.exception))
+        message = str(ctx.exception)
+        # The message has to name the model that is actually missing and
+        # the persona actually loaded. It used to hardcode "ollama
+        # create yuzu -f Modelfile.yuzu", which points at the wrong
+        # thing the moment the main character changes or a second robot
+        # exists -- at exactly the moment someone is already stuck.
+        self.assertIn("not-a-real-model", message)
+        self.assertIn("build_yuzu_model.py", message)
+        self.assertIn(yuzu_personas.LIVE_PERSONA, message)
+        self.assertNotIn("Modelfile.yuzu", message)
 
     def test_unreachable_ollama_names_the_fix(self):
         # Port 1 is reserved and never listening.
@@ -1042,6 +1051,53 @@ class TestPersonas(unittest.TestCase):
                     yuzu_personas.scaffold("saki")      # no silent overwrite
             finally:
                 yuzu_personas.PERSONA_DIR = real
+
+    def test_a_new_persona_starts_from_the_measured_prompt(self):
+        """Pivoting to a different main character must not restart the
+        lineage at v1.
+
+        The scaffold was built on {HARDWARE} and {DIALOGUE_RULE} -- the
+        v1 blocks. That is the 20% action hit rate, no movement rule at
+        all (the rule that took moves_at_all from 50% to 100%), and a
+        "Wrong: [winks]" example that measurably taught [winks] in 3 of
+        4 live replies. Every measured win would have had to be
+        rediscovered by whoever got bored of Yuzu.
+
+        This reuses TestYuzu5's own pins, so the two can't drift: if a
+        win is ever added there, a scaffold that lacks it fails here.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            staged = Path(tmp) / "personas"
+            shutil.copytree(yuzu_personas.PERSONA_DIR, staged)
+            real = yuzu_personas.PERSONA_DIR
+            yuzu_personas.PERSONA_DIR = staged
+            try:
+                yuzu_personas.scaffold("saki")
+                prompt = yuzu_personas.load("saki").prompt
+            finally:
+                yuzu_personas.PERSONA_DIR = real
+
+        for name, needle in TestYuzu5.MEASURED_WINS.items():
+            self.assertIn(needle, prompt,
+                          f"a fresh persona would start without: {name}")
+        # And nothing from v1's body block, which is what it used to get.
+        self.assertNotIn("[winks]", prompt,
+                         "the scaffold names the action that naming "
+                         "measurably teaches")
+
+    def test_a_new_persona_is_addressed_by_its_own_name(self):
+        # The eval's persona-baseline prompt used to be the literal
+        # "Hey Yuzu, what's up?", so every non-Yuzu arm was scored on a
+        # turn that called it by the wrong character's name.
+        class FakePersona:
+            name = "Saki"
+        prompts = prompt_eval.prompts_for(FakePersona())
+        self.assertIn("Hey Saki, what's up?", prompts)
+        self.assertNotIn("Hey Yuzu, what's up?", prompts)
+        self.assertEqual(len(prompts), len(prompt_eval.TEST_PROMPTS))
+        # No persona at all (a raw system_prompt) must still work.
+        self.assertTrue(all("{name}" not in p
+                            for p in prompt_eval.prompts_for(None)))
 
 
 # Real replies captured from Llama-3.2-3B-heretic in PocketPal. Actual

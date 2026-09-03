@@ -33,7 +33,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 230 tests, ~18 seconds
+python YUZU_TESTER.py         # 232 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -80,7 +80,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 230 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 232 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -148,6 +148,13 @@ percentage points, because every difference in the yuzu2-vs-yuzu3 round
 turned out to be a single reply and looked like a result until it was
 counted. If a candidate wins, move `LIVE_PERSONA` and record it in
 `CLAUDE.md`.
+
+**Pivoting to a different main character** is `python yuzu_personas.py
+--new <name>`, edit the file it writes, then move `LIVE_PERSONA`. The
+scaffold starts from the measured prompt, so a new character inherits
+all nine proven wins instead of restarting the lineage. Full walkthrough
+of what you keep and what you rewrite is in
+[PERSONA_SWITCHING.md](PERSONA_SWITCHING.md).
 
 Two characters are built on the Muto S2 today: **Yuzu** (gyaru, hot
 pink, hype) and **Coco** (kuudere, cold blue, deadpan). Switching

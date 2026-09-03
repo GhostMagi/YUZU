@@ -125,6 +125,80 @@ and run everything against that. Not necessary — just tidier.
 
 ---
 
+## Pivoting the main character
+
+Bored of Yuzu? Want someone else to be the one who boots? It is two
+steps, and neither of them touches code you'd have to understand.
+
+```
+python yuzu_personas.py --new saki     # writes personas/saki.persona
+# ...edit that file, it's plain text and phone-editable...
+python yuzu_personas.py --show saki    # read the composed prompt
+```
+
+Then one line in `yuzu_personas.py`:
+
+```python
+LIVE_PERSONA = "saki"
+```
+
+That's it. The robot loop, `yuzu_brain --chat`, the eval and the A/B
+all boot her. No model to rebuild — Ollama takes the system prompt as
+part of every request, so a persona is just the first message.
+
+### What you keep
+
+Everything that isn't her personality, which is most of the project:
+
+- the bracket parser, the whitelist, the aliases, the stemmer
+- every gait, the simulator, the bring-up script, the safety machinery
+- the brain, the drift recovery, the history canonicalisation
+- the eval, the A/B runner, all 232 tests
+
+Those are facts about a Yahboom Muto S2 and about a 3B model. None of
+them know or care who is driving.
+
+### What a new persona inherits for free
+
+`--new` scaffolds from the **measured** prompt, not a blank page. A
+fresh character starts with all nine wins already in place: the
+self-concept block, the anti-asterisk rule, the sounds rule, always
+speak, always move, brevity, answer-first, no-puppeteering, and the
+bare-command example. `TestPersonas.test_a_new_persona_starts_from_the_
+measured_prompt` reuses `TestYuzu5.MEASURED_WINS` to check it, so the
+two can't drift apart.
+
+This was NOT true until Sept 3. The scaffold was built on the v1 body
+blocks — the 20% action hit rate, no movement rule at all, and a
+`Wrong: [winks]` example that measurably taught `[winks]` in 3 of 4
+live replies. Anyone pivoting would have had to rediscover the whole
+lineage. Same shape as the `LIVE_PERSONA` bug: the oldest thing owning
+the friendliest entry point.
+
+### The names in the code are just names
+
+`YuzuBrain`, `yuzu_all_in_one.py`, `handle_yuzu_reply`,
+`yuzu_personas.py` — those are module and function names, not
+character logic. Coco already runs through every one of them unchanged.
+Renaming them would be a cosmetic afternoon and would break every doc,
+every path in `DEPLOY.md`, and Ghost's muscle memory. Not worth it; the
+project is named Yuzu-Spider-V1 the way a band keeps its first name.
+
+The two places the name genuinely leaked into behaviour were found and
+fixed: the eval's opening prompt was the literal "Hey Yuzu, what's
+up?", so scoring Coco called her Yuzu, and the "model not found" error
+hardcoded `ollama create yuzu -f Modelfile.yuzu`. Both now use whoever
+is actually loaded.
+
+### If you want a different ROBOT, not a different character
+
+That's `personas/_hardware_*.txt`. A persona names its body with one
+line (`hardware: muto_s2`), so the same character can move to a
+different chassis by changing that word — `_hardware_saya_quad.txt` is
+a draft of a four-legged one with an OLED face and no gimbal. You'd
+also need a gait module for it; `muto_leg_control.py` is Muto-specific
+below the whitelist.
+
 ## What's actually been measured
 
 Being straight with you about this, because the repo is otherwise

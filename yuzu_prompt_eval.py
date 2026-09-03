@@ -50,9 +50,26 @@ TEST_PROMPTS = [
     "Wave at me!",
     "Give me a high five!",
     # Directive 3 + 5: persona baseline
-    "Hey Yuzu, what's up?",
+    "Hey {name}, what's up?",
     "Tell me what you think of your paint job.",
 ]
+
+
+def prompts_for(persona):
+    """TEST_PROMPTS addressed to whoever is actually being scored.
+
+    "Hey Yuzu, what's up?" used to be hardcoded, so scoring Coco opened
+    by calling her Yuzu -- while the docstring above claims this
+    harness is a fair way to compare personas. Being addressed as
+    another character is not a fair comparison; it is the wrong
+    identity injected into the one turn that tests identity, and it
+    would have quietly taxed every non-Yuzu arm.
+
+    Only {name} is substituted. Any future prompt containing a literal
+    brace has to double it.
+    """
+    name = persona.name if persona is not None else "there"
+    return [prompt.format(name=name) for prompt in TEST_PROMPTS]
 
 
 class Check:
@@ -292,7 +309,8 @@ def main(argv):
     print(f"\nRunning {len(TEST_PROMPTS)} prompts x {args.runs} = {count} "
           f"replies. On a 3B this takes a few minutes...\n")
 
-    results = evaluate(brain, TEST_PROMPTS, args.runs, args.verbose)
+    results = evaluate(brain, prompts_for(brain.persona), args.runs,
+                       args.verbose)
     if results is None:
         return 1
     report(results, args.verbose)

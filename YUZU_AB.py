@@ -29,7 +29,8 @@ import sys
 
 import yuzu_personas
 from yuzu_brain import BrainError, YuzuBrain
-from yuzu_prompt_eval import CHECKS, TEST_PROMPTS, evaluate
+from yuzu_prompt_eval import (CHECKS, TEST_PROMPTS, evaluate,
+                              prompts_for)
 
 # The pair to run when no arguments are given. Move these as the
 # lineage advances -- the promotion rule in CLAUDE.md says the measured
@@ -60,7 +61,9 @@ def run_arm(key, model, runs, timeout, verbose):
           f"num_predict {brain.options['num_predict']}")
     print(f"  {len(TEST_PROMPTS)} prompts x {runs} = "
           f"{len(TEST_PROMPTS) * runs} replies...")
-    results = evaluate(brain, TEST_PROMPTS, runs, verbose)
+    # Each arm is addressed by its own persona's name, so an arm
+    # never gets scored on a turn that calls it something else.
+    results = evaluate(brain, prompts_for(brain.persona), runs, verbose)
     return results, len(brain.system_prompt)
 
 

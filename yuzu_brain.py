@@ -283,10 +283,15 @@ class YuzuBrain:
         models = self.available_models()
         if not any(m == self.model or m.startswith(self.model + ":")
                    for m in models):
+            # Name the model that is actually missing, not "yuzu". A
+            # pivot to another main character, or a second robot, makes
+            # a hardcoded fix instruction point at the wrong thing at
+            # exactly the moment someone is stuck.
             raise BrainError(
                 f"Ollama is running, but no model named '{self.model}'.\n"
                 f"  Pulled models: {', '.join(models) or '(none)'}\n"
-                f"  Build Yuzu:    ollama create yuzu -f Modelfile.yuzu\n"
+                f"  Build it:  python build_yuzu_model.py --persona "
+                f"{self.persona.key if self.persona else '<key>'} --create\n"
                 f"  Or point at another:  export YUZU_MODEL=<name>"
             )
         return True

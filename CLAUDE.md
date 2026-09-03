@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 230 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 232 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 230 tests pass on it. Getting it
+(that repo path is confirmed working). 232 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -325,6 +325,44 @@ about. My world is this room," and the gyaru stopped wanting to go to
 the mall. Movement stays whitelisted; imagination is free and belongs
 in the sentence, never in brackets. Don't put character stances in
 `_hardware_*.txt` — that file is for servos.
+
+## Pivoting the main character
+
+Ghost asked (Sept 3) how hard it would be to swap Yuzu out for a
+different main persona. Answer: one new file plus one line
+(`LIVE_PERSONA`), and PERSONA_SWITCHING.md walks it through. Checked by
+reading every runtime reference to the name, not by assuming.
+
+The check found the entry point was rotten. `yuzu_personas.TEMPLATE` --
+what `--new saki` writes -- was built on `{HARDWARE}` and
+`{DIALOGUE_RULE}`, the v1 blocks: 20% action hit rate, NO movement rule
+(the rule that took moves_at_all from 50% to 100%), and a
+`Wrong: [winks]` example, which is the exact pink-elephant pattern this
+repo measured putting `[winks]` in 3 of 4 live replies. Anyone pivoting
+would have restarted the lineage from the worst prompt in the repo.
+
+Fixed: the scaffold is now the measured shape (`{HARDWARE_MENU_V5}`,
+the five rules that each fixed something, the four tested example
+shapes), and `TestPersonas.test_a_new_persona_starts_from_the_measured
+_prompt` asserts a fresh scaffold carries every entry in
+`TestYuzu5.MEASURED_WINS` -- reusing that dict, so adding a win there
+automatically guards the scaffold too.
+
+Two other places the name leaked into BEHAVIOUR, both fixed:
+
+- `yuzu_prompt_eval.TEST_PROMPTS` opened with the literal "Hey Yuzu,
+  what's up?", so every Coco run was scored on a turn calling her Yuzu
+  -- while that file's docstring claims it is a fair way to compare
+  personas. `prompts_for(persona)` substitutes the real name now.
+- `YuzuBrain.check()` hardcoded `ollama create yuzu -f Modelfile.yuzu`
+  as the fix instruction, which points at the wrong thing the moment
+  the main character changes, at exactly the moment someone is stuck.
+
+Everything else carrying "Yuzu" -- `YuzuBrain`, `handle_yuzu_reply`,
+`run_yuzu_forever`, the filenames -- is a NAME, not character logic.
+Coco already runs through all of it unchanged. Don't rename them: it
+would be cosmetic, and it would break every doc path, DEPLOY.md, and
+Ghost's muscle memory for no behavioural gain.
 
 ## Bring-up safety
 
