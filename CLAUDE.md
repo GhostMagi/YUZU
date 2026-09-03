@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 277 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 279 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 277 tests pass on it. Getting it
+(that repo path is confirmed working). 279 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -607,10 +607,35 @@ heard and a test pins that they are untouched -- deleting character
 from a noise espeak says perfectly well would be the same mistake in
 the other direction. `--tryout <noise>` auditions them.
 
-**Her prompt teaches "Ehehe~, Haha!, Pfft, Ugh, Ooh".** Only Pfft is
-unsayable, so the rule stays as written -- but if that line is ever
-edited for some other reason, swapping Pfft for something with a vowel
-is a free improvement. A test pins that the other four survive.
+**Pfft is now GONE FROM THE PROMPT. Ghost's call, and the right one:**
+fix it at the source instead of handling the symptom downstream. It was
+taught in TWO places -- the shared sounds rule, and the "Say something
+silly!" example. The EXAMPLE is the stronger teacher; this repo has
+twice measured that examples beat rules.
+
+**Removing it from one place broke two archived A/Bs, and that is worth
+remembering.** The first pass edited `[HARDWARE_MENU]` and yuzu4's
+example only. Immediately, `test_v2_and_v3_differ_by_exactly_one_line`
+failed (2 lines differed) and `test_v4_is_otherwise_identical_to_v2`
+failed. The lineage's one-variable property depends on every arm
+sharing identical body text apart from its own deliberate variable, and
+a one-sided edit destroys it.
+
+`_hardware_muto_s2.txt`'s own header already said this: a body fix
+should "land on all of them at once instead of needing five identical
+edits". **A vocabulary fix is a body fix. It goes everywhere** -- all
+three menu blocks and all five persona examples. Then every archived
+comparison holds again, and a test now asserts NO persona anywhere
+teaches an unsayable sound.
+
+Prompt sizes after: yuzu4 3797 -> 3785.
+
+**The code drop stays too, as the net.** Same reasoning as the action
+whitelist surviving alongside a prompt that lists the legal moves: the
+prompt REDUCES, code GUARANTEES. `[winks]` is named as forbidden and
+still turned up in 3 of 4 live replies, and "Pfft" is ordinary English
+the base model knows whether or not it is taught. Four lines, no other
+dependency; drop them if Ghost would rather.
 
 **Audition spellings instead of guessing across round trips:**
 

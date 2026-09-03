@@ -158,6 +158,15 @@ _WHITESPACE = re.compile(r'\s+')
 # too, and the rest of the sentence survives intact. "PFFT! My camera
 # is shaking!" becomes "My camera is shaking!" -- her transcript still
 # prints the PFFT, because speak() prints the original.
+#
+# Ghost's call, Sept 3: Pfft is also GONE FROM THE PROMPT, which is the
+# better fix and the one that actually reduces how often it shows up.
+# This stays as the net, for the same reason the action whitelist stays
+# even though the prompt lists the legal moves: the prompt REDUCES,
+# code GUARANTEES. [winks] is named as forbidden and still turned up in
+# 3 of 4 live replies -- "Pfft" is ordinary English the base model
+# knows with or without being taught it. Say the word and I'll pull
+# these four lines; nothing else depends on them.
 UNSAYABLE = ("pfft", "pft")
 _UNSAYABLE = re.compile(
     r'\b(?:' + "|".join(UNSAYABLE) + r')\b[!?.,]*\s*', re.IGNORECASE)

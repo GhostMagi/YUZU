@@ -2891,19 +2891,49 @@ class TestVoice(unittest.TestCase):
             self.assertEqual(self.voice.sayable(noise), noise,
                              f"{noise} is being dropped but was never heard")
 
-    def test_her_prompt_taught_vocalizations_still_mostly_survive(self):
-        """The persona files teach "Ehehe~, Haha!, Pfft, Ugh, Ooh" as
-        the sounds to use. Only one of those is unsayable, so the rule
-        is still worth keeping as written -- but if that line is ever
-        edited for another reason, swapping Pfft for something with a
-        vowel is a free improvement."""
-        taught = ["Ehehe~", "Haha!", "Ugh", "Ooh"]
-        for sound in taught:
+    def test_the_live_prompt_never_teaches_a_sound_it_cannot_say(self):
+        """Ghost's call, and the right one: fix it at the source.
+
+        The prompt taught "Pfft" in TWO places -- the shared sounds
+        rule, and yuzu4's own "Say something silly!" example. The
+        example is the stronger teacher; this repo has twice measured
+        that examples beat rules. Both are gone from the live persona.
+
+        Generalised on purpose. Any future sound added to the prompt
+        gets checked against what the voice can actually produce, so
+        this can't come back by someone adding a nice-looking noise.
+        """
+        prompt = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).prompt
+        for noise in self.voice.UNSAYABLE:
+            self.assertNotIn(
+                noise.lower(), prompt.lower(),
+                f"the live persona teaches '{noise}', which this voice "
+                f"drops entirely -- pick a sound with a vowel in it")
+
+    def test_the_sounds_it_still_teaches_are_all_sayable(self):
+        # Ehehe~ and the tilde strip are already measured working.
+        for sound in ("Ehehe~", "Haha!", "Ugh", "Ooh"):
             self.assertTrue(self.voice.for_speech(sound).strip(),
-                            f"{sound} is taught by the prompt and would "
-                            f"be silent")
-        self.assertEqual(self.voice.for_speech("Pfft"), "",
-                         "Pfft is the one taught sound this voice can't make")
+                            f"{sound} is taught by the prompt but would "
+                            f"come out silent")
+
+    def test_no_persona_anywhere_teaches_an_unsayable_sound(self):
+        """Applied to the whole lineage, not just the live arm.
+
+        The first attempt removed Pfft from ONE body block and ONE
+        example, and immediately broke two archived A/Bs -- v2-vs-v3
+        stopped differing by exactly one line, and v4 stopped being
+        "v2 plus one example". The hardware file's own header says a
+        body fix should "land on all of them at once", and that lockstep
+        is precisely what keeps the closed comparisons one-variable.
+        A vocabulary fix is a body fix. It goes everywhere.
+        """
+        for key in yuzu_personas.available():
+            prompt = yuzu_personas.load(key).prompt.lower()
+            for noise in self.voice.UNSAYABLE:
+                self.assertNotIn(noise.lower(), prompt,
+                                 f"{key} teaches '{noise}', which the voice "
+                                 f"drops entirely")
 
     def test_single_capitals_and_normal_words_are_untouched(self):
         # "I" must not become "i", and ordinary Capitalised words are
