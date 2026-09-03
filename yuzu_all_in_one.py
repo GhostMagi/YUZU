@@ -41,6 +41,15 @@ try:
 except ImportError:
     yuzu_personas = None
 
+# Piper lives behind its own module for the same reason the gaits do:
+# it is the one real dependency in the project, and the phone has
+# neither the binary nor a voice file. Missing = she prints, exactly as
+# she did before there was a voice.
+try:
+    import yuzu_voice
+except ImportError:
+    yuzu_voice = None
+
 
 # ============================================================================
 # PART 0: HARDWARE BINDING
@@ -68,6 +77,7 @@ if legs:
         raise SystemExit(1)
 
 leds = LEDManager() if LEDManager else None
+voice = yuzu_voice.Voice() if yuzu_voice else None
 
 
 def set_led_state(state):
@@ -358,7 +368,16 @@ def split_reply(text: str) -> list:
 
 
 def speak(text: str):
-    print(f"TTS SAYS: \"{text}\"")   # <-- swap this line for your real TTS call
+    """Say one line out loud, and always print it.
+
+    The print stays even with Piper working. On a robot you are SSH'd
+    into from another room, the transcript is how you know what she
+    said when the speaker is out of earshot or the audio failed -- and
+    say() returning False is silent by design, because a conversation
+    that stops when the speaker breaks is worse than a silent one.
+    """
+    heard = voice.say(text) if (voice and voice.ready) else False
+    print(f"{'YUZU SAYS' if heard else 'TTS SAYS'}: \"{text}\"")
 
 
 def handle_yuzu_reply(raw_llm_output: str, interleave=True):
@@ -413,6 +432,21 @@ def apply_persona_look(persona):
             leds.apply_persona_colors(colors)
 
 
+def apply_persona_voice(persona):
+    """Let the loaded character set her own speaking speed.
+
+    Every persona file has carried piper_length_scale since the format
+    was written -- yuzu4 asks for 0.88, Coco for 1.08 -- and until
+    there was a voice, nothing read it. A kuudere should not talk at a
+    gyaru's pace.
+    """
+    if voice is None or persona is None:
+        return
+    scale = persona.settings.get("piper_length_scale")
+    if scale is not None:
+        voice.length_scale = scale
+
+
 def start_brain(persona_key=None):
     """Connect to Ollama once, at boot. Returns a short status string.
 
@@ -433,6 +467,7 @@ def start_brain(persona_key=None):
     brain.on_recover = _announce_recovery
     current_persona = candidate.persona
     apply_persona_look(current_persona)
+    apply_persona_voice(current_persona)
     who = current_persona.name if current_persona else "custom prompt"
     return f"{who} via Ollama, model '{brain.model}'"
 
@@ -470,6 +505,7 @@ def switch_persona(key):
     brain.on_recover = _announce_recovery
     current_persona = candidate.persona
     apply_persona_look(current_persona)
+    apply_persona_voice(current_persona)
     print(f"Now talking to {current_persona.name} "
           f"({current_persona.archetype}). History cleared.")
     return True
@@ -513,6 +549,11 @@ def run_yuzu_forever():
     print(f"brain: {brain_status}")
     print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
           f"leds: {'yuzu_led_manager' if leds else 'off'}")
+    if voice and voice.ready:
+        print(f"voice: piper, {voice.model.name}")
+    else:
+        reason = voice.why_not() if voice else "yuzu_voice.py not found"
+        print(f"voice: printing only ({reason})")
     banner = "!" * 58 if USE_HARDWARE else ""
     if banner:
         print(banner)
@@ -568,6 +609,10 @@ def run_yuzu_forever():
             else:
                 print(" no replies scored yet (echo stub, or nothing said)")
             print(f" motor faults: {len(motor_faults)}")
+            if voice and voice.failures:
+                print(f" voice failures: {len(voice.failures)}")
+                for code, lines in voice.failures[-2:]:
+                    print(f"   exit {code}: {' '.join(lines)}")
             for name, err in motor_faults[-3:]:
                 print(f"   {name}: {err}")
             print()

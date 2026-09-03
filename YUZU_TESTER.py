@@ -2754,6 +2754,188 @@ class TestABRunner(unittest.TestCase):
         self.assertEqual(self.ab.ARMS[0], yuzu_personas.LIVE_PERSONA)
 
 
+class TestVoice(unittest.TestCase):
+    """Piper, and specifically the text that reaches it.
+
+    The audio itself can't be tested from here -- no speaker, no piper
+    binary. What CAN be tested is everything up to the synthesiser, and
+    that is the part that had never been looked at: speak() was a
+    print(), so nothing had ever asked what actually comes out the end
+    of the pipeline.
+    """
+
+    def setUp(self):
+        import yuzu_voice
+        self.voice = yuzu_voice
+
+    # --- what reaches the synthesiser -----------------------------
+
+    def test_the_whole_reply_corpus_arrives_as_plain_speech(self):
+        """Replay every captured model reply and check what Piper would
+        be handed. This is the test that justifies the module."""
+        allowed = set(" .,!?'\"-:;()")
+        for raw in TestHistoricalCorpus.CORPUS:
+            said = yuzu.strip_actions(yuzu.normalize_actions(raw))
+            spoken = self.voice.for_speech(said)
+            for char in spoken:
+                self.assertTrue(
+                    char.isalnum() or char in allowed,
+                    f"{char!r} (U+{ord(char):04X}) would reach Piper "
+                    f"from: {raw!r}")
+
+    def test_the_tilde_on_her_laugh_is_removed(self):
+        # "Ehehe~" is real captured output and her signature laugh. The
+        # tilde is a written convention, not a sound.
+        self.assertEqual(self.voice.for_speech("Ehehe~ okay okay!"),
+                         "Ehehe okay okay!")
+        self.assertEqual(self.voice.for_speech("Woah~~~"), "Woah")
+
+    def test_a_bare_multiplication_sign_never_reaches_piper(self):
+        # normalize_actions deliberately leaves "2 * 3 * 4" alone -- the
+        # version that didn't ate the middle of the sentence. So the
+        # asterisks survive to here, and an asterisk is not a word.
+        self.assertNotIn("*", self.voice.for_speech("it's 2 * 3 * 4 babe"))
+        self.assertIn("babe", self.voice.for_speech("it's 2 * 3 * 4 babe"))
+
+    def test_emoji_are_dropped(self):
+        self.assertEqual(self.voice.for_speech("hey cutie 💅✨"), "hey cutie")
+
+    def test_all_caps_is_deliberately_left_alone(self):
+        """Pinned as a DECISION, not an oversight.
+
+        "OMG" and "PFFT" are how she talks. Some engines read capitals
+        as initialisms and some don't, and which one Piper does is a
+        fact nobody here has heard yet -- so it stays untouched until
+        the demo settles it. If this test ever changes, it should
+        change because someone listened.
+        """
+        self.assertEqual(self.voice.for_speech("MY. GOSH. hot pink!"),
+                         "MY. GOSH. hot pink!")
+
+    def test_nothing_to_say_stays_nothing(self):
+        for empty in ("", "   ", "~", "***", "  ~~ "):
+            self.assertEqual(self.voice.for_speech(empty), "")
+
+    # --- talking to piper without piper ---------------------------
+
+    def test_flag_detection_reads_pipers_own_help(self):
+        """Piper has shipped both --output_file and --output-file.
+        Guessing is an unrecognized-arguments error and silence."""
+        underscore = self.voice.detect_flags(
+            "  --model M  --output_file F  --length_scale L")
+        self.assertEqual(underscore["output"], "--output_file")
+        self.assertEqual(underscore["length"], "--length_scale")
+        hyphen = self.voice.detect_flags(
+            "  --model M  --output-file F  --length-scale L")
+        self.assertEqual(hyphen["output"], "--output-file")
+        self.assertEqual(hyphen["length"], "--length-scale")
+
+    def test_unreadable_help_falls_back_to_a_spelling_not_a_crash(self):
+        flags = self.voice.detect_flags("")
+        self.assertTrue(flags["output"].startswith("--output"))
+        self.assertTrue(flags["length"].startswith("--length"))
+
+    def test_the_command_only_sets_speed_when_a_persona_asked_for_one(self):
+        v = self.voice.Voice(model="/tmp/x.onnx", piper="/usr/bin/piper")
+        self.assertNotIn("--length_scale", " ".join(v.command("/tmp/o.wav")))
+        v.length_scale = 0.88
+        argv = v.command("/tmp/o.wav")
+        self.assertIn("0.88", argv)
+        self.assertIn("/tmp/x.onnx", argv)
+
+    def test_saying_something_with_nothing_installed_is_false_not_a_crash(self):
+        v = self.voice.Voice(model=None, piper=None)
+        self.assertFalse(v.ready)
+        self.assertFalse(v.say("Hey cutie!"))       # must not raise
+        self.assertIn("piper", v.why_not())
+
+    def test_why_not_names_the_first_missing_piece(self):
+        v = self.voice.Voice(model="/tmp/x.onnx", piper=None)
+        self.assertIn("piper isn't on PATH", v.why_not())
+
+    def test_a_bad_voice_override_says_both_files_are_needed(self):
+        # Piper's own error when the .json is missing does not mention
+        # the .json, which is a genuinely miserable half hour.
+        import os
+        with unittest.mock.patch.dict(
+                os.environ, {self.voice.VOICE_ENV: "/nope/missing.onnx"}):
+            with self.assertRaises(self.voice.VoiceError) as ctx:
+                self.voice.find_voice()
+        self.assertIn(".onnx.json", str(ctx.exception))
+
+    # --- wiring into the robot ------------------------------------
+
+    def test_the_import_is_optional_so_the_phone_still_runs(self):
+        """yuzu_voice is the project's only real dependency boundary.
+        If yuzu_all_in_one imports it at module level unguarded, the
+        whole robot stops booting in Pydroid."""
+        import ast
+        tree = ast.parse((Path(__file__).parent / "yuzu_all_in_one.py")
+                         .read_text())
+        guarded = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Try):
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Import):
+                        guarded.update(a.name for a in child.names)
+        self.assertIn("yuzu_voice", guarded,
+                      "yuzu_voice must be imported inside a try/except")
+
+    def test_speech_still_prints_when_the_voice_cannot_play(self):
+        # The transcript is how you know what she said when you are
+        # SSH'd in from another room.
+        import io, contextlib
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            yuzu.speak("Not much, just vibing!")
+        self.assertIn("Not much, just vibing!", buffer.getvalue())
+
+    def test_every_persona_sets_its_own_speaking_speed(self):
+        """piper_length_scale rode along in every persona file since
+        the format was written and nothing read it until now. If one
+        persona lacks it, switching to her silently keeps the previous
+        character's pace."""
+        for key in yuzu_personas.available():
+            self.assertIn("piper_length_scale",
+                          yuzu_personas.load(key).settings,
+                          f"{key} has no speaking speed")
+
+    def test_switching_persona_changes_the_speaking_speed(self):
+        v = self.voice.Voice(model="/tmp/x.onnx", piper="/usr/bin/piper")
+        real, yuzu.voice = yuzu.voice, v
+        try:
+            yuzu.apply_persona_voice(yuzu_personas.load("coco"))
+            coco = v.length_scale
+            yuzu.apply_persona_voice(yuzu_personas.load("yuzu4"))
+            self.assertNotEqual(coco, v.length_scale)
+            self.assertGreater(coco, v.length_scale,
+                               "the kuudere should speak slower than the gyaru")
+        finally:
+            yuzu.voice = real
+
+    def test_the_speaking_speed_is_not_sent_to_ollama(self):
+        # It's a Piper setting living in the same settings block as the
+        # sampling knobs. Leaking it into the model options would be a
+        # 400 from Ollama on an unknown parameter.
+        for key in yuzu_personas.available():
+            self.assertNotIn("piper_length_scale",
+                             yuzu_personas.load(key).options())
+
+    # --- the demo has to stay honest ------------------------------
+
+    def test_the_demo_lines_are_what_piper_would_really_receive(self):
+        """The demo exists so 'how does it sound' takes 30 seconds
+        instead of being guessed at. That only works if the lines are
+        the real post-pipeline text."""
+        for line in self.voice.DEMO_LINES:
+            self.assertNotIn("[", line, "a demo line still has a bracket")
+            self.assertTrue(self.voice.for_speech(line).strip())
+        joined = " ".join(self.voice.DEMO_LINES)
+        self.assertIn("~", joined, "no line exercises the tilde")
+        self.assertTrue(re.search(r'\b[A-Z]{2,}\b', joined),
+                        "no line exercises ALL-CAPS")
+
+
 class TestSourceHygiene(unittest.TestCase):
     """Things that are fine today and break on a newer Python.
 

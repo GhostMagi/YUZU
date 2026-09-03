@@ -33,7 +33,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 248 tests, ~18 seconds
+python YUZU_TESTER.py         # 266 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -80,7 +80,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 248 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 266 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -89,6 +89,7 @@ $400.
 | **The body** | |
 | `muto_firstcontact.py` | **Run this before any gait.** Guided bring-up, one joint at a time |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
+| `yuzu_voice.py` | Piper TTS. The project's one dependency boundary |
 | `yuzu_led_manager.py` | The one LED config loader (zones + states) |
 | `yuzu_led_controller.py` | Zone dump, front-end over `LEDManager` |
 | `yuzu_robot_config.json` | The one config file |
@@ -183,13 +184,22 @@ mic -> listen_and_transcribe()      [STUB: swap in Whisper]
     -> ask_yuzu_brain()             REAL: yuzu_brain.py -> Ollama
     -> normalize_actions()          stray *asterisks* -> [brackets]
     -> split_reply()                ordered speech/action parts
-         speech -> LED "speaking" -> speak()   [STUB: swap in Piper]
+         speech -> LED "speaking" -> speak()   REAL: yuzu_voice.py -> Piper
          action -> LED "moving"   -> whitelist -> muto_leg_control gait
     -> LED "idle"
 ```
 
-Two STUBs left: mic in, audio out. The brain is real. If Ollama isn't
-running, the loop still boots and says so instead of crashing.
+One STUB left: the mic. The brain is real, and so is her voice — Piper
+if it's installed, printing if it isn't. If Ollama isn't running the
+loop still boots and says so instead of crashing.
+
+```
+python3 yuzu_voice.py --check   # what's installed
+python3 yuzu_voice.py           # hear her say real captured replies
+```
+
+Setup is in [JETSON_SETUP.md](JETSON_SETUP.md) §6 and works on any
+laptop — Piper is software, no Jetson needed.
 
 ## The action whitelist
 

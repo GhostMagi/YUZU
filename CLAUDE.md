@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 248 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 266 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 248 tests pass on it. Getting it
+(that repo path is confirmed working). 266 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -524,6 +524,61 @@ Everything else carrying "Yuzu" -- `YuzuBrain`, `handle_yuzu_reply`,
 Coco already runs through all of it unchanged. Don't rename them: it
 would be cosmetic, and it would break every doc path, DEPLOY.md, and
 Ghost's muscle memory for no behavioural gain.
+
+## Her voice
+
+`yuzu_voice.py`, Sept 3. Piper TTS, and **the project's only dependency
+boundary**. Everything else is stdlib so it runs in Pydroid; Piper is a
+real binary and a real model file and neither exists on a phone. So the
+dep lives in one module, `yuzu_all_in_one.py` imports it in a
+try/except exactly like the gaits and the LEDs, and with Piper absent
+she prints as she always did. A test asserts that import stays guarded.
+
+It shells out to the `piper` binary with `subprocess` rather than
+importing a Python package, so the project still `pip install`s
+nothing.
+
+**`piper_length_scale` finally does something.** It has been in every
+persona file since the format was written and NOTHING read it. yuzu4
+runs 0.88, Coco 1.08. `apply_persona_voice()` is called from the same
+two places as `apply_persona_look()`, so switching character changes
+her voice with her, and a test asserts the kuudere speaks slower than
+the gyaru.
+
+**Piper's flag names are detected, not guessed.** It has shipped both
+`--output_file` and `--output-file`, and both `--length_scale` and
+`--length-scale`. Getting it wrong is an unrecognized-arguments error
+and silence. `detect_flags()` reads `piper --help` once and picks. When
+piper fails, its OWN stderr is surfaced -- it names a missing json or a
+bad model far better than anything guessed from here.
+
+**What the sanitiser does, derived from real data not imagination.**
+Replaying all 26 captured replies through the pipeline, exactly two
+non-word characters survive into speech, and `for_speech()` removes
+both:
+
+    'Ehehe~! DANCE DANCE!'  ->  'Ehehe! DANCE DANCE!'
+    "it's 2 * 3 * 4 babe"   ->  "it's 2 3 4 babe"
+
+The asterisks are from the multiplication case `normalize_actions`
+deliberately leaves alone, because the version that didn't ate the
+middle of the sentence.
+
+**ALL-CAPS is deliberately NOT touched, and that is pinned by a test.**
+"OMG", "PFFT", "MY. GOSH." are how she talks. Some engines read
+capitals as initialisms and some don't, and which one Piper does is a
+fact nobody in this project has heard yet. Guessing would be inventing
+one. `python3 yuzu_voice.py` speaks exactly those strings and says what
+to listen for; if it spells them out, THAT is the evidence to change it
+on. Same discipline as every prompt claim here.
+
+**Not verified: how any of it sounds.** There was no speaker and no
+piper binary on the machine this was written on. Everything up to the
+synthesiser is tested; the audio is not. Setup is JETSON_SETUP.md §6
+and works on the laptop -- no Jetson needed, Piper is software.
+
+**The remaining STUB is the mic.** Whisper is worth waiting for the
+Orin; TTS was not, because it cost nothing and needed nothing.
 
 ## Bring-up safety
 

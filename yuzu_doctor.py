@@ -78,6 +78,7 @@ EXPECTED = {
     "yuzu_robot_config.json": "LED config",
     "muto_leg_control.py":    "leg gaits + simulator",
     "muto_firstcontact.py":   "guided first bring-up on real servos",
+    "yuzu_voice.py":          "Piper TTS (her voice)",
     "yuzu_led_manager.py":    "LED manager",
     "YUZU_TESTER.py":         "the test suite",
     "yuzu_prompt_eval.py":    "prompt scoring",

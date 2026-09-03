@@ -321,7 +321,57 @@ Jetson prints a Jetson-only section: power mode, RAM, what the swap is
 sitting on, and which of the settings above are actually set in the
 service. It reads files only — no `sudo`, nothing that can hang.
 
-### 6. Piper
+### 6. Piper — giving her a voice
+
+Works on the laptop too, and there is no reason to wait for the Jetson:
+Piper is software, the laptop has speakers, and this is the half of
+audio that costs nothing. (Whisper, the listening half, is worth
+waiting for the Orin.)
+
+```bash
+pip install piper-tts          # gives you a `piper` command
+sudo apt install -y alsa-utils # `aplay`, to actually hear it
+```
+
+Then a voice. A voice is **two files** with the same stem, and Piper's
+error when the `.json` is missing does not mention the `.json`:
+
+```bash
+mkdir -p ~/YUZU/voices && cd ~/YUZU/voices
+BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium
+wget $BASE/en_US-amy-medium.onnx
+wget $BASE/en_US-amy-medium.onnx.json
+```
+
+If those 404, browse **huggingface.co/rhasspy/piper-voices** and take
+any `en_US` voice — grab the `.onnx` AND the `.onnx.json` next to it.
+`amy` is a reasonable starting point for the gyaru; `lessac` is
+flatter and suits Coco better. It's a taste call, try a few.
+
+Check it and hear it:
+
+```bash
+cd ~/YUZU
+python3 yuzu_voice.py --check   # what's found, and the exact command
+python3 yuzu_voice.py           # say real captured replies out loud
+```
+
+The demo speaks lines chosen for what's most likely to come out wrong,
+and tells you what to listen for — the tilde on `Ehehe~`, whether
+ALL-CAPS like `MY. GOSH.` gets spelled out letter by letter, and
+whether her speed is right.
+
+**Speed is per persona.** `piper_length_scale` in the `.persona` file:
+yuzu4 runs 0.88 (a little quick, suits the hype), Coco runs 1.08
+(slower, deadpan). Lower is faster. Switching persona mid-conversation
+changes her voice with her.
+
+After that, `python3 yuzu_all_in_one.py` just talks. If Piper or the
+voice file is missing it prints her lines exactly as before — the boot
+line tells you which mode you're in.
+
+### 6b. Piper gotchas
+
 
 Piper needs **both** files per voice in the same folder — `.onnx` and
 `.onnx.json` — or it silently won't load. Voice speed is `length_scale`
