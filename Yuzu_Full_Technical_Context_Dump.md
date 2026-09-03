@@ -66,12 +66,13 @@ limitation, not something to keep chasing via prompt engineering.
 - Audio: originally spec'd as "USB mini speakerphone"; now leaning
   toward a sub-$25 ultra-compact USB conference speaker/mic puck for a
   lower-profile mount, plugged into the built-in USB hub.
-- Paint/aesthetic (FINAL, locked in): neon lime-green structural chassis
-  ("torso") with hot-pink lower leg struts -- nicknamed "cyberpunk
-  watermelon" / "toxic-neon gyaru vibe." Automotive-grade or Cerakote
-  paint. Pink LED underglow/trim runs on its OWN dedicated micro LiPo
-  battery + switch specifically to avoid voltage sag/noise on the main
-  servo serial bus.
+- Paint/aesthetic: NOT SPECIFIED HERE ON PURPOSE. The colour scheme is
+  Ghost's call and has changed more than once; pinning it in this file
+  just means the file goes stale. Automotive-grade or Cerakote paint,
+  process in paintstepslol.txt. What matters technically and does NOT
+  change with the colours: the LED underglow/trim runs on its OWN
+  dedicated micro LiPo battery + switch, specifically to keep voltage
+  sag and switching noise off the main servo serial bus.
 - Proposed accessories (not yet built): 3D printed pink cyber-cat ears
   with embedded RGB tips on the top deck, blinged-out phone charms/
   lanyards on front mounting points, a potential laser pointer clip on

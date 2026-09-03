@@ -36,7 +36,7 @@ it survives independently of any one chat.
 - has never used Python before this project; since then independently wrote and ran a working regex-based bracket-action parser on their phone (Z Flip 6, via Pydroid 3)
 - also uses Google Gemini alongside Claude, trading versioned "handoff notes" text files between the two AIs
 - confirmed hardware: 256GB NVMe SSD (or currently: both a 256GB and 128GB microSD card on hand), USB audio for mic+TTS, 18x 35KG serial bus servos, direct Python serial calls instead of ROS2
-- finalized Yuzu's paint scheme: neon lime-green chassis with hot-pink lower leg struts ("cyberpunk watermelon"), pink LED underglow on its own dedicated micro LiPo battery
+- chassis paint scheme is deliberately not recorded -- it has changed several times and is Ghost's call; what stays fixed is that the LED underglow runs on its own dedicated micro LiPo battery, to keep noise off the servo bus
 - has the real low-level servo API reference: g_bot.motor(servo_id, angle, runtime=100), torque/load-leg commands, 6-leg/18-servo ID mapping
 - revisiting Saya as a separate physical quadruped build: Sesame Robot framework, ESP32, 8x MG90S servos, 128x64 OLED reactive pixel face, Kuudere personality
 - Yuzu's spec now includes proposed accessories: 3D printed pink cyber-cat ears with RGB tips, phone charms/lanyards, a potential laser pointer clip on the camera gimbal

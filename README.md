@@ -4,8 +4,9 @@ A Yahboom Muto S2 hexapod (18-DOF, 6 legs) running a local Llama-3.2-3B
 persona named Yuzu on a Jetson Orin Nano. Fully offline: local STT, local
 LLM, local TTS, no cloud.
 
-Neon lime-green chassis, hot-pink leg struts, pink underglow. Cyberpunk
-watermelon.
+Paint scheme is Ghost's call and deliberately not pinned down in this
+repo -- see `paintstepslol.txt` for the prep process, which works for
+any colours.
 
 **Status:** brain works today on any PC. Chassis and LEDs are later.
 

@@ -33,6 +33,17 @@ missing **k, l, m, Enter and up-arrow**, so if the Bluetooth one is ever
 flat or absent: numpad Enter works, `Ctrl+P` is up-arrow in a terminal,
 and Tab completion covers the dead letters.
 
+**Don't record the chassis paint scheme anywhere.** Ghost has changed
+it repeatedly and asked (Sept 3) that it stay out of the repo, because
+every doc naming a colour goes stale the next time he changes his mind.
+paintstepslol.txt keeps the PREP PROCESS, which works for any colours.
+What does stay recorded is the electrical bit that doesn't change with
+the paint: LED trim runs on its own micro LiPo, off the servo bus.
+
+This does NOT mean stripping pink from Yuzu. Her liking hot pink is
+character, it lives in the persona files, and removing it would gut
+her. The rule is about the CHASSIS FINISH, not her taste.
+
 ## Prompt work
 
 `personas/yuzu.persona` is the ORIGINAL, extensively tested by Ghost.
