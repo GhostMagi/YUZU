@@ -3,6 +3,9 @@ Yuzu's voice -- Piper TTS, isolated behind its own module.
 
     python3 yuzu_voice.py            # say a few real replies out loud
     python3 yuzu_voice.py --check    # just report what's installed
+    python3 yuzu_voice.py --say "PFFT! hey cutie"   # test any line
+    python3 yuzu_voice.py --raw "pfft"              # skip the cleanup
+    python3 yuzu_voice.py --tryout pfft             # audition spellings
 
 THE DEPENDENCY BOUNDARY LIVES HERE, DELIBERATELY.
 
@@ -122,6 +125,55 @@ _EMOJI_AND_SYMBOLS = re.compile(
 _WHITESPACE = re.compile(r'\s+')
 
 
+# Vowel-less noises espeak-ng cannot phonemise, so it falls back to
+# spelling them letter by letter. MEASURED Sept 3: "PFFT!" came back
+# "Pee Eff Eff Tee" -- and it STILL did after being lowercased, which
+# is what ruled out capitalisation as the cause. A token with no vowel
+# has nothing for the letter-to-sound rules to bite on.
+#
+# The values here are spellings that DO have something to bite on. They
+# are the one thing in this file nobody has listened to yet:
+#     python3 yuzu_voice.py --tryout pfft
+# speaks the candidates so the right one gets picked by ear instead of
+# by me guessing twice in a row.
+# ONLY what has been heard to fail. "pfft" is measured. Everything
+# else stays out until someone listens, because a respelling for a
+# noise espeak already handles makes it WORSE, and this file has
+# already changed one thing on a hypothesis that turned out wrong.
+# Audition a candidate before adding it:  --tryout psh
+SAYABLE = {
+    "pfft": "puft",
+    "pft": "puft",
+}
+
+# Candidate spellings to audition for a noise, when the default is
+# wrong. Order is roughly "closest to the written form" first.
+# Candidates to audition. The unmapped ones are here so their CURRENT
+# sound can be checked before anything is done to them -- if espeak
+# already says "tsk" correctly, the right change is no change.
+TRYOUTS = {
+    "pfft": ["pfft", "puft", "pift", "puh", "pfff", "pshh"],
+    "psh": ["psh", "pish", "pshh", "pssh"],
+    "hmph": ["hmph", "humph", "hmmph"],
+    "tsk": ["tsk", "tisk", "tut"],
+    "shh": ["shh", "shush", "shhh"],
+    "grr": ["grr", "gurr", "grrr"],
+}
+
+_WORD = re.compile(r"[A-Za-z']+")
+
+
+def sayable(text: str) -> str:
+    """Respell noises espeak would otherwise spell out letter by letter.
+
+    Case-insensitive on the way in, and the replacement is used as
+    written -- these are pronunciation hints, not her actual words, and
+    speak() prints the original anyway.
+    """
+    return _WORD.sub(
+        lambda m: SAYABLE.get(m.group(0).lower(), m.group(0)), text)
+
+
 def unshout(text: str) -> str:
     """Lowercase shouted words, keep real initialisms capitalised.
 
@@ -148,6 +200,7 @@ def for_speech(text: str) -> str:
     text = _ASTERISK.sub(" ", text)       # a bare * is never a word
     text = _EMOJI_AND_SYMBOLS.sub(" ", text)
     text = unshout(text)                  # PFFT -> pfft, OMG stays OMG
+    text = sayable(text)                  # pfft -> something with a vowel
     return _WHITESPACE.sub(" ", text).strip()
 
 
@@ -313,9 +366,14 @@ class Voice:
             argv += [flags["length"], str(self.length_scale)]
         return argv
 
-    def say(self, text):
-        """Speak one line. Returns True if audio actually played."""
-        spoken = for_speech(text)
+    def say(self, text, clean=True):
+        """Speak one line. Returns True if audio actually played.
+
+        clean=False speaks the string exactly as given, which is how
+        `--raw` and `--tryout` audition a spelling without for_speech
+        rewriting it first.
+        """
+        spoken = for_speech(text) if clean else text.strip()
         if not spoken or not self.ready:
             return False
         wav = None
@@ -389,6 +447,18 @@ worth reporting.
 
 def _cli(argv):
     check_only = "--check" in argv
+    say_text = raw_text = tryout = None
+    for flag, target in (("--say", "say"), ("--raw", "raw"),
+                         ("--tryout", "tryout")):
+        if flag in argv:
+            index = argv.index(flag)
+            value = " ".join(argv[index + 1:]) if index + 1 < len(argv) else ""
+            if target == "say":
+                say_text = value
+            elif target == "raw":
+                raw_text = value
+            else:
+                tryout = value.strip().lower()
     voice = Voice()
 
     print("PIPER   ", voice.piper or "NOT FOUND")
@@ -403,6 +473,29 @@ def _cli(argv):
     print("FLAGS   ", voice.flags())
     print("COMMAND ", " ".join(voice.command("/tmp/example.wav")))
     if check_only:
+        return 0
+
+    if tryout is not None:
+        candidates = TRYOUTS.get(tryout, [tryout])
+        print(f"\nAuditioning {len(candidates)} spellings of '{tryout}'.")
+        print("Say which one sounded right -- that is the whole test.\n")
+        for candidate in candidates:
+            print(f"  {candidate}")
+            voice.say(candidate, clean=False)
+        print(f"\nCurrent mapping: {tryout} -> "
+              f"{SAYABLE.get(tryout, '(unmapped, said as written)')}")
+        return 0
+
+    if raw_text is not None:
+        print(f'raw (no cleanup): "{raw_text}"')
+        voice.say(raw_text, clean=False)
+        return 0
+
+    if say_text is not None:
+        cleaned = for_speech(say_text)
+        print(f'wrote : "{say_text}"')
+        print(f'saying: "{cleaned}"')
+        voice.say(say_text)
         return 0
 
     print(LISTEN_FOR)

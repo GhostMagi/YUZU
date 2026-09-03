@@ -2810,7 +2810,9 @@ class TestVoice(unittest.TestCase):
         So the decision changed, on evidence, exactly as that test said
         it should.
         """
-        self.assertEqual(self.voice.for_speech("PFFT! My camera!"),
+        # unshout() is the caps layer specifically. for_speech also
+        # respells the noise afterwards, which is a separate fix.
+        self.assertEqual(self.voice.unshout("PFFT! My camera!"),
                          "pfft! My camera!")
         self.assertEqual(self.voice.for_speech("MY. GOSH. SIX legs!"),
                          "my. gosh. six legs!")
@@ -2839,6 +2841,65 @@ class TestVoice(unittest.TestCase):
             self.assertEqual(self.voice.unshout(word), word.lower())
         for word in ("OMG", "OG"):
             self.assertEqual(self.voice.unshout(word), word)
+
+    def test_vowelless_noises_are_respelled_not_just_lowercased(self):
+        """MEASURED twice, and the second measurement is the useful one.
+
+        Round 1: "PFFT!" came back "Pee Eff Eff Tee". I blamed the
+        capitals and lowercased it.
+        Round 2: still "pee eff eff tee".
+
+        That rules capitalisation out. espeak-ng phonemises what it can
+        and SPELLS what it can't, and "pfft" has no vowel for the
+        letter-to-sound rules to bite on. Lowercasing a vowel-less
+        token changes nothing. The respelling is the actual fix.
+        """
+        self.assertNotEqual(self.voice.for_speech("PFFT!"), "pfft!",
+                            "lowercasing alone was measured NOT to work")
+        self.assertEqual(self.voice.for_speech("PFFT! My camera!"),
+                         "puft! My camera!")
+
+    def test_respelling_is_case_insensitive(self):
+        for written in ("pfft", "PFFT", "Pfft"):
+            self.assertIn("puft", self.voice.for_speech(written))
+
+    def test_every_respelling_has_a_vowel_to_pronounce(self):
+        """The whole point. A replacement with no vowel would get
+        spelled out exactly like the thing it replaced."""
+        for noise, replacement in self.voice.SAYABLE.items():
+            self.assertTrue(
+                set("aeiouy") & set(replacement.lower()),
+                f"{noise} -> {replacement!r} still has nothing to say")
+
+    def test_ordinary_words_are_not_respelled(self):
+        for word in ("hey", "pink", "spin", "Paris", "camera"):
+            self.assertEqual(self.voice.sayable(word), word)
+
+    def test_only_measured_noises_are_respelled(self):
+        """Respelling a noise espeak already says correctly makes it
+        WORSE. Only "pfft" has actually been heard to fail, so only
+        "pfft" is mapped. Everything else lives in TRYOUTS until
+        somebody listens -- this file has already changed one thing on
+        a hypothesis that turned out wrong.
+        """
+        self.assertEqual(set(self.voice.SAYABLE), {"pfft", "pft"},
+                         "a respelling was added without hearing it fail")
+        for noise in ("tsk", "shh", "grr", "hmph", "psh"):
+            self.assertEqual(self.voice.sayable(noise), noise,
+                             f"{noise} is being changed but was never heard")
+            self.assertIn(noise, self.voice.TRYOUTS,
+                          f"{noise} can't be auditioned")
+
+    def test_every_tryout_offers_the_current_mapping_as_a_candidate(self):
+        """--tryout exists so a spelling gets picked by ear instead of
+        guessed at twice in a row. It has to include what is currently
+        used, or there is nothing to compare against."""
+        for noise, candidates in self.voice.TRYOUTS.items():
+            current = self.voice.SAYABLE.get(noise)
+            if current:
+                self.assertIn(current, candidates,
+                              f"--tryout {noise} never plays the spelling "
+                              f"that is actually in use")
 
     def test_single_capitals_and_normal_words_are_untouched(self):
         # "I" must not become "i", and ordinary Capitalised words are

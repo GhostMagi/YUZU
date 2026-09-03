@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 271 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 277 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 271 tests pass on it. Getting it
+(that repo path is confirmed working). 277 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -568,11 +568,49 @@ middle of the sentence.
 tilde strip works -- "Ehehe~" came out as a laugh, not a symbol.
 
 **ALL-CAPS was left untouched with a test saying "change this when
-someone listens". Someone listened.** Ghost ran the demo: "PFFT!" came
-back **"Pee Eff Eff Tee"**. Piper spells capitals it can't pronounce.
+someone listens". Someone listened, twice, and the FIRST reading was
+wrong.**
 
-The fix is NOT blanket lowercasing, because two different things wear
-capitals in her voice:
+Round 1: "PFFT!" came back "Pee Eff Eff Tee". Diagnosed as "Piper
+spells out ALL-CAPS", and `unshout()` was written.
+Round 2, after lowercasing: **still "pee eff eff tee".**
+
+That rules capitalisation out as the cause. espeak-ng phonemises what
+it can and SPELLS what it can't, and "pfft" has NO VOWEL for the
+letter-to-sound rules to bite on. Lowercasing a vowel-less token
+changes nothing about how unpronounceable it is. Two variables were
+confounded in round 1 -- ALL-CAPS and vowel-less -- and the wrong one
+got changed.
+
+The fix is `sayable()`: respell the noise as something with a vowel in
+it. `pfft -> puft`. `speak()` prints the ORIGINAL, so her transcript
+still says PFFT.
+
+**Only "pfft" is mapped, and that restraint is pinned by a test.**
+Respelling a noise espeak already handles makes it worse, and this
+file has now changed one thing on a hypothesis that turned out wrong.
+`TRYOUTS` holds candidates for tsk / shh / grr / hmph / psh so their
+CURRENT sound can be heard before anything is done to them.
+
+**`unshout()` is now UNVERIFIED, not vindicated.** It was written for
+the wrong reason and no evidence says it helps. It also might: "MY.
+GOSH. SIX legs!" has never been listened to either way. It stays
+because it is harmless and might be right, and this is flagged so
+nobody later reads it as a measured win. Settle it with
+`--say "MY. GOSH. SIX legs!"` versus `--raw "MY. GOSH. SIX legs!"`.
+
+**Audition spellings instead of guessing across round trips:**
+
+    python3 yuzu_voice.py --say "PFFT! hey cutie"   # through for_speech
+    python3 yuzu_voice.py --raw "pfft"              # exactly as typed
+    python3 yuzu_voice.py --tryout pfft             # speak the candidates
+
+The `--raw` / `--say` pair is the diagnostic: same string, one through
+the cleanup and one around it. That is how you tell a for_speech bug
+from an espeak limit, and it costs ten seconds instead of a commit.
+
+If ALL-CAPS ever DOES turn out to matter, the fix is not blanket
+lowercasing, because two different things wear capitals in her voice:
 
     OMG, OG                          real initialisms. "oh em gee" IS
                                      how you say them. Keep the caps.
