@@ -33,7 +33,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 242 tests, ~18 seconds
+python YUZU_TESTER.py         # 248 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -80,7 +80,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 242 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 248 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 242 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 248 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 242 tests pass on it. Getting it
+(that repo path is confirmed working). 248 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -64,11 +64,15 @@ Current lineage and status:
     yuzu2   measured base. 36 + 12 replies. moves_at_all 80.6-83.3%.
     yuzu3   asterisk experiment. CLOSED, no effect. Keep as the record.
     yuzu4   yuzu2 + bare-command example. LIVE. Beat yuzu5 head to head.
-    yuzu5   the 17% trim. SCORED AND LOST, one sentence too far.
-    yuzu6   yuzu5's rule trim, yuzu4's body block back. NOT yet scored.
+    yuzu5   the 17% trim. Scored 7/12. CLOSED.
+    yuzu6   the trim with v4's body back. Scored 9/12. CLOSED.
 
-So the base to build on is **yuzu4**. Scored against yuzu5 on Sept 3
-and won; yuzu6 is the next challenger. Losing arms stay as the record
+THE TRIM LINE IS CLOSED. Not because the trims were proven harmful --
+they weren't, see the noise floor below -- but because the thing they
+existed to buy, they don't buy. Both spoke MORE per reply than yuzu4.
+
+So the base to build on is **yuzu4**. It has now outscored both
+challengers and nothing is queued against it. Losing arms stay as the record
 of what was tried -- that is what stopped yuzu5 being re-attempted from
 scratch and what will stop yuzu6 being mis-read later.
 
@@ -303,15 +307,94 @@ rate is prompt-controllable: one sentence suppresses it, and removing
 that sentence roughly doubled it. Do not re-shelve this as a model
 limit.
 
-**yuzu6 — built Sept 3, NOT yet scored.** `sed` of yuzu5 with
+**yuzu6 — built and scored Sept 3. CLOSED.** `sed` of yuzu5 with
 `{HARDWARE_MENU_V5}` swapped back to `{HARDWARE_MENU}`. Literally one
 token, so it differs from yuzu5 in the body block and nothing else, and
 a test asserts exactly that. 3393 chars: still an 11% cut on yuzu4, so
 404 of the 663 characters of latency win survive.
 
-If yuzu6 scores like yuzu4, the body rewrite is proven to be the whole
-cost and the rule trim is free. If yuzu6 also loses, the rule cut was
-not free either and yuzu4 stands as the end of the line.
+It scored 9/12 against yuzu4's 12/12 -- see the round below. The
+hypothesis did not survive: restoring the sentence did not restore the
+score. yuzu4 stands as the end of the line.
+
+**yuzu6 SCORED — Sept 3, same session. It lost too, and that is what
+exposed the real problem: THE HARNESS CANNOT SEE A 3-REPLY DIFFERENCE.**
+
+    check              yuzu4    yuzu6    counts        diff
+    moves_at_all      100.0%    75.0%   12/12 vs 9/12   -3 replies
+    no_asterisks       66.7%    33.3%    8/12 vs 4/12   -4 replies
+    actions_runnable   75.0%    41.7%    9/12 vs 5/12   -4 replies
+    one_per_bracket   100.0%    91.7%   12/12 vs 11/12  -1 reply
+    has_dialogue       91.7%    91.7%   identical
+    spoken length       24w      30w
+
+Now put yuzu4's TWO runs side by side. Same laptop, same model, same
+12 prompts, same everything -- the only thing that changed is which
+challenger it happened to be paired against:
+
+    check              run 1    run 2    swing
+    moves_at_all        9/12    12/12    3 replies  <-- the headline
+    no_asterisks        6/12     8/12    2 replies
+    actions_runnable   10/12     9/12    1 reply
+    has_dialogue       12/12    11/12    1 reply
+
+**An unchanged prompt swings three replies at n=12.** That is the same
+size as the gap we spent two rounds calling a result. So:
+
+- yuzu5's -2 replies: inside the noise.
+- yuzu6's -3 replies: exactly the noise floor.
+- Neither trim is PROVEN worse. Neither is proven equal either. At this
+  sample size the harness simply cannot tell, and no amount of staring
+  at the tables will change that.
+
+**CORRECTION to the yuzu5 entry above.** It says "Do not read this the
+way yuzu3 was read... FOUR checks all move the same way, and there is a
+mechanism". The mechanism reasoning was fair and the sentence
+hypothesis was worth testing -- but the confidence was not earned, and
+yuzu6 then restored that exact sentence and still scored 9/12. The
+sounds-sentence hypothesis is NOT SUPPORTED. Leave the yuzu5 numbers
+where they are; they are real. It is the reading of them that was
+overconfident.
+
+**WHAT ACTUALLY CLOSES THE TRIM LINE: spoken length, the one metric
+that does not wobble.**
+
+    yuzu4   run 1  24w      run 2  24w      <- identical across runs
+    yuzu5   26w
+    yuzu6   30w
+
+yuzu4 came back 24 and 24 while its headline swung three replies. That
+stability is what makes the length numbers worth something the movement
+numbers aren't. Both trims dropped the tail of the brevity rule --
+"You're talking to someone, not writing a post." -- and both got
+wordier, yuzu6 by a quarter.
+
+And that kills the whole point. The trim existed to cut latency. It
+saves 404 prompt characters, paid ONCE per turn and prefilled in a
+batch. It costs +6 generated words, paid ONE TOKEN AT A TIME, every
+turn. Generation is the expensive half. **A shorter prompt that
+produces longer replies is a latency loss wearing a latency win's
+clothes.**
+
+Add to that: the phone latency wall was the entire motivation, and the
+Orin removes it. Chasing 400 characters on a box that is about to be an
+order of magnitude faster is the wrong place to spend eval time.
+
+**So: yuzu4 stands. Don't build yuzu7 out of a smaller yuzu4.** If a
+future prompt change is worth testing, it should be one that adds or
+fixes a behaviour, not one that shortens.
+
+**Three fixes to YUZU_AB.py from this round:**
+
+- **The noise floor is now measured, not assumed.** It was declaring a
+  winner at 1.5 replies. `NOISE_FLOOR_REPLIES = 3`, cited to the two
+  yuzu4 runs, and stated in REPLIES so `--runs 3` genuinely lowers it
+  instead of just printing smaller numbers.
+- **Spoken length gets its own verdict.** If the arm with the shorter
+  prompt also has the longer replies, it says so and explains why that
+  is not a latency win. That is the check that would have closed this
+  line after ONE round instead of two.
+- Both arms' dropped-action lists print (was challenger-only).
 
 **A loss needs no confirmation run.** The promotion rule says confirm
 before PROMOTING. yuzu4 already boots, so the outcome here is "change

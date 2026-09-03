@@ -1843,8 +1843,11 @@ class TestYuzu6(unittest.TestCase):
         self.assertGreater((v4 - v6) / v4, 0.10,
                            "less than a 10% cut isn't worth an eval run")
 
-    def test_it_is_the_candidate_arm(self):
-        self.assertEqual(YUZU_AB_ARMS()[1], "yuzu6")
+    def test_it_is_closed_and_no_longer_the_default_candidate(self):
+        # yuzu6 scored 9/12 against yuzu4's 12/12 and is CLOSED. Leaving
+        # it as the default arm would make a bare YUZU_AB.py re-run a
+        # settled round for 15 minutes.
+        self.assertNotEqual(YUZU_AB_ARMS()[1], "yuzu6")
 
 
 def YUZU_AB_ARMS():
@@ -2611,17 +2614,71 @@ class TestABRunner(unittest.TestCase):
                             {left_key: 3797, right_key: 3134})
         return buffer.getvalue()
 
+    def test_a_three_reply_gap_is_inside_the_measured_noise_floor(self):
+        """The lesson that cost two eval runs to learn.
+
+        yuzu4 was run twice against different challengers, same laptop,
+        same model, same prompts, nothing changed -- and scored 9/12
+        then 12/12 on moves_at_all. A single unchanged prompt swings
+        three replies at n=12. This file used to declare a winner at
+        1.5, which is how yuzu5 and yuzu6 both got read as results.
+        """
+        out = self.render(self.arm(moves_at_all=12), self.arm(moves_at_all=9))
+        self.assertIn("noise floor", out.lower())
+        self.assertNotIn("favours", out)
+
+    def test_a_gap_bigger_than_the_floor_still_names_a_winner(self):
+        out = self.render(self.arm(moves_at_all=12), self.arm(moves_at_all=5))
+        self.assertIn("favours", out)
+
+    def test_the_floor_is_in_replies_so_it_scales_with_runs(self):
+        # Stated in replies, not points, so tripling --runs really does
+        # make the harness able to resolve smaller differences instead
+        # of just printing smaller-looking numbers.
+        self.assertEqual(self.ab.NOISE_FLOOR_REPLIES, 3)
+        big = self.arm()
+        big["total"] = 36
+        for check in prompt_eval.CHECKS:
+            big["passes"][check.name] = 36
+        other = dict(big, passes=Counter(big["passes"]))
+        other["passes"]["moves_at_all"] = 33      # 3 replies at n=36
+        import contextlib, io
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.ab.compare("armA", big, "armB", other,
+                            {"armA": 3797, "armB": 3134})
+        self.assertIn("8.3 points", buffer.getvalue(),
+                      "3 replies at n=36 should read as 8.3 points, not 25")
+
+    def test_a_shorter_prompt_with_longer_replies_is_flagged(self):
+        """The finding that actually closed the trim line: yuzu6 had
+        the shorter prompt AND spoke 6 more words per reply. Characters
+        are prefilled once; words are generated one at a time. That is
+        a latency loss wearing a latency win's clothes."""
+        left, right = self.arm(), self.arm()
+        left["lengths"] = [24] * 12
+        right["lengths"] = [30] * 12
+        out = self.render(left, right)     # armB has the shorter prompt
+        self.assertIn("SHORTER prompt and the LONGER", out)
+        self.assertIn("6 words more", out)
+
+    def test_a_small_length_difference_is_not_flagged(self):
+        left, right = self.arm(), self.arm()
+        left["lengths"] = [24] * 12
+        right["lengths"] = [26] * 12
+        self.assertNotIn("SHORTER prompt and the LONGER", self.render(left, right))
+
     def test_one_reply_of_difference_is_called_a_coin_flip(self):
         """The yuzu2-vs-yuzu3 lesson, enforced. Every difference in that
         round was one reply, which at n=12 is 8.3 points, and it read
         like a result until it was counted."""
         out = self.render(self.arm(moves_at_all=10), self.arm(moves_at_all=9))
         self.assertIn("ONE REPLY IS 8.3 POINTS", out)
-        self.assertIn("coin flip", out)
+        self.assertIn("noise floor", out.lower())
         self.assertNotIn("favours", out)
 
     def test_a_real_gap_names_the_winner_and_the_next_step(self):
-        out = self.render(self.arm(moves_at_all=6), self.arm(moves_at_all=11))
+        out = self.render(self.arm(moves_at_all=5), self.arm(moves_at_all=12))
         self.assertIn("favours armB", out)
         self.assertIn("--runs 3", out)
         self.assertIn("LIVE_PERSONA", out)
@@ -2641,6 +2698,15 @@ class TestABRunner(unittest.TestCase):
         out = self.render(self.arm(no_asterisks=3), self.arm(no_asterisks=11))
         self.assertIn("level", out)
         self.assertNotIn("favours", out)
+
+    def test_running_a_prompt_against_itself_is_the_no_candidate_default(self):
+        """With nothing queued, both arms are LIVE_PERSONA. That is not
+        a wasted run: it measures the noise floor, which is exactly what
+        two rounds of reading 3-reply gaps as results turned out to
+        need."""
+        arms = self.ab.ARMS
+        if arms[0] == arms[1]:
+            self.assertEqual(arms[0], yuzu_personas.LIVE_PERSONA)
 
     def test_the_default_arms_both_exist(self):
         for key in self.ab.ARMS:

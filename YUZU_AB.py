@@ -37,13 +37,45 @@ from yuzu_prompt_eval import (CHECKS, TEST_PROMPTS, evaluate,
 # winner becomes the base, so the left arm should normally be
 # yuzu_personas.LIVE_PERSONA and the right arm whatever is being tried
 # against it.
-ARMS = (yuzu_personas.LIVE_PERSONA, "yuzu6")
+# The pair to run when no arguments are given.
+#
+# Both slots point at LIVE_PERSONA on purpose: yuzu5 and yuzu6 are both
+# CLOSED and nothing is queued against yuzu4, so a bare `YUZU_AB.py`
+# would otherwise quietly re-run a settled round and burn 15 minutes.
+# Running a prompt against itself is the one genuinely useful thing to
+# do with no candidate -- it measures the noise floor, which is what
+# this round turned out to need. Put a real key in the right slot when
+# there is something to test.
+ARMS = (yuzu_personas.LIVE_PERSONA, yuzu_personas.LIVE_PERSONA)
 
 # moves_at_all is the honest robot-facing number and everything else is
 # context. actions_runnable is an all() and no_asterisks measures a
 # model prior that normalize_actions rescues anyway -- both look worse
 # than the robot behaves. Printed, but never the headline.
 HEADLINE = "moves_at_all"
+
+# The noise floor, MEASURED rather than assumed.
+#
+# yuzu4 was run twice against different challengers on the same laptop,
+# same model, same settings, same 12 prompts. It scored 9/12 the first
+# time and 12/12 the second on moves_at_all. Nothing about the prompt
+# changed between those runs. So a SINGLE unchanged prompt swings three
+# replies at this sample size, and any gap at or below that is not
+# evidence of anything.
+#
+# This file used to declare a winner at 1.5 replies, which is how two
+# rounds got read as results before anyone thought to compare a prompt
+# against itself. If you widen the sample, lower this -- it is in
+# replies, not points, precisely so it scales with --runs.
+NOISE_FLOOR_REPLIES = 3
+
+# Words spoken per reply. Worth watching BECAUSE it barely moves:
+# yuzu4 came back 24w on both of its runs while its headline swung
+# three replies. A metric that stable can resolve differences the
+# headline cannot, and generation length costs far more time on the
+# robot than prompt length does -- a shorter prompt that produces
+# longer replies is a latency LOSS wearing a latency win's clothes.
+LENGTH_WARN_WORDS = 4
 
 
 def run_arm(key, model, runs, timeout, verbose):
@@ -92,28 +124,54 @@ def compare(left_key, left, right_key, right, chars):
         print(f"{check.name:<18} {pa:8.1f}% {pb:8.1f}% {pb - pa:+7.1f}   "
               f"{a}/{left['total']} vs {b}/{right['total']}{mark}")
 
+    spoken = {}
     for key, results in ((left_key, left), (right_key, right)):
         lengths = results["lengths"]
         if lengths:
+            spoken[key] = sum(lengths) / len(lengths)
             print(f"\n{key:<10} prompt {chars[key]} chars, "
-                  f"spoken {sum(lengths) / len(lengths):.0f} words avg")
+                  f"spoken {spoken[key]:.0f} words avg")
+
+    # Spoken length gets its own verdict. It is the low-variance metric
+    # here, and it is the one that decides whether a prompt trim is
+    # actually a latency win: characters saved once per turn against
+    # words generated every turn, and generation is the expensive half.
+    if len(spoken) == 2:
+        grew = spoken[right_key] - spoken[left_key]
+        if abs(grew) >= LENGTH_WARN_WORDS:
+            longer, shorter = ((right_key, left_key) if grew > 0
+                               else (left_key, right_key))
+            print(f"\n!! {longer} speaks {abs(grew):.0f} words more per reply "
+                  f"than {shorter}.")
+            if chars.get(longer, 0) < chars.get(shorter, 0):
+                print(f"   {longer} has the SHORTER prompt and the LONGER "
+                      f"replies. That is not a")
+                print("   latency win: prompt characters are paid once per "
+                      "turn and prefilled,")
+                print("   generated words are paid one at a time. Weigh it "
+                      "before promoting.")
 
     print(f"\n{'-' * 66}")
     print(f"ONE REPLY IS {point:.1f} POINTS at this sample size.")
+    print(f"MEASURED NOISE FLOOR: {NOISE_FLOOR_REPLIES} replies "
+          f"({NOISE_FLOOR_REPLIES * point:.1f} points). yuzu4 scored 9/12 "
+          f"then 12/12\non two runs of the SAME prompt -- so a gap this "
+          f"size proves nothing.")
+    floor = point * NOISE_FLOOR_REPLIES
     biggest = max(
         abs(100.0 * right["passes"][c.name] / right["total"]
             - 100.0 * left["passes"][c.name] / left["total"])
         for c in CHECKS)
-    if biggest <= point * 1.5:
-        print("Every difference above is within one or two replies. That is a")
-        print("coin flip, not a result. Re-run with --runs 3 before believing")
-        print("any of it -- or accept that the two arms are the same.")
+    if biggest <= floor:
+        print("Every difference above is inside the noise floor. That is not")
+        print("a result. --runs 3 triples the sample and cuts one reply to")
+        print(f"{point / 3:.1f} points -- or accept that the two arms are the same.")
     else:
         headline = (100.0 * right["passes"][HEADLINE] / right["total"]
                     - 100.0 * left["passes"][HEADLINE] / left["total"])
-        if abs(headline) <= point * 1.5:
-            print(f"{HEADLINE} moved less than two replies. The arms are level")
-            print("on the number that matters, whatever else shifted.")
+        if abs(headline) <= floor:
+            print(f"{HEADLINE} moved less than the noise floor. The arms are")
+            print("level on the number that matters, whatever else shifted.")
         else:
             winner = right_key if headline > 0 else left_key
             print(f"{HEADLINE} favours {winner} by {abs(headline):.1f} points "

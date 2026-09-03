@@ -226,7 +226,7 @@ behind it. If the two disagree, the code is right.
   yuzu_led_manager.py   the one LED loader. Zones + state profiles.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
-  YUZU_TESTER.py        242 stdlib tests. `python YUZU_TESTER.py`. The
+  YUZU_TESTER.py        248 stdlib tests. `python YUZU_TESTER.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
 
