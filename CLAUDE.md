@@ -571,33 +571,46 @@ tilde strip works -- "Ehehe~" came out as a laugh, not a symbol.
 someone listens". Someone listened, twice, and the FIRST reading was
 wrong.**
 
-Round 1: "PFFT!" came back "Pee Eff Eff Tee". Diagnosed as "Piper
-spells out ALL-CAPS", and `unshout()` was written.
-Round 2, after lowercasing: **still "pee eff eff tee".**
+**THERE ARE TWO INDEPENDENT MECHANISMS. Round 1 confounded them and
+diagnosed the wrong one.**
 
-That rules capitalisation out as the cause. espeak-ng phonemises what
-it can and SPELLS what it can't, and "pfft" has NO VOWEL for the
-letter-to-sound rules to bite on. Lowercasing a vowel-less token
-changes nothing about how unpronounceable it is. Two variables were
-confounded in round 1 -- ALL-CAPS and vowel-less -- and the wrong one
-got changed.
+Round 1: "PFFT!" -> "Pee Eff Eff Tee". Blamed ALL-CAPS. Wrote
+`unshout()`.
+Round 2, lowercased: still "pee eff eff tee". So capitals were not the
+cause OF THAT ONE.
+Round 3, respelled puft / pift / puh / pfff / pshh: none worked either.
 
-The fix is `sayable()`: respell the noise as something with a vowel in
-it. `pfft -> puft`. `speak()` prints the ORIGINAL, so her transcript
-still says PFFT.
+Then the clean A/B that separated them, on a single word:
 
-**Only "pfft" is mapped, and that restraint is pinned by a test.**
-Respelling a noise espeak already handles makes it worse, and this
-file has now changed one thing on a hypothesis that turned out wrong.
-`TRYOUTS` holds candidates for tsk / shh / grr / hmph / psh so their
-CURRENT sound can be heard before anything is done to them.
+    "SIX legs"  ->  spelled out, letter by letter
+    "six legs"  ->  said properly
 
-**`unshout()` is now UNVERIFIED, not vindicated.** It was written for
-the wrong reason and no evidence says it helps. It also might: "MY.
-GOSH. SIX legs!" has never been listened to either way. It stays
-because it is harmless and might be right, and this is flagged so
-nobody later reads it as a measured win. Settle it with
-`--say "MY. GOSH. SIX legs!"` versus `--raw "MY. GOSH. SIX legs!"`.
+**Both mechanisms are real:**
+
+1. **ALL-CAPS gets spelled out.** CONFIRMED by SIX vs six, same word,
+   same sentence, only the case changed. `unshout()` is the fix and is
+   now MEASURED, not the lucky guess it looked like an hour ago.
+2. **Vowel-less tokens get spelled out regardless of case.** "pfft" has
+   nothing for espeak's letter-to-sound rules to bite on. No spelling
+   of a raspberry becomes a word, because a synthesiser says words.
+
+**"pfft" is DROPPED, not respelled.** Three rounds was enough to stop
+guessing. It fails exactly the way the action whitelist already fails:
+an action this body can't do produces silence, never a substitute
+movement -- so a noise this voice can't make produces silence too, and
+the sentence around it survives. "PFFT! My camera is shaking!" is
+spoken as "My camera is shaking!". Her transcript still prints the
+PFFT, because `speak()` prints the original.
+
+Nothing else is dropped. tsk / shh / grr / hmph / psh have never been
+heard and a test pins that they are untouched -- deleting character
+from a noise espeak says perfectly well would be the same mistake in
+the other direction. `--tryout <noise>` auditions them.
+
+**Her prompt teaches "Ehehe~, Haha!, Pfft, Ugh, Ooh".** Only Pfft is
+unsayable, so the rule stays as written -- but if that line is ever
+edited for some other reason, swapping Pfft for something with a vowel
+is a free improvement. A test pins that the other four survive.
 
 **Audition spellings instead of guessing across round trips:**
 

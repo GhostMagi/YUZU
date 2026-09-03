@@ -2801,14 +2801,16 @@ class TestVoice(unittest.TestCase):
         self.assertEqual(self.voice.for_speech("hey cutie 💅✨"), "hey cutie")
 
     def test_shouted_words_are_lowercased_so_piper_says_them(self):
-        """MEASURED Sept 3, en_US-amy-medium, Ghost's laptop.
+        """CONFIRMED Sept 3 by an A/B on a single word.
 
-        The previous version of this test pinned ALL-CAPS as
-        deliberately untouched, on the grounds that whether Piper reads
-        capitals as initialisms was a fact nobody here had heard. Ghost
-        ran the demo and heard it: "PFFT!" came back "Pee Eff Eff Tee".
-        So the decision changed, on evidence, exactly as that test said
-        it should.
+            "SIX legs"  -> spelled out, letter by letter
+            "six legs"  -> said properly
+
+        Same word, same sentence, only the case changed. Capitals
+        really do trigger spelling-out -- independently of the
+        vowel-less problem "pfft" turned out to have. Two separate
+        mechanisms; this is the one lowercasing fixes, and the reason
+        unshout() stays.
         """
         # unshout() is the caps layer specifically. for_speech also
         # respells the noise afterwards, which is a separate fix.
@@ -2842,64 +2844,66 @@ class TestVoice(unittest.TestCase):
         for word in ("OMG", "OG"):
             self.assertEqual(self.voice.unshout(word), word)
 
-    def test_vowelless_noises_are_respelled_not_just_lowercased(self):
-        """MEASURED twice, and the second measurement is the useful one.
+    def test_a_noise_this_voice_cannot_make_is_dropped_not_mangled(self):
+        """MEASURED three times, Sept 3, en_US-amy-medium:
 
-        Round 1: "PFFT!" came back "Pee Eff Eff Tee". I blamed the
-        capitals and lowercased it.
-        Round 2: still "pee eff eff tee".
+            "PFFT!"                       -> "Pee Eff Eff Tee"
+            lowercased to "pfft"          -> still "pee eff eff tee"
+            respelled puft/pift/puh/...   -> none of them worked either
 
-        That rules capitalisation out. espeak-ng phonemises what it can
-        and SPELLS what it can't, and "pfft" has no vowel for the
-        letter-to-sound rules to bite on. Lowercasing a vowel-less
-        token changes nothing. The respelling is the actual fix.
+        A synthesiser says WORDS. A bilabial raspberry is not one and no
+        spelling of it becomes one. Third round is where guessing again
+        stopped being worth it.
+
+        So it is dropped -- the same call the action whitelist makes for
+        a movement this body can't do: silence, never a substitute. The
+        sentence around it survives.
         """
-        self.assertNotEqual(self.voice.for_speech("PFFT!"), "pfft!",
-                            "lowercasing alone was measured NOT to work")
         self.assertEqual(self.voice.for_speech("PFFT! My camera!"),
-                         "puft! My camera!")
-
-    def test_respelling_is_case_insensitive(self):
+                         "My camera!")
         for written in ("pfft", "PFFT", "Pfft"):
-            self.assertIn("puft", self.voice.for_speech(written))
+            self.assertEqual(self.voice.for_speech(written), "")
 
-    def test_every_respelling_has_a_vowel_to_pronounce(self):
-        """The whole point. A replacement with no vowel would get
-        spelled out exactly like the thing it replaced."""
-        for noise, replacement in self.voice.SAYABLE.items():
-            self.assertTrue(
-                set("aeiouy") & set(replacement.lower()),
-                f"{noise} -> {replacement!r} still has nothing to say")
+    def test_dropping_the_noise_leaves_no_orphaned_punctuation(self):
+        # "PFFT! My camera" must not become "! My camera" -- a stray
+        # "!" is exactly the kind of thing a synthesiser reads oddly.
+        self.assertEqual(self.voice.for_speech("Ehehe~ Pfft, I crack up."),
+                         "Ehehe I crack up.")
 
-    def test_ordinary_words_are_not_respelled(self):
-        for word in ("hey", "pink", "spin", "Paris", "camera"):
+    def test_the_rest_of_the_reply_always_survives(self):
+        """Fails safe. Losing one noise is fine; losing the sentence is
+        the robot going quiet for no visible reason."""
+        said = self.voice.for_speech("PFFT! No arms on this chassis, cutie!")
+        self.assertIn("chassis", said)
+        self.assertIn("cutie", said)
+
+    def test_ordinary_words_are_not_dropped(self):
+        for word in ("hey", "pink", "spin", "Paris", "camera", "puft"):
             self.assertEqual(self.voice.sayable(word), word)
 
-    def test_only_measured_noises_are_respelled(self):
-        """Respelling a noise espeak already says correctly makes it
-        WORSE. Only "pfft" has actually been heard to fail, so only
-        "pfft" is mapped. Everything else lives in TRYOUTS until
-        somebody listens -- this file has already changed one thing on
-        a hypothesis that turned out wrong.
-        """
-        self.assertEqual(set(self.voice.SAYABLE), {"pfft", "pft"},
-                         "a respelling was added without hearing it fail")
-        for noise in ("tsk", "shh", "grr", "hmph", "psh"):
+    def test_nothing_is_dropped_that_was_never_heard_to_fail(self):
+        """Only pfft has been measured. Dropping a noise espeak says
+        perfectly well would delete character for no reason -- and this
+        module has already changed one thing on a wrong hypothesis."""
+        self.assertEqual(set(self.voice.UNSAYABLE), {"pfft", "pft"})
+        for noise in ("tsk", "shh", "grr", "hmph", "psh", "ugh", "ooh",
+                      "haha", "hehe", "woah"):
             self.assertEqual(self.voice.sayable(noise), noise,
-                             f"{noise} is being changed but was never heard")
-            self.assertIn(noise, self.voice.TRYOUTS,
-                          f"{noise} can't be auditioned")
+                             f"{noise} is being dropped but was never heard")
 
-    def test_every_tryout_offers_the_current_mapping_as_a_candidate(self):
-        """--tryout exists so a spelling gets picked by ear instead of
-        guessed at twice in a row. It has to include what is currently
-        used, or there is nothing to compare against."""
-        for noise, candidates in self.voice.TRYOUTS.items():
-            current = self.voice.SAYABLE.get(noise)
-            if current:
-                self.assertIn(current, candidates,
-                              f"--tryout {noise} never plays the spelling "
-                              f"that is actually in use")
+    def test_her_prompt_taught_vocalizations_still_mostly_survive(self):
+        """The persona files teach "Ehehe~, Haha!, Pfft, Ugh, Ooh" as
+        the sounds to use. Only one of those is unsayable, so the rule
+        is still worth keeping as written -- but if that line is ever
+        edited for another reason, swapping Pfft for something with a
+        vowel is a free improvement."""
+        taught = ["Ehehe~", "Haha!", "Ugh", "Ooh"]
+        for sound in taught:
+            self.assertTrue(self.voice.for_speech(sound).strip(),
+                            f"{sound} is taught by the prompt and would "
+                            f"be silent")
+        self.assertEqual(self.voice.for_speech("Pfft"), "",
+                         "Pfft is the one taught sound this voice can't make")
 
     def test_single_capitals_and_normal_words_are_untouched(self):
         # "I" must not become "i", and ordinary Capitalised words are

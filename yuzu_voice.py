@@ -96,11 +96,17 @@ class VoiceError(RuntimeError):
 #   '~'  x1   from "Ehehe~", which is her signature laugh.
 #
 # Both would be handed to Piper today. Neither is a word.
-# MEASURED, Sept 3, on Ghost's laptop with en_US-amy-medium: Piper
-# spells ALL-CAPS out letter by letter when the word isn't a known
-# pronounceable token. "PFFT!" came back "Pee Eff Eff Tee".
+# CONFIRMED Sept 3, en_US-amy-medium, by direct A/B on one word:
 #
-# But blanket-lowercasing is wrong, because two different things wear
+#     "SIX legs"  -> spelled out, letter by letter
+#     "six legs"  -> said properly
+#
+# Same word, same sentence, only the case changed. So capitals really
+# do trigger spelling-out, independently of the vowel-less problem that
+# "pfft" turned out to have. Two separate mechanisms; this is the one
+# lowercasing actually fixes.
+#
+# Blanket-lowercasing is still wrong, because two different things wear
 # capitals in her voice:
 #
 #   OMG, OG   -- genuine initialisms. "oh em gee" IS how you say them,
@@ -136,21 +142,38 @@ _WHITESPACE = re.compile(r'\s+')
 #     python3 yuzu_voice.py --tryout pfft
 # speaks the candidates so the right one gets picked by ear instead of
 # by me guessing twice in a row.
-# ONLY what has been heard to fail. "pfft" is measured. Everything
-# else stays out until someone listens, because a respelling for a
-# noise espeak already handles makes it WORSE, and this file has
-# already changed one thing on a hypothesis that turned out wrong.
-# Audition a candidate before adding it:  --tryout psh
-SAYABLE = {
-    "pfft": "puft",
-    "pft": "puft",
-}
+# Noises espeak simply cannot make. MEASURED Sept 3, three rounds:
+#
+#   "PFFT!"                     -> "Pee Eff Eff Tee"
+#   lowercased to "pfft"        -> still "pee eff eff tee"
+#   respelled puft/pift/puh/... -> none of them worked either
+#
+# A speech synthesiser says WORDS. A bilabial raspberry is not one, and
+# no spelling of it is going to become one. The third round is where
+# that stopped being worth another guess.
+#
+# So they are DROPPED, which is the same call the action whitelist
+# already makes: an action this body can't do produces silence, never a
+# substitute movement. A noise this voice can't make produces silence
+# too, and the rest of the sentence survives intact. "PFFT! My camera
+# is shaking!" becomes "My camera is shaking!" -- her transcript still
+# prints the PFFT, because speak() prints the original.
+UNSAYABLE = ("pfft", "pft")
+_UNSAYABLE = re.compile(
+    r'\b(?:' + "|".join(UNSAYABLE) + r')\b[!?.,]*\s*', re.IGNORECASE)
+
+# Kept only to audition alternatives if dropping ever feels too lossy.
+# Nothing here is applied.
+SAYABLE = {}
 
 # Candidate spellings to audition for a noise, when the default is
 # wrong. Order is roughly "closest to the written form" first.
-# Candidates to audition. The unmapped ones are here so their CURRENT
-# sound can be checked before anything is done to them -- if espeak
+# Candidates to audition. Nothing here is applied -- it exists so a
+# noise gets judged by ear before anything is done to it. If espeak
 # already says "tsk" correctly, the right change is no change.
+#
+# "pfft" is SETTLED: none of these worked, which is what moved it to
+# UNSAYABLE. Kept so the finding can be re-heard rather than re-argued.
 TRYOUTS = {
     "pfft": ["pfft", "puft", "pift", "puh", "pfff", "pshh"],
     "psh": ["psh", "pish", "pshh", "pssh"],
@@ -164,14 +187,12 @@ _WORD = re.compile(r"[A-Za-z']+")
 
 
 def sayable(text: str) -> str:
-    """Respell noises espeak would otherwise spell out letter by letter.
+    """Drop noises this voice cannot make.
 
-    Case-insensitive on the way in, and the replacement is used as
-    written -- these are pronunciation hints, not her actual words, and
-    speak() prints the original anyway.
+    Fails the same way the action whitelist does: silence, never a
+    mangled substitute. The sentence around it is untouched.
     """
-    return _WORD.sub(
-        lambda m: SAYABLE.get(m.group(0).lower(), m.group(0)), text)
+    return _UNSAYABLE.sub("", text)
 
 
 def unshout(text: str) -> str:
@@ -430,14 +451,15 @@ Listen for these three things. The line under each is what Piper
 actually receives -- if the sound doesn't match the text, that's a bug
 worth reporting.
 
-  1. "PFFT!"      -- MEASURED Sept 3: Piper spelled this "Pee Eff Eff
-                     Tee". It is now lowercased before Piper sees it,
-                     so it should be a noise, not an acronym. Same for
-                     "MY. GOSH. SIX legs!"
-  2. "OMG"/"OG"   -- these are the opposite case and stay capitalised
-                     on purpose. "oh em gee" and "oh gee" IS how you say
-                     them. If they come out as mush, the allowlist in
-                     SPOKEN_INITIALISMS is wrong.
+  1. "PFFT!"      -- SETTLED. Three rounds: spelled out, still spelled
+                     out lowercased, and no respelling worked either. A
+                     synthesiser says words and a raspberry isn't one,
+                     so it is DROPPED. You should hear "My camera is
+                     shaking!" with no noise in front of it.
+  2. "OMG"/"OG"   -- the opposite case, and still unheard. They stay
+                     capitalised on purpose: "oh em gee" and "oh gee"
+                     IS how you say them. If they come out as mush, the
+                     allowlist in SPOKEN_INITIALISMS is wrong.
   3. Speed        -- yuzu4 asks for length_scale 0.88, slightly faster
                      than default. Coco runs 1.08, slower. If she sounds
                      rushed or sedated, that dial is one line in her
