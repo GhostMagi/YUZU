@@ -32,7 +32,6 @@ import yuzu_personas
 import yuzu_prompt_eval as prompt_eval
 import yuzu_brain as yuzu_brain_module
 from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
-from yuzu_led_manager import LEDManager
 
 
 class TestActionMatching(unittest.TestCase):
@@ -166,39 +165,6 @@ class TestSplitReply(unittest.TestCase):
     def test_leading_action(self):
         self.assertEqual(yuzu.split_reply("[squats] hey"),
                          [("action", "squats"), ("speech", "hey")])
-
-
-class TestLEDManager(unittest.TestCase):
-    def test_reads_the_real_config_not_a_second_one(self):
-        # REGRESSION: it used to default to "led_config.json" on a bare
-        # relative path, creating a duplicate config next to whatever
-        # directory you ran python from, and never reading the real one.
-        led = LEDManager()
-        self.assertEqual(led.config_path.name, "yuzu_robot_config.json")
-        self.assertTrue(led.config_path.is_absolute())
-        self.assertEqual(led.robot_name, "Yuzu-Spider-V1")
-
-    def test_state_profiles_are_configured_not_fallback_white(self):
-        led = LEDManager()
-        for state in ("idle", "moving", "alert"):
-            self.assertNotEqual(led.get_state_profile(state)["color"], "#FFFFFF",
-                                f"state '{state}' fell through to the white fallback")
-
-    def test_missing_section_is_filled_from_defaults(self):
-        from yuzu_led_manager import _merge_defaults, DEFAULT_CONFIG
-        partial = {"robot_name": "Yuzu-Spider-V1", "led_zones": {}}
-        merged = _merge_defaults(partial, DEFAULT_CONFIG)
-        self.assertIn("state_profiles", merged)
-        self.assertEqual(merged["robot_name"], "Yuzu-Spider-V1")
-
-    def test_unknown_state_falls_back_without_crashing(self):
-        self.assertEqual(LEDManager().get_state_profile("nonsense")["color"], "#FFFFFF")
-
-    def test_config_file_is_valid_json_with_both_sections(self):
-        path = Path(__file__).parent / "yuzu_robot_config.json"
-        data = json.loads(path.read_text())
-        self.assertIn("led_zones", data)
-        self.assertIn("state_profiles", data)
 
 
 class TestGaits(unittest.TestCase):
@@ -981,7 +947,6 @@ class TestPersonas(unittest.TestCase):
         self.assertIsInstance(persona.options()["temperature"], float)
         self.assertNotIn("piper_length_scale", persona.options(),
                          "voice settings are not Ollama sampling options")
-        self.assertEqual(persona.led_states()["idle"], "#FF69B4")
 
     def test_a_body_swap_changes_the_rules_not_the_character(self):
         """Same persona text against two robots must yield two prompts
@@ -1993,20 +1958,6 @@ class TestPersonaWiring(BrainTestCase):
         self.assertEqual(brain.system_prompt, "You are a test.")
         self.assertIsNone(brain.persona)
 
-    def test_led_palette_overrides_color_but_not_effect(self):
-        led = LEDManager()
-        before = led.get_state_profile("idle")
-        led.apply_persona_colors({"idle": "#123456", "nosuchstate": "#000000"})
-        after = led.get_state_profile("idle")
-        self.assertEqual(after["color"], "#123456")
-        self.assertEqual(after["effect"], before["effect"])
-        self.assertEqual(after["brightness"], before["brightness"])
-
-
-class TestDoctor(unittest.TestCase):
-    """yuzu_doctor.py is the one file that gets tapped by someone who
-    can't read a traceback, so it must never raise -- on any input."""
-
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.path = Path(self.dir.name) / "m.gguf"
@@ -2323,14 +2274,6 @@ class TestCoco(unittest.TestCase):
         self.assertIn("Hm.", examples)                # a sound, typed inline
         self.assertEqual(yuzu.lookup_actions("Hm"), [],
                          "a sound must never resolve to a movement")
-
-    def test_she_does_not_glow_like_a_gyaru(self):
-        cold = self.coco.led_states()
-        warm = yuzu_personas.load("yuzu").led_states()
-        self.assertEqual(set(cold), set(warm))
-        for state, colour in cold.items():
-            self.assertNotEqual(colour, warm[state],
-                                f"Coco's {state} LED is Yuzu's pink")
 
     def test_her_voice_is_slower_than_the_gyaru_and_is_not_a_sampling_option(self):
         self.assertGreater(self.coco.settings["piper_length_scale"],

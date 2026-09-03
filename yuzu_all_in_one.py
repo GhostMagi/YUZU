@@ -8,11 +8,10 @@ once a mic is hooked up. The brain is real: it talks to Ollama via
 yuzu_brain.py, and falls back to an echo stub when Ollama isn't up.
 
 This file will run anywhere, including Pydroid on the phone, with no
-hardware and no other files present. If muto_leg_control.py and
-yuzu_led_manager.py ARE sitting next to it, it picks them up
-automatically: bracketed actions drive real gaits, and the LEDs follow
-what Yuzu is doing (thinking / moving / speaking / idle). If they're
-missing it falls back to printing, exactly like it always did.
+hardware and no other files present. If muto_leg_control.py IS sitting
+next to it, bracketed actions drive real gaits; if yuzu_voice.py and
+Piper are there, she speaks out loud. Missing either one falls back to
+printing, exactly like it always did.
 """
 
 import os
@@ -24,11 +23,6 @@ try:
     import muto_leg_control as legs
 except ImportError:
     legs = None
-
-try:
-    from yuzu_led_manager import LEDManager
-except ImportError:
-    LEDManager = None
 
 try:
     from yuzu_brain import BrainError, YuzuBrain
@@ -76,14 +70,7 @@ if legs:
         print(f"\n{exc}\n")
         raise SystemExit(1)
 
-leds = LEDManager() if LEDManager else None
 voice = yuzu_voice.Voice() if yuzu_voice else None
-
-
-def set_led_state(state):
-    """Nudge the lights. No-op when the LED manager isn't around."""
-    if leds:
-        leds.apply_state(state)
 
 
 # ============================================================================
@@ -388,20 +375,16 @@ def handle_yuzu_reply(raw_llm_output: str, interleave=True):
     cleaned = normalize_actions(raw_llm_output)
 
     if not interleave:
-        set_led_state("moving")
         run_actions_in_order(extract_actions(cleaned))
         speech = strip_actions(cleaned)
         if speech:
-            set_led_state("speaking")
             speak(speech)
         return
 
     for kind, value in split_reply(cleaned):
         if kind == "speech":
-            set_led_state("speaking")
             speak(value)
         else:
-            set_led_state("moving")
             run_action(value)
 
 
@@ -422,14 +405,6 @@ current_persona = None
 # Unset means yuzu_personas.LIVE_PERSONA -- the measured winner, not the
 # frozen v1 archive that happens to own the "yuzu" key.
 PERSONA = os.environ.get("YUZU_PERSONA")
-
-
-def apply_persona_look(persona):
-    """Let the loaded character tint her own LED states."""
-    if leds and persona is not None:
-        colors = persona.led_states()
-        if colors:
-            leds.apply_persona_colors(colors)
 
 
 def apply_persona_voice(persona):
@@ -466,7 +441,6 @@ def start_brain(persona_key=None):
     brain = candidate
     brain.on_recover = _announce_recovery
     current_persona = candidate.persona
-    apply_persona_look(current_persona)
     apply_persona_voice(current_persona)
     who = current_persona.name if current_persona else "custom prompt"
     return f"{who} via Ollama, model '{brain.model}'"
@@ -504,7 +478,6 @@ def switch_persona(key):
     brain = candidate
     brain.on_recover = _announce_recovery
     current_persona = candidate.persona
-    apply_persona_look(current_persona)
     apply_persona_voice(current_persona)
     print(f"Now talking to {current_persona.name} "
           f"({current_persona.archetype}). History cleared.")
@@ -547,8 +520,7 @@ def run_yuzu_forever():
     print("Listening... 'quit' to stop. Commands: /personas /persona <name> "
           "/reset /health")
     print(f"brain: {brain_status}")
-    print(f"gaits: {'muto_leg_control' if legs else 'print-only'}   "
-          f"leds: {'yuzu_led_manager' if leds else 'off'}")
+    print(f"gaits: {'muto_leg_control' if legs else 'print-only'}")
     if voice and voice.ready:
         print(f"voice: piper, {voice.model.name}")
     else:
@@ -565,7 +537,6 @@ def run_yuzu_forever():
     print()
     if legs and g_bot:
         legs.stance(g_bot)
-    set_led_state("idle")
     while True:
         user_text = listen_and_transcribe()
         command = user_text.strip().lower()
@@ -617,10 +588,8 @@ def run_yuzu_forever():
                 print(f"   {name}: {err}")
             print()
             continue
-        set_led_state("thinking")
         raw_reply = ask_yuzu_brain(user_text)
         handle_yuzu_reply(raw_reply)
-        set_led_state("idle")
         print()
 
 
@@ -629,7 +598,6 @@ def shutdown():
     if legs and g_bot:
         print("Parking legs...")
         legs.rest(g_bot)
-    set_led_state("idle")
     if motor_faults:
         print(f"({len(motor_faults)} motor fault(s) this session)")
 

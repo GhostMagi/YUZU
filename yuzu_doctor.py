@@ -75,11 +75,9 @@ EXPECTED = {
     "yuzu_brain.py":          "the Ollama client",
     "yuzu_personas.py":       "persona loader (Yuzu's personality)",
     "personas":               "the persona + body files",
-    "yuzu_robot_config.json": "LED config",
     "muto_leg_control.py":    "leg gaits + simulator",
     "muto_firstcontact.py":   "guided first bring-up on real servos",
     "yuzu_voice.py":          "Piper TTS (her voice)",
-    "yuzu_led_manager.py":    "LED manager",
     "YUZU_TESTER.py":         "the test suite",
     "yuzu_prompt_eval.py":    "prompt scoring",
 }

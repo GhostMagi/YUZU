@@ -94,7 +94,6 @@ export YUZU_PERSONA=coco
 
 - the system prompt (her whole character)
 - her sampling — Coco runs at temperature 0.7, Yuzu at 0.8
-- her LED colours — Coco's states go cold, Yuzu's stay pink
 - the conversation history, which is **cleared on purpose**
 
 That last one is deliberate and it matters. If you carry Yuzu's banter
@@ -153,7 +152,7 @@ Everything that isn't her personality, which is most of the project:
 - the bracket parser, the whitelist, the aliases, the stemmer
 - every gait, the simulator, the bring-up script, the safety machinery
 - the brain, the drift recovery, the history canonicalisation
-- the eval, the A/B runner, all 279 tests
+- the eval, the A/B runner, all 272 tests
 
 Those are facts about a Yahboom Muto S2 and about a 3B model. None of
 them know or care who is driving.

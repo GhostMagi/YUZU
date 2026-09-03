@@ -223,12 +223,17 @@ behind it. If the two disagree, the code is right.
                         simulator. Untested on hardware.
   muto_firstcontact.py  guided six-stage bring-up on real servos. Run
                         this before any gait touches the chassis.
-  yuzu_led_manager.py   the one LED loader. Zones + state profiles.
-  yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
-  yuzu_robot_config.json  the one config file.
-  YUZU_TESTER.py        279 stdlib tests. `python YUZU_TESTER.py`. The
+  YUZU_TESTER.py        272 stdlib tests. `python YUZU_TESTER.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
+
+  (LEDs are gone as of Sept 3 -- yuzu_led_manager.py,
+  yuzu_led_controller.py and yuzu_robot_config.json were deleted at
+  Ghost's request. The chassis lighting is far enough off that the
+  subsystem was pure console noise around every reply. Sections below
+  still describe LED bugs that were found and fixed; that history is
+  real and stays, it just no longer describes files that exist.
+  Everything is recoverable from git.)
 
   (readtest.py is gone. It was a 20-line "does the JSON load" script
   from before yuzu_led_controller.py existed, which now does the same

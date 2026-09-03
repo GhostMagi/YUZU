@@ -13,7 +13,7 @@ Everything else in this project is standard library, which is why it
 runs in Pydroid on a phone with nothing installed. Piper is a real
 binary and a real model file, and neither exists on the phone. So this
 module is the only thing that knows about them, `yuzu_all_in_one.py`
-imports it in a try/except like it does the gaits and the LEDs, and
+imports it in a try/except like it does the gaits, and
 with Piper absent she prints exactly as she always did.
 
 Nothing here imports Piper as a Python package either. It shells out to

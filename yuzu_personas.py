@@ -27,7 +27,7 @@ FILE FORMAT -- plain text, editable on a phone:
     archetype: Gyaru
     hardware: muto_s2
     temperature: 0.8
-    led_idle: #FF69B4
+    piper_length_scale: 0.88
     ---
     You are Yuzu, ...
     2. HARDWARE ACTION PARSING: {HARDWARE}
@@ -100,12 +100,6 @@ class Persona:
         gyaru; anything not set here falls back to yuzu_brain's defaults."""
         return {k: v for k, v in self.settings.items()
                 if k in _NUMERIC and not k.startswith("piper_")}
-
-    def led_states(self):
-        """Per-persona LED colors, as {state: hex}. A tsundere shouldn't
-        glow the same pink as a gyaru."""
-        return {k[len("led_"):]: v for k, v in self.settings.items()
-                if k.startswith("led_")}
 
     def __repr__(self):
         return f"<Persona {self.key} ({self.archetype})>"
@@ -272,10 +266,6 @@ description: one line, for the persona list
 # assistant, which is the failure a low-affect character is already
 # closest to -- so don't chase "cold" with temperature, write it.
 temperature: 0.8
-# Her LED states. Pick colours that suit her, these are placeholders.
-led_idle: #9E9E9E
-led_speaking: #FFFFFF
-led_thinking: #607D8B
 # TTS speed. Lower is faster; 0.85-0.9 reads as high energy, 1.05-1.1
 # as measured and calm.
 piper_length_scale: 0.9

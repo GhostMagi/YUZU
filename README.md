@@ -8,7 +8,7 @@ Paint scheme is Ghost's call and deliberately not pinned down in this
 repo -- see `paintstepslol.txt` for the prep process, which works for
 any colours.
 
-**Status:** brain works today on any PC. Chassis and LEDs are later.
+**Status:** brain and voice work today on any PC. Chassis is later.
 
 > ### On a fresh Jetson, run this FIRST
 > ```
@@ -33,9 +33,8 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 279 tests, ~18 seconds
+python YUZU_TESTER.py         # 272 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
-python yuzu_led_controller.py # dump the LED zone config
 ```
 
 All stdlib. No pip installs, not even for Ollama. Runs in Pydroid on a phone.
@@ -80,7 +79,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 279 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 272 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -90,9 +89,6 @@ $400.
 | `muto_firstcontact.py` | **Run this before any gait.** Guided bring-up, one joint at a time |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_voice.py` | Piper TTS. The project's one dependency boundary |
-| `yuzu_led_manager.py` | The one LED config loader (zones + states) |
-| `yuzu_led_controller.py` | Zone dump, front-end over `LEDManager` |
-| `yuzu_robot_config.json` | The one config file |
 | **Read these** | |
 | `PHONE_START.md` | Phone instructions, no terminal needed |
 | `DEPLOY.md` | Moving the brain onto the Jetson |
@@ -180,13 +176,11 @@ no rewriting. `personas/_hardware_saya_quad.txt` is a draft of that.
 
 ```
 mic -> listen_and_transcribe()      [STUB: swap in Whisper]
-    -> LED "thinking"
     -> ask_yuzu_brain()             REAL: yuzu_brain.py -> Ollama
     -> normalize_actions()          stray *asterisks* -> [brackets]
     -> split_reply()                ordered speech/action parts
-         speech -> LED "speaking" -> speak()   REAL: yuzu_voice.py -> Piper
-         action -> LED "moving"   -> whitelist -> muto_leg_control gait
-    -> LED "idle"
+         speech -> speak()               REAL: yuzu_voice.py -> Piper
+         action -> whitelist -> muto_leg_control gait
 ```
 
 One STUB left: the mic. The brain is real, and so is her voice — Piper

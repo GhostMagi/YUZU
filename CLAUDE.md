@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 279 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 272 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 279 tests pass on it. Getting it
+(that repo path is confirmed working). 272 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -39,8 +39,8 @@ and Tab completion covers the dead letters.
 it repeatedly and asked (Sept 3) that it stay out of the repo, because
 every doc naming a colour goes stale the next time he changes his mind.
 paintstepslol.txt keeps the PREP PROCESS, which works for any colours.
-What does stay recorded is the electrical bit that doesn't change with
-the paint: LED trim runs on its own micro LiPo, off the servo bus.
+(The LED trim that used to be recorded here is gone with the rest of
+the LED work -- see "LEDs are removed" below.)
 
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
@@ -531,7 +531,7 @@ Ghost's muscle memory for no behavioural gain.
 boundary**. Everything else is stdlib so it runs in Pydroid; Piper is a
 real binary and a real model file and neither exists on a phone. So the
 dep lives in one module, `yuzu_all_in_one.py` imports it in a
-try/except exactly like the gaits and the LEDs, and with Piper absent
+try/except exactly like the gaits, and with Piper absent
 she prints as she always did. A test asserts that import stays guarded.
 
 It shells out to the `piper` binary with `subprocess` rather than
@@ -540,10 +540,9 @@ nothing.
 
 **`piper_length_scale` finally does something.** It has been in every
 persona file since the format was written and NOTHING read it. yuzu4
-runs 0.88, Coco 1.08. `apply_persona_voice()` is called from the same
-two places as `apply_persona_look()`, so switching character changes
-her voice with her, and a test asserts the kuudere speaks slower than
-the gyaru.
+runs 0.88, Coco 1.08. `apply_persona_voice()` runs wherever a persona is
+loaded or switched, so changing character changes her voice with her,
+and a test asserts the kuudere speaks slower than the gyaru.
 
 **Piper's flag names are detected, not guessed.** It has shipped both
 `--output_file` and `--output-file`, and both `--length_scale` and
@@ -681,6 +680,31 @@ installed" about a binary sitting right there is the worse failure.
 
 **The remaining STUB is the mic.** Whisper is worth waiting for the
 Orin; TTS was not, because it cost nothing and needed nothing.
+
+## LEDs are removed
+
+Ghost's call, Sept 3, after watching a real conversation scroll past:
+five `[LED] state=...` lines wrapped around two lines of dialogue, for
+hardware that does not exist and is "way down the line". Deleted
+outright rather than silenced, because a dead subsystem you still have
+to read around is worse than no subsystem.
+
+Gone: `yuzu_led_manager.py`, `yuzu_led_controller.py`,
+`yuzu_robot_config.json`, `LEDManager`, `set_led_state()`,
+`apply_persona_look()`, `Persona.led_states()`, the `led_*` lines in
+every persona file, and `TestLEDManager`.
+
+**"Her awareness of it" was already nil** -- checked before touching
+anything. No persona prompt has ever contained the words LED, light,
+glow or neon. The `led_*` entries were hex colours in the settings
+block, above the `---`, so they never reached a composed prompt. Her
+prompt is byte-identical after this change and needs no re-test.
+
+**It is all in git** -- `git show 9e1b4b4:yuzu_led_manager.py` brings
+the manager back, and the same for the other two files. If the trim
+ever gets built, restore them rather than rewriting: the merged
+zones-plus-state-profiles design in there took a real bug to arrive at
+(two incompatible colour formats and a config file nothing read).
 
 ## Bring-up safety
 
