@@ -33,7 +33,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 272 tests, ~18 seconds
+python YUZU_TESTER.py         # 278 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 ```
 
@@ -79,7 +79,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 272 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 278 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -190,7 +190,12 @@ loop still boots and says so instead of crashing.
 ```
 python3 yuzu_voice.py --check   # what's installed
 python3 yuzu_voice.py           # hear her say real captured replies
+python3 yuzu_voice.py --list    # every voice you have, and which is live
+python3 yuzu_voice.py --use amy # switch voices, permanently
 ```
+
+Browse and preview voices at **rhasspy.github.io/piper-samples** before
+downloading — they're ~60MB each.
 
 Setup is in [JETSON_SETUP.md](JETSON_SETUP.md) §6 and works on any
 laptop — Piper is software, no Jetson needed.

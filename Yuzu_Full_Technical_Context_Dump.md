@@ -223,7 +223,7 @@ behind it. If the two disagree, the code is right.
                         simulator. Untested on hardware.
   muto_firstcontact.py  guided six-stage bring-up on real servos. Run
                         this before any gait touches the chassis.
-  YUZU_TESTER.py        272 stdlib tests. `python YUZU_TESTER.py`. The
+  YUZU_TESTER.py        278 stdlib tests. `python YUZU_TESTER.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
 

@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
-led_config.json
+
+# Piper voices. A model is ~60MB and a personal choice; the repo tells
+# you how to get one (JETSON_SETUP.md section 6) rather than shipping it.
+# ACTIVE is which one you picked -- also yours, not the project's.
+voices/

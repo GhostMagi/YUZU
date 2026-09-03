@@ -357,10 +357,64 @@ wget $BASE/en_US-amy-medium.onnx
 wget $BASE/en_US-amy-medium.onnx.json
 ```
 
-If those 404, browse **huggingface.co/rhasspy/piper-voices** and take
-any `en_US` voice — grab the `.onnx` AND the `.onnx.json` next to it.
-`amy` is a reasonable starting point for the gyaru; `lessac` is
-flatter and suits Coco better. It's a taste call, try a few.
+### Finding a different voice
+
+**Listen before you download.** Every Piper voice has a sample clip at
+**rhasspy.github.io/piper-samples** — play a few, note the name of one
+you like, then fetch it. A voice is ~60MB, and downloading five to
+audition them is the slow way round.
+
+The names decode as `language-speaker-quality`:
+
+| Part | Means |
+|---|---|
+| `en_US`, `en_GB` | language and accent |
+| `amy`, `lessac`, `alba`, `ryan` | the speaker |
+| `x_low` `low` `medium` `high` | quality vs size and speed |
+
+**Stick to `medium`.** `high` is bigger and slower for a difference you
+won't hear over a robot speaker, and `low` sounds like a phone from
+2009. On the Orin, where the voice shares 8GB with the LLM, `medium` is
+the right trade.
+
+To download one, take the name and slot it into the same URL shape —
+`.../en/<language>/<speaker>/<quality>/<full-name>.onnx`, plus the
+matching `.onnx.json`:
+
+```bash
+cd ~/YUZU/voices
+BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium
+wget $BASE/en_US-lessac-medium.onnx
+wget $BASE/en_US-lessac-medium.onnx.json
+```
+
+If a link 404s, browse **huggingface.co/rhasspy/piper-voices** and take
+the two files by hand. Both, always — a voice without its `.onnx.json`
+fails with an error that never mentions the `.onnx.json`.
+
+### Switching between them
+
+```bash
+python3 yuzu_voice.py --list          # what you have, and which is live
+python3 yuzu_voice.py --use lessac    # switch, permanently
+python3 yuzu_voice.py                 # hear it
+```
+
+`--use` takes any unique part of the name and remembers it in
+`voices/ACTIVE`. Ambiguous input is refused rather than guessed at, and
+deleting a voice you had selected falls back rather than going mute.
+
+**Why `--use` exists:** without it, the first voice ALPHABETICALLY
+wins. Download `en_GB-alba` when you already have `en_US-amy` and she
+quietly switches accents — and worse, downloading a nicer voice and
+still hearing the old one looks like nothing happened. `--list` marks
+the active one so this is always visible.
+
+For a one-off without changing your pick:
+
+```bash
+YUZU_VOICE=~/YUZU/voices/en_GB-alba-medium.onnx python3 yuzu_all_in_one.py
+```
 
 Check it and hear it:
 

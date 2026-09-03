@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 272 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 278 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 272 tests pass on it. Getting it
+(that repo path is confirmed working). 278 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -677,6 +677,23 @@ laptop -- no Jetson needed, Piper is software.
 writable, and warns about PATH in the middle of thirty lines of
 download output. `find_piper()` looks there, because reporting "not
 installed" about a binary sitting right there is the worse failure.
+
+**Choosing a voice: `--list` and `--use`.** `find_voice()` used to
+take the first `.onnx` ALPHABETICALLY, which is a live footgun the
+moment there are two: download `en_GB-alba` alongside `en_US-amy` and
+she quietly changes accent, and downloading a nicer voice and still
+hearing the old one looks like nothing happened. `--use <fragment>`
+remembers a choice in `voices/ACTIVE` (one line of plain text, no
+config format, phone-editable), `--list` marks which is live and says
+so when nothing is chosen. `YUZU_VOICE` still wins over both, for
+one-offs. Ambiguous input is refused rather than guessed; a remembered
+voice that was deleted falls back instead of going mute. `voices/` is
+gitignored -- a model is 60MB and a personal taste call.
+
+Preview voices at rhasspy.github.io/piper-samples BEFORE downloading.
+Names decode as language-speaker-quality; stick to `medium` (`high` is
+bigger and slower for nothing you'd hear over a robot speaker, and on
+the Orin the voice shares 8GB with the LLM).
 
 **The remaining STUB is the mic.** Whisper is worth waiting for the
 Orin; TTS was not, because it cost nothing and needed nothing.

@@ -14,6 +14,7 @@ import unittest.mock
 from pathlib import Path
 
 import itertools
+import os
 import re
 import shutil
 import struct
@@ -2960,10 +2961,87 @@ class TestVoice(unittest.TestCase):
         v.piper = None                      # even if one was found here
         self.assertIn("pip install piper-tts", v.why_not())
 
+    def fake_voices(self, *names):
+        """A voices/ dir with real .onnx + .onnx.json pairs."""
+        import tempfile
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        root = Path(holder.name)
+        for name in names:
+            (root / f"{name}.onnx").write_bytes(b"\0" * 64)
+            (root / f"{name}.onnx.json").write_text("{}")
+        return root
+
+    def test_a_voice_missing_its_json_is_not_offered(self):
+        """Piper's error when the .onnx.json is absent does not mention
+        the .onnx.json. Never list a voice that will fail that way."""
+        root = self.fake_voices("good")
+        (root / "orphan.onnx").write_bytes(b"\0" * 64)   # no .json beside it
+        with unittest.mock.patch.object(self.voice, "VOICE_DIRS", (root,)):
+            names = [v.name for v in self.voice.list_voices()]
+        self.assertEqual(names, ["good.onnx"])
+
+    def test_two_voices_and_no_choice_is_flagged_not_silent(self):
+        """THE footgun. find_voice() takes the first alphabetically, so
+        downloading en_GB-alba after en_US-amy silently changes who she
+        sounds like -- and downloading a nicer voice and hearing the old
+        one looks like nothing happened at all."""
+        root = self.fake_voices("en_US-amy-medium", "en_GB-alba-medium")
+        with unittest.mock.patch.object(self.voice, "VOICE_DIRS", (root,)):
+            with unittest.mock.patch.object(
+                    self.voice, "ACTIVE_FILE", root / "ACTIVE"):
+                with unittest.mock.patch.dict(os.environ, {}, clear=False):
+                    os.environ.pop(self.voice.VOICE_ENV, None)
+                    self.assertEqual(self.voice.find_voice().name,
+                                     "en_GB-alba-medium.onnx")
+                    chosen = self.voice.use_voice("amy")
+                    self.assertEqual(chosen.name, "en_US-amy-medium.onnx")
+                    self.assertEqual(self.voice.find_voice().name,
+                                     "en_US-amy-medium.onnx")
+
+    def test_a_remembered_voice_that_was_deleted_falls_back(self):
+        # Deleting the .onnx must not leave her mute with a dangling
+        # pointer -- fall back to whatever is actually installed.
+        root = self.fake_voices("en_US-amy-medium")
+        active = root / "ACTIVE"
+        active.write_text("en_US-gone-medium.onnx\n")
+        with unittest.mock.patch.object(self.voice, "VOICE_DIRS", (root,)):
+            with unittest.mock.patch.object(self.voice, "ACTIVE_FILE", active):
+                self.assertIsNone(self.voice.remembered_voice())
+                self.assertEqual(self.voice.find_voice().name,
+                                 "en_US-amy-medium.onnx")
+
+    def test_an_ambiguous_choice_refuses_rather_than_guessing(self):
+        root = self.fake_voices("en_US-amy-medium", "en_US-lessac-medium")
+        with unittest.mock.patch.object(self.voice, "VOICE_DIRS", (root,)):
+            with unittest.mock.patch.object(
+                    self.voice, "ACTIVE_FILE", root / "ACTIVE"):
+                with self.assertRaises(self.voice.VoiceError) as ctx:
+                    self.voice.use_voice("medium")
+        self.assertIn("matches 2 voices", str(ctx.exception))
+
+    def test_an_unknown_choice_lists_what_is_installed(self):
+        root = self.fake_voices("en_US-amy-medium")
+        with unittest.mock.patch.object(self.voice, "VOICE_DIRS", (root,)):
+            with self.assertRaises(self.voice.VoiceError) as ctx:
+                self.voice.use_voice("klingon")
+        self.assertIn("en_US-amy-medium.onnx", str(ctx.exception))
+
+    def test_the_env_override_still_wins_over_a_remembered_choice(self):
+        # YUZU_VOICE is the one-off escape hatch; it must beat the file.
+        root = self.fake_voices("en_US-amy-medium", "en_US-lessac-medium")
+        active = root / "ACTIVE"
+        active.write_text("en_US-amy-medium.onnx\n")
+        override = root / "en_US-lessac-medium.onnx"
+        with unittest.mock.patch.object(self.voice, "VOICE_DIRS", (root,)):
+            with unittest.mock.patch.object(self.voice, "ACTIVE_FILE", active):
+                with unittest.mock.patch.dict(
+                        os.environ, {self.voice.VOICE_ENV: str(override)}):
+                    self.assertEqual(self.voice.find_voice(), override)
+
     def test_a_bad_voice_override_says_both_files_are_needed(self):
         # Piper's own error when the .json is missing does not mention
         # the .json, which is a genuinely miserable half hour.
-        import os
         with unittest.mock.patch.dict(
                 os.environ, {self.voice.VOICE_ENV: "/nope/missing.onnx"}):
             with self.assertRaises(self.voice.VoiceError) as ctx:

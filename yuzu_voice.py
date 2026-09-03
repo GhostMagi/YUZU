@@ -6,6 +6,8 @@ Yuzu's voice -- Piper TTS, isolated behind its own module.
     python3 yuzu_voice.py --say "PFFT! hey cutie"   # test any line
     python3 yuzu_voice.py --raw "pfft"              # skip the cleanup
     python3 yuzu_voice.py --tryout pfft             # audition spellings
+    python3 yuzu_voice.py --list                    # every voice installed
+    python3 yuzu_voice.py --use lessac              # switch to one, for good
 
 THE DEPENDENCY BOUNDARY LIVES HERE, DELIBERATELY.
 
@@ -270,11 +272,82 @@ def find_piper():
     return None
 
 
+# Remembers which voice was picked, so a second download doesn't
+# silently change who she sounds like. One line of plain text holding a
+# filename -- no config format, editable from a phone, and deleting it
+# just falls back to the first voice found.
+ACTIVE_FILE = HERE / "voices" / "ACTIVE"
+
+
+def list_voices():
+    """Every usable voice on this machine, in search order.
+
+    A voice is TWO files with the same stem -- model.onnx AND
+    model.onnx.json. Piper's error when the json is missing does not
+    mention the json, which is a genuinely miserable half hour, so a
+    voice missing its json is not listed as usable at all.
+    """
+    found, seen = [], set()
+    for directory in VOICE_DIRS:
+        try:
+            if not directory.is_dir():
+                continue
+            for onnx in sorted(directory.glob("*.onnx")):
+                real = onnx.resolve()
+                if real in seen:
+                    continue
+                seen.add(real)
+                if onnx.with_suffix(".onnx.json").is_file():
+                    found.append(onnx)
+        except (OSError, PermissionError):
+            continue
+    return found
+
+
+def remembered_voice():
+    """The voice named in voices/ACTIVE, if it still exists."""
+    try:
+        name = ACTIVE_FILE.read_text(encoding="utf-8").strip()
+    except (OSError, PermissionError):
+        return None
+    if not name:
+        return None
+    for voice in list_voices():
+        if voice.name == name:
+            return voice
+    return None
+
+
+def use_voice(fragment):
+    """Remember a voice by any part of its name. Returns the path."""
+    matches = [v for v in list_voices() if fragment.lower() in v.name.lower()]
+    if not matches:
+        raise VoiceError(
+            f"No installed voice matches '{fragment}'.\n"
+            f"  Installed: "
+            f"{', '.join(v.name for v in list_voices()) or '(none)'}\n"
+            f"  Download more into {HERE / 'voices'} -- see "
+            f"JETSON_SETUP.md section 6."
+        )
+    if len(matches) > 1:
+        raise VoiceError(
+            f"'{fragment}' matches {len(matches)} voices:\n  " +
+            "\n  ".join(v.name for v in matches) +
+            "\n  Be more specific."
+        )
+    ACTIVE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ACTIVE_FILE.write_text(matches[0].name + "\n", encoding="utf-8")
+    return matches[0]
+
+
 def find_voice():
     """A usable .onnx voice, or None.
 
-    Requires the matching .onnx.json beside it. Piper needs both, and
-    the error it gives when the json is missing does not say so.
+    Order: YUZU_VOICE for a one-off, then whatever --use remembered,
+    then the first voice found. That last fallback is why the other two
+    exist -- with two voices in the folder it silently picks
+    alphabetically, so downloading a nicer one and hearing the old one
+    would look like nothing happened.
     """
     override = os.environ.get(VOICE_ENV)
     if override:
@@ -286,16 +359,11 @@ def find_voice():
             f"  A voice is TWO files: model.onnx AND model.onnx.json.\n"
             f"  Both have to sit in the same folder."
         )
-    for directory in VOICE_DIRS:
-        try:
-            if not directory.is_dir():
-                continue
-            for onnx in sorted(directory.glob("*.onnx")):
-                if onnx.with_suffix(".onnx.json").is_file():
-                    return onnx
-        except (OSError, PermissionError):
-            continue
-    return None
+    remembered = remembered_voice()
+    if remembered:
+        return remembered
+    installed = list_voices()
+    return installed[0] if installed else None
 
 
 def find_player():
@@ -476,8 +544,54 @@ worth reporting.
 """
 
 
+def _show_voices():
+    installed = list_voices()
+    if not installed:
+        print(f"\nNo voices installed. Put a matching .onnx AND .onnx.json "
+              f"into\n  {HERE / 'voices'}\nBrowse and LISTEN first at "
+              f"rhasspy.github.io/piper-samples -- downloading a voice you "
+              f"haven't\nheard is how you end up with three you don't want.")
+        return 1
+    try:
+        active = find_voice()
+    except VoiceError as exc:
+        print(f"\n{exc}\n")
+        active = None
+    print(f"\n{len(installed)} voice(s) installed:\n")
+    for voice in installed:
+        size = voice.stat().st_size / 1e6
+        mark = "  <- ACTIVE" if active and voice == active else ""
+        print(f"  {voice.name:<34} {size:>5.0f} MB{mark}")
+    if os.environ.get(VOICE_ENV):
+        print(f"\n{VOICE_ENV} is set, and it wins over everything else.")
+    elif ACTIVE_FILE.exists():
+        print(f"\nRemembered in {ACTIVE_FILE}")
+    elif len(installed) > 1:
+        print("\nNothing is chosen, so the FIRST one alphabetically wins.")
+        print("Pick deliberately:  python3 yuzu_voice.py --use <part of name>")
+    print("\nSwitch:  python3 yuzu_voice.py --use <part of the name>")
+    print("Hear it: python3 yuzu_voice.py")
+    return 0
+
+
 def _cli(argv):
     check_only = "--check" in argv
+    if "--list" in argv:
+        return _show_voices()
+    if "--use" in argv:
+        index = argv.index("--use")
+        fragment = " ".join(argv[index + 1:]).strip()
+        if not fragment:
+            print("Which one? Try:  python3 yuzu_voice.py --list")
+            return 1
+        try:
+            chosen = use_voice(fragment)
+        except VoiceError as exc:
+            print(f"\n{exc}\n")
+            return 1
+        print(f"Now using {chosen.name}")
+        print("Hear it:  python3 yuzu_voice.py")
+        return 0
     say_text = raw_text = tryout = None
     for flag, target in (("--say", "say"), ("--raw", "raw"),
                          ("--tryout", "tryout")):
