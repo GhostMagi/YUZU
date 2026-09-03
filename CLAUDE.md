@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 268 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 271 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 268 tests pass on it. Getting it
+(that repo path is confirmed working). 271 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -564,18 +564,44 @@ The asterisks are from the multiplication case `normalize_actions`
 deliberately leaves alone, because the version that didn't ate the
 middle of the sentence.
 
-**ALL-CAPS is deliberately NOT touched, and that is pinned by a test.**
-"OMG", "PFFT", "MY. GOSH." are how she talks. Some engines read
-capitals as initialisms and some don't, and which one Piper does is a
-fact nobody in this project has heard yet. Guessing would be inventing
-one. `python3 yuzu_voice.py` speaks exactly those strings and says what
-to listen for; if it spells them out, THAT is the evidence to change it
-on. Same discipline as every prompt claim here.
+**SHE SPEAKS. Heard Sept 3, en_US-amy-medium, Ghost's laptop.** The
+tilde strip works -- "Ehehe~" came out as a laugh, not a symbol.
 
-**Not verified: how any of it sounds.** There was no speaker and no
-piper binary on the machine this was written on. Everything up to the
-synthesiser is tested; the audio is not. Setup is JETSON_SETUP.md §6
-and works on the laptop -- no Jetson needed, Piper is software.
+**ALL-CAPS was left untouched with a test saying "change this when
+someone listens". Someone listened.** Ghost ran the demo: "PFFT!" came
+back **"Pee Eff Eff Tee"**. Piper spells capitals it can't pronounce.
+
+The fix is NOT blanket lowercasing, because two different things wear
+capitals in her voice:
+
+    OMG, OG                          real initialisms. "oh em gee" IS
+                                     how you say them. Keep the caps.
+    PFFT HAHA GOSH SIX DANCE MY      shouted words. Spelling them is
+                                     nonsense. Lowercase them.
+
+Both lists come from words she has actually produced. `unshout()` keeps
+`SPOKEN_INITIALISMS` capitalised and lowercases the rest. Nothing is
+lost by dropping the caps -- Piper takes no emphasis from them -- and
+`speak()` prints the ORIGINAL text, so her transcript still shouts.
+
+If a new ALL-CAPS word shows up in a future round,
+`test_every_all_caps_word_she_has_ever_said_is_classified` is the thing
+that forces someone to decide which kind it is.
+
+**Still unheard: OMG and OG.** Ghost reported PFFT and the tilde; he
+did not say how the initialisms came out. They stay capitalised on the
+reasoning above, and the demo now exercises both classes explicitly.
+If "OMG" is mush, the allowlist is what's wrong.
+
+**Verified by machine, not by ear:** the text reaching the synthesiser,
+the command construction, flag detection, and every failure path
+falling back to printing. Setup is JETSON_SETUP.md §6 and works on any
+laptop -- no Jetson needed, Piper is software.
+
+**pip hides piper in `~/.local/bin`** when site-packages isn't
+writable, and warns about PATH in the middle of thirty lines of
+download output. `find_piper()` looks there, because reporting "not
+installed" about a binary sitting right there is the worse failure.
 
 **The remaining STUB is the mic.** Whisper is worth waiting for the
 Orin; TTS was not, because it cost nothing and needed nothing.

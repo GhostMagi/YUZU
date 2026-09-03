@@ -2800,17 +2800,51 @@ class TestVoice(unittest.TestCase):
     def test_emoji_are_dropped(self):
         self.assertEqual(self.voice.for_speech("hey cutie 💅✨"), "hey cutie")
 
-    def test_all_caps_is_deliberately_left_alone(self):
-        """Pinned as a DECISION, not an oversight.
+    def test_shouted_words_are_lowercased_so_piper_says_them(self):
+        """MEASURED Sept 3, en_US-amy-medium, Ghost's laptop.
 
-        "OMG" and "PFFT" are how she talks. Some engines read capitals
-        as initialisms and some don't, and which one Piper does is a
-        fact nobody here has heard yet -- so it stays untouched until
-        the demo settles it. If this test ever changes, it should
-        change because someone listened.
+        The previous version of this test pinned ALL-CAPS as
+        deliberately untouched, on the grounds that whether Piper reads
+        capitals as initialisms was a fact nobody here had heard. Ghost
+        ran the demo and heard it: "PFFT!" came back "Pee Eff Eff Tee".
+        So the decision changed, on evidence, exactly as that test said
+        it should.
         """
-        self.assertEqual(self.voice.for_speech("MY. GOSH. hot pink!"),
-                         "MY. GOSH. hot pink!")
+        self.assertEqual(self.voice.for_speech("PFFT! My camera!"),
+                         "pfft! My camera!")
+        self.assertEqual(self.voice.for_speech("MY. GOSH. SIX legs!"),
+                         "my. gosh. six legs!")
+
+    def test_real_initialisms_keep_their_capitals(self):
+        """The other half, and why blanket-lowercasing would be wrong.
+
+        "oh em gee" and "oh gee" IS how those are said. Spelling out is
+        correct here and only here -- both appear in captured replies,
+        and both currently sound right.
+        """
+        self.assertEqual(self.voice.for_speech("OMG, like, hi!"),
+                         "OMG, like, hi!")
+        self.assertEqual(self.voice.for_speech("My OG granddad!"),
+                         "My OG granddad!")
+        for word in ("OMG", "OG"):
+            self.assertIn(word, self.voice.SPOKEN_INITIALISMS)
+
+    def test_every_all_caps_word_she_has_ever_said_is_classified(self):
+        """Both classes are drawn from real captured output, not
+        imagined. If a new one shows up in a future round, this is the
+        test that makes someone decide which kind it is."""
+        for word in ("DANCE", "GOSH", "HAHA", "MY", "PFFT", "SIX", "SUPER"):
+            self.assertNotIn(word, self.voice.SPOKEN_INITIALISMS,
+                             f"{word} is a shouted word, not an initialism")
+            self.assertEqual(self.voice.unshout(word), word.lower())
+        for word in ("OMG", "OG"):
+            self.assertEqual(self.voice.unshout(word), word)
+
+    def test_single_capitals_and_normal_words_are_untouched(self):
+        # "I" must not become "i", and ordinary Capitalised words are
+        # not shouting.
+        self.assertEqual(self.voice.for_speech("I think Paris is unreal."),
+                         "I think Paris is unreal.")
 
     def test_nothing_to_say_stays_nothing(self):
         for empty in ("", "   ", "~", "***", "  ~~ "):
@@ -2967,8 +3001,11 @@ class TestVoice(unittest.TestCase):
             self.assertTrue(self.voice.for_speech(line).strip())
         joined = " ".join(self.voice.DEMO_LINES)
         self.assertIn("~", joined, "no line exercises the tilde")
-        self.assertTrue(re.search(r'\b[A-Z]{2,}\b', joined),
-                        "no line exercises ALL-CAPS")
+        caps = set(re.findall(r'\b[A-Z]{2,}\b', joined))
+        self.assertTrue(caps & self.voice.SPOKEN_INITIALISMS,
+                        "no line exercises a real initialism (OMG/OG)")
+        self.assertTrue(caps - self.voice.SPOKEN_INITIALISMS,
+                        "no line exercises a shouted word (PFFT/GOSH)")
 
 
 class TestSourceHygiene(unittest.TestCase):

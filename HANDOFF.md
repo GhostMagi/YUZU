@@ -36,7 +36,7 @@ Everything else she says goes to text-to-speech.
   hardware attached
 - Swappable personas: character text and body rules are separate files,
   composed at load time
-- 268 tests, ~18 seconds, all passing
+- 271 tests, ~18 seconds, all passing
 
 **Model:** `Llama-3.2-3B-Instruct-heretic-ablitered-uncensored` Q4_K_M
 (the "ablitered" misspelling is genuinely in the repo name), pulled via

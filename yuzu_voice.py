@@ -93,6 +93,27 @@ class VoiceError(RuntimeError):
 #   '~'  x1   from "Ehehe~", which is her signature laugh.
 #
 # Both would be handed to Piper today. Neither is a word.
+# MEASURED, Sept 3, on Ghost's laptop with en_US-amy-medium: Piper
+# spells ALL-CAPS out letter by letter when the word isn't a known
+# pronounceable token. "PFFT!" came back "Pee Eff Eff Tee".
+#
+# But blanket-lowercasing is wrong, because two different things wear
+# capitals in her voice:
+#
+#   OMG, OG   -- genuine initialisms. "oh em gee" IS how you say them,
+#                and lowercasing would break what currently works.
+#   PFFT, HAHA, GOSH, SIX, DANCE, MY, SUPER
+#             -- shouted words. Spelling them is nonsense.
+#
+# So: keep the initialisms capitalised, lowercase everything else. The
+# caps carried no sound anyway -- Piper takes no emphasis from them --
+# so nothing is lost by dropping them, and speak() prints the ORIGINAL
+# text, so her transcript still shows her shouting.
+SPOKEN_INITIALISMS = {
+    "OMG", "OG", "IDK", "TBH", "LOL", "LMAO", "BRB", "BFF",
+    "AF", "FR", "DIY", "DJ", "TV", "PC", "AI", "OK",
+}
+_SHOUTED = re.compile(r'\b[A-Z]{2,}\b')
 _TILDE_RUN = re.compile(r'~+')
 _ASTERISK = re.compile(r'\*+')
 _EMOJI_AND_SYMBOLS = re.compile(
@@ -101,24 +122,32 @@ _EMOJI_AND_SYMBOLS = re.compile(
 _WHITESPACE = re.compile(r'\s+')
 
 
+def unshout(text: str) -> str:
+    """Lowercase shouted words, keep real initialisms capitalised.
+
+    See SPOKEN_INITIALISMS. This exists because someone listened, which
+    is the only way anything in this project gets decided.
+    """
+    return _SHOUTED.sub(
+        lambda m: m.group(0) if m.group(0) in SPOKEN_INITIALISMS
+        else m.group(0).lower(),
+        text)
+
+
 def for_speech(text: str) -> str:
     """Clean one line of dialogue for the synthesiser.
 
-    Deliberately conservative. This runs AFTER strip_actions, so the
-    brackets are already gone and what's left is meant to be said out
-    loud -- the job here is only to remove things that are not words,
-    never to rewrite her voice.
-
-    In particular ALL-CAPS is left exactly alone. "OMG" and "PFFT" are
-    how she talks, some engines read capitals as initialisms, and
-    guessing which way Piper goes would be inventing a fact. Run the
-    demo, listen, and if it spells them out, fix it then with evidence.
+    Runs AFTER strip_actions, so the brackets are already gone and
+    what's left is meant to be said out loud. The job is to remove
+    things that aren't words and fix things that would be mispronounced
+    -- never to rewrite her voice.
     """
     if not text:
         return ""
     text = _TILDE_RUN.sub("", text)       # Ehehe~ -> Ehehe
     text = _ASTERISK.sub(" ", text)       # a bare * is never a word
     text = _EMOJI_AND_SYMBOLS.sub(" ", text)
+    text = unshout(text)                  # PFFT -> pfft, OMG stays OMG
     return _WHITESPACE.sub(" ", text).strip()
 
 
@@ -331,29 +360,29 @@ class Voice:
 DEMO_LINES = [
     "Not much, just vibing! What's good with you?",
     "Ehehe~ okay okay, I'm a kitty cat on six legs!",     # the tilde
-    "MY. GOSH. hot pink!",                                # ALL-CAPS
-    "OMG, like, hi! robot babe!",                         # OMG, PFFT
-    "PFFT! My camera is shaking!",
+    "PFFT! My camera is shaking!",                        # shouted word
+    "MY. GOSH. SIX legs!",                                # more shouting
+    "OMG, like, hi! My OG granddad!",                     # real initialisms
     "Aw, no arms on this chassis, cutie! That wiggle is a hug in robot.",
     "Paris! North of the country, big pointy tower, unreal shopping.",
 ]
 
 LISTEN_FOR = """
-Listen for these four things specifically:
+Listen for these three things. The line under each is what Piper
+actually receives -- if the sound doesn't match the text, that's a bug
+worth reporting.
 
-  1. "Ehehe~"     -- does it sound like a laugh, or does it read the
-                     tilde out? (for_speech strips it before Piper
-                     sees it, so it should just be "Ehehe".)
-  2. "MY. GOSH."  -- said as words, or spelled "em why gee oh ess
-                     aitch"? Some engines treat ALL-CAPS as initialisms.
-                     Capitals are deliberately left alone for now; if
-                     this comes out wrong, that is the evidence to
-                     change it on.
-  3. "OMG"/"PFFT" -- "oh em gee" is right, "omg" as a word is fine
-                     too. Both are better than silence.
-  4. Speed        -- yuzu4 asks for length_scale 0.88, which is slightly
-                     faster than default. Coco runs 1.08, slower. If
-                     she sounds rushed or drugged, that dial is in the
+  1. "PFFT!"      -- MEASURED Sept 3: Piper spelled this "Pee Eff Eff
+                     Tee". It is now lowercased before Piper sees it,
+                     so it should be a noise, not an acronym. Same for
+                     "MY. GOSH. SIX legs!"
+  2. "OMG"/"OG"   -- these are the opposite case and stay capitalised
+                     on purpose. "oh em gee" and "oh gee" IS how you say
+                     them. If they come out as mush, the allowlist in
+                     SPOKEN_INITIALISMS is wrong.
+  3. Speed        -- yuzu4 asks for length_scale 0.88, slightly faster
+                     than default. Coco runs 1.08, slower. If she sounds
+                     rushed or sedated, that dial is one line in her
                      .persona file.
 """
 
@@ -379,7 +408,11 @@ def _cli(argv):
     print(LISTEN_FOR)
     for line in DEMO_LINES:
         cleaned = for_speech(line)
-        print(f'  saying: "{cleaned}"')
+        if cleaned != line:
+            print(f'  wrote : "{line}"')
+            print(f'  saying: "{cleaned}"')
+        else:
+            print(f'  saying: "{cleaned}"')
         if not voice.say(line):
             print("     ...that one didn't play.")
     if voice.failures:
