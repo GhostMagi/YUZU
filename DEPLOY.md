@@ -26,7 +26,7 @@ That's the whole list. **Nothing in this project needs pip.**
 ```bash
 git clone https://github.com/GhostMagi/YUZU.git
 cd YUZU
-python3 test_yuzu.py          # 182 tests. If this passes, the code is fine.
+python3 YUZU_TESTER.py          # 193 tests. If this passes, the code is fine.
 python3 yuzu_all_in_one.py    # talk to her
 ```
 
@@ -43,7 +43,7 @@ Every dependency is standard library, on purpose:
   `ollama` package or `requests`
 - `gguf_inspect.py` parses GGUF headers with `struct`, not the `gguf`
   package
-- `test_yuzu.py` is `unittest` with a hand-rolled mock Ollama server,
+- `YUZU_TESTER.py` is `unittest` with a hand-rolled mock Ollama server,
   not pytest
 - `muto_leg_control.py` is arithmetic and `time.sleep`
 
@@ -69,7 +69,7 @@ stops with an explanation rather than pretending.
 
 ```bash
 git clone ... && cd YUZU
-python3 test_yuzu.py
+python3 YUZU_TESTER.py
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M
 python3 build_yuzu_model.py --base hf.co/... --create

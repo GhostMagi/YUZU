@@ -33,7 +33,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python test_yuzu.py           # 148 tests, ~9 seconds
+python YUZU_TESTER.py           # 193 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 python yuzu_led_controller.py # dump the LED zone config
 ```
@@ -92,7 +92,7 @@ $400.
 | `yuzu_led_controller.py` | Zone dump, front-end over `LEDManager` |
 | `yuzu_robot_config.json` | The one config file |
 | `readtest.py` | Smoke test that the config loads |
-| `test_yuzu.py` | Test suite |
+| `YUZU_TESTER.py` | Test suite |
 | `Yuzu_Full_Technical_Context_Dump.md` | Full project context and reasoning |
 | `Claude_Memory_Export_StackchanBuild.md` | Project history, Stackchan → now |
 | `paintstepslol.txt` | Paint prep steps for the chassis |

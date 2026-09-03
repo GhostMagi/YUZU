@@ -156,7 +156,7 @@ are for. Don't hand him a ten-step plan; hand him step one and wait.
 **Check things before asserting them.** This project has been bitten
 repeatedly by confident guesses — a stale doc, a parser bug nobody
 tested, a hypothesis that felt obviously right and measured as noise.
-Run the code. Score the output. `python test_yuzu.py` is 18 seconds.
+Run the code. Score the output. `python YUZU_TESTER.py` is 18 seconds.
 
 **Where the detail lives**
 | File | What's in it |

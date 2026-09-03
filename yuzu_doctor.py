@@ -71,7 +71,7 @@ EXPECTED = {
     "yuzu_robot_config.json": "LED config",
     "muto_leg_control.py":    "leg gaits + simulator",
     "yuzu_led_manager.py":    "LED manager",
-    "test_yuzu.py":           "the test suite",
+    "YUZU_TESTER.py":           "the test suite",
     "yuzu_prompt_eval.py":    "prompt scoring",
 }
 

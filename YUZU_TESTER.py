@@ -2,7 +2,7 @@
 Yuzu's test suite. Plain stdlib unittest -- no pip installs, so it runs
 in Pydroid on the phone exactly like it runs on the Jetson:
 
-    python test_yuzu.py
+    python YUZU_TESTER.py
 
 Every test here is a real bug that was found by running the code, or a
 behaviour worth locking down so a future edit can't quietly break it.

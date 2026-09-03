@@ -221,7 +221,7 @@ behind it. If the two disagree, the code is right.
   yuzu_led_controller.py  thin zone-dump front-end over LEDManager.
   yuzu_robot_config.json  the one config file.
   readtest.py           smoke test that the config loads. Portable.
-  test_yuzu.py          82 stdlib tests. `python test_yuzu.py`. The
+  YUZU_TESTER.py          193 stdlib tests. `python YUZU_TESTER.py`. The
                         brain tests run against a mock Ollama server,
                         so no model download is needed to run them.
 
@@ -229,7 +229,7 @@ behind it. If the two disagree, the code is right.
 ## 7. BUGS FOUND BY RUNNING THE CODE (all now fixed)
 ======================================================================
 Each of these was reproduced before being fixed, and each has a
-regression test in test_yuzu.py named after it.
+regression test in YUZU_TESTER.py named after it.
 
 1. `[stretches]` did nothing. The stemmer dropped a trailing "s" from
    any word over 3 characters, turning "stretches" into "stretche",

@@ -247,7 +247,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 ```
 git clone https://github.com/GhostMagi/YUZU.git
 cd YUZU
-python3 test_yuzu.py
+python3 YUZU_TESTER.py
 ```
 154 tests, about 9 seconds. If they pass, the laptop is ready.
 
