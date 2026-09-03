@@ -3139,6 +3139,49 @@ class TestVoice(unittest.TestCase):
         self.assertIn("yuzu_voice", guarded,
                       "yuzu_voice must be imported inside a try/except")
 
+    def test_the_transcript_names_whoever_is_actually_talking(self):
+        """A whole conversation with the kuudere scrolled past labelled
+        "YUZU SAYS". Third instance of the same class -- the name
+        leaking out of the character it belongs to -- after the eval
+        prompt and the missing-model error. This one hid longest
+        because it is a print, not logic, so auditing runtime
+        references missed it."""
+        import contextlib, io
+        real = yuzu.current_persona
+        try:
+            for key, expected in ((yuzu_personas.LIVE_PERSONA, "YUZU SAYS"),
+                                  ("coco", "COCO SAYS")):
+                yuzu.current_persona = yuzu_personas.load(key)
+                buffer = io.StringIO()
+                with contextlib.redirect_stdout(buffer):
+                    yuzu.speak("Waiting for you to say something.")
+                self.assertIn(expected, buffer.getvalue())
+                if key == "coco":
+                    self.assertNotIn("YUZU", buffer.getvalue())
+        finally:
+            yuzu.current_persona = real
+
+    def test_no_persona_loaded_still_labels_the_line(self):
+        # The echo stub runs with current_persona None. Never crash, and
+        # never claim to be a character that isn't loaded.
+        real = yuzu.current_persona
+        try:
+            yuzu.current_persona = None
+            self.assertEqual(yuzu.speaker_name(), "ROBOT")
+        finally:
+            yuzu.current_persona = real
+
+    def test_the_transcript_says_when_audio_did_not_play(self):
+        """The old label carried this distinction ("YUZU SAYS" heard vs
+        "TTS SAYS" printed) and it is worth keeping -- on a robot you
+        are SSH'd into, it is how you tell a silent speaker from a
+        silent robot."""
+        import contextlib, io
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            yuzu.speak("No arms on this chassis.")
+        self.assertIn("(text only)", buffer.getvalue())
+
     def test_speech_still_prints_when_the_voice_cannot_play(self):
         # The transcript is how you know what she said when you are
         # SSH'd in from another room.

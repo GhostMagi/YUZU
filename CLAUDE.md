@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 283 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 286 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 283 tests pass on it. Getting it
+(that repo path is confirmed working). 286 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -736,6 +736,51 @@ the Orin the voice shares 8GB with the LLM).
 
 **The remaining STUB is the mic.** Whisper is worth waiting for the
 Orin; TTS was not, because it cost nothing and needed nothing.
+
+## The transcript now names who is speaking
+
+`speak()` hardcoded `"YUZU SAYS"`, so Ghost's first real conversation
+with Coco scrolled past entirely labelled YUZU. Fixed: `speaker_name()`
+reads `current_persona`, falling back to `ROBOT` on the echo stub.
+
+**Third instance of one class of bug** -- the name leaking out of the
+character it belongs to. The other two were the eval opening "Hey Yuzu,
+what's up?" for every persona, and `check()` saying
+`ollama create yuzu` whatever model was missing. This one survived the
+audit that caught those because it is a `print`, not logic. If a fourth
+turns up, grep for the string, not the code path.
+
+The heard-vs-printed distinction is kept as a `(text only)` suffix. On
+a robot you are SSH'd into, that is how you tell a silent speaker from
+a silent robot.
+
+## OPEN: the servo file hands every persona a gyaru's sounds
+
+Found Sept 3 in Coco's first live conversation. She produced
+`[Ehehe~]` (bracketed, so the whitelist dropped it) and spoke "Haha!".
+Both are Yuzu's register, and her own rule says she does not shout or
+stack exclamation marks.
+
+The mechanism is visible in the prompt, not inferred:
+
+    body block hands BOTH of them : Ehehe~, Haha!, Ugh, Ooh
+    yuzu4's own examples use      : Ehehe~        (consistent)
+    coco's own examples use       : Hm.           (never shown to her)
+
+`_hardware_muto_s2.txt` is the file CLAUDE.md already says is "for
+servos" and must not carry character stances. The sounds RULE (sounds
+are words, not brackets) is a body fact and belongs there. The sound
+EXAMPLES are character and do not.
+
+**Proposed fix, NOT applied -- Ghost's call.** Drop the four tokens
+from the shared line, keep the rule. Each persona's own examples
+already carry her register: Yuzu has "Ehehe~", Coco has "Hm.". That is
+the pattern this repo proved twice, examples over rules.
+
+Cost: it changes the LIVE persona's prompt, so it wants an A/B round to
+confirm nothing regressed. Against that, n=1 conversation -- two
+register slips in four turns, and both failed safe. Worth doing when
+something else justifies a round, not on its own.
 
 ## LEDs are removed
 

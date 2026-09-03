@@ -354,6 +354,21 @@ def split_reply(text: str) -> list:
     return parts
 
 
+def speaker_name():
+    """Whoever is actually talking, for the transcript.
+
+    Hardcoding "YUZU" here meant a whole conversation with the kuudere
+    scrolled past labelled YUZU SAYS. Same class as the eval prompt that
+    opened "Hey Yuzu, what's up?" for every persona and the error that
+    said `ollama create yuzu` whatever model was missing -- the name
+    leaking out of the character it belongs to. This one hid longer
+    because it is a print, not logic.
+    """
+    if current_persona is not None:
+        return current_persona.name.upper()
+    return "ROBOT"
+
+
 def speak(text: str):
     """Say one line out loud, and always print it.
 
@@ -364,7 +379,8 @@ def speak(text: str):
     that stops when the speaker breaks is worse than a silent one.
     """
     heard = voice.say(text) if (voice and voice.ready) else False
-    print(f"{'YUZU SAYS' if heard else 'TTS SAYS'}: \"{text}\"")
+    tail = "" if heard else " (text only)"
+    print(f"{speaker_name()} SAYS{tail}: \"{text}\"")
 
 
 def handle_yuzu_reply(raw_llm_output: str, interleave=True):
