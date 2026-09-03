@@ -1060,6 +1060,17 @@ class TestHistoryCanonicalisation(unittest.TestCase):
             self.assertNotIn("*", message["content"])
         self.assertIn("[spins]", brain.history[1]["content"])
 
+    def test_stop_is_sayable(self):
+        """Found live: told to "stop walking", Yuzu used [centers camera]
+        because nothing on the menu meant stop. stance() -- feet planted,
+        body level, motion finished -- is exactly stopping."""
+        for phrase in ("stop", "stop walking", "stop moving", "stand still",
+                       "hold still", "halt", "freeze", "wait", "stay"):
+            matches = yuzu.lookup_actions(phrase)
+            self.assertTrue(matches, f"[{phrase}] must be sayable")
+            self.assertIs(matches[0][0], yuzu.ACTION_WHITELIST["stand"][0],
+                          f"[{phrase}] should plant her, not something else")
+
     def test_recovered_phrasings_from_live_output(self):
         for phrase in ("wriggles legs around", "bounces up and down",
                        "shakes legs some more", "twirls"):

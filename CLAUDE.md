@@ -142,6 +142,42 @@ the action in prose.
 +78 chars, one variable. Run `--persona yuzu2` vs `--persona yuzu4`
 and watch `moves_at_all` and that specific prompt.
 
+**yuzu4 HELD — Sept 3, PocketPal, 4 replies.** Not the clean bare-command
+test (the commands got wrapped in greetings), but the thing it was built
+for worked anyway: **4/4 replies moved**, including "Hii! Whats up girl?
+Walk forward." — the exact shape that produced zero brackets in both
+earlier arms. Actions run 9/17 = 53%, dragged down by vocalizations.
+
+Two new findings from that round:
+
+1. **Wrong direction, not no direction.** "Walk forward" got
+   `[walks backward]`; "Turn around" got `[looks right]`. She now
+   reliably reaches for the menu but grabs the wrong item off it. This
+   is a different failure class from the old one and probably a 3B
+   comprehension limit rather than a prompt bug -- weigh carefully
+   before spending prompt budget on it, see the latency note below.
+
+2. **There was NO way to say stop.** No stop, halt, wait, stand still
+   or freeze anywhere in the whitelist. Told to "stop walking" she used
+   `[centers camera]`, the closest thing available. FIXED: those nine
+   phrasings now alias to `stand`, which calls `stance()` -- feet
+   planted, body level, motion over. That IS stopping.
+
+**LATENCY IS THE URGENT PROBLEM ON THE PHONE.** Time-to-first-token
+across that one four-turn conversation:
+
+    turn 1   51s
+    turn 2   73s
+    turn 3   98s
+    turn 4  107s
+
+Climbing every turn as history accumulates on top of a 3797-char
+prompt. Nearly two minutes before she starts speaking. The Jetson will
+be far better (GPU, and `history_turns=8` caps the growth), but this is
+now the strongest argument against adding ANY further prompt rules.
+Every new line costs seconds on every turn, forever. If something must
+be added, take something else out.
+
 **Eval cost on the laptop is real.** 36 replies took long enough that
 Ghost abandoned a run. Use `--runs 1` (12 replies) for direction; the
 12-reply numbers tracked the 36-reply ones closely (58.3 vs 52.8 on

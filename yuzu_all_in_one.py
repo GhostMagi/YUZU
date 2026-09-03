@@ -162,6 +162,21 @@ ACTION_ALIASES = {
     "sit":               "squat",
     "stand up":          "stand",
     "get up":            "stand",
+    # "Stop" is one of the most natural things to say to a robot and
+    # there was NO way to say it -- no stop, halt, wait or stand still
+    # anywhere in the whitelist. Told to stop walking, Yuzu reached for
+    # [centers camera] because it was the closest thing on the menu.
+    # stand() calls stance(): feet planted, body level, motion over.
+    # That IS stopping, so these all point at it.
+    "stop":              "stand",
+    "stop walking":      "stand",
+    "stop moving":       "stand",
+    "stand still":       "stand",
+    "hold still":        "stand",
+    "halt":              "stand",
+    "freeze":            "stand",
+    "wait":              "stand",
+    "stay":              "stand",
     "wiggle legs":       "shake legs",
     "wriggle legs":      "shake legs",
     "wriggle":           "shake legs",
