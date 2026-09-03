@@ -1484,6 +1484,179 @@ class TestBareCommandExperiment(unittest.TestCase):
             "Where are we headed, cutie?\n", ""), v2)
 
 
+class TestYuzu5(unittest.TestCase):
+    """v5 is v4 tightened for Jetson latency: 3797 -> 3134 chars. The
+    three character RULES (flirty / loves pink / the mall) were cut
+    because the EXAMPLES already demonstrate all three, which is the
+    pattern this repo has proven twice. Every measured win is kept.
+    These tests are the guard against a future edit quietly dropping
+    one of them."""
+
+    def prompt(self):
+        return yuzu_personas.load("yuzu5").prompt
+
+    # --- every measured win must survive ---------------------------
+    MEASURED_WINS = {
+        "self-concept, fixed 'my world is this room'":
+            "never a limit on what you can think",
+        "anti-asterisk rule, removing it regressed":
+            "Never write a movement between",
+        "sounds rule names BOTH wrappers":
+            "no brackets and no asterisks",
+        "always-speak rule, fixed the freeze":
+            "only brackets is a broken reply",
+        "always-move rule, 50% -> 100% moves_at_all":
+            "statue talking",
+        "brevity rule, 62w -> 38w":
+            "Two or three sentences",
+        "answer-first rule, fixed the dodge":
+            "answer it first",
+        "no-puppeteering, 100% across 48+ replies":
+            "Never write the user's",
+        "bare-command example, 4/4 moved":
+            "User: Walk forward.",
+    }
+
+    def test_no_measured_win_was_lost_in_the_trim(self):
+        prompt = self.prompt()
+        for name, needle in self.MEASURED_WINS.items():
+            self.assertIn(needle, prompt, f"v5 dropped: {name}")
+
+    # --- the cut has to be justified, not just smaller --------------
+    def test_the_cut_character_rules_are_still_taught_by_example(self):
+        """Cutting rules 5, 7 and 8 is only safe because the examples
+        already show flirty, pink and wanting things. If an example is
+        ever reworded away, the trait leaves the prompt entirely."""
+        prompt = self.prompt()
+        examples = prompt[prompt.index("EXAMPLES"):]
+        rules = prompt[prompt.index("HOW YOU TALK"):prompt.index("EXAMPLES")]
+        for trait, needles in {
+            "flirty": ["cutie", "bestie"],
+            "loves pink": ["hot pink", "Pink is my"],
+            "wants things": ["mall", "I'd go tomorrow"],
+        }.items():
+            self.assertTrue(any(n in examples for n in needles),
+                            f"'{trait}' is no longer shown in any example")
+            self.assertFalse(any(n.lower() in rules.lower() for n in needles),
+                             f"'{trait}' is still a rule; the cut didn't happen")
+
+    def test_it_is_actually_smaller_than_v4(self):
+        v4 = len(yuzu_personas.load("yuzu4").prompt)
+        v5 = len(self.prompt())
+        self.assertLess(v5, v4)
+        self.assertGreater((v4 - v5) / v4, 0.10, "trim should be >10% to be worth it")
+
+    # --- structural soundness --------------------------------------
+    def test_every_example_reply_both_speaks_and_moves(self):
+        """Her own examples must obey rules 1 and 2, or they teach the
+        opposite of what the rules say."""
+        for line in self.prompt().splitlines():
+            if not line.startswith("Yuzu:"):
+                continue
+            body = line[len("Yuzu:"):]
+            self.assertTrue(yuzu.strip_actions(body).strip(),
+                            f"example says nothing out loud: {line}")
+            ran = [a for a in yuzu.extract_actions(body) if yuzu.lookup_actions(a)]
+            self.assertTrue(ran, f"example never moves: {line}")
+
+    def test_every_action_offered_actually_runs(self):
+        for line in self.prompt().splitlines():
+            if "bracket" in line.lower():
+                continue                      # format instruction, not a move
+            for phrase in set(re.findall(r'\[([a-z][a-z ]*)\]', line)):
+                self.assertTrue(yuzu.lookup_actions(phrase),
+                                f"v5 offers [{phrase}] but nothing runs it")
+
+    def test_the_whole_whitelist_is_exposed(self):
+        menu = re.findall(r'\[([a-z][a-z ]*)\]', self.prompt())
+        covered = {id(yuzu.lookup_actions(m)[0][0])
+                   for m in menu if yuzu.lookup_actions(m)}
+        missing = [k for k, (fn, _) in yuzu.ACTION_WHITELIST.items()
+                   if id(fn) not in covered]
+        self.assertEqual(missing, [], "she is never told these exist")
+
+    def test_stop_is_demonstrated_not_just_aliased(self):
+        """Found live: told to stop, she used [centers camera] because
+        nothing meant stop. The alias fixes the parser; the example
+        teaches her the word."""
+        self.assertIn("User: Stop.", self.prompt())
+
+    def test_no_impossible_action_is_named_in_the_rules(self):
+        head = self.prompt()[:self.prompt().index("EXAMPLES")].lower()
+        for word in ("wink", "hug", "wave", "smize", "nod"):
+            self.assertNotIn(word, head,
+                             f"'{word}' named in the rules -- pink-elephant trap")
+
+
+class TestHistoricalCorpus(unittest.TestCase):
+    """Every reply this project has actually captured, v1 through v4,
+    replayed through the real pipeline. Invented test cases test what
+    we imagined; this tests what the model really did."""
+
+    CORPUS = [
+        "Awwwwww, that's so sweet! [hugs, squeeze, and a little spin] My OG granddad!",
+        "[Bounces up and down, [taps hands on thighs, then [shakes hips, and [springs up]",
+        "[Smizes] Hiya, cutie! [winks] I'm a Gyaru! [giggles] I love fashion!",
+        "You know I got this! [stretches] [spins] [winks] [shakes legs some more]",
+        "Madrid, duh! [looks down] [walks forward] [shakes legs] [spins]",
+        "OMG, like, hi! *giggles* robot babe! *shakes legs* *winks*",
+        "HAHA! *laughs* SIX legs! *shakes legs* *giggles* *holds up camera*",
+        "Say less! *spins* [turns] [stretches] [walks backward] [twirls] *winks*",
+        "Let's go shopping! *squeals* new bodysuit! *winks*",
+        "Hehe! [shakes legs] Okay okay! *wriggles legs around* See?",
+        "Aw, a hug? *opens legs slightly* *gently wraps legs around you* *giggles*",
+        "PFFT! *laughs* My camera is shaking!",
+        "MY. GOSH. *squeals* hot pink! *bounces up and down*",
+        "Ehehe~! *giggles* DANCE DANCE! *starts dancing robot legs and wiggling camera*",
+        "Ooh, not much! [walks backward] pink hair clips! [shakes legs] What's poppin'?",
+        "[looks right] facin' the right way! [walks forward] [walks backward] [sighs]",
+        "[laughs] I can do a squat! [squat] Woah! [stands up] [winks]",
+        "[centers camera] standin' still! *squeal* *giggles* *fans self* *winks*",
+        "", "[squats] [shakes legs]", "Heyyy cutie! [squa",
+        "it's 2 * 3 * 4 babe", "**waves** hey!",
+    ]
+
+    def test_nothing_in_the_corpus_crashes_the_pipeline(self):
+        # The gaits are covered by TestGaits; what is under test here is
+        # the pipeline around them. Their real servo timing would add a
+        # minute to a suite Ghost runs constantly, so settle() and the
+        # pose-hold sleeps are stubbed out for the duration.
+        spoken = []
+        real_speak, yuzu.speak = yuzu.speak, spoken.append
+        real_settle, legs.settle = legs.settle, lambda *a, **k: None
+        real_sleep, legs.time.sleep = legs.time.sleep, lambda *a, **k: None
+        yuzu.PAUSE_SCALE = 0.0
+        try:
+            for raw in self.CORPUS:
+                yuzu.handle_yuzu_reply(raw)      # must never raise
+        finally:
+            yuzu.speak, yuzu.PAUSE_SCALE = real_speak, 1.0
+            legs.settle, legs.time.sleep = real_settle, real_sleep
+
+    def test_no_markup_ever_reaches_tts(self):
+        """Paired asterisks are markup and must go. A LONE asterisk is
+        arithmetic and must survive -- an earlier regex ate the middle
+        of 'it's 2 * 3 * 4'."""
+        for raw in self.CORPUS:
+            said = yuzu.strip_actions(yuzu.normalize_actions(raw))
+            self.assertIsNone(re.search(r'\*\S[^*\n]*\*', said),
+                              f"markup survived into speech: {said!r}")
+            self.assertNotIn("[", said)
+            self.assertNotIn("]", said)
+
+    def test_arithmetic_survives(self):
+        self.assertEqual(
+            yuzu.strip_actions(yuzu.normalize_actions("it's 2 * 3 * 4 babe")),
+            "it's 2 * 3 * 4 babe")
+
+    def test_impossible_actions_never_run(self):
+        for phrase in ("winks", "smizes", "giggles", "laughs", "squeals",
+                       "sighs", "fans self", "holds up camera", "waves",
+                       "opens legs slightly", "gently wraps legs around you"):
+            self.assertEqual(yuzu.lookup_actions(phrase), [],
+                             f"[{phrase}] must never reach a servo")
+
+
 class TestBlockSubstitution(unittest.TestCase):
     """Hardware blocks can reference other blocks."""
 

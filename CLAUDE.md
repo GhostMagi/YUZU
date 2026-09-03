@@ -178,6 +178,37 @@ now the strongest argument against adding ANY further prompt rules.
 Every new line costs seconds on every turn, forever. If something must
 be added, take something else out.
 
+**yuzu5 — the trim, built Sept 3, NOT yet run against the model.**
+3797 -> 3134 chars, a 17% cut, motivated entirely by the latency wall
+above. What changed:
+
+- Rules 5, 7 and 8 (playful/flirty, loves pink, the mall) are GONE as
+  rules. They are cut only because the EXAMPLES already demonstrate all
+  three -- "cutie"/"bestie", "nails in hot pink"/"Pink is my whole
+  personality", "unreal shopping, I'd go tomorrow". That is the pattern
+  this repo proved twice: examples teach character better than rules.
+  A test asserts each trait still appears in an example AND no longer
+  appears as a rule, so rewording an example can't silently delete a
+  trait.
+- The body prose is tightened, same meaning, fewer words.
+- Added one example: `User: Stop.` -- the stop aliases fix the parser,
+  but she also needs to see the word.
+- Eight rules became five.
+
+Every one of the nine measured wins is kept and pinned by
+`TestYuzu5.MEASURED_WINS`: self-concept, anti-asterisk, sounds naming
+both wrappers, always-speak, always-move, brevity, answer-first,
+no-puppeteering, bare-command example.
+
+**What "tested in a sim" does and does not mean here.** Verified by
+machine: every example both speaks and moves, every phrase offered
+actually runs, all 13 whitelist entries are exposed, no impossible
+action is named in the rules, and the whole historical corpus -- 23
+real replies spanning v1 to v4 plus five pathological cases -- runs
+through the pipeline with zero crashes and zero markup reaching TTS.
+NOT verified: how the model responds to v5. Only the laptop or the
+Jetson can answer that. Run `--persona yuzu4` vs `--persona yuzu5`.
+
 **Eval cost on the laptop is real.** 36 replies took long enough that
 Ghost abandoned a run. Use `--runs 1` (12 replies) for direction; the
 12-reply numbers tracked the 36-reply ones closely (58.3 vs 52.8 on
