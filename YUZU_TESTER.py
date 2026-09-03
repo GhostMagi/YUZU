@@ -2442,17 +2442,62 @@ class TestMovementRule(unittest.TestCase):
         self.assertIn("Say the actual answer before you say how you feel",
                       yuzu_personas.load("yuzu2").prompt)
 
-    def test_coco_is_on_hold_and_did_not_receive_this(self):
-        """Ghost asked to iterate on Yuzu alone. A new block in the
-        shared body file must reach only the personas that reference its
-        token -- that is the whole point of composing by name, and it is
-        what keeps one character's round from contaminating another's."""
+    def test_coco_has_it_now_that_her_hold_is_lifted(self):
+        """Coco was deliberately held back while Yuzu iterated, so one
+        character's round could not contaminate another's. Ghost lifted
+        that hold on Sept 3 ("im ready for coco").
+
+        The composing-by-name property this used to guard still holds
+        and is still worth having -- a block reaches only the personas
+        that reference its token. What changed is that Coco now
+        references it on purpose.
+        """
         blocks = yuzu_personas._parse_hardware("muto_s2")
         self.assertIn("MOVEMENT_RULE_V2", blocks)
-        self.assertIn(blocks["MOVEMENT_RULE_V2"],
-                      yuzu_personas.load("yuzu2").prompt)
+        for key in ("yuzu2", "coco"):
+            self.assertIn(blocks["MOVEMENT_RULE_V2"],
+                          yuzu_personas.load(key).prompt,
+                          f"{key} lost the 50%-to-100% movement rule")
+        # The frozen v1 archive composes a different block set and must
+        # NOT pick it up -- that is the property still being guarded.
         self.assertNotIn(blocks["MOVEMENT_RULE_V2"],
-                         yuzu_personas.load("coco").prompt)
+                         yuzu_personas.load("yuzu").prompt)
+
+    def test_coco_carries_every_measured_win_the_live_persona_has(self):
+        """Parity, checked mechanically instead of remembered.
+
+        Coco was built on v2's structure and then Yuzu got three more
+        rounds of measured fixes. She had drifted two behind: the
+        always-MOVE rule (50% -> 100% on moves_at_all, the single
+        biggest win in the project) and the bare-command example (4/4
+        replies moved). Both were format rules, not character, so there
+        was never a reason for her not to have them.
+
+        Reuses TestYuzu5.MEASURED_WINS so a win added there is
+        automatically required of her too.
+        """
+        coco = yuzu_personas.load("coco").prompt
+        live = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).prompt
+        for name, needle in TestYuzu5.MEASURED_WINS.items():
+            if needle not in live:
+                continue                      # not a win the live arm has
+            if needle == "User: Walk forward.":
+                self.assertIn(needle, coco, f"coco lacks: {name}")
+                continue
+            self.assertIn(needle, coco, f"coco lacks: {name}")
+
+    def test_cocos_bare_command_example_is_in_her_own_register(self):
+        """The SHAPE is what was measured -- a flat imperative. The
+        voice has to be hers, or the example teaches Yuzu's register to
+        a kuudere, which is the drift that made persona switching clear
+        history in the first place."""
+        coco = yuzu_personas.load("coco").prompt
+        line = [l for l in coco.splitlines() if l.startswith("Coco: Walking")][0]
+        self.assertEqual(yuzu.extract_actions(line), ["walks forward"])
+        self.assertTrue(yuzu.lookup_actions("walks forward"))
+        for gyaru in ("!", "cutie", "bestie", "omg", "hype"):
+            self.assertNotIn(gyaru, line.lower(),
+                             f"'{gyaru}' is Yuzu's voice, not Coco's")
 
     def test_every_example_in_every_persona_actually_moves(self):
         """If an example can sit still, the strongest signal in the
@@ -2656,6 +2701,34 @@ class TestABRunner(unittest.TestCase):
         for key in self.ab.ARMS:
             self.assertIn(key, yuzu_personas.available(),
                           f"YUZU_AB.ARMS names '{key}', which isn't a persona")
+
+    def test_comparing_two_characters_is_not_a_promotion_race(self):
+        """Every check is a hardware rule, so scoring a gyaru against a
+        kuudere is fair and informative. But "move LIVE_PERSONA to the
+        winner" is nonsense advice when the arms are two different
+        characters -- nobody replaces Coco with Yuzu. Fix the losing
+        one's prompt instead."""
+        import contextlib, io
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            self.ab.compare("yuzu4", self.arm(moves_at_all=12),
+                            "coco", self.arm(moves_at_all=5),
+                            {"yuzu4": 3785, "coco": 4058}, characters=True)
+        out = buffer.getvalue()
+        self.assertIn("different characters", out)
+        self.assertNotIn("LIVE_PERSONA", out)
+
+    def test_two_versions_of_one_character_still_talk_about_promotion(self):
+        out = self.render(self.arm(moves_at_all=5), self.arm(moves_at_all=12))
+        self.assertIn("LIVE_PERSONA", out)
+        self.assertNotIn("different characters", out)
+
+    def test_persona_names_distinguish_characters_from_versions(self):
+        # yuzu2/yuzu4 are both NAMED Yuzu; coco is not.
+        self.assertEqual(self.ab.persona_names("yuzu2", "yuzu4"),
+                         ["Yuzu", "Yuzu"])
+        self.assertEqual(self.ab.persona_names("yuzu4", "coco"),
+                         ["Yuzu", "Coco"])
 
     def test_a_win_for_the_live_arm_does_not_ask_for_a_confirm_run(self):
         """Measured Sept 3: yuzu4 beat yuzu5 and the tool still said

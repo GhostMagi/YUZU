@@ -99,7 +99,18 @@ def run_arm(key, model, runs, timeout, verbose):
     return results, len(brain.system_prompt)
 
 
-def compare(left_key, left, right_key, right, chars):
+def persona_names(*keys):
+    """The character NAME behind each key, when it can be loaded."""
+    names = []
+    for key in keys:
+        try:
+            names.append(yuzu_personas.load(key).name)
+        except yuzu_personas.PersonaError:
+            names.append(key)
+    return names
+
+
+def compare(left_key, left, right_key, right, chars, characters=False):
     total = min(left["total"], right["total"])
     if not total:
         print("\nNothing was scored in one of the arms.")
@@ -180,7 +191,17 @@ def compare(left_key, left, right_key, right, chars):
             # already boots wins, the outcome is "change nothing", and
             # telling someone to spend 72 more replies confirming the
             # status quo is how a harness stops being run at all.
-            if winner == yuzu_personas.LIVE_PERSONA:
+            if characters and left_key != right_key:
+                # Two different CHARACTERS, not two versions of one. The
+                # checks are all hardware rules, so scoring them against
+                # each other is fair and informative -- but "promote the
+                # winner" is nonsense advice when the arms are a gyaru
+                # and a kuudere. Nobody replaces Coco with Yuzu.
+                print(f"These are different characters, so this is not a")
+                print(f"promotion race -- {winner} simply follows the format")
+                print("rules better. Fix the losing one's prompt rather than")
+                print("retiring it.")
+            elif winner == yuzu_personas.LIVE_PERSONA:
                 print(f"{winner} is already LIVE_PERSONA, so the outcome is")
                 print("CHANGE NOTHING -- no confirmation run needed. Record")
                 print(f"why {right_key} lost in CLAUDE.md and move on.")
@@ -241,7 +262,9 @@ def main(argv):
             return 1
         scored[key], chars[key] = results, size
 
-    compare(arms[0], scored[arms[0]], arms[1], scored[arms[1]], chars)
+    left_name, right_name = persona_names(*arms)
+    compare(arms[0], scored[arms[0]], arms[1], scored[arms[1]], chars,
+            characters=left_name != right_name)
     return 0
 
 

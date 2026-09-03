@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 278 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 283 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 278 tests pass on it. Getting it
+(that repo path is confirmed working). 283 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -105,10 +105,49 @@ bracketed action would actually move the robot.
 
 Measured so far: v1 20% action hit rate → v2 78–83%.
 
-`personas/coco.persona` (kuudere) is built on v2's structure and carries
-its fixes. First live round (9 replies, Sept 1): **11/11 actions ran**,
-has_dialogue 89% — one all-actions freeze, which was the predicted #1
-risk for the archetype. Small sample; treat it as promising, not proven.
+`personas/coco.persona` (kuudere). First live round (9 replies, Sept 1):
+**11/11 actions ran**, has_dialogue 89% — one all-actions freeze, which
+was the predicted #1 risk for the archetype. Small sample; treat it as
+promising, not proven.
+
+**Coco is caught up to yuzu4 as of Sept 3.** Ghost lifted her hold
+("im ready for coco"). She was built on v2's structure and Yuzu then
+had three more measured rounds, so she had drifted TWO wins behind:
+
+- **the always-MOVE rule** (`{MOVEMENT_RULE_V2}`) -- 50% -> 100% on
+  moves_at_all, the single biggest measured win in the project, and she
+  did not have it at all. A terse low-affect character is the one most
+  likely to talk without moving, so she needed it more than Yuzu did.
+- **the bare-command example.** All eight of her examples were
+  questions or social requests -- exactly the shape that produced ZERO
+  brackets in both yuzu2 and yuzu3 when handed a flat imperative. Hers
+  is in her own register: `Coco: Walking. [walks forward] Say when to
+  stop.` A test asserts it has no exclamation marks, no "cutie", no
+  "bestie" -- teaching Yuzu's voice to a kuudere is the same drift that
+  made persona switching clear history in the first place.
+
+A third flag, "brevity rule", was a false positive from a literal
+needle. Her rule "Short is fine. Silent is not. One or two calm
+sentences is a normal reply for you." IS the brevity rule in her idiom.
+Left alone.
+
+She is 4058 chars against yuzu4's 3785. **Deliberately not trimmed to
+compensate** -- the trim line is closed, and both attempts at shortening
+Yuzu made her wordier. Adding a measured win is the change this repo
+sanctions; shortening to pay for it is the one it doesn't.
+
+`test_coco_carries_every_measured_win_the_live_persona_has` reuses
+`TestYuzu5.MEASURED_WINS`, so a win added there is automatically
+required of her too and she cannot silently fall behind again.
+
+**To score her: `python3 YUZU_AB.py yuzu4 coco`.** Both arms in one
+process under identical conditions, which after the noise-floor finding
+is the only honest way to compare -- yuzu4 alone swung three replies
+between two separate runs. Every check is a hardware rule, so scoring a
+gyaru against a kuudere is fair. The tool now notices the arms are
+different CHARACTERS (different persona `name`) and drops the "move
+LIVE_PERSONA to the winner" advice, which is nonsense when nobody is
+replacing Coco with Yuzu -- it says fix the loser's prompt instead.
 
 **FIRST MACHINE-SCORED RUN — Sept 2, on Ghost's own laptop.** Not
 PocketPal screenshots: `yuzu_prompt_eval.py --persona yuzu2`, 36 replies,
