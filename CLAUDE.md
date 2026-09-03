@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 286 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 291 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 286 tests pass on it. Getting it
+(that repo path is confirmed working). 291 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -736,6 +736,50 @@ the Orin the voice shares 8GB with the LLM).
 
 **The remaining STUB is the mic.** Whisper is worth waiting for the
 Orin; TTS was not, because it cost nothing and needed nothing.
+
+## NANO_DAY_ONE.md is the runbook now
+
+Ghost, Sept 3, plainly: *"i dont read thru the project alot"* and
+*"can we streamline this for the nanoorinsuperdevkit specifically?
+thats legit her brain -- i only used the laptop cuz its what i had."*
+
+Both are true and the docs did not reflect either. Getting a board
+running meant picking between four files totalling 1229 lines, and
+`JETSON_SETUP.md` opened with **"Stage 1 -- before the Jetson
+arrives"**, a stage that expires the day the box lands.
+
+`NANO_DAY_ONE.md` is one linear page, box to talking, no decisions.
+Written to be read off a phone at the board. Steps 1-9 get her
+answering; 10-12 (voice, the 8GB settings, the doctor) are marked
+bonus so a bad evening still ends with a working robot.
+
+The other docs keep everything and lose nothing -- README, DEPLOY and
+JETSON_SETUP now point at the runbook first, and JETSON_SETUP carries a
+banner saying its Stage 1 is history and §5b/§6 are the parts still
+worth reading.
+
+**`TestDayOneRunbook` keeps it honest**, because he will not
+cross-check it: every file it names must exist, the test count it
+promises must be the real one (self-referential on purpose -- adding a
+test fails it until the doc is updated), it must use the `grep -i
+heretic` model line rather than a hardcoded `yuzu`, and it must keep
+saying which parts are unverified. The throttle reminder is asserted to
+sit in the FIRST HALF of the page, not buried in troubleshooting.
+
+That reminder now lives in four places. This is the one he will
+actually open.
+
+**When Ghost says the Nano has arrived, LEAD WITH `nvpmodel -m 0`.**
+He asked for that directly -- *"i think ill remember to Un-Throttle it
+but mention it when i text all excited with the nano"*. Do not bury it
+under congratulations. First line.
+
+**Two things in that runbook have never touched real hardware** and are
+labelled as such in it: `piper-tts` on arm64 (the wheel he installed
+was x86; whether an aarch64 one exists is unknown), and the doctor's
+Jetson section (written from file paths, fixture-tested only). Both are
+flagged so a failure there reads as a known risk rather than as
+something he did.
 
 ## The transcript now names who is speaking
 

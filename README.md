@@ -20,6 +20,11 @@ any colours.
 > `yuzu_doctor.py` and the robot's own boot message both reprint it when
 > they detect a Jetson. More in [JETSON_SETUP.md](JETSON_SETUP.md).
 
+## Your Nano just arrived?
+
+**[NANO_DAY_ONE.md](NANO_DAY_ONE.md)** — one page, top to bottom, no
+decisions. Box to talking to her. Everything else is reference.
+
 ## Moving it to the Jetson?
 
 **[DEPLOY.md](DEPLOY.md)** — `git clone`, run the tests, done. The whole repo is standard library; there is nothing to install.
@@ -33,7 +38,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 286 tests, ~18 seconds
+python YUZU_TESTER.py         # 291 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 ```
 
@@ -79,7 +84,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 286 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 291 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -92,7 +97,8 @@ $400.
 | **Read these** | |
 | `PHONE_START.md` | Phone instructions, no terminal needed |
 | `DEPLOY.md` | Moving the brain onto the Jetson |
-| `JETSON_SETUP.md` | Setup runbook, PC and Jetson, plus the 8GB tuning |
+| `NANO_DAY_ONE.md` | **Day one on the Orin. Start here.** |
+| `JETSON_SETUP.md` | Reference: the 8GB tuning, voices, troubleshooting |
 | `HEADLESS_SETUP.md` | Jetson setup from a Steam Deck, no monitor |
 | `UBUNTU_LAPTOP.md` | Putting Ubuntu on the laptop, phone-readable |
 | `PERSONA_SWITCHING.md` | Two characters on one robot, and the tradeoffs |

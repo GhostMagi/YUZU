@@ -3240,6 +3240,61 @@ class TestVoice(unittest.TestCase):
                         "no line exercises a shouted word (PFFT/GOSH)")
 
 
+class TestDayOneRunbook(unittest.TestCase):
+    """NANO_DAY_ONE.md is the one page Ghost reads at the board, off a
+    phone, with the box open. A stale command there costs an evening,
+    and he has said plainly he does not read much of the project -- so
+    the runbook has to be right without being cross-checked."""
+
+    def setUp(self):
+        self.doc = (Path(__file__).parent / "NANO_DAY_ONE.md").read_text()
+
+    def test_the_throttle_reminder_is_impossible_to_miss(self):
+        """It ships throttled with no symptom but slowness. This is the
+        fourth place that reminder lives, and the first one he will
+        actually open on day one."""
+        self.assertIn("nvpmodel -m 0", self.doc)
+        self.assertIn("jetson_clocks", self.doc)
+        # Before the halfway mark, not buried in troubleshooting.
+        self.assertLess(self.doc.index("nvpmodel -m 0") / len(self.doc), 0.5,
+                        "the throttle reminder drifted too far down")
+
+    def test_every_project_file_it_names_exists(self):
+        named = set(re.findall(r'\b([A-Za-z_]+\.(?:py|md))\b', self.doc))
+        here = Path(__file__).parent
+        for name in sorted(named):
+            self.assertTrue((here / name).exists(),
+                            f"NANO_DAY_ONE.md sends him to {name}, "
+                            f"which does not exist")
+
+    def test_the_test_count_it_promises_is_the_real_one(self):
+        """He is told a test count is the sign the software arrived
+        intact. If that number is stale, a correct install looks
+        broken -- and this repo has shipped a stale count in four
+        places at once before. Self-referential on purpose: adding a
+        test fails this until the runbook is updated too."""
+        claimed = re.search(r'\*\*(\d+) tests', self.doc)
+        self.assertIsNotNone(claimed, "the runbook stopped naming a count")
+        loader = unittest.TestLoader()
+        actual = loader.loadTestsFromModule(sys.modules[__name__]).countTestCases()
+        self.assertEqual(int(claimed.group(1)), actual,
+                         "NANO_DAY_ONE.md promises a stale test count")
+
+    def test_it_uses_the_model_name_he_will_actually_have(self):
+        # The Ollama model is named after the HF path, not "yuzu". A
+        # runbook that says `--model yuzu` fails on a fresh board.
+        self.assertIn("grep -i heretic", self.doc)
+        self.assertNotIn("YUZU_MODEL=yuzu ", self.doc)
+
+    def test_it_is_honest_about_what_is_unverified(self):
+        """Two things in it have never run on real hardware: piper on
+        arm64, and the doctor's Jetson section. Saying so is what stops
+        a failure there reading as "I broke it"."""
+        lowered = self.doc.lower()
+        self.assertIn("unverified", lowered)
+        self.assertIn("never run on real hardware", lowered)
+
+
 class TestSourceHygiene(unittest.TestCase):
     """Things that are fine today and break on a newer Python.
 

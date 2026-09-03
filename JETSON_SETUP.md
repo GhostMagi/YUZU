@@ -1,5 +1,15 @@
 # Getting Yuzu's brain running
 
+> **Day one with the Orin? Use [NANO_DAY_ONE.md](NANO_DAY_ONE.md)
+> instead.** It is one linear page from box to talking, with no
+> decisions to make.
+>
+> This document is the REFERENCE. Stage 1 below describes proving the
+> pipeline on a PC *before* the Jetson arrives — which is history now.
+> The parts still worth reading are **§5b** (the 8GB memory settings)
+> and **§6** (voices).
+
+
 Goal: Llama-3.2-3B Heretic-abliterated answering as Yuzu, through
 Ollama, fully offline. Written to be done in two stages — **stage 1
 needs no Jetson at all**, so the prompt can be tuned before the money

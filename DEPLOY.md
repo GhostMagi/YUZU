@@ -1,5 +1,9 @@
 # Moving Yuzu's brain onto the Jetson
 
+> Doing this for the first time on a fresh board?
+> **[NANO_DAY_ONE.md](NANO_DAY_ONE.md)** is the step-by-step. This page
+> is the "why it is this portable" explanation behind it.
+
 Short answer: **yes, you can just plop it on.** `git clone`, then run
 it. No pip install, no build step, no config file to edit.
 
@@ -26,7 +30,7 @@ That's the whole list. **Nothing in this project needs pip.**
 ```bash
 git clone https://github.com/GhostMagi/YUZU.git
 cd YUZU
-python3 YUZU_TESTER.py          # 286 tests. If this passes, the code is fine.
+python3 YUZU_TESTER.py          # 291 tests. If this passes, the code is fine.
 python3 yuzu_all_in_one.py    # talk to her
 ```
 
