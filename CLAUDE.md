@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 293 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 297 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 293 tests pass on it. Getting it
+(that repo path is confirmed working). 297 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -849,33 +849,65 @@ definition.
 handed "Ehehe~" by the shared body block too. Three characters now, two
 of them wrong for it.
 
-## OPEN: the servo file hands every persona a gyaru's sounds
+## SOLVED: character bleed from the shared body file
 
-Found Sept 3 in Coco's first live conversation. She produced
-`[Ehehe~]` (bracketed, so the whitelist dropped it) and spoke "Haha!".
-Both are Yuzu's register, and her own rule says she does not shout or
-stack exclamation marks.
+Ghost, Sept 4: *"i still feel like theres a way to solve the bleeding
+over of personalities."* He was right, and it was a three-line change.
 
-The mechanism is visible in the prompt, not inferred:
+**The problem.** `_hardware_muto_s2.txt` is for SERVO FACTS -- this
+file has said so since a character stance in there collared every
+persona at once ("your whole world is the room you're standing in").
+But the sounds rule still shipped Yuzu's own examples, `Ehehe~, Haha!,
+Ugh, Ooh`, to everybody. A kuudere and a netrunner were being handed a
+gyaru's vocabulary by a file about legs. Coco produced `[Ehehe~]` in
+her first live conversation; Byte would have too.
 
-    body block hands BOTH of them : Ehehe~, Haha!, Ugh, Ooh
-    yuzu4's own examples use      : Ehehe~        (consistent)
-    coco's own examples use       : Hm.           (never shown to her)
+**The fix: a persona can override any block by naming it in ALL_CAPS
+above the `---`.**
 
-`_hardware_muto_s2.txt` is the file CLAUDE.md already says is "for
-servos" and must not carry character stances. The sounds RULE (sounds
-are words, not brackets) is a body fact and belongs there. The sound
-EXAMPLES are character and do not.
+    SOUND_EXAMPLES: Ah, Oh, Huh
 
-**Proposed fix, NOT applied -- Ghost's call.** Drop the four tokens
-from the shared line, keep the rule. Each persona's own examples
-already carry her register: Yuzu has "Ehehe~", Coco has "Hm.". That is
-the pattern this repo proved twice, examples over rules.
+`load()` merges those over the hardware blocks before expansion. The
+RULE ("sounds are words, never brackets") is a body fact and stays
+shared. The EXAMPLES are character and now come from the character.
 
-Cost: it changes the LIVE persona's prompt, so it wants an A/B round to
-confirm nothing regressed. Against that, n=1 conversation -- two
-register slips in four turns, and both failed safe. Worth doing when
-something else justifies a round, not on its own.
+**Nothing moved.** The `[SOUND_EXAMPLES]` default is Yuzu's exact
+list, so all EIGHT composed prompts came out byte-identical -- verified
+by capturing every prompt before the change and diffing after. No A/B
+was invalidated, no re-test needed. That was the objection that blocked
+this for two days and it is simply gone.
+
+    yuzu2..yuzu6   Ehehe~, Haha!, Ugh, Ooh   (unchanged, default)
+    coco           Ah, Oh, Huh
+    byte           Heh, Ha, Huh
+
+Every one of those is deliberately vowel-carrying, so espeak
+phonemises it instead of spelling it out. `Hm` and `Tch` are NOT taught
+-- vowel-less, and never heard through Piper. A test asserts every
+taught sound survives `for_speech`, because teaching her a sound the
+voice drops is worse than teaching none.
+
+**A test that asserted the wart now asserts the fix.**
+`TestCoco.test_her_sound_register_is_her_own_not_the_gyaru_one` used to
+open "KNOWN WART, deliberately handled here rather than in the shared
+body file... editing the shared file would change yuzu2's composed
+prompt mid-A/B". That objection was correct and is now satisfied, so
+the test flipped from pinning the wart to pinning its absence.
+
+**One test needed narrowing, correctly.**
+`test_the_body_rules_are_identical_across_both_characters` compared
+body text up to the closing sounds line. Sound examples are per
+character now, so it compares up to the sounds RULE instead -- the
+self-concept, the bracket rule and the action menu must still be
+identical across every character on the chassis. That is the real
+guarantee: one character must never be taught moves another isn't.
+
+**The mechanism generalises.** Any future character-flavoured token in
+a shared body file gets the same treatment: token it out, default it to
+whatever the lineage already says, override per persona. And a persona
+that overrides a block badly enough to drop a measured win is caught by
+`test_every_character_carries_the_measured_wins`, which reads the
+COMPOSED prompt.
 
 ## LEDs are removed
 

@@ -2262,16 +2262,24 @@ class TestCoco(unittest.TestCase):
                                 f"demonstration and it comes back in output")
 
     def test_her_sound_register_is_her_own_not_the_gyaru_one(self):
-        """KNOWN WART, deliberately handled here rather than in the
-        shared body file: {HARDWARE_MENU} illustrates 'sounds are speech,
-        not movement' with 'Ehehe~, Haha!, Pfft' -- which is Yuzu's
-        voice, not a fact about a hexapod, and it lands in every persona
-        that composes the menu in. Editing the shared file would change
+        """THE WART IS FIXED. This test used to assert it.
+
+        It read: "KNOWN WART... {HARDWARE_MENU} illustrates 'sounds are
+        speech' with Yuzu's voice, and it lands in every persona that
+        composes the menu in. Editing the shared file would change
         yuzu2's composed prompt mid-A/B, so instead Coco's EXAMPLES
-        carry her own register, which a 3B weights more heavily anyway."""
-        self.assertIn("Ehehe~", self.prompt)          # inherited from the body
+        carry her own register."
+
+        That objection was real and is now satisfied. The examples moved
+        behind a {SOUND_EXAMPLES} token whose DEFAULT is Yuzu's exact
+        list, so every yuzu prompt is byte-identical and no A/B moved.
+        Coco supplies her own, so she is no longer handed "Ehehe~" by a
+        file about legs.
+        """
+        self.assertNotIn("Ehehe~", self.prompt,
+                         "Coco is still being handed the gyaru's sounds")
+        self.assertIn("Ah, Oh, Huh", self.prompt)
         examples = self.prompt.split("EXAMPLES")[1]
-        self.assertNotIn("Ehehe~", examples)
         self.assertIn("Hm.", examples)                # a sound, typed inline
         self.assertEqual(yuzu.lookup_actions("Hm"), [],
                          "a sound must never resolve to a movement")
@@ -2463,6 +2471,70 @@ class TestMovementRule(unittest.TestCase):
         self.assertNotIn(blocks["MOVEMENT_RULE_V2"],
                          yuzu_personas.load("yuzu").prompt)
 
+    def test_a_persona_can_override_a_shared_block(self):
+        """The fix for character bleed, at the root.
+
+        The shared file is for SERVO FACTS -- CLAUDE.md has said so
+        since a character stance in there collared every persona at once
+        ("your whole world is the room you're standing in"). But the
+        sounds rule still shipped Yuzu's own examples to everybody, so a
+        kuudere and a netrunner were handed a gyaru's vocabulary by a
+        file about legs. Coco produced "Ehehe~" in her first live
+        conversation.
+
+        An ALL_CAPS setting above the '---' now overrides the block of
+        that name. The RULE stays shared; the EXAMPLES come from the
+        character.
+        """
+        blocks = yuzu_personas._parse_hardware("muto_s2")
+        self.assertIn("SOUND_EXAMPLES", blocks,
+                      "the shared file lost its default sounds block")
+        for key in ("coco", "byte"):
+            self.assertIn("SOUND_EXAMPLES",
+                          yuzu_personas.load(key).settings,
+                          f"{key} stopped supplying her own sounds")
+
+    def test_the_default_sounds_are_still_yuzus_exact_list(self):
+        """The whole point of a DEFAULT is that the lineage did not
+        move. If this changes, every archived comparison shifts and the
+        measured numbers stop describing the prompts on disk."""
+        blocks = yuzu_personas._parse_hardware("muto_s2")
+        self.assertEqual(blocks["SOUND_EXAMPLES"], "Ehehe~, Haha!, Ugh, Ooh")
+        for key in ("yuzu2", "yuzu3", yuzu_personas.LIVE_PERSONA,
+                    "yuzu5", "yuzu6"):
+            self.assertIn("Ehehe~, Haha!, Ugh, Ooh",
+                          yuzu_personas.load(key).prompt,
+                          f"{key}'s composed prompt drifted")
+
+    def test_no_character_is_taught_another_characters_sounds(self):
+        gyaru = ("ehehe", "haha", "ooh")
+        live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            if persona.name == live_name:
+                continue
+            low = persona.prompt.lower()
+            for token in gyaru:
+                self.assertNotIn(token, low,
+                                 f"{key} is still handed '{token}'")
+
+    def test_every_taught_sound_survives_tts(self):
+        """A sound the voice drops is worse than no example: it teaches
+        her to say something nobody hears. "pfft" was exactly that."""
+        import yuzu_voice
+        for key in yuzu_personas.available():
+            prompt = yuzu_personas.load(key).prompt
+            lines = [l for l in prompt.splitlines()
+                     if "come out of your speaker" in l]
+            if not lines:
+                continue                      # v1 body block has no rule
+            listed = lines[0].split("around them: ")[1]
+            listed = listed.split(". Brackets")[0].rstrip(".")
+            for sound in (x.strip() for x in listed.split(",")):
+                self.assertTrue(
+                    yuzu_voice.for_speech(sound).strip(),
+                    f"{key} teaches '{sound}', which the voice drops")
+
     def test_every_character_carries_the_measured_wins(self):
         """Generalised from the Coco-only version.
 
@@ -2605,9 +2677,17 @@ class TestPersonaSwitching(BrainTestCase):
         # verbatim in a finished prompt. What matters is that the body
         # section comes out identical for every character on the chassis.
         def body_section(key):
+            """Up to the sounds rule only.
+
+            The sound EXAMPLES are deliberately per-character now, so
+            comparing past them would fail by design. What must stay
+            identical is everything about the BODY -- the self-concept,
+            the bracket rule, and the action menu. If those ever differ,
+            one character is being taught moves the other isn't, which
+            is the failure this test exists for."""
             prompt = yuzu_personas.load(key).prompt
             start = prompt.index("You are a person, and right now")
-            end = prompt.index("Brackets are only ever for the movements")
+            end = prompt.index("Sounds you make")
             return prompt[start:end]
 
         reference = body_section("yuzu2")

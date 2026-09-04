@@ -183,6 +183,24 @@ def load(key=LIVE_PERSONA):
     body = settings.get("hardware", "muto_s2")
     blocks = _parse_hardware(body)
 
+    # A persona may override any block by naming it in ALL_CAPS above
+    # the '---'. This is how character bleed gets fixed at the root.
+    #
+    # The shared body file is for SERVO FACTS, and CLAUDE.md has said so
+    # since a character stance in there collared every persona at once
+    # ("your whole world is the room you're standing in"). But the
+    # sounds rule still shipped Yuzu's own examples -- Ehehe~, Haha! --
+    # to everybody, so a kuudere and a netrunner were both being handed
+    # a gyaru's vocabulary by a file about legs. Coco produced "Ehehe~"
+    # in her first live conversation.
+    #
+    # The RULE (sounds are words, never brackets) is a body fact and
+    # stays shared. The EXAMPLES are character and now come from the
+    # persona. Anything not overridden falls back to the block file, so
+    # every existing prompt is unchanged.
+    blocks.update({k: v for k, v in settings.items()
+                   if k.isupper() and isinstance(v, str)})
+
     # Blocks may reference other blocks, so substitute repeatedly until
     # the text stops changing. A single pass only worked while the
     # referenced block happened to be defined AFTER the one using it --
