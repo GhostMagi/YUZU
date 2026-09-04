@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 291 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 293 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 291 tests pass on it. Getting it
+(that repo path is confirmed working). 293 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -797,6 +797,57 @@ turns up, grep for the string, not the code path.
 The heard-vs-printed distinction is kept as a `(text only)` suffix. On
 a robot you are SSH'd into, that is how you tell a silent speaker from
 a silent robot.
+
+## Byte — persona #3, Sept 4
+
+Ghost's brief: *"named Byte... lean into a Cyberpunk vibe (NOT the
+game, just as a general vibe)... female as usual. not weeb stuff like
+usual. Tech!"* plus *"maybe she likes videogames"* and *"keep it trim
+as possible while being neat"*.
+
+Netrunner, not a `-dere` -- that is the point of the brief. Dry, quick,
+clipped tech slang. Likes videogames (movement tech, speedruns,
+anything she can break), rooftops at 3am, rain on neon.
+
+**3396 chars, the trimmest of the three** (yuzu4 3785, coco 4058).
+Seven rules, seven examples, all nine measured wins. Built on
+`{HARDWARE_MENU}` + `{DIALOGUE_RULE_V2}` + `{MOVEMENT_RULE_V2}` --
+the same blocks the winning arm uses, so she starts where Yuzu ended
+rather than where Yuzu began.
+
+Verified by machine: every example speaks AND moves, every bracketed
+phrase runs through the real parser, every spoken line is already
+TTS-clean (`for_speech` changes nothing), and her own text carries none
+of Yuzu's register. NOT verified: how the model actually plays her.
+`python3 YUZU_AB.py yuzu4 byte` when there is a spare fifteen minutes.
+
+**The register check caught two things and the second was in COCO.**
+Byte's rule 5 originally read *"No hype, no stacked exclamation marks,
+nothing cute"* -- three negations, one of which is literally Yuzu's own
+word. Rewritten as what she IS: *"State it flat and move on."* Shorter
+too.
+
+Then the generalised test found *"no hype"* sitting in Coco's rule 5 as
+well. Dropped the token from her, kept every formatting constraint
+around it -- a nine-character edit, not a rewrite of a working
+character.
+
+The evidence that tone-negations hurt is thin (the measured
+pink-elephant cases are all about naming an ACTION or a FORMAT, like
+`[winks]` or an asterisk, not a mood). But it costs nothing to describe
+what a character is instead of what she isn't, and consistency across
+three of them is worth having.
+
+**`test_every_character_carries_the_measured_wins` replaces the
+Coco-only version.** It derives the character list from the persona
+files -- anyone whose `name` differs from the live arm's -- so persona
+#4 is covered the day it lands, with no list to maintain. The archives
+(yuzu2/3/5/6) stay exempt; yuzu2 lacks the bare-command example by
+definition.
+
+**Byte is a THIRD data point for the open issue below.** She would be
+handed "Ehehe~" by the shared body block too. Three characters now, two
+of them wrong for it.
 
 ## OPEN: the servo file hands every persona a gyaru's sounds
 

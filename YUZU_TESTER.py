@@ -2463,6 +2463,49 @@ class TestMovementRule(unittest.TestCase):
         self.assertNotIn(blocks["MOVEMENT_RULE_V2"],
                          yuzu_personas.load("yuzu").prompt)
 
+    def test_every_character_carries_the_measured_wins(self):
+        """Generalised from the Coco-only version.
+
+        A CHARACTER (Coco, Byte, anyone added later) must carry every
+        win the live arm has. The yuzu2/3/5/6 archives are exempt --
+        they are the record of what was tried and yuzu2 lacks the
+        bare-command example by definition.
+
+        Coco drifted two wins behind while Yuzu had three more rounds,
+        and nobody noticed until it was checked mechanically. This makes
+        the next character impossible to forget: it derives the list
+        from TestYuzu5.MEASURED_WINS and the set of characters from the
+        persona files themselves.
+        """
+        live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
+        live = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).prompt
+        characters = [k for k in yuzu_personas.available()
+                      if yuzu_personas.load(k).name != live_name]
+        self.assertTrue(characters, "no non-Yuzu characters found at all")
+        for key in characters:
+            prompt = yuzu_personas.load(key).prompt
+            for name, needle in TestYuzu5.MEASURED_WINS.items():
+                if needle not in live:
+                    continue
+                self.assertIn(needle, prompt, f"{key} lacks: {name}")
+
+    def test_each_character_speaks_in_her_own_register(self):
+        """The bare-command example is a measured SHAPE, but the voice
+        has to be the character's. Teaching Yuzu's register to anyone
+        else is the drift that makes persona switching clear history."""
+        gyaru = ("cutie", "bestie", "omg", "hype", "sparkl", "uwu")
+        live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            if persona.name == live_name:
+                continue
+            # Only her OWN text -- the shared body block is a separate,
+            # known issue and is not this test's business.
+            own = persona.path.read_text(encoding="utf-8").lower()
+            for word in gyaru:
+                self.assertNotIn(word, own,
+                                 f"{key} uses '{word}', which is Yuzu's voice")
+
     def test_coco_carries_every_measured_win_the_live_persona_has(self):
         """Parity, checked mechanically instead of remembered.
 

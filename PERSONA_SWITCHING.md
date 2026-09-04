@@ -152,7 +152,7 @@ Everything that isn't her personality, which is most of the project:
 - the bracket parser, the whitelist, the aliases, the stemmer
 - every gait, the simulator, the bring-up script, the safety machinery
 - the brain, the drift recovery, the history canonicalisation
-- the eval, the A/B runner, all 291 tests
+- the eval, the A/B runner, all 293 tests
 
 Those are facts about a Yahboom Muto S2 and about a 3B model. None of
 them know or care who is driving.
