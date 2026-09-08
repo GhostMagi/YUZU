@@ -1,4 +1,4 @@
-# Two characters, one robot
+# Five characters, one deck
 
 You were right — the Muto S2 + Orin can absolutely hold more than one
 persona. What matters is *which of two very different mechanisms* you
@@ -181,7 +181,8 @@ the friendliest entry point.
 character logic. Coco already runs through every one of them unchanged.
 Renaming them would be a cosmetic afternoon and would break every doc,
 every path in `DEPLOY.md`, and Ghost's muscle memory. Not worth it; the
-project is named Yuzu-Spider-V1 the way a band keeps its first name.
+project is named YUZU the way a band keeps its first name -- and it
+keeps it now that Shiro is the lead, for exactly the same reason.
 
 The two places the name genuinely leaked into behaviour were found and
 fixed: the eval's opening prompt was the literal "Hey Yuzu, what's

@@ -1,4 +1,4 @@
-# Yuzu-Spider-V1 — working notes for Claude
+# YUZU — working notes for Claude
 
 ## Conventions
 

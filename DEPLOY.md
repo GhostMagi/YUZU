@@ -1,4 +1,4 @@
-# Moving Yuzu's brain onto the Jetson
+# Moving the brain onto the Jetson
 
 > Doing this for the first time on a fresh board?
 > **[NANO_DAY_ONE.md](NANO_DAY_ONE.md)** is the step-by-step. This page

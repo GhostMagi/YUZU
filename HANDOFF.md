@@ -1,4 +1,4 @@
-# Yuzu-Spider-V1 — handoff
+# YUZU — handoff
 
 **Paste this whole file into a fresh AI chat to bring it up to speed.**
 Written Sept 3, 2026. Repo: github.com/GhostMagi/YUZU

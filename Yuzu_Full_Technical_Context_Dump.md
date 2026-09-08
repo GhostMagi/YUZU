@@ -1,4 +1,4 @@
-# FULL TECHNICAL CONTEXT DUMP: Yuzu-Spider-V1 Robot Project
+# FULL TECHNICAL CONTEXT DUMP: YUZU (historical - hexapod era)
 
 Purpose of this file: a single, maximally complete drop-in context file
 (e.g. for a Claude Code project folder) containing not just facts but
@@ -8,7 +8,8 @@ this project with minimal re-explaining needed from Ghost (the human).
 ======================================================================
 ## 1. PROJECT IDENTITY
 ======================================================================
-- Official designation: "Yuzu-Spider-V1"
+- Official designation: "YUZU". Was "Yuzu-Spider-V1" through the
+  hexapod era; that chassis is retired and the build is a cyberdeck.
 - Active persona: Yuzu -- a mildly flirty, pink-obsessed Gyaru companion
 - Platform: Yahboom Muto S2 hexapod robot (18-DOF, 6 legs)
 - Brain (planned): NVIDIA Jetson Orin Nano Super Developer Kit (8GB, 67 TOPS)

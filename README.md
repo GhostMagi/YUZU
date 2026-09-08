@@ -1,14 +1,24 @@
-# Yuzu-Spider-V1
+# YUZU — a local-AI cyberdeck
 
-A Yahboom Muto S2 hexapod (18-DOF, 6 legs) running a local Llama-3.2-3B
-persona named Yuzu on a Jetson Orin Nano. Fully offline: local STT, local
-LLM, local TTS, no cloud.
+A handheld cyberdeck built around a Jetson Orin Nano Super, running a
+local Llama-3.2-3B character. Fully offline: local LLM, local TTS, no
+cloud, nothing to `pip install`.
 
-Paint scheme is Ghost's call and deliberately not pinned down in this
-repo -- see `paintstepslol.txt` for the prep process, which works for
-any colours.
+Five characters ship with it — **Shiro** (yami kawaii) is the current
+lead; Yuzu, Coco, Byte and Saya are one config line away.
 
-**Status:** brain and voice work today on any PC. Chassis is later.
+YUZU is the CODEBASE name and stays that way, the way a band keeps its
+first name. It was "Yuzu-Spider-V1" while the target was a hexapod;
+that chassis is retired and the spider is the part that went stale.
+Naming the project after whoever is currently the favourite character
+is what made the old name wrong, so it isn't named after Shiro either.
+
+Finish is Ghost's call and deliberately not pinned down in this repo --
+see `paintstepslol.txt` for the prep process, which works for any
+colours.
+
+**Status:** brain and voice work today on any PC and on the board.
+The deck enclosure is the build in progress.
 
 > ### On a fresh Jetson, run this FIRST
 > ```

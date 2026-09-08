@@ -1,4 +1,4 @@
-# Getting Yuzu's brain running
+# Getting the brain running
 
 > **Day one with the Orin? Use [NANO_DAY_ONE.md](NANO_DAY_ONE.md)
 > instead.** It is one linear page from box to talking, with no

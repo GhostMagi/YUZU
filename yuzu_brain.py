@@ -21,12 +21,21 @@ rules composed in from a shared hardware file. See yuzu_personas.py.
 
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 import yuzu_personas
+
+# Same guard as yuzu_all_in_one: Piper is a real binary and a real model
+# file, and neither exists on a phone. Absent, --chat just prints, which
+# is exactly what it did before there was a voice.
+try:
+    import yuzu_voice
+except ImportError:                                 # pragma: no cover
+    yuzu_voice = None
 
 HERE = Path(__file__).parent
 
@@ -504,6 +513,26 @@ def _cli(argv):
         print(f"{who}: {brain.ask(greeting)}")
         return 0
 
+    # SPEAK THROUGH yuzu_voice, never through a second hand-rolled
+    # subprocess call. A --chat-local speak() that shelled out to piper
+    # directly was written on the Jetson, and it bypassed every single
+    # thing that module exists for: for_speech() (so tildes, ALL-CAPS
+    # and any stray bracket went to the synthesiser raw -- "Ehehe~" and
+    # the SIX/six finding were both fixed IN for_speech), detect_flags()
+    # (piper ships both --output_file and --output-file; guessing wrong
+    # is a silent unrecognized-arguments failure), the voices/ACTIVE
+    # choice from --use, and piper_length_scale, so every character
+    # spoke at the same speed. It also only wrote a wav and never played
+    # it. Voice.say() does all of that and never raises.
+    voice = yuzu_voice.Voice() if yuzu_voice else None
+    if voice is not None:
+        scale = brain.persona.settings.get("piper_length_scale") \
+            if brain.persona else None
+        if scale is not None:
+            voice.length_scale = scale
+        print(f"voice: piper, {voice.model.name}" if voice.ready
+              else f"voice: printing only ({voice.why_not()})")
+
     print("Interactive. 'quit' to exit, 'reset' to clear history.\n")
     while True:
         try:
@@ -521,9 +550,21 @@ def _cli(argv):
             continue
         print(f"{who}: ", end="", flush=True)
         try:
+            spoken = []
             for piece in brain.ask_stream(text):
                 print(piece, end="", flush=True)
+                spoken.append(piece)
             print("\n")
+            if voice is not None and voice.ready:
+                # --chat deliberately PRINTS the raw model output --
+                # that is what it is for, seeing what she says before
+                # the whitelist touches it. But speaking it raw would
+                # read "[spins]" aloud as words. On the robot,
+                # handle_yuzu_reply strips brackets long before TTS;
+                # there is no such step here, so do it for the spoken
+                # copy only. Deck personas emit none of these, which is
+                # why this is a one-liner and not a parser.
+                voice.say(re.sub(r"\[[^\]]*\]", " ", "".join(spoken)))
         except BrainError as exc:
             print(f"\n{exc}\n")
             return 1
