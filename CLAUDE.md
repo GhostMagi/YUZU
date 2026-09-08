@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 329 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 331 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 329 tests pass on it. Getting it
+(that repo path is confirmed working). 331 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -645,11 +645,41 @@ pairing mode" the moment the alternatives are on screen.
 re-pairing after every power cycle, which on a handheld deck means
 every time it is put down.
 
-**Not verified: the button combos.** `START + A` for D-input and
-`START + B` for Switch mode are what the script tells him to use, taken
-from the standard 8BitDo convention rather than from this pad in his
-hands. The mode turned out NOT to be the problem (see below), so they
-have still never been tested.
+**THE CABLE WON. `pad` now says so first.** After an hour of bonding
+failures, the pad plugged into one of the devkit's **USB-A** ports
+appeared instantly:
+
+    N: Name="8BitDo 8BitDo Micro gamepad"
+
+No pairing, no bonding, no agent, nothing to debug. `pad` now detects a
+wired gamepad BEFORE prompting for anything and tells him he is already
+done; `--status` reports a USB pad rather than "not paired", which was
+a flatly wrong answer about a controller that was plugged in and
+working.
+
+**A cable is not a workaround on this build.** The deck has USB ports
+and will be sitting on a desk. Bluetooth is the harder path AND the
+optional one -- offer the easy one first.
+
+**One trap worth naming: the devkit's USB-C port is the phone's serial
+console.** Saying "plug it in" without saying which port sent him to
+the one already in use.
+
+**THE BUTTON COMBOS WERE WRONG AND WERE STATED AS INSTRUCTIONS.**
+Ghost, with the pad in his hand: *"ur button combls dont matcj how it
+seems to work idk im just having alot of trouble."* `START + A` and
+`START + B` came from the generic 8BitDo convention, were flagged here
+as unverified, and were then printed to him as numbered steps anyway --
+so he went hunting for buttons that are not on his pad while the real
+fault was bonding.
+
+The script now describes **the STATE to reach** ("the light must FLASH,
+not sit solid") and lets him use whatever his pad's pair button does.
+A test pins that the combos are gone.
+
+**Generalisable: when he can see the hardware and I cannot, name the
+goal, not the keystrokes.** Unverified specifics presented as steps are
+worse than no steps -- they send a person debugging their own hands.
 
 ## PAIRED IS NOT BONDED — and BlueZ logs Success on the rejection
 

@@ -2988,6 +2988,37 @@ class TestPadPairing(unittest.TestCase):
         self.assertIn("Bonded:", done.stdout)
         self.assertIn("NO", done.stdout)
 
+    def test_a_wired_pad_short_circuits_the_whole_bluetooth_dance(self):
+        """MEASURED Sept 9, after an hour of bonding failures: plugged
+        into a USB-A port the pad appeared instantly as
+        `8BitDo 8BitDo Micro gamepad` -- no pairing, no bonding, no
+        agent, nothing to debug.
+
+        So a connected pad must never be sent through pairing again.
+        The cable is not a workaround; the deck has USB ports."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("USB-A", body,
+                      "it does not tell him the cable is the easy path")
+        # the wired check must come BEFORE the pairing prompt, or he is
+        # asked to hold buttons on a pad that already works
+        self.assertLess(body.index("ALREADY connected (USB)"),
+                        body.index("pairing mode"),
+                        "it prompts for pairing before noticing the pad "
+                        "is already plugged in and working")
+
+    def test_it_no_longer_asserts_button_combos_it_cannot_verify(self):
+        """Ghost, with the pad in his hand: "ur button combls dont
+        matcj how it seems to work". They were the generic 8BitDo
+        convention, stated as instructions, and they were wrong for
+        this pad -- which sent him hunting for buttons that are not
+        there while the real fault was bonding.
+
+        He can see the pad. Describe the STATE to reach (light
+        flashing), not the keys to press."""
+        body = self.SCRIPT.read_text()
+        self.assertNotIn("START + A", body)
+        self.assertIn("FLASH", body.upper())
+
     def test_it_trusts_the_pad_so_it_reconnects_by_itself(self):
         """Without `trust`, it needs re-pairing after every power-off --
         which on a deck means every time he closes the lid."""

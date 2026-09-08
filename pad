@@ -49,8 +49,19 @@ has_input_node() {
 
 case "${1:-}" in
 --status)
+    # USB first. A wired pad is a working pad and has no MAC at all,
+    # so checking Bluetooth first reports "not paired" about a
+    # controller that is plugged in and functioning.
     MAC=$(mac_of)
-    [ -z "$MAC" ] && { echo "No $WANT controller is paired yet."; exit 1; }
+    if [ -z "$MAC" ]; then
+        if has_input_node; then
+            echo "Gamepad:    connected over USB and working."
+            echo "            Nothing to pair. mGBA: Refresh, then Set all."
+            exit 0
+        fi
+        echo "No $WANT controller is paired, and none is plugged in."
+        exit 1
+    fi
     echo "Paired:     $MAC"
     connected "$MAC" && echo "Bluetooth:  connected" \
                      || echo "Bluetooth:  NOT connected"
@@ -69,10 +80,29 @@ case "${1:-}" in
     ;;
 esac
 
+# MEASURED Sept 9, after an hour of bonding failures: the pad plugged
+# into a USB-A port on the devkit appeared instantly as
+# "8BitDo 8BitDo Micro gamepad" with no pairing, no bonding, no agent.
+# A cable is not a workaround here -- the deck has USB ports and this
+# is simply the path that works.
+if has_input_node; then
+    echo
+    echo "  A $WANT gamepad is ALREADY connected (USB) and working."
+    echo "  Nothing to pair. In mGBA: Settings -> Controllers,"
+    echo "  press Refresh, then Set all."
+    echo
+    echo "  Unplug it and rerun this if you want it over Bluetooth."
+    echo
+    exit 0
+fi
+
 echo
-echo "  Put the controller in pairing mode:"
-echo "    1. Hold  START + A   for a second  (D-input mode, what Linux wants)"
-echo "    2. Then hold  SELECT  ~3s until the light flashes fast"
+echo "  Easiest path by far: plug the pad into one of the devkit's"
+echo "  USB-A ports. It works instantly, with no pairing at all."
+echo "  (The USB-C port is the phone's serial console -- not that one.)"
+echo
+echo "  Otherwise, put the controller in pairing mode. Use whatever"
+echo "  its pair button does -- the light must FLASH, not sit solid:"
 echo
 read -r -p "  Light flashing? Press Enter to search. " _
 
