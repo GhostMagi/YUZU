@@ -303,7 +303,7 @@ sudo systemctl edit ollama        # opens a drop-in; paste the block below
 [Service]
 Environment="OLLAMA_NUM_PARALLEL=1"
 Environment="OLLAMA_MAX_LOADED_MODELS=1"
-Environment="OLLAMA_KEEP_ALIVE=-1"
+Environment="OLLAMA_KEEP_ALIVE=30m"
 Environment="OLLAMA_FLASH_ATTENTION=1"
 Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
 ```
@@ -316,13 +316,14 @@ sudo systemctl daemon-reload && sudo systemctl restart ollama
 |---|---|
 | `OLLAMA_NUM_PARALLEL=1` | Ollama sizes the KV cache as `num_ctx × num_parallel`. Left to choose for itself it reserves slots for concurrent requests a robot with one mouth will never make, and every slot is real memory out of the 8GB |
 | `OLLAMA_MAX_LOADED_MODELS=1` | Stops a second model being held alongside the 3B. On a shared 8GB, two resident models is how you land in swap |
-| `OLLAMA_KEEP_ALIVE=-1` | Never unload. The default is 5 minutes, which for a companion robot is backwards: she sits quiet in a corner, someone walks up and speaks, and the model has to be read back off disk first — so the first thing anyone ever says to her is the slowest reply she gives |
+| `OLLAMA_KEEP_ALIVE=30m` | Unload after half an hour idle. Ollama's default of 5 minutes is too short — step away for a coffee and the next thing you say gets the slowest reply she gives. `-1` (never unload) was right while the board did nothing but run her; the cyberdeck is also a general-purpose computer, so she gives the 8GB back when nobody is talking. Set `-1` only if the board is hers alone |
 | `OLLAMA_FLASH_ATTENTION=1` | Cheaper attention, less memory per token of context |
 | `OLLAMA_KV_CACHE_TYPE=q8_0` | Quantises the KV cache, roughly halving what context costs. Needs flash attention on |
 
 `yuzu_brain.py` also sends `keep_alive` per request, so if you can't
 edit the service you can get the same effect with
-`export YUZU_KEEP_ALIVE=-1` before starting the robot. Set it to `0`
+`export YUZU_KEEP_ALIVE=-1` before starting the robot, if the board
+is hers alone. Set it to `0`
 instead when you're bringing Whisper up alongside her and need the
 memory back between turns.
 
@@ -469,7 +470,7 @@ in the json; lower is faster. 0.85–0.9 suits the gyaru energy.
 | Replies too long, TTS drags | Lower `num_predict` in `yuzu_brain.py`, rebuild the Modelfile |
 | She writes your lines | `no_puppeteering`; the `stop` params in the Modelfile catch most of it |
 | Very slow on Jetson | Confirm GPU not CPU; `nvpmodel -m 0`; check thermals in `jtop` |
-| First reply after a quiet spell is slow, then fine | Ollama unloaded her. `OLLAMA_KEEP_ALIVE=-1`, or `export YUZU_KEEP_ALIVE=-1`. See 5b |
+| First reply after a quiet spell is slow, then fine | Ollama unloaded her, which is now deliberate — she frees the 8GB when idle. Lengthen the window (`OLLAMA_KEEP_ALIVE=1h`) or pin her with `-1` if the board is hers alone. See 5b |
 
 Sources for the model:
 [DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored](https://huggingface.co/DavidAU/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored)

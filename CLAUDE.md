@@ -448,6 +448,62 @@ eval still reports 0% on the movement rows for any deck persona, so it
 cannot give her honest numbers yet. That harness gap is now the single
 biggest thing between her and a real measurement.
 
+## The deck is a COMPUTER too, not just a place she lives (Sept 9)
+
+Ghost, via a hardware-planning session: the deck should "eventually
+pull double duty as a usable general-purpose computer, not just an AI
+companion to talk to." That reframes a decision this file recorded
+confidently in the other direction.
+
+`OLLAMA_KEEP_ALIVE` moves `-1` -> `30m` everywhere: the doctor's
+expected value, the systemd block in JETSON_SETUP.md and
+NANO_DAY_ONE.md, the troubleshooting row, and the test that pins the
+unit file. The reasoning for `-1` was never wrong, it just assumed the
+board had no other job.
+
+**The interesting part: the request body already won.** A per-request
+`keep_alive` overrides the environment variable, and `yuzu_brain.py`
+has sent one on every call since the keep-alive work went in
+(`YUZU_KEEP_ALIVE`, default `30m`). So Shiro's traffic was ALREADY
+unloading at 30m while the unit file said "never unload" and the doctor
+cheerfully reported it correct. The two layers disagreed for days and
+nothing surfaced it, because both readings looked right on their own.
+
+Check the request body before the environment. That is the general
+lesson and it is not specific to Ollama.
+
+## PLANNED cyberdeck parts — SELECTED, NOT BOUGHT (Sept 9)
+
+Big parts are ~20 days out. **The only hardware actually owned is the
+Orin Nano Super devkit and its 512GB NVMe.** Do not write anything that
+assumes the rest exists.
+
+    power     Xiwai USB-C PD 65W trigger -> 5.5x2.5mm barrel, centre +
+              JSAUX 20,000mAh 65W USB-C PD bank (2nd port runs screen+audio)
+    display   7" 1024x600 IPS capacitive touch, HDMI in, USB 5V power
+              BENFEI PASSIVE DisplayPort->HDMI adapter
+    audio     USB sound card (Waveshare-compatible): mic in AND amplified
+              speaker out on a JST header, 8ohm/5W, driver-free
+              Waveshare 8ohm 5W dual-driver speaker, JST, NO SOLDERING
+    keyboard  already owned, Bluetooth
+    case      undecided
+    budget    ~$147 planned of a ~$300-350 allotment
+
+**The passive adapter question is RESOLVED and it went the good way.**
+This file previously flagged the passive-vs-active DP-to-HDMI trap as a
+silent failure to avoid. NVIDIA's own docs state this board's
+DisplayPort supports both active AND passive adapters, so the cheap
+BENFEI is fine. Recorded so nobody re-raises it.
+
+**The USB sound card solves audio out AND mic in on one device**, which
+is what the handoff notes recommended: Piper gets a speaker now, and
+Whisper gets its input later without buying twice. When it lands,
+`aplay -l` gives the card index Piper needs to route to.
+
+Still unmeasured and worth doing once it is powered: **actual current
+draw at `nvpmodel -m 0`**, to check the ~2.5-3h runtime estimate that
+was arithmetic rather than measurement.
+
 ## The suite had never been run on a Jetson until Sept 8
 
 Ghost ran `YUZU_TESTER.py` on the Orin for the first time and got
@@ -1412,14 +1468,24 @@ JETSON_SETUP.md 5b; the short version and the reasoning:
   each slot is real memory out of the pool Whisper and Piper want next.
 - **`OLLAMA_MAX_LOADED_MODELS=1`.** Two resident models on 8GB shared
   is how you land in swap.
-- **`OLLAMA_KEEP_ALIVE=-1`.** Ollama unloads an idle model after five
-  minutes. For a companion robot that is backwards: she sits quiet in a
-  corner, someone walks up and speaks, and the 3B has to be read back
-  off disk first -- so the very first thing anyone says to her is the
-  slowest reply she ever gives. `yuzu_brain.py` now sends `keep_alive`
-  on every request too (`YUZU_KEEP_ALIVE`, default `30m`), so this
-  works even without editing the service. Set it to `0` while bringing
+- **`OLLAMA_KEEP_ALIVE=30m`. CHANGED FROM `-1`, Sept 9.** Ollama
+  unloads an idle model after five minutes, which is too short -- step
+  away for a coffee and the next thing you say gets the slowest reply
+  she ever gives. `-1` (never unload) was the right answer while the
+  board did nothing but run her. **The cyberdeck is also meant to be a
+  usable general-purpose computer**, so pinning 3GB-odd of the shared
+  8GB forever works against that; 30m keeps her instant through any
+  real conversation and gives the memory back when nobody is talking.
+  Set `-1` only if the board is hers alone. Set `0` while bringing
   Whisper up alongside her and you need the memory back between turns.
+
+  **A per-request `keep_alive` BEATS the environment variable**, and
+  `yuzu_brain.py` has always sent one (`YUZU_KEEP_ALIVE`, default
+  `30m`). So Shiro's own traffic was ALREADY unloading at 30m no matter
+  what the systemd unit said -- the `-1` in the unit only ever governed
+  other clients, like a bare `ollama run` in a terminal. Worth knowing
+  before anyone debugs this layer: check the request body before the
+  environment.
 - **`OLLAMA_FLASH_ATTENTION=1` + `OLLAMA_KV_CACHE_TYPE=q8_0`.** Roughly
   halves what context costs in memory. The second needs the first.
 - **Swap belongs on the NVMe, not the microSD.** Swap is sustained

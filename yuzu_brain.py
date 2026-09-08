@@ -58,11 +58,13 @@ DEFAULT_TIMEOUT = int(os.environ.get("YUZU_TIMEOUT", "300"))
 # slowest reply she ever gives. On the Orin, off NVMe, that reload is
 # seconds; off a microSD it is worse.
 #
-# 30m is the compromise for a laptop or phone that has other uses for
-# its memory. On the Jetson, where nothing else wants the 8GB yet, pin
-# her there for good:
+# 30m is the compromise, and it is now the answer on the Jetson too.
+# It was worth pinning her resident with -1 while the board did nothing
+# but run her. The cyberdeck is also meant to be a usable computer, so
+# the 8GB has other claims on it and she should let go when nobody is
+# talking:
 #
-#     export YUZU_KEEP_ALIVE=-1
+#     export YUZU_KEEP_ALIVE=-1     # only if the board is HERS alone
 #
 # Set it to 0 to go back to unloading immediately after every reply,
 # which is what you want if you're bringing up Whisper alongside her and

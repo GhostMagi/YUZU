@@ -3744,11 +3744,11 @@ class TestJetsonChecks(unittest.TestCase):
         would report 'not set' on a box where they are set correctly,
         which is a worse answer than not checking at all."""
         unit = ('[Service]\n'
-                'Environment="OLLAMA_KEEP_ALIVE=-1"\n'
+                'Environment="OLLAMA_KEEP_ALIVE=30m"\n'
                 'Environment="OLLAMA_NUM_PARALLEL=1" "OLLAMA_FLASH_ATTENTION=1"\n')
         with self.fake_read({"/etc/systemd/system/ollama.service": unit}):
             env = self.doctor.ollama_service_env()
-        self.assertEqual(env["OLLAMA_KEEP_ALIVE"], "-1")
+        self.assertEqual(env["OLLAMA_KEEP_ALIVE"], "30m")
         self.assertEqual(env["OLLAMA_NUM_PARALLEL"], "1")
         self.assertEqual(env["OLLAMA_FLASH_ATTENTION"], "1")
 

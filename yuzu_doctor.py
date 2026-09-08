@@ -346,10 +346,14 @@ OLLAMA_TUNING = {
         "8GB shared, two models is how you land in swap.",
     ),
     "OLLAMA_KEEP_ALIVE": (
-        "-1",
-        "Keeps her loaded instead of unloading after 5 idle minutes. "
-        "Otherwise the first thing anyone says to her after a quiet "
-        "spell is the slowest reply she ever gives.",
+        "30m",
+        "Long enough that she never reloads mid-conversation, short "
+        "enough that the 8GB comes back when nobody is talking to her. "
+        "Was -1 (never unload) while this was only a companion robot; "
+        "the cyberdeck is also a general-purpose computer and wants "
+        "its memory back. Ollama's own default of 5m is too short -- "
+        "step away for a coffee and the next reply is the slowest one "
+        "she ever gives.",
     ),
     "OLLAMA_FLASH_ATTENTION": (
         "1",
