@@ -2952,6 +2952,24 @@ class TestDropBox(unittest.TestCase):
                           'multipart/form-data; boundary=X'),
             (None, None))
 
+    def test_it_stops_by_itself_after_one_file(self):
+        """Ghost asked how to macro a Ctrl-C, which is the wrong thing
+        to have to ask. His phone terminal has no easy one, and a
+        server he cannot stop is worse than one that quits early -- so
+        the default is one file and out, and --stay is the opt-in.
+
+        The shutdown MUST happen after the reply is written. Stopping
+        from inside the handler before that cuts the response off, and
+        the phone shows a network error over a file that arrived
+        perfectly intact."""
+        import inspect
+        body = inspect.getsource(drop.Drop.do_POST)
+        self.assertIn("self._page(", body)
+        self.assertLess(body.index("self._page("), body.index("done = True"),
+                        "the server stops before answering the phone, so a "
+                        "good upload will look like a failed one")
+        self.assertIn("STAY", body)
+
     def test_it_reports_a_reachable_address(self):
         """It must print the LAN address, not 127.0.0.1 -- the phone
         cannot reach loopback, and this project has already lost time

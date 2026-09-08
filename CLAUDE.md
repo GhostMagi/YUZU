@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 310 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 311 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 310 tests pass on it. Getting it
+(that repo path is confirmed working). 311 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -589,9 +589,21 @@ hostile inputs. `os.path.basename` after normalising backslashes, so
 `../../../../etc/passwd` writes `passwd` into the current folder and
 nothing escapes. Verified live as well as in the suite.
 
+**It STOPS BY ITSELF after one file.** Ghost asked how to macro a
+Ctrl-C, which is the wrong thing to have to ask -- his phone terminal
+has no easy one, and a server he cannot stop is worse than one that
+quits too early. So one file and out is the default; `--stay` is the
+opt-in for several, and `pkill -f drop.py` ends that.
+
+**The shutdown happens AFTER the reply is written**, and a test pins
+that ordering. Stopping from inside the handler before the response
+goes out cuts it off mid-flight, and the phone shows a network error
+over a file that arrived perfectly intact -- the worst kind of false
+alarm, because the obvious response is to send it again.
+
 **It is deliberately NOT a general file server.** GET serves one page,
-POST accepts one file. Nothing lists or reads the disk, so leaving it
-running exposes an inbox, not a filesystem. Still: Ctrl-C when done.
+POST accepts one file. Nothing lists or reads the disk, so even while
+up it is an inbox, not a filesystem.
 
 **Prefer `git pull` over pasting a long script into the serial
 terminal.** That link drops characters on anything long -- already
