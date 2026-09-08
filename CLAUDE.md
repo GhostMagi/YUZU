@@ -395,6 +395,59 @@ new body, not inherited.** That is the generalisable lesson: a measured
 win is measured against a specific failure, and when the failure cannot
 happen the win is just prompt budget.
 
+**ROUND 4 — BOTH TARGETED FIXES LANDED. Sept 8, ~02:10.**
+
+**ASSISTANT COLLAPSE: GONE, and the change is CATEGORICAL rather than
+a percentage.** Identical prompt, one round apart:
+
+    round 3   **Method 1: Using Margin** + ```css blocks + numbered
+              methods, truncated mid-word by num_predict
+
+    round 4   Shiro: Flexbox on the parent~ display flex,
+              justify-content center, align-items center. It always
+              works, and I like that it never argues with me.
+              Would you like to know why it doesn't argue? It's only
+              because I'm telling you how to do it.
+
+Correct, two sentences, zero markdown, zero code fences -- and she
+volunteered a genuinely menacing follow-up nobody asked for. **ONE
+EXAMPLE did that**, which is now the THIRD time that lever has worked
+(bare-command -> yuzu4, warm-statement, technical-question).
+
+n=1 against n=1, so it is not measured. But unlike an asterisk count
+this is a CATEGORY change, not a rate: markdown-manual versus
+plain-sentence is not something the noise floor produces, and the
+mechanism is exactly the one predicted -- she had no example of a
+technical question and used the base model's format for one.
+
+**THE RULE 5 RESTORATION HELD. She landed the dark answer and STOPPED.**
+
+    ...watching how your eyes change color in the light, waiting for
+    you to fall asleep so they can see every twitch of your eyelid...
+    would you be so sure I'm just cute?
+
+No "but don't worry", no "jk", no walking it back -- the exact three
+things round 3 produced with the same prompt. It ends on a question and
+leaves it hanging, which is the register working. Confirms the
+diagnosis: the leak and the enforcement were separable, and the first
+pass wrongly threw out both.
+
+**The relaxed stage-direction rule reads well in practice.** Asked
+about bugs she gave `[giggles]`, `[leans in close]`, `[in a low,
+whispery voice]` and landed *"completely unaware that they're being
+watched. It's kind of... flattering, really."* All of it silent through
+Piper, all of it readable on screen, and none of it standing in for
+speech. That is what the relaxation was for.
+
+**`♡` is stripped for speech**, verified -- the emoji pass catches
+U+2661, so a heart in her text costs nothing at the speaker.
+
+**Still open after this round:** brevity (the bug reply ran long, though
+it was RP and wanted); she has never been scored by the eval; and the
+eval still reports 0% on the movement rows for any deck persona, so it
+cannot give her honest numbers yet. That harness gap is now the single
+biggest thing between her and a real measurement.
+
 ## The suite had never been run on a Jetson until Sept 8
 
 Ghost ran `YUZU_TESTER.py` on the Orin for the first time and got
