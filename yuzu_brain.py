@@ -500,7 +500,21 @@ def _cli(argv):
     except BrainError as exc:
         print(f"\n{exc}\n")
         return 1
-    who = brain.persona.name if brain.persona else "custom prompt"
+    # PRINT THE KEY, NOT JUST THE NAME. Two personas can share a name --
+    # `shiro` is the retired hexapod and `shiro_deck` is the live one,
+    # and both said "persona: Shiro" at boot. Ghost ran `--persona
+    # shiro` by hand, got [walks backward] and [shakes legs], and
+    # reasonably asked whether it was character bleed. It was not: it
+    # was the right character on a body that no longer exists, and the
+    # banner gave him nothing to catch it with.
+    if brain.persona:
+        who = brain.persona.name
+        if brain.persona.key != who.lower():
+            who = f"{who} ({brain.persona.key})"
+        if not brain.persona.moves:
+            who += " [no body]"
+    else:
+        who = "custom prompt"
     print(f"persona: {who}   model: {brain.model}   host: {brain.host}")
     try:
         brain.check()

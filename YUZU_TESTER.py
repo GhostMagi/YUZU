@@ -2812,6 +2812,33 @@ class TestMovementRule(unittest.TestCase):
                     f"{key} has no body, but an example acts: {reply!r}")
 
 
+class TestBootBanner(unittest.TestCase):
+    """Two personas can share a NAME. The banner has to disambiguate."""
+
+    def test_the_banner_names_the_key_when_it_differs_from_the_name(self):
+        """MEASURED THE HARD WAY, Sept 9. `shiro` (retired hexapod) and
+        `shiro_deck` (live) both printed "persona: Shiro". Ghost ran the
+        first by hand, got [walks backward] and [shakes legs], and asked
+        whether it was character bleed -- a completely fair reading,
+        because nothing on screen said which of the two he had.
+
+        Fifth instance of the name-vs-identity class this file keeps
+        tripping over. The name is not the identity; the KEY is.
+        """
+        shiro = yuzu_personas.load("shiro")
+        deck = yuzu_personas.load("shiro_deck")
+        self.assertEqual(shiro.name, deck.name)     # the whole problem
+        self.assertNotEqual(shiro.key, deck.key)
+
+        import inspect
+        banner = inspect.getsource(yuzu_brain._cli)
+        self.assertIn("brain.persona.key", banner,
+                      "the boot banner does not print the key, so two "
+                      "personas sharing a name are indistinguishable")
+        self.assertIn("no body", banner,
+                      "the banner should say when the body cannot move")
+
+
 class TestShiroDeck(unittest.TestCase):
     """The live arm. Findings here come from Ghost's first real deck
     conversation, Sept 8 -- four replies, on the Orin, through Ollama."""

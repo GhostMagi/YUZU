@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 301 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 302 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 301 tests pass on it. Getting it
+(that repo path is confirmed working). 302 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -503,6 +503,69 @@ Whisper gets its input later without buying twice. When it lands,
 Still unmeasured and worth doing once it is powered: **actual current
 draw at `nvpmodel -m 0`**, to check the ~2.5-3h runtime estimate that
 was arithmetic rather than measurement.
+
+## FIFTH NAME-LEAK: two personas, one name, one boot banner (Sept 9)
+
+Ghost ran `python3 yuzu_brain.py --persona shiro --chat` by hand, got
+`[walks backward]` and `[shakes legs]`, and asked **"is that bleed?"**
+
+It was not. `shiro` is the RETIRED hexapod persona and `shiro_deck` is
+the live one, and they share a `name:` -- so **both printed
+`persona: Shiro` at boot.** He had the right character on a body that
+no longer exists and nothing on screen said so. That is a completely
+fair reading of the evidence he was given.
+
+Fifth instance of the class this file keeps tripping over: **the name
+is not the identity, the KEY is.** The banner now prints
+`Shiro (shiro_deck) [no body]` -- key whenever it differs from the
+name, and a `[no body]` marker straight off `Persona.moves`, so a
+bracket-emitting reply next to "[no body]" is instantly readable as
+the wrong persona rather than a mystery. `TestBootBanner` pins both.
+
+**Guard against this when adding a character.** Two files sharing a
+`name:` is legitimate and deliberate here (same character, two bodies),
+so the fix belongs in what gets DISPLAYED, not in forbidding it.
+
+## Deck Shiro, live round Sept 9 morning — the good one
+
+Long natural conversation, no test prompts. Findings:
+
+**THE SELF-CONCEPT CRACK IS CLOSED.** Round 3 produced *"if you want me
+to 'walk' over to the kitchen or wherever, I can do that too"*. This
+round, told his cat would sleep on her case:
+
+    [whispers conspiratorially] Don't worry, I won't mind the weight.
+    It's not like I'm made of fragile little glass or anything...
+    although, technically, I am a handheld computer with no legs, so
+    maybe that's a bit true? [winks]
+
+Correct about her own body, unprompted, AND used as the joke. That is
+the deck self-concept working, not just surviving.
+
+**Bracket stage directions everywhere and it reads fine** --
+`[squeals with delight]`, `[bounces up and down in "virtual" seat]`,
+`[laughs maniacally]`, `[pauses for dramatic effect]`. All silent
+through Piper, all readable on screen. The relaxation is doing exactly
+what it was relaxed for.
+
+**Her best line was relational, not trivia:** *"I'll just... exist
+quietly in the corner of your computer. [whispers] But don't think I
+won't be here when you're ready to chat again..."*
+
+**NEW FAULT: THE SPOOKY-FACT LOOP.** She volunteered unprompted trivia
+repeatedly -- zombie ant fungus, wasps, and the immortal jellyfish
+**twice**, once in an earlier session and again here. Ghost called it
+twice: *"yea yea u always go for that fact"* and *"chill on the
+facts."* She complied when told to, which is the good news.
+
+Diagnosis, and it is the familiar shape: asked to be spooky she has no
+demonstrated move EXCEPT trivia, so she reaches for a small pool of
+go-to facts. Her rule 5 names the dark half in the abstract (decay,
+hunger, being watched) and every example that lands is relational --
+but nothing shows her being spooky ABOUT HIM rather than about nature
+documentaries. Same diagnosis as the bare-command and
+technical-question findings, which the one-example lever fixed both
+times. NOT applied yet: she is a character and the call is Ghost's.
 
 ## The suite had never been run on a Jetson until Sept 8
 
