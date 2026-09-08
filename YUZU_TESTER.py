@@ -602,7 +602,11 @@ class TestBrain(BrainTestCase):
                             "LIVE_PERSONA must not be the frozen v1 archive")
         self.assertIn(live, yuzu_personas.available())
         # It has to actually compose, or the robot boots into a traceback.
-        self.assertIn("You are Yuzu", yuzu_personas.load(live).prompt)
+        # By the LIVE persona's OWN name -- this asserted "You are Yuzu"
+        # until Shiro took the slot, which would have made moving the
+        # main character look like a broken build.
+        self.assertIn(f"You are {yuzu_personas.load(live).name}",
+                      yuzu_personas.load(live).prompt)
         # And it is what an un-argued brain picks up.
         self.assertEqual(YuzuBrain(model="yuzu", host=self.host).persona.key,
                          live)
@@ -668,7 +672,7 @@ class TestBrain(BrainTestCase):
         brain.ask("again")
         messages = MockOllama.seen["last"]["messages"]
         self.assertEqual(messages[0]["role"], "system")
-        self.assertIn("You are Yuzu", messages[0]["content"])
+        self.assertIn(f"You are {brain.persona.name}", messages[0]["content"])
 
     def test_sampling_options_are_sent(self):
         self.brain().ask("hey")
@@ -694,7 +698,7 @@ class TestBrain(BrainTestCase):
         brain.ask("hey")
         brain.reset()
         self.assertEqual(brain.history, [])
-        self.assertIn("You are Yuzu", brain.system_prompt)
+        self.assertIn(f"You are {brain.persona.name}", brain.system_prompt)
 
     def test_remember_false_leaves_no_trace(self):
         brain = self.brain()
@@ -1394,7 +1398,10 @@ class TestHardwareBlocks(unittest.TestCase):
         """A prompt that offers a move the whitelist drops produces a
         robot that ignores its own advertised abilities."""
         for key in yuzu_personas.available():
-            prompt = yuzu_personas.load(key).prompt
+            persona = yuzu_personas.load(key)
+            if not persona.built:
+                continue        # no controller exists to check against
+            prompt = persona.prompt
             for line in prompt.splitlines():
                 # "Wrong: [winks]" deliberately shows an invalid action,
                 # so those lines are exempt from this check. (Whether
@@ -1679,6 +1686,27 @@ class TestYuzu5(unittest.TestCase):
     # arm as it was actually run, while everything built afterwards
     # (yuzu6, and every scaffolded persona) is held to it.
     SOUNDS_ENFORCEMENT = "Brackets are only ever for the movements listed above."
+
+    # Of the nine, these three only mean anything on a body that moves:
+    # they are phrased in brackets, in movement, and in a walk command.
+    # A cyberdeck persona is not missing them, it has no use for them --
+    # requiring them would put an action menu back into a character who
+    # drives nothing, which is the exact failure _hardware_cyberdeck.txt
+    # exists to prevent.
+    # The brevity win is a CAP ON SENTENCES, not one literal phrase.
+    # Coco says "One or two calm sentences", Byte "Keep it tight. One or
+    # two sentences", Yuzu "two or three sentences". All three ARE the
+    # brevity rule in their own register, and CLAUDE.md already records
+    # one false positive from matching this one literally.
+    BREVITY_WIN = "brevity rule, 62w -> 38w"
+    BREVITY_RE = re.compile(r"(one or two|two or three)\s+\w*\s*sentences?",
+                            re.I)
+
+    BODY_PROTOCOL_WINS = {
+        "always-speak rule, fixed the freeze",
+        "always-move rule, 50% -> 100% moves_at_all",
+        "bare-command example, 4/4 moved",
+    }
 
     def test_v5_is_the_arm_that_lacked_the_sounds_enforcement_line(self):
         """The record of why v5 lost, pinned so it can't be quietly
@@ -2187,7 +2215,7 @@ class TestPersonaExamples(unittest.TestCase):
             persona = yuzu_personas.load(key)
             for reply in self.example_replies(persona):
                 for check in prompt_eval.CHECKS:
-                    if (not persona.moves
+                    if (not (persona.moves and persona.built)
                             and check.name in self.MOVEMENT_CHECKS):
                         continue
                     self.assertTrue(
@@ -2198,6 +2226,8 @@ class TestPersonaExamples(unittest.TestCase):
     def test_no_example_demonstrates_an_action_the_robot_drops(self):
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
+            if not persona.built:
+                continue        # nothing wired up to drop it yet
             for reply in self.example_replies(persona):
                 for action in yuzu.extract_actions(yuzu.normalize_actions(reply)):
                     self.assertTrue(
@@ -2508,8 +2538,7 @@ class TestMovementRule(unittest.TestCase):
         measured numbers stop describing the prompts on disk."""
         blocks = yuzu_personas._parse_hardware("muto_s2")
         self.assertEqual(blocks["SOUND_EXAMPLES"], "Ehehe~, Haha!, Ugh, Ooh")
-        for key in ("yuzu2", "yuzu3", yuzu_personas.LIVE_PERSONA,
-                    "yuzu5", "yuzu6"):
+        for key in ("yuzu2", "yuzu3", "yuzu4", "yuzu5", "yuzu6"):
             self.assertIn("Ehehe~, Haha!, Ugh, Ooh",
                           yuzu_personas.load(key).prompt,
                           f"{key}'s composed prompt drifted")
@@ -2537,10 +2566,10 @@ class TestMovementRule(unittest.TestCase):
         'bestie' check on Coco's example.
         """
         gyaru = ("ehehe", "haha", "ooh")
-        live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
+        gyaru_name = yuzu_personas.load("yuzu4").name   # hers, not live's
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
-            if persona.name == live_name:
+            if persona.name == gyaru_name:
                 continue
             handed = persona.blocks.get("SOUND_EXAMPLES", "").lower()
             for token in gyaru:
@@ -2579,27 +2608,53 @@ class TestMovementRule(unittest.TestCase):
         from TestYuzu5.MEASURED_WINS and the set of characters from the
         persona files themselves.
         """
-        live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
-        live = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).prompt
+        live_persona = yuzu_personas.load(yuzu_personas.LIVE_PERSONA)
+        live = live_persona.prompt
+        # SCOPED TO THE LIVE BODY. It used to be "everyone whose name
+        # differs from the live arm's", which silently assumed the live
+        # arm was Yuzu and every other persona was a peer. Once the
+        # cyberdeck became the build that broke twice over: the
+        # yuzu2..yuzu6 lineage archives became "characters" and would
+        # have been held to wins yuzu2 lacks by definition, and Saya's
+        # quadruped -- a retired plan on a body with no controller --
+        # was being asked to carry them too.
+        #
+        # A win is measured ON a body. Personas on a retired chassis are
+        # records, exactly like the yuzu lineage; what has to keep up is
+        # every character standing on the body that actually boots.
         characters = [k for k in yuzu_personas.available()
-                      if yuzu_personas.load(k).name != live_name]
-        self.assertTrue(characters, "no non-Yuzu characters found at all")
+                      if k != yuzu_personas.LIVE_PERSONA
+                      and yuzu_personas.load(k).hardware
+                      == live_persona.hardware]
+        self.assertTrue(characters, "no peer characters on the live body")
         for key in characters:
-            prompt = yuzu_personas.load(key).prompt
+            persona = yuzu_personas.load(key)
             for name, needle in TestYuzu5.MEASURED_WINS.items():
                 if needle not in live:
                     continue
-                self.assertIn(needle, prompt, f"{key} lacks: {name}")
+                if (not persona.moves
+                        and name in TestYuzu5.BODY_PROTOCOL_WINS):
+                    continue
+                if name == TestYuzu5.BREVITY_WIN:
+                    self.assertTrue(
+                        TestYuzu5.BREVITY_RE.search(persona.prompt),
+                        f"{key} caps no sentence count: {name}")
+                    continue
+                self.assertIn(needle, persona.prompt, f"{key} lacks: {name}")
 
     def test_each_character_speaks_in_her_own_register(self):
         """The bare-command example is a measured SHAPE, but the voice
         has to be the character's. Teaching Yuzu's register to anyone
         else is the drift that makes persona switching clear history."""
         gyaru = ("cutie", "bestie", "omg", "hype", "sparkl", "uwu")
-        live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
+        # Pinned to Yuzu, NOT to whoever is live. These words are HERS,
+        # and they stay hers after the main character changes -- keying
+        # this on LIVE_PERSONA made the whole yuzu lineage read as
+        # "other characters" the moment Shiro took the slot.
+        gyaru_name = yuzu_personas.load("yuzu4").name
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
-            if persona.name == live_name:
+            if persona.name == gyaru_name:
                 continue
             # Only her OWN text -- the shared body block is a separate,
             # known issue and is not this test's business.
@@ -2622,7 +2677,12 @@ class TestMovementRule(unittest.TestCase):
         automatically required of her too.
         """
         coco = yuzu_personas.load("coco").prompt
-        live = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).prompt
+        # yuzu4, not LIVE_PERSONA. Robot Coco is a record of the hexapod
+        # era and yuzu4 is the arm she was built to keep up with; once
+        # the deck took over, comparing her against a bodiless live arm
+        # compared two different bodies. Deck parity is enforced by
+        # test_every_character_carries_the_measured_wins.
+        live = yuzu_personas.load("yuzu4").prompt
         for name, needle in TestYuzu5.MEASURED_WINS.items():
             if needle not in live:
                 continue                      # not a win the live arm has
@@ -2653,7 +2713,7 @@ class TestMovementRule(unittest.TestCase):
         """
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
-            if not persona.moves:
+            if not (persona.moves and persona.built):
                 continue
             for reply in re.findall(rf'^{re.escape(persona.name)}:\s*(\S.*)$',
                                     persona.prompt, re.M):
@@ -3328,7 +3388,9 @@ class TestVoice(unittest.TestCase):
         import contextlib, io
         real = yuzu.current_persona
         try:
-            for key, expected in ((yuzu_personas.LIVE_PERSONA, "YUZU SAYS"),
+            live_says = yuzu_personas.load(
+                yuzu_personas.LIVE_PERSONA).name.upper() + " SAYS"
+            for key, expected in ((yuzu_personas.LIVE_PERSONA, live_says),
                                   ("coco", "COCO SAYS")):
                 yuzu.current_persona = yuzu_personas.load(key)
                 buffer = io.StringIO()

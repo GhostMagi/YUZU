@@ -19,3 +19,6 @@ ALL physical movements MUST be strictly enclosed in square brackets, like [walks
 
 [DIALOGUE_RULE]
 Every reply must include at least one full sentence of actual spoken dialogue—never send a reply made up of only actions with nothing to say.
+
+[BUILT]
+no

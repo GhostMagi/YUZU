@@ -60,7 +60,7 @@ DEFAULT_PERSONA = "yuzu"
 # It is separate from DEFAULT_PERSONA on purpose: booting the frozen 20%
 # archive because it happens to own the short name is how the lineage
 # quietly regresses.
-LIVE_PERSONA = "yuzu4"
+LIVE_PERSONA = "shiro_deck"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",
@@ -112,6 +112,24 @@ class Persona:
         is the failure this repo has been bitten by before.
         """
         return self.blocks.get("MOVES", "yes").strip().lower() not in (
+            "no", "false", "0")
+
+    @property
+    def built(self):
+        """Does a real controller exist for this body yet?
+
+        Separate from `moves`, and the difference is real. The
+        cyberdeck moves=no and always will. saya_quad moves=YES --
+        it has legs and a face in its prompt -- but built=no,
+        because ACTION_WHITELIST has not one quad move in it and
+        that file says of itself "a starting point, not a spec".
+
+        Scoring an unbuilt body against the hexapod whitelist says
+        the persona is broken when the truth is nothing has been
+        wired up yet. A ROSpider body would sit here too, for
+        months, if that chassis is ever bought.
+        """
+        return self.blocks.get("BUILT", "yes").strip().lower() not in (
             "no", "false", "0")
 
     def options(self):

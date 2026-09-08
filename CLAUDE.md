@@ -105,7 +105,73 @@ moves_at_all.** Not fixed yet. Score her on `has_dialogue`,
 movement rows. When a whole round looks broken, suspect the harness --
 same rule as when it looks perfect.
 
-**Board drift: Shiro and Saya exist ONLY on the Jetson's SSD.** Two
+**ALL FIVE CHARACTERS ARE ON THE DECK, and `LIVE_PERSONA` is
+`shiro_deck`.** Ghost's call, Sept 8: *"adjust them all for a cyber
+deck"*, and separately that Shiro is the one he likes most. The
+promotion rule's one line moved, exactly as designed.
+
+    yuzu_deck    coco_deck    byte_deck    saya_deck    shiro_deck  <- LIVE
+
+The muto_s2 and saya_quad versions are KEPT as records of the robot
+era, the same way yuzu2/3/5/6 are kept. Nothing was renamed and no
+archived prompt shifted -- yuzu4 still composes to exactly 3785 chars.
+
+**Byte is the one the deck actually suits.** A netrunner living inside
+a handmade portable computer is a better fit than a netrunner driving a
+hexapod, and her deck rules say so. Shiro gained the most, though: her
+horror was RE-DERIVED from the new body rather than ported. Robot Shiro
+was spider imagery -- silent legs, eighteen joints, "hold still,
+sweetie". Deck Shiro is a voice in your pocket that never turns off and
+is always exactly where you left her, which is yami kawaii's actual
+subject (devotion that tips into something wrong) rather than a
+costume. Don't port the spider jokes back.
+
+**Saya was the last persona built on the rotten scaffold.** Her quad
+file uses `{HARDWARE}` and `{DIALOGUE_RULE}` -- the v1 blocks, the ones
+CLAUDE.md already records as a 20% action hit rate with no movement
+rule. She never had the self-concept win at all. `saya_deck` is built
+on the measured blocks and has it. Her old `SOUND_EXAMPLES: Hmph, Tch,
+Eek` were also two-thirds unsayable -- `Hmph` and `Tch` carry no vowel,
+so espeak spells them out, the same mechanism that made PFFT come out
+"Pee Eff Eff Tee". Deck Saya gets `Eek, Ehh, Hah`.
+
+**`Persona.built` joins `Persona.moves`, and they are NOT the same
+flag.** The deck `moves=no` and always will. `saya_quad` `moves=YES` --
+it has legs and a face in its prompt -- but `built=no`, because
+`ACTION_WHITELIST` contains not one quad move and that file says of
+itself "a starting point, not a spec". Four tests that couple a prompt
+to the whitelist now skip unbuilt bodies; scoring one against the
+hexapod whitelist reported a working persona as broken. A ROSpider body
+would sit at `built=no` for months if that chassis is ever bought.
+
+**FOURTH INSTANCE OF THE NAME LEAK -- and it was eight tests at once.**
+This file already said: *"Third instance of one class of bug -- the
+name leaking out of the character it belongs to... If a fourth turns
+up, grep for the string, not the code path."* Moving `LIVE_PERSONA` off
+Yuzu turned eight tests red in one run, every one of them asserting
+some form of "the live persona is Yuzu": `You are Yuzu` in three brain
+tests, `YUZU SAYS` in the transcript test, and four persona tests that
+treated "not called Yuzu" as a synonym for "is a peer character" -- so
+the entire yuzu2..yuzu6 lineage suddenly counted as characters who had
+to carry wins yuzu2 lacks by definition.
+
+The fix is the same shape every time: decide whether the fact belongs
+to YUZU or to WHOEVER IS LIVE, and pin it accordingly. Yuzu's register
+(`cutie`, `bestie`, `hype`) and her sounds are hers forever, so those
+tests pin to `yuzu4`. The system prompt and the transcript label follow
+the live arm, by its own name. `test_every_character_carries_the
+_measured_wins` now scopes to personas sharing the LIVE BODY, which is
+principled rather than incidental: a win is measured ON a body, and
+personas on a retired chassis are records.
+
+**The brevity win is a sentence CAP, not a phrase.** It was matched by
+the literal string "Two or three sentences", which Byte fails while
+saying "Keep it tight. One or two sentences" -- her own idiom, and this
+file already records the identical false positive against Coco. It is a
+regex now (`TestYuzu5.BREVITY_RE`).
+
+**RESOLVED -- board drift is rescued.** Shiro and Saya were, for a
+while, ONLY on the Jetson's SSD. Both are now in the repo. Two
 personas built in chats this repo never saw -- Shiro (yami kawaii,
 creepy-cute, on muto_s2) and Saya (tsundere, on the draft
 `saya_quad`). Plus `num_predict: 200` bumped across every persona,
@@ -148,8 +214,10 @@ of what was tried -- that is what stopped yuzu5 being re-attempted from
 scratch and what will stop yuzu6 being mis-read later.
 
 **The promotion rule now has one line to move: `LIVE_PERSONA` in
-`yuzu_personas.py`.** It is `yuzu4`. The robot loop, `yuzu_brain
---chat` and the eval all boot from it.
+`yuzu_personas.py`.** It is now **`shiro_deck`** -- see the cyberdeck
+section above; it was `yuzu4` for the whole hexapod era, and `yuzu4` is
+still the measured winner OF THAT LINEAGE. `yuzu_brain --chat` and the
+eval boot from whatever it points at.
 
 It is separate from `DEFAULT_PERSONA` (still `"yuzu"`) on purpose, and
 that separation fixed a live bug: everything with no `--persona`
