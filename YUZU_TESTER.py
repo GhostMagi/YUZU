@@ -2515,16 +2515,38 @@ class TestMovementRule(unittest.TestCase):
                           f"{key}'s composed prompt drifted")
 
     def test_no_character_is_taught_another_characters_sounds(self):
+        """What the SHARED BODY FILE hands her, not what she says.
+
+        NARROWED, and the narrowing is the point. This used to scan the
+        whole composed prompt, which conflated two different things:
+        the sounds block a file about legs HANDS a character (bleed,
+        the real bug -- Coco produced [Ehehe~] live because of it), and
+        the words a character says in her OWN authored examples
+        (character, the author's call).
+
+        Shiro is why. She was written on the board before the override
+        existed, so she really was handed 'Ehehe~, Haha!, Ugh, Ooh' --
+        a gyaru's vocabulary given to a yami kawaii by the servo file.
+        That is caught here. But her own line "...not that I'd ever
+        need to. Ehehe." is a soft creepy giggle she was deliberately
+        written with and tested on, and failing her for it is the same
+        literal-needle false positive this project already recorded
+        once against Coco's brevity rule.
+
+        Authored register has its own guard -- see the '!'/'cutie'/
+        'bestie' check on Coco's example.
+        """
         gyaru = ("ehehe", "haha", "ooh")
         live_name = yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
             if persona.name == live_name:
                 continue
-            low = persona.prompt.lower()
+            handed = persona.blocks.get("SOUND_EXAMPLES", "").lower()
             for token in gyaru:
-                self.assertNotIn(token, low,
-                                 f"{key} is still handed '{token}'")
+                self.assertNotIn(token, handed,
+                                 f"{key} is still handed '{token}' by the "
+                                 f"shared body file")
 
     def test_every_taught_sound_survives_tts(self):
         """A sound the voice drops is worse than no example: it teaches
