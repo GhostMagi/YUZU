@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 298 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 299 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 298 tests pass on it. Getting it
+(that repo path is confirmed working). 299 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -182,6 +182,51 @@ and he has no token on that box. **Any reflash of that SSD destroys
 them**, and the ROSpider plan he wrote says to flash right over it. Get
 that branch pushed, or `cat` the two persona files out, before anything
 touches the disk.
+
+## The suite had never been run on a Jetson until Sept 8
+
+Ghost ran `YUZU_TESTER.py` on the Orin for the first time and got
+**`Ran 298 tests in 123.554s` / `FAILED (failures=2)`** -- on the exact
+files that pass everywhere else. Both were real, both were in
+`TestThrottleReminder`, and neither was reachable off the target
+hardware. Reproduced here by simulating an Orin rather than making him
+re-run it over a serial link that kept dropping.
+
+- **`test_detection_never_raises_off_a_jetson` asserted `False`.** The
+  name says "never raises"; the assertion said "is not a Jetson". Only
+  true off one. Replaced by two tests that mean something on any
+  machine: `test_the_two_copies_of_the_jetson_check_agree` (the real
+  invariant -- `yuzu_doctor.on_a_jetson` and
+  `yuzu_all_in_one._on_a_jetson` are duplicated ON PURPOSE so the
+  doctor can ship as a lone download, and if they drift, the reminder
+  appears in one place and not the other), and
+  `test_detection_answers_both_ways_and_never_raises`, which fakes the
+  marker file instead of assuming its absence.
+
+- **`test_the_doctor_stays_quiet_on_a_phone` was reading dirt from
+  earlier tests.** `yuzu_doctor.notes` is a module-level list every
+  check appends to and `summary()` prints all of it, but the test
+  helper only isolated `on_a_jetson`. Off a Jetson `check_jetson()`
+  adds nothing so the leak is invisible; ON one it appends "Run: sudo
+  nvpmodel -m 0" and the assertion trips. The test was right and the
+  harness was dirty. `render_summary` now saves, clears and restores
+  `notes`.
+
+**The general lesson: a test that can only pass on the machine you
+wrote it on is not passing, it is untested.** Anything asserting a
+property of the HOST -- hardware present, file absent, binary missing
+-- should fake the condition both ways rather than assume today's
+machine. Piper is the next candidate: it is installed on the Orin and
+absent here, and those tests happen to be well isolated already.
+
+**Simulating the board beats waiting for it.** The serial link from
+the phone drops on anything longer than a minute, and the suite takes
+two on that box. Faking detection found the failure count in one run;
+faking the filesystem at BOTH layers (`os.path.exists` AND
+`pathlib.Path.exists` -- `Path.exists` goes through `os.stat` and does
+not see a patched `os.path.exists`) confirmed the fix. Getting that
+second detail wrong made the two copies disagree and the new agreement
+test caught it, which is a fair advert for the test.
 
 ## Prompt work
 

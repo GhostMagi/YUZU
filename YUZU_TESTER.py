@@ -2097,6 +2097,16 @@ class TestThrottleReminder(unittest.TestCase):
 
         import yuzu_doctor
         real = yuzu_doctor.on_a_jetson
+        # ISOLATE `notes` TOO, not just the detector. It is a module
+        # level list every check appends to, and summary() prints all of
+        # it -- so whatever ran earlier in the suite leaks into this
+        # render. Off a Jetson check_jetson() adds nothing and the leak
+        # is invisible; ON one it appends "Run: sudo nvpmodel -m 0",
+        # which made test_the_doctor_stays_quiet_on_a_phone fail the
+        # first time this suite was ever run on Ghost's Orin. The test
+        # was right and the harness was dirty.
+        saved_notes = list(yuzu_doctor.notes)
+        yuzu_doctor.notes.clear()
         yuzu_doctor.on_a_jetson = lambda: on_jetson
         buffer = io.StringIO()
         try:
@@ -2104,6 +2114,7 @@ class TestThrottleReminder(unittest.TestCase):
                 yuzu_doctor.summary({})
         finally:
             yuzu_doctor.on_a_jetson = real
+            yuzu_doctor.notes[:] = saved_notes
         return buffer.getvalue()
 
     def test_the_doctor_prints_it_on_a_jetson(self):
@@ -2115,10 +2126,46 @@ class TestThrottleReminder(unittest.TestCase):
     def test_the_doctor_stays_quiet_on_a_phone(self):
         self.assertNotIn("nvpmodel", self.render_summary(False))
 
-    def test_detection_never_raises_off_a_jetson(self):
+    def test_the_two_copies_of_the_jetson_check_agree(self):
+        """RENAMED AND FIXED -- it asserted both detectors return False,
+        which is only true OFF a Jetson. The suite had never been run on
+        the actual target hardware; the first time it was (Ghost's Orin,
+        Sept 8) it came back "Ran 298 tests... FAILED (failures=2)", and
+        this was one of them. The assertion was stronger than the name.
+
+        What the duplication actually needs guarding is AGREEMENT.
+        yuzu_doctor.on_a_jetson and yuzu_all_in_one._on_a_jetson are two
+        copies of one check, kept separate on purpose because the doctor
+        has to run as a lone download that imports nothing from this
+        project. Two copies can drift -- and if they do, the doctor
+        prints the throttle reminder while the robot's boot line stays
+        silent, or the reverse. That is the bug worth catching, and
+        unlike "always False" it is meaningful on every machine.
+        """
         import yuzu_doctor
-        self.assertIs(yuzu_doctor.on_a_jetson(), False)
-        self.assertIs(yuzu.__dict__["_on_a_jetson"](), False)
+        doctor = yuzu_doctor.on_a_jetson()
+        robot = yuzu.__dict__["_on_a_jetson"]()
+        self.assertIsInstance(doctor, bool)
+        self.assertIsInstance(robot, bool)
+        self.assertEqual(doctor, robot,
+                         "the two copies of the Jetson check disagree -- "
+                         "the reminder would appear in one place only")
+
+    def test_detection_answers_both_ways_and_never_raises(self):
+        """The behaviour the old name claimed to test, actually tested:
+        both copies say True when the marker is there, False when it is
+        not, and neither raises when the paths are absent (the phone
+        case the try/except exists for). Driven by faking the
+        filesystem, so it gives the same answer on a laptop, a phone and
+        an Orin."""
+        import yuzu_doctor
+        robot_check = yuzu.__dict__["_on_a_jetson"]
+        for present in (True, False):
+            with unittest.mock.patch.object(yuzu_doctor, "Path") as fake:
+                fake.return_value.exists.return_value = present
+                self.assertIs(yuzu_doctor.on_a_jetson(), present)
+            with unittest.mock.patch("os.path.exists", return_value=present):
+                self.assertIs(robot_check(), present)
 
     def test_the_readme_leads_with_it(self):
         readme = (Path(__file__).parent / "README.md").read_text()
