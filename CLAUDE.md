@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 319 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 321 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 319 tests pass on it. Getting it
+(that repo path is confirmed working). 321 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -584,10 +584,9 @@ has already made:
   serial link looks EXACTLY like a freeze -- that already cost one
   power-cycle of this board when a foreground `kiwix-serve` was read as
   a hang. A test asserts the launch line is detached.
-- **`xdpyinfo`, not a lock file.** A leftover file in `~/.vnc` claims a
-  session exists when none does, which is how you end up debugging
-  "could not connect to display :1" against a server that never ran.
-  Ask X itself whether it is there.
+- **Check that the PHONE can reach it, not that X is running.** See
+  the loopback finding below -- this is where the first version was
+  wrong, and it was wrong in the most convincing way available.
 - **The ROM is resolved BEFORE anything starts**, so a typo fails in a
   second rather than after a desktop has spun up.
 - **`lan_ip` never returns empty.** A bare `:5901` reads as a bug in
@@ -607,6 +606,45 @@ rather than a quoting fault.
 
 **Grepping source text is a proxy; running the thing is the test.**
 Same lesson the Jetson round produced from the other direction.
+
+## TigerVNC binds to LOOPBACK by default, and every local signal lied
+
+First real run of `gba`: it reported success, printed the address, and
+AVNC would not connect. **Everything checkable from the board said it
+was working.**
+
+    vncserver -list    1  5901  9170  Xtigervnc      <- session exists
+    xdpyinfo           answers                       <- X is alive
+    the process        running                       <- not crashed
+    ss -ltn            LISTEN 127.0.0.1:5901         <- THE ANSWER
+    the log            "on local interface(s), port 5901"
+
+**Modern TigerVNC defaults to `-localhost yes`.** It was listening for
+connections from the board to itself. No phone on that network could
+ever reach it, and nothing said so -- the log line is honest but reads
+like a status message rather than an exclusion.
+
+Two changes, and the second matters more than the first:
+
+1. `vncserver` is now invoked with **`-localhost no`**.
+2. **The check became "is a non-loopback listener on 5901" instead of
+   "is X running".** The original used `xdpyinfo`, which was true the
+   entire time the thing was broken.
+
+**A check that cannot observe the actual failure mode is not a check.**
+That is the generalisable line, and this repo keeps re-deriving it:
+`actions_runnable` passed vacuously on replies with no actions;
+`yuzu_doctor` read the environment while the truth was in the request
+body; the two Jetson tests asserted properties of the host machine.
+Every one of them reported healthy while the real thing was broken.
+
+The script now also **fails loudly and prints what it IS listening
+on** if the desktop comes up unreachable, rather than cheerfully
+printing an address that will not work. And it **leaves a healthy
+session alone** -- restarting one would drop him mid-game.
+
+`TestGbaLauncher` drives the real script against a stub `ss` that
+reports his exact broken state, and asserts the repair happens.
 
 ## drop.py — getting a file from the phone onto the board (Sept 9)
 

@@ -2938,7 +2938,7 @@ class TestGbaLauncher(unittest.TestCase):
 
     NASTY = "Pokemon - Emerald Version (USA, Europe) (patched).gba"
 
-    def _run(self, *args, roms=(NASTY,)):
+    def _run(self, *args, roms=(NASTY,), bind="0.0.0.0"):
         """Drive the real script against stub vncserver/mgba-qt/xdpyinfo,
         so this tests BEHAVIOUR rather than matching source text. An
         earlier text-matching version of this flagged $ROMS inside a
@@ -2951,13 +2951,24 @@ class TestGbaLauncher(unittest.TestCase):
             binv = tmp / "bin"
             binv.mkdir()
             calls = tmp / "calls"
+            # `ss` reports whatever `bind` says until vncserver is asked
+            # to start a real session, at which point it reports a
+            # reachable one -- so a test can drive the loopback repair.
+            flag = tmp / "bound"
             for name, script in (
-                    ("vncserver", f'echo "vnc $*" >> {calls}\nexit 0\n'),
+                    ("vncserver",
+                     f'echo "vnc $*" >> {calls}\n'
+                     f'[ "$1" = "-kill" ] || touch {flag}\nexit 0\n'),
                     ("mgba-qt", f'echo "rom=$1" >> {calls}\nexit 0\n'),
-                    ("xdpyinfo", "exit 1\n")):       # pretend no desktop
+                    ("ss",
+                     'echo "State Recv-Q Send-Q Local:Port Peer"\n'
+                     f'if [ -f {flag} ]; then echo "LISTEN 0 5 0.0.0.0:5901 *"\n'
+                     f'else echo "LISTEN 0 5 {bind}:5901 *"; fi\n')):
                 target = binv / name
                 target.write_text("#!/bin/bash\n" + script)
                 target.chmod(0o755)
+            if bind == "0.0.0.0":
+                flag.touch()              # already reachable, nothing to fix
             for rom in roms:
                 (gba_dir / rom).write_bytes(b"x")
             env = dict(os.environ, HOME=str(tmp / "home"),
@@ -2992,11 +3003,41 @@ class TestGbaLauncher(unittest.TestCase):
         self.assertIn("drop.py", done.stdout)
         self.assertEqual(log, "", "it started a desktop with no ROM to play")
 
-    def test_the_display_check_does_not_trust_a_lock_file(self):
-        """A leftover file in ~/.vnc claims a session exists when it
-        does not, which is how you end up debugging `could not connect
-        to display :1` against a server that never ran. Ask X itself."""
-        self.assertIn("xdpyinfo", self.SCRIPT.read_text())
+    def test_it_checks_the_phone_can_REACH_it_not_just_that_X_is_up(self):
+        """MEASURED THE HARD WAY, Sept 9. The first version checked
+        `xdpyinfo` -- is X running -- and reported success while
+        TigerVNC was bound to 127.0.0.1. Every local signal said
+        working: a session listed, a process alive, X answering. AVNC
+        could not connect and nothing on screen said why.
+
+        `vncserver -list`            1  5901  9170  Xtigervnc
+        `ss -ltn`                    LISTEN  127.0.0.1:5901
+        the log                      "on local interface(s), port 5901"
+
+        Two things had to change: pass -localhost no, and check the
+        BINDING rather than the process. A check that cannot see the
+        actual failure mode is not a check."""
+        done, log = self._run(bind="127.0.0.1")
+        self.assertIn("-localhost no", log,
+                      "it did not restart the desktop with -localhost no, "
+                      "so the phone still cannot reach it")
+        self.assertIn(self.NASTY, log, "the game never launched")
+
+    def test_a_desktop_already_reachable_is_left_alone(self):
+        """Restarting a working session would drop him mid-game."""
+        done, log = self._run(bind="0.0.0.0")
+        self.assertNotIn("vnc", log, "it restarted a healthy desktop")
+        self.assertIn(self.NASTY, log)
+
+    def test_the_desktop_check_does_not_trust_a_lock_file(self):
+        """A leftover file in ~/.vnc claims a session exists when none
+        does, which is how you end up debugging "could not connect to
+        display :1" against a server that never ran. Ask the kernel
+        what is actually listening instead."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("ss -ltn", body)
+        self.assertNotIn("~/.vnc", body,
+                         "it is reading the lock directory again")
 
     def test_there_is_a_way_to_stop_it(self):
         """He asked how to macro a Ctrl-C. The answer is that he should

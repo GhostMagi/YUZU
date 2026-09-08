@@ -45,16 +45,37 @@ else
         echo "Send one over:  cd $ROMS && python3 ~/YUZU/drop.py"; exit 1; }
 fi
 
-# xdpyinfo is the honest check -- a leftover lock file in ~/.vnc says a
-# session exists when it does not, which is exactly how you end up
-# debugging "could not connect to display :1" against a server that was
-# never running.
-if ! DISPLAY=$DISP xdpyinfo >/dev/null 2>&1; then
+# The check is "can the PHONE reach it", not "is X running". Those came
+# apart on the first real attempt: TigerVNC started fine, xdpyinfo was
+# happy, and the server was bound to 127.0.0.1 -- listening only for
+# connections from the board itself. AVNC could not connect and nothing
+# on screen said why, because by every other measure it was working.
+#
+# So: look for a listener on $PORT that is NOT loopback.
+reachable() {
+    ss -ltn 2>/dev/null | awk -v port=":$PORT" '
+        $4 ~ port"$" && $4 !~ /^127\./ && $4 !~ /^\[::1\]/ { found = 1 }
+        END { exit !found }'
+}
+
+if ! reachable; then
     echo "Starting the desktop..."
     vncserver -kill $DISP >/dev/null 2>&1     # clears a stale lock; may fail
-    vncserver $DISP -geometry 1280x720 -depth 24 >/dev/null 2>&1 \
-        || { echo "vncserver would not start. Run it by hand to see why:"; \
-             echo "  vncserver $DISP -geometry 1280x720 -depth 24"; exit 1; }
+    # -localhost no is the whole fix. Without it TigerVNC binds to
+    # loopback and every phone on the network is locked out.
+    if ! vncserver $DISP -geometry 1280x720 -depth 24 -localhost no \
+            > /tmp/vncstart.log 2>&1; then
+        echo "vncserver would not start:"
+        tail -5 /tmp/vncstart.log
+        exit 1
+    fi
+    sleep 2                                   # it binds a moment after forking
+    if ! reachable; then
+        echo "The desktop started but is not reachable from the network."
+        echo "What it is actually listening on:"
+        ss -ltn | grep "$PORT" || echo "  nothing on port $PORT"
+        exit 1
+    fi
 fi
 
 # nohup + & so the emulator does NOT hold this terminal. A foreground
