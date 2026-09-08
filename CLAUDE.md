@@ -7,7 +7,7 @@
   the chat as a copy-paste block**, without being asked. Ghost tests in
   PocketPal on a phone, so a file path or a command is useless to him —
   he needs the text itself. Get it with:
-      python yuzu_personas.py --show yuzu4
+      python yuzu_personas.py --show shiro_deck
   (that key is `yuzu_personas.LIVE_PERSONA`; `python yuzu_personas.py`
   on its own marks which one is live.)
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
