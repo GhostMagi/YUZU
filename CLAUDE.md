@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 311 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 319 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 311 tests pass on it. Getting it
+(that repo path is confirmed working). 319 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -560,6 +560,53 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 512gb SSD"). The deck self-concept holds for what she IS (she got the
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
+
+## `gba` — one word to play (Sept 9)
+
+Ghost: *"help make it easier to just open gameboy with a smaller
+code."* The real command was three lines -- a `vncserver` invocation,
+a `DISPLAY=:1` prefix and a glob -- and none of that is something to
+retype on a phone keyboard.
+
+    ~/YUZU/gba            newest ROM in ~/ROMs/gba
+    ~/YUZU/gba soul       newest ROM matching "soul"
+    ~/YUZU/gba --off      stop the emulator and the desktop
+
+Shell rather than Python, deliberately: it launches X apps and manages
+a VNC session, which is what a shell is good at. **He connects with
+AVNC**, so it prints the address to point AVNC at rather than assuming
+he remembers it.
+
+Four decisions in it worth keeping, each from a mistake this project
+has already made:
+
+- **`nohup ... &`, never foreground.** A foreground process on a phone
+  serial link looks EXACTLY like a freeze -- that already cost one
+  power-cycle of this board when a foreground `kiwix-serve` was read as
+  a hang. A test asserts the launch line is detached.
+- **`xdpyinfo`, not a lock file.** A leftover file in `~/.vnc` claims a
+  session exists when none does, which is how you end up debugging
+  "could not connect to display :1" against a server that never ran.
+  Ask X itself whether it is there.
+- **The ROM is resolved BEFORE anything starts**, so a typo fails in a
+  second rather than after a desktop has spun up.
+- **`lan_ip` never returns empty.** A bare `:5901` reads as a bug in
+  the script when it really means "this board is not on the network" --
+  a different problem with a different fix.
+
+**A test caught a bad test here, which is the part worth remembering.**
+The first version of `test_every_rom_path_is_quoted` matched SOURCE
+TEXT and flagged `$ROMS` inside a quoted `echo` string -- correct code,
+false alarm. It was replaced by a BEHAVIOUR test that runs the real
+script against stub `vncserver`/`mgba-qt`/`xdpyinfo` binaries and
+asserts the path arriving at the emulator. The quoting bug it exists to
+catch is real -- his one ROM is `Pokemon - Emerald Version (USA,
+Europe) (patched).gba`, spaces and parentheses -- and it would surface
+as `mgba-qt: Pokemon: No such file`, which reads like a missing ROM
+rather than a quoting fault.
+
+**Grepping source text is a proxy; running the thing is the test.**
+Same lesson the Jetson round produced from the other direction.
 
 ## drop.py — getting a file from the phone onto the board (Sept 9)
 

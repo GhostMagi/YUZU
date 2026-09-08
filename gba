@@ -1,0 +1,70 @@
+#!/bin/bash
+# One word to play. Starts the VNC desktop if it isn't up, launches the
+# emulator into it, and tells you what to point AVNC at.
+#
+#   ~/YUZU/gba              newest ROM in ~/ROMs/gba
+#   ~/YUZU/gba soul         newest ROM whose name contains "soul"
+#
+# Written because the real command was three lines with a DISPLAY
+# prefix, a vncserver invocation and a glob -- none of which is
+# something to retype on a phone keyboard.
+
+set -u
+ROMS="$HOME/ROMs/gba"
+DISP=":1"
+PORT=5901
+
+# The address AVNC can actually reach. The board also lists a docker
+# bridge and a USB-gadget link, and this project has lost time twice to
+# picking the wrong one out of `hostname -I` -- so ask the routing
+# table instead of guessing.
+lan_ip() {
+    local found
+    found=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+    # Never return empty -- printing a bare ":5901" reads like a bug in
+    # the script when it is really "this board is not on the network",
+    # which is a different problem with a different fix.
+    [ -n "$found" ] && echo "$found" || echo "<board is offline>"
+}
+
+if [ "${1:-}" = "--off" ]; then
+    pkill -f mgba-qt 2>/dev/null
+    vncserver -kill $DISP >/dev/null 2>&1
+    echo "Emulator and desktop stopped."
+    exit 0
+fi
+
+# Pick the ROM before starting anything, so a typo fails in a second
+# instead of after a desktop has been spun up.
+if [ $# -gt 0 ]; then
+    ROM=$(ls -t "$ROMS"/*"$1"*.gba 2>/dev/null | head -1)
+    [ -z "$ROM" ] && { echo "No ROM matching '$1' in $ROMS"; exit 1; }
+else
+    ROM=$(ls -t "$ROMS"/*.gba 2>/dev/null | head -1)
+    [ -z "$ROM" ] && { echo "No .gba files in $ROMS yet."; \
+        echo "Send one over:  cd $ROMS && python3 ~/YUZU/drop.py"; exit 1; }
+fi
+
+# xdpyinfo is the honest check -- a leftover lock file in ~/.vnc says a
+# session exists when it does not, which is exactly how you end up
+# debugging "could not connect to display :1" against a server that was
+# never running.
+if ! DISPLAY=$DISP xdpyinfo >/dev/null 2>&1; then
+    echo "Starting the desktop..."
+    vncserver -kill $DISP >/dev/null 2>&1     # clears a stale lock; may fail
+    vncserver $DISP -geometry 1280x720 -depth 24 >/dev/null 2>&1 \
+        || { echo "vncserver would not start. Run it by hand to see why:"; \
+             echo "  vncserver $DISP -geometry 1280x720 -depth 24"; exit 1; }
+fi
+
+# nohup + & so the emulator does NOT hold this terminal. A foreground
+# process on a phone serial link looks exactly like a freeze, and that
+# has already cost one power-cycle on this board.
+nohup env DISPLAY=$DISP mgba-qt "$ROM" >/dev/null 2>&1 &
+
+echo
+echo "  Playing:  $(basename "$ROM")"
+echo "  Open AVNC and connect to:  $(lan_ip):$PORT"
+echo
+echo "  Quit from inside mGBA, or stop everything with:  ~/YUZU/gba --off"
+echo

@@ -2901,6 +2901,111 @@ class TestShiroDeck(unittest.TestCase):
                 self.assertNotIn("[", line)
 
 
+class TestGbaLauncher(unittest.TestCase):
+    """`gba` -- one word to play, because the real command was three
+    lines with a DISPLAY prefix, a vncserver invocation and a glob.
+    None of that is something to retype on a phone keyboard.
+
+    Shell rather than Python on purpose: it launches X apps and manages
+    a VNC session, which is what a shell is actually good at."""
+
+    SCRIPT = Path(__file__).parent / "gba"
+
+    def test_it_exists_and_is_executable(self):
+        self.assertTrue(self.SCRIPT.exists())
+        self.assertTrue(os.access(self.SCRIPT, os.X_OK),
+                        "gba is not executable, so `~/YUZU/gba` fails")
+
+    def test_it_is_valid_shell(self):
+        """A syntax error here surfaces on a phone at the board."""
+        import subprocess
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_the_emulator_is_launched_detached(self):
+        """A foreground process on a serial link looks EXACTLY like a
+        freeze. That already cost one power-cycle on this board, when a
+        foreground kiwix-serve was read as the machine hanging."""
+        body = self.SCRIPT.read_text()
+        launch = [ln for ln in body.splitlines() if "mgba-qt" in ln
+                  and not ln.strip().startswith("#")]
+        self.assertTrue(launch, "nothing launches the emulator")
+        self.assertTrue(any("nohup" in ln and ln.rstrip().endswith("&")
+                            for ln in launch),
+                        "mgba-qt is launched in the FOREGROUND -- it will "
+                        "hold the terminal and read as a frozen board")
+
+    NASTY = "Pokemon - Emerald Version (USA, Europe) (patched).gba"
+
+    def _run(self, *args, roms=(NASTY,)):
+        """Drive the real script against stub vncserver/mgba-qt/xdpyinfo,
+        so this tests BEHAVIOUR rather than matching source text. An
+        earlier text-matching version of this flagged $ROMS inside a
+        quoted echo string, which was never a bug."""
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            gba_dir = tmp / "home" / "ROMs" / "gba"
+            gba_dir.mkdir(parents=True)
+            binv = tmp / "bin"
+            binv.mkdir()
+            calls = tmp / "calls"
+            for name, script in (
+                    ("vncserver", f'echo "vnc $*" >> {calls}\nexit 0\n'),
+                    ("mgba-qt", f'echo "rom=$1" >> {calls}\nexit 0\n'),
+                    ("xdpyinfo", "exit 1\n")):       # pretend no desktop
+                target = binv / name
+                target.write_text("#!/bin/bash\n" + script)
+                target.chmod(0o755)
+            for rom in roms:
+                (gba_dir / rom).write_bytes(b"x")
+            env = dict(os.environ, HOME=str(tmp / "home"),
+                       PATH=f"{binv}:{os.environ['PATH']}")
+            done = subprocess.run(["bash", str(self.SCRIPT), *args],
+                                  capture_output=True, text=True, env=env)
+            log = calls.read_text() if calls.exists() else ""
+            return done, log
+
+    def test_a_rom_name_with_spaces_and_parens_reaches_the_emulator(self):
+        """The one ROM he actually has is named `Pokemon - Emerald
+        Version (USA, Europe) (patched).gba`. An unquoted expansion
+        breaks on the only real input this will ever get -- and it
+        would break as `mgba-qt: Pokemon: No such file`, which reads
+        like a missing ROM rather than a quoting bug."""
+        done, log = self._run()
+        self.assertIn(f"rom=", log, done.stderr)
+        self.assertIn(self.NASTY, log,
+                      "the ROM path arrived at the emulator mangled")
+
+    def test_it_picks_the_newest_rom_and_can_be_filtered_by_name(self):
+        done, log = self._run("Emerald",
+                              roms=("Metroid Fusion.gba", self.NASTY))
+        self.assertIn(self.NASTY, log)
+        self.assertNotIn("Metroid", log)
+
+    def test_a_missing_rom_fails_fast_and_says_how_to_send_one(self):
+        """Nothing should be started before the ROM is found -- a typo
+        must fail in a second, not after a desktop has spun up."""
+        done, log = self._run(roms=())
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("drop.py", done.stdout)
+        self.assertEqual(log, "", "it started a desktop with no ROM to play")
+
+    def test_the_display_check_does_not_trust_a_lock_file(self):
+        """A leftover file in ~/.vnc claims a session exists when it
+        does not, which is how you end up debugging `could not connect
+        to display :1` against a server that never ran. Ask X itself."""
+        self.assertIn("xdpyinfo", self.SCRIPT.read_text())
+
+    def test_there_is_a_way_to_stop_it(self):
+        """He asked how to macro a Ctrl-C. The answer is that he should
+        never need one -- same reasoning as drop.py stopping itself."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("--off", body)
+        self.assertIn("pkill -f mgba-qt", body)
+
+
 class TestDropBox(unittest.TestCase):
     """drop.py -- getting a file from the phone onto the board.
 
