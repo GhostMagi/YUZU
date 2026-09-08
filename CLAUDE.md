@@ -472,37 +472,68 @@ nothing surfaced it, because both readings looked right on their own.
 Check the request body before the environment. That is the general
 lesson and it is not specific to Ollama.
 
-## PLANNED cyberdeck parts — SELECTED, NOT BOUGHT (Sept 9)
+## CYBERDECK PARTS — LOCKED SPEC, still NOT BOUGHT (Sept 9, v2)
 
-Big parts are ~20 days out. **The only hardware actually owned is the
-Orin Nano Super devkit and its 512GB NVMe.** Do not write anything that
-assumes the rest exists.
+Big parts ~20 days out. **The only hardware actually owned is the Orin
+Nano Super devkit, its 512GB NVMe, and the keyboard.** Do not write
+anything that assumes the rest exists.
 
-    power     Xiwai USB-C PD 65W trigger -> 5.5x2.5mm barrel, centre +
-              JSAUX 20,000mAh 65W USB-C PD bank (2nd port runs screen+audio)
-    display   7" 1024x600 IPS capacitive touch, HDMI in, USB 5V power
-              BENFEI PASSIVE DisplayPort->HDMI adapter
-    audio     USB sound card (Waveshare-compatible): mic in AND amplified
-              speaker out on a JST header, 8ohm/5W, driver-free
-              Waveshare 8ohm 5W dual-driver speaker, JST, NO SOLDERING
-    keyboard  already owned, Bluetooth
-    case      undecided
-    budget    ~$147 planned of a ~$300-350 allotment
+    power     Xiwai USB-C PD 65W -> 5.5x2.5mm barrel, centre +   ~$60
+              JSAUX 20,000mAh 65W USB-C PD bank ($49.99)
+    display   7" 1024x600 IPS capacitive touch, HDMI in ($46.99) ~$56
+              BENFEI 4K DisplayPort->HDMI, PASSIVE ($8.99)
+    audio     USB sound card, mic in + amplified 8ohm/5W out     ~$31
+              on one JST header, driver-free ($18.99)
+              Waveshare 8ohm 5W dual-driver speaker ($11.99)
+    keyboard  Arteck Bluetooth. OWNED. Measured 10" x 6.5".       $0
+    case      HUL 18" two-tone aluminium, Pick-N-Pluck foam      ~$55
+    mounting  Jiahezhi 440pc nylon standoff/screw kit, M2.5+M3   ~$10
+    cables    ZIIYAN 163pc sleeve/clip/strap kit                 ~$10
+                                                        total  ~$222
 
-**The passive adapter question is RESOLVED and it went the good way.**
-This file previously flagged the passive-vs-active DP-to-HDMI trap as a
-silent failure to avoid. NVIDIA's own docs state this board's
-DisplayPort supports both active AND passive adapters, so the cheap
-BENFEI is fine. Recorded so nobody re-raises it.
+**MEASUREMENTS TAKEN. Do not re-ask for these.**
 
-**The USB sound card solves audio out AND mic in on one device**, which
-is what the handoff notes recommended: Piper gets a speaker now, and
-Whisper gets its input later without buying twice. When it lands,
-`aplay -l` gives the card index Piper needs to route to.
+    Arteck keyboard              10" x 6.5"
+    devkit height, fan+heatsink  ~1.9-2"
+    case interior                17.3" x 12.4" x 4.3"
+    case exterior                17.9" x 14.4" x 5.1"
 
-Still unmeasured and worth doing once it is powered: **actual current
-draw at `nvpmodel -m 0`**, to check the ~2.5-3h runtime estimate that
-was arithmetic rather than measurement.
+The 4.3" interior depth clears the devkit with real room to spare, and
+17.3 x 12.4 swallows a 10" keyboard and a 7" panel side by side. **This
+is a big deck** -- that was a looks-prioritised choice and it is his.
+
+**THE FARADAY QUESTION WAS CHECKED AND ANSWERED.** This file warned
+that an all-metal enclosure is a cage, and his keyboard is Bluetooth
+while the board needs WiFi. The HUL case is aluminium FRAMED with ABS
+panels -- cosmetic metal, not a sealed shell -- so there is no real RF
+shielding and he has accepted that knowingly. Good outcome: the warning
+was raised, verified, and closed rather than assumed either way.
+
+Residual worth one test rather than one assumption: an antenna sitting
+directly against an aluminium frame can still lose range locally even
+with no cage. **Check Bluetooth keyboard range once assembled** instead
+of trusting the geometry.
+
+**Nylon standoffs, deliberately.** Non-conductive, so a stray standoff
+cannot short anything on the carrier board. M2.5 is stated to cover the
+devkit's mounting holes -- **verify against the real board** before
+drilling foam around it.
+
+**PC MODE is a real goal, not a metaphor.** The board runs full Ubuntu
+ARM64: browser, terminal, editors, LibreOffice, all native. The only
+hard limit is the architecture -- no Windows software, no x86-only
+Linux binaries. This is exactly why `OLLAMA_KEEP_ALIVE` moved off `-1`:
+CPU and GPU share ONE memory pool, so whatever Ollama holds is RAM the
+PC side never gets.
+
+**Floated, not scoped: Kiwix/ZIM offline wiki archives.** An offline
+Wikipedia on the deck would pair well with an offline character, and
+the NVMe has the room. Nobody has committed to it. If it happens, it is
+storage and a reader, not a model -- so it costs disk, not the 8GB.
+
+Still unmeasured and worth doing the moment it is powered: **actual
+current draw at `nvpmodel -m 0`**, to check the ~2.5-3h runtime figure,
+which is arithmetic and not measurement.
 
 ## FIFTH NAME-LEAK: two personas, one name, one boot banner (Sept 9)
 
