@@ -676,9 +676,19 @@ class TestBrain(BrainTestCase):
         self.assertIn(f"You are {brain.persona.name}", messages[0]["content"])
 
     def test_sampling_options_are_sent(self):
-        self.brain().ask("hey")
+        """SIXTH instance of the name-leak class, caught by promoting
+        Saya: this asserted `temperature == 0.8`, which was Shiro's
+        number, not a property of the brain. Saya runs 0.85 and the
+        test went red on a change that broke nothing.
+
+        What the test is FOR is that the persona's sampling settings
+        reach the request at all. So read the number off the persona
+        instead of pinning it, and the next promotion is quiet."""
+        brain = self.brain()
+        brain.ask("hey")
         options = MockOllama.seen["last"]["options"]
-        self.assertEqual(options["temperature"], 0.8)
+        self.assertEqual(options["temperature"],
+                         brain.persona.settings["temperature"])
         self.assertIn("num_predict", options)
         self.assertIn("num_ctx", options)
 

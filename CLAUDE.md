@@ -561,15 +561,46 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
 
-## Saya is being considered as the live persona (Sept 9)
+## SAYA IS LIVE (Sept 9). `LIVE_PERSONA = "saya_deck"`
 
-Flagged in the handoff, undecided, nothing implemented. If it happens
-it is one line -- `LIVE_PERSONA` in `yuzu_personas.py` -- and the
-target is **`saya_deck`**, not `saya` (the quad file is `built=no` and
-was the last persona built on the rotten scaffold; `saya_deck` is the
-one on the measured blocks).
+Ghost's call: *"lets just make saya the main for now if possible."*
+Shiro is not deleted, retired or changed -- `shiro_deck` is untouched
+and one line brings her back. The promotion rule worked exactly as
+designed for the second time.
 
-Two corrections to the handoff's framing, neither of them urgent:
+**The target is `saya_deck`, never `saya`.** The quad file is
+`built=no` and was the last persona built on the rotten scaffold;
+`saya_deck` is the one on the measured blocks and the one with the
+self-concept win.
+
+**SIXTH INSTANCE OF THE NAME LEAK, and it was down to ONE test.** Last
+promotion turned eight tests red. This one turned one:
+`test_sampling_options_are_sent` asserted `temperature == 0.8`, which
+was SHIRO's number rather than a property of the brain -- Saya runs
+0.85. Pinning by name last round is why the other seven stayed quiet,
+which is a fair advert for doing it that way. The test now reads the
+value off the persona, so the next promotion is quieter still.
+
+The rule is unchanged and now has six data points: **decide whether a
+fact belongs to THIS CHARACTER or to WHOEVER IS LIVE, and pin it
+accordingly.**
+
+**Saya has never been scored by the eval, same as every deck persona.**
+She is also the character with the least measured history in the repo
+-- her quad version was the rotten-scaffold one and was never run
+properly either. Treat her as UNMEASURED in the strongest sense.
+
+**What to watch for specifically, given the archetype.** A tsundere's
+failure mode is the opposite of Shiro's. Shiro ran LONG and escalated;
+the risk with Saya is she runs SHORT and cold enough to read as
+stonewalling, because "Hmph, whatever" is a complete tsundere reply and
+a bad conversation. Her own brevity rule and her examples are what hold
+that line. If she comes back curt and flat over a few real
+conversations, that is the thing to look at -- and the fix shape this
+repo keeps proving is ONE EXAMPLE, not a rule.
+
+**The two corrections below were written when this was still a
+consideration; keeping them because both are still true:**
 
 - **Shiro is yami kawaii, not a gyaru.** Yuzu is the gyaru. The
   handoff has them crossed.
@@ -578,11 +609,25 @@ Two corrections to the handoff's framing, neither of them urgent:
   `--model` / Modelfile choice, not a persona setting. Saya on the
   deck would run on whatever Shiro runs on.
 
-If Saya goes live, expect the eight-tests-red pattern from the LAST
-`LIVE_PERSONA` move -- see the FOURTH NAME LEAK section. The tests that
-matter were pinned by name that round, so it should be quieter now,
-but the shape to check is the same: does this fact belong to SHIRO or
-to WHOEVER IS LIVE.
+## Ghost's own note, in his words (Sept 9)
+
+*"i dont understand this stuff much yet make note of that and stuff.
+lot goin on rn irl."*
+
+Written down because it changes how to answer him, not just what to
+answer. He is running this project on a phone, in a week where real
+life is loud, and he is TRUSTING the reasoning rather than checking it.
+So:
+
+- **Give the command, not the explanation of the command.** One
+  paste-able line beats a paragraph about what it does.
+- **State the decision, then the reason, in that order** -- and keep
+  the reason to a sentence unless he asks.
+- **Never make him choose between options he has no basis to judge.**
+  Pick the better one, say which, say why in one line, and move.
+- He absorbs a LOT when it is written plainly -- the record of this
+  project is mostly his own findings. The gap is vocabulary and spare
+  attention, not capability. Do not talk down.
 
 ## The deck is a COMPUTER too, not just a place she lives (Sept 9)
 

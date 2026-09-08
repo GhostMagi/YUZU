@@ -60,7 +60,7 @@ DEFAULT_PERSONA = "yuzu"
 # It is separate from DEFAULT_PERSONA on purpose: booting the frozen 20%
 # archive because it happens to own the short name is how the lineage
 # quietly regresses.
-LIVE_PERSONA = "shiro_deck"
+LIVE_PERSONA = "saya_deck"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",
