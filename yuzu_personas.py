@@ -72,11 +72,12 @@ class PersonaError(RuntimeError):
 
 
 class Persona:
-    def __init__(self, key, settings, prompt, path):
+    def __init__(self, key, settings, prompt, path, blocks=None):
         self.key = key
         self.settings = settings
         self.prompt = prompt
         self.path = path
+        self.blocks = blocks or {}
 
     @property
     def name(self):
@@ -93,6 +94,25 @@ class Persona:
     @property
     def hardware(self):
         return self.settings.get("hardware", "muto_s2")
+
+    @property
+    def moves(self):
+        """Does this body have movements at all?
+
+        Declared by the hardware file as a [MOVES] block, defaulting
+        to yes -- so muto_s2, saya_quad and anything added later are
+        unchanged and no composed prompt shifts by a byte.
+
+        The cyberdeck is the first body that says no. Yuzu lives on
+        it as a resident AI and drives no hardware, so every
+        movement-shaped check ('did this reply move?', 'does this
+        example move?') is not FAILING for her, it is meaningless.
+        Scoring a bodiless persona on moves_at_all would report a
+        working character as 0%% broken -- the harness lying, which
+        is the failure this repo has been bitten by before.
+        """
+        return self.blocks.get("MOVES", "yes").strip().lower() not in (
+            "no", "false", "0")
 
     def options(self):
         """Sampling overrides for this persona, in Ollama's option names.
@@ -237,7 +257,7 @@ def load(key=LIVE_PERSONA):
             f"{'them' if len(leftover) > 1 else 'it'}.\n"
             f"  Defined there: {', '.join(sorted(blocks)) or '(none)'}"
         )
-    return Persona(key, settings, prompt, path)
+    return Persona(key, settings, prompt, path, blocks)
 
 
 def available():

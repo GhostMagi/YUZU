@@ -2177,11 +2177,19 @@ class TestPersonaExamples(unittest.TestCase):
             self.assertTrue(self.example_replies(persona),
                             f"{key} has no example reply to imitate")
 
+    # Checks that ask "did it move?". Meaningless for a body with no
+    # movements -- see Persona.moves. Named rather than detected so
+    # adding a check makes someone decide which kind it is.
+    MOVEMENT_CHECKS = ("moves_at_all", "actions_runnable", "one_per_bracket")
+
     def test_every_example_passes_every_compliance_check(self):
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
             for reply in self.example_replies(persona):
                 for check in prompt_eval.CHECKS:
+                    if (not persona.moves
+                            and check.name in self.MOVEMENT_CHECKS):
+                        continue
                     self.assertTrue(
                         check.fn(reply),
                         f"{key} example fails {check.name} "
@@ -2616,13 +2624,39 @@ class TestMovementRule(unittest.TestCase):
 
     def test_every_example_in_every_persona_actually_moves(self):
         """If an example can sit still, the strongest signal in the
-        prompt says sitting still is fine."""
+        prompt says sitting still is fine.
+
+        Bodies that MOVE only. A bodiless persona (the cyberdeck) is
+        held to the opposite rule below -- not a weaker one.
+        """
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
+            if not persona.moves:
+                continue
             for reply in re.findall(rf'^{re.escape(persona.name)}:\s*(\S.*)$',
                                     persona.prompt, re.M):
                 self.assertTrue(prompt_eval.moves_at_all(reply),
                                 f"{key} example never moves: {reply!r}")
+
+    def test_a_bodiless_persona_never_demonstrates_moving(self):
+        """The inverse guarantee, and it is STRICTER than the one above.
+
+        On the deck every bracket is dead weight: nothing runs it, the
+        parser strips it, and it costs generated tokens on every turn.
+        One example carrying a stray bracket teaches the whole habit --
+        this repo has measured examples beating rules twice. So a body
+        that declares [MOVES] no must show none, anywhere.
+        """
+        bodiless = [k for k in yuzu_personas.available()
+                    if not yuzu_personas.load(k).moves]
+        self.assertTrue(bodiless, "no bodiless persona to check")
+        for key in bodiless:
+            persona = yuzu_personas.load(key)
+            for reply in re.findall(rf'^{re.escape(persona.name)}:\s*(\S.*)$',
+                                    persona.prompt, re.M):
+                self.assertEqual(
+                    yuzu.extract_actions(yuzu.normalize_actions(reply)), [],
+                    f"{key} has no body, but an example acts: {reply!r}")
 
 
 class TestPersonaSwitching(BrainTestCase):

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 297 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 298 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 297 tests pass on it. Getting it
+(that repo path is confirmed working). 298 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -45,6 +45,77 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE BUILD IS A CYBERDECK NOW (Sept 8)
+
+Ghost, plainly: **"shes not going to control anything. resident ai."**
+
+The Muto S2 is RETIRED. It was never bought. Between Sept 4 and Sept 8
+the target moved twice -- first to a Hiwonder ROSpider (ROS2, 18DOF,
+lidar + depth cam, officially supports the Orin Nano Super, ~$1100,
+saving up for it), then to a **handheld cyberdeck** built around the
+Orin Nano Super he already owns. ROSpider is "someday potentially."
+
+**Do not build gaits.** A `pose()` gait for `[strikes a pose]` was
+half-written when this landed and was dropped unbuilt: it was
+uncalibrated angles for a chassis nobody is buying, and ROSpider is a
+different servo API entirely. `muto_leg_control.py`,
+`muto_firstcontact.py` and `_hardware_muto_s2.txt` are KEPT, not
+deleted -- ROSpider may still happen and the tripod work is real. They
+are just not the build.
+
+**`personas/_hardware_cyberdeck.txt` is the new body: no body at all.**
+The bracket layer is ABSENT, not silenced. A deck persona is never told
+brackets exist, never shown an action menu, never told to move. Leaving
+the menu in with nothing wired up would reproduce the `[strikes a pose]`
+drop at 100% of replies -- she would emit movements into a void every
+turn, and the prompt would be lying to her about what she is.
+
+What survives is everything that was about HER. That is the same split
+this repo already enforces the other way round ("the body bounds what
+she can DO, never what she can know or want"). A body of nothing bounds
+nothing -- so the self-concept block matters MORE here, not less: on a
+deck, her having tastes, opinions and knowledge is the entire product.
+
+`personas/yuzu_deck.persona` is yuzu4's character on that body. 3056
+chars against yuzu4's 3785, a **19% cut with zero character lost**.
+UNMEASURED -- no A/B has been run on it.
+
+**This is NOT the trim line reopening.** yuzu5 and yuzu6 both lost
+because they cut character-adjacent rules and she came back WORDIER,
+which is a latency loss wearing a latency win's clothes. This removes a
+body that does not exist. Every non-body rule is carried over verbatim,
+including the brevity rule's tail sentence that both trims dropped.
+Don't cite this cut as evidence the trims were fine.
+
+**`Persona.moves` -- declared, not detected.** A hardware file says
+`[MOVES] no`; everything else defaults to yes, so muto_s2, saya_quad
+and every archived prompt are unchanged to the byte. Two tests asserted
+that EVERY persona's examples move, which is a body assumption, not a
+quality bar -- they now skip bodies that don't move, and a bodiless
+persona is held to the **stricter** inverse instead
+(`test_a_bodiless_persona_never_demonstrates_moving`): it must show no
+brackets anywhere, because examples beat rules and one stray bracket
+teaches the habit. `TestPersonaExamples.MOVEMENT_CHECKS` names the
+movement-shaped eval checks so adding a check forces a decision.
+
+**`yuzu_prompt_eval.py` still scores a deck persona as 0% on
+moves_at_all.** Not fixed yet. Score her on `has_dialogue`,
+`not_an_assistant`, `no_puppeteering` and spoken length; ignore the
+movement rows. When a whole round looks broken, suspect the harness --
+same rule as when it looks perfect.
+
+**Board drift: Shiro and Saya exist ONLY on the Jetson's SSD.** Two
+personas built in chats this repo never saw -- Shiro (yami kawaii,
+creepy-cute, on muto_s2) and Saya (tsundere, on the draft
+`saya_quad`). Plus `num_predict: 200` bumped across every persona,
+three new Modelfiles, and uncommitted edits to `yuzu_brain.py`. Ghost
+committed all of it on the board as branch `board-rescue` (afcf580, 17
+files) but the push failed on auth -- GitHub stopped taking passwords
+and he has no token on that box. **Any reflash of that SSD destroys
+them**, and the ROSpider plan he wrote says to flash right over it. Get
+that branch pushed, or `cat` the two persona files out, before anything
+touches the disk.
 
 ## Prompt work
 
