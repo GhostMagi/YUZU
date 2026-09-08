@@ -12,6 +12,10 @@
 set -u
 WANT="${PAD_NAME:-8bitdo}"          # override for a different brand
 SCAN_SECS=15
+# Overridable so the test suite can drive both "pad present" and "pad
+# absent" instead of asserting whatever today's machine happens to have
+# plugged in. This repo has been bitten by host-dependent tests before.
+INPUTS="${PAD_INPUTS:-/proc/bus/input/devices}"
 
 mac_of() {
     bluetoothctl devices 2>/dev/null \
@@ -44,32 +48,58 @@ bonded() {
 # "connected". Those come apart: a pad can be linked at the BT layer
 # and still expose no gamepad, which looks identical from bluetoothctl.
 has_input_node() {
-    grep -i -- "$WANT" /proc/bus/input/devices >/dev/null 2>&1
+    grep -i -- "$WANT" "$INPUTS" >/dev/null 2>&1
 }
 
 case "${1:-}" in
 --status)
-    # USB first. A wired pad is a working pad and has no MAC at all,
-    # so checking Bluetooth first reports "not paired" about a
-    # controller that is plugged in and functioning.
+    # THE VERDICT GOES FIRST.
+    #
+    # This printed Paired / Bluetooth / Bonded / Gamepad in that order,
+    # so a working USB pad read as:
+    #
+    #     Bluetooth:  NOT connected
+    #     Bonded:     NO -- BlueZ will refuse the gamepad
+    #     Gamepad:    visible to games
+    #
+    # Two alarming lines about a transport that is not in use, and the
+    # one line that decides everything last. That is the same fault as
+    # every bug this evening: reporting the layers around the answer.
+    if has_input_node; then
+        echo
+        echo "  WORKING. Games can see the controller."
+        echo "  In mGBA: Settings -> Controllers, press Refresh, then Set all."
+        MAC=$(mac_of)
+        if [ -n "$MAC" ] && ! bonded "$MAC"; then
+            echo
+            echo "  (Bluetooth is half-paired, but it is wired right now,"
+            echo "   so that does not matter. ~/YUZU/pad --forget clears it.)"
+        fi
+        echo
+        exit 0
+    fi
+
+    echo
+    echo "  NOT AVAILABLE. No game can see a controller."
     MAC=$(mac_of)
     if [ -z "$MAC" ]; then
-        if has_input_node; then
-            echo "Gamepad:    connected over USB and working."
-            echo "            Nothing to pair. mGBA: Refresh, then Set all."
-            exit 0
+        echo
+        echo "  Easiest fix: wake the pad (press a button), THEN plug it"
+        echo "  into a USB-A port on the devkit. A sleeping pad only charges."
+        echo "  (Not the USB-C port -- that is the phone's serial console.)"
+    else
+        echo "    paired to $MAC"
+        connected "$MAC" && echo "    bluetooth connected" \
+                         || echo "    bluetooth not connected"
+        if ! bonded "$MAC"; then
+            echo "    NOT BONDED -- BlueZ refuses the gamepad over bluetooth"
         fi
-        echo "No $WANT controller is paired, and none is plugged in."
-        exit 1
+        echo
+        echo "  Easiest fix: wake the pad, then plug it into a USB-A port."
+        echo "  For bluetooth instead:  ~/YUZU/pad --forget   then  ~/YUZU/pad"
     fi
-    echo "Paired:     $MAC"
-    connected "$MAC" && echo "Bluetooth:  connected" \
-                     || echo "Bluetooth:  NOT connected"
-    bonded "$MAC" && echo "Bonded:     yes" \
-                  || echo "Bonded:     NO -- BlueZ will refuse the gamepad"
-    has_input_node && echo "Gamepad:    visible to games" \
-                   || echo "Gamepad:    NOT visible -- games will not see it"
-    exit 0
+    echo
+    exit 1
     ;;
 --forget)
     MAC=$(mac_of)

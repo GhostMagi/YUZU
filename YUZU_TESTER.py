@@ -2910,7 +2910,7 @@ class TestPadPairing(unittest.TestCase):
 
     SCRIPT = Path(__file__).parent / "pad"
 
-    def _run(self, *args, devices="", info=""):
+    def _run(self, *args, devices="", info="", inputs=""):
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:
             binv = Path(tmp) / "bin"
@@ -2921,10 +2921,53 @@ class TestPadPairing(unittest.TestCase):
                           f"  info)    printf '%s\\n' {info!r} ;;\n"
                           "  *) exit 0 ;;\nesac\n")
             bt.chmod(0o755)
-            env = dict(os.environ, PATH=f"{binv}:{os.environ['PATH']}")
+            # Drive the "is a gamepad present" check from a fixture
+            # rather than from whatever this machine has plugged in --
+            # a test that only passes on the machine it was written on
+            # is not passing, it is untested.
+            fake_inputs = Path(tmp) / "inputs"
+            fake_inputs.write_text(inputs)
+            env = dict(os.environ, PATH=f"{binv}:{os.environ['PATH']}",
+                       PAD_INPUTS=str(fake_inputs))
             return subprocess.run(["bash", str(self.SCRIPT), *args],
                                   capture_output=True, text=True,
                                   env=env, input="\n", timeout=60)
+
+    WIRED = 'N: Name="8BitDo 8BitDo Micro gamepad"\n'
+
+    def test_status_leads_with_the_verdict_not_the_bluetooth_noise(self):
+        """MEASURED Sept 9. A WORKING wired pad printed:
+
+            Bluetooth:  NOT connected
+            Bonded:     NO -- BlueZ will refuse the gamepad
+            Gamepad:    visible to games
+
+        Two alarming lines about a transport that is not in use, and
+        the one line that decides everything last. Ghost read it as
+        broken. It was working.
+
+        Same fault as every bug this evening -- reporting the layers
+        AROUND the answer -- except this time in my own output."""
+        done = self._run("--status", inputs=self.WIRED,
+                         devices=self.PAIRED,
+                         info="\tConnected: no\n\tBonded: no")
+        self.assertEqual(done.returncode, 0)
+        first = [ln for ln in done.stdout.splitlines() if ln.strip()][0]
+        self.assertIn("WORKING", first,
+                      f"the first line is not the verdict: {first!r}")
+        self.assertLess(done.stdout.index("WORKING"),
+                        done.stdout.index("Bluetooth"),
+                        "bluetooth noise still comes before the verdict")
+
+    def test_a_missing_pad_says_what_to_DO_about_it(self):
+        """A verdict with no next step just relocates the problem."""
+        done = self._run("--status", inputs="", devices="", info="")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("NOT AVAILABLE", done.stdout)
+        self.assertIn("USB-A", done.stdout)
+        self.assertIn("wake", done.stdout.lower(),
+                      "a sleeping pad only charges, and that is the "
+                      "single most likely cause -- say so")
 
     PAIRED = "Device E4:17:D8:12:34:56 8BitDo Micro gamepad"
 
@@ -2934,11 +2977,10 @@ class TestPadPairing(unittest.TestCase):
                               capture_output=True)
         self.assertEqual(done.returncode, 0, done.stderr.decode())
 
-    def test_status_is_honest_when_nothing_is_paired(self):
+    def test_status_is_honest_when_there_is_no_controller_at_all(self):
         done = self._run("--status")
         self.assertEqual(done.returncode, 1)
-        self.assertIn("no 8bitdo controller is paired", done.stdout.lower(),
-                      done.stdout)
+        self.assertIn("not available", done.stdout.lower(), done.stdout)
 
     def test_it_checks_for_a_GAMEPAD_not_just_a_bluetooth_link(self):
         """The failure this exists to catch: a pad linked at the
@@ -2952,9 +2994,9 @@ class TestPadPairing(unittest.TestCase):
         self.assertIn("/proc/bus/input/devices", body,
                       "nothing verifies a real gamepad appeared, so a "
                       "half-connected pad reports success")
-        done = self._run("--status", devices=self.PAIRED,
+        done = self._run("--status", inputs="", devices=self.PAIRED,
                          info="\tConnected: yes")
-        self.assertIn("Gamepad:", done.stdout)
+        self.assertIn("NOT AVAILABLE", done.stdout)
 
     def test_pairing_happens_in_ONE_session_so_the_bond_completes(self):
         """MEASURED, Sept 9, and it was the actual bug. The first
@@ -2981,12 +3023,12 @@ class TestPadPairing(unittest.TestCase):
 
     def test_it_reports_BONDED_not_just_connected(self):
         """`Connected: yes` is true while the gamepad is being refused.
-        `Bonded` is the only field that tells the truth, so --status
-        has to show it or it repeats the lie that cost this evening."""
-        done = self._run("--status", devices=self.PAIRED,
+        Bonding is the only thing that tells the truth, so a pad that
+        is NOT working has to say so or it repeats the lie that cost
+        this evening."""
+        done = self._run("--status", inputs="", devices=self.PAIRED,
                          info="\tConnected: yes\n\tBonded: no")
-        self.assertIn("Bonded:", done.stdout)
-        self.assertIn("NO", done.stdout)
+        self.assertIn("NOT BONDED", done.stdout)
 
     def test_a_wired_pad_short_circuits_the_whole_bluetooth_dance(self):
         """MEASURED Sept 9, after an hour of bonding failures: plugged

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 331 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 333 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 331 tests pass on it. Getting it
+(that repo path is confirmed working). 333 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -680,6 +680,42 @@ A test pins that the combos are gone.
 **Generalisable: when he can see the hardware and I cannot, name the
 goal, not the keystrokes.** Unverified specifics presented as steps are
 worse than no steps -- they send a person debugging their own hands.
+
+## THE VERDICT GOES FIRST — my own output made the same mistake
+
+`pad --status` on a **working** wired controller printed:
+
+    Paired:     E4:17:D8:F6:23:CC
+    Bluetooth:  NOT connected
+    Bonded:     NO -- BlueZ will refuse the gamepad
+    Gamepad:    visible to games
+
+Two alarming lines about a transport that **is not in use**, and the
+one line that decides everything last. Ghost read it as broken. It was
+working, and had been for two minutes.
+
+This is the fourth instance of the evening's pattern and the only one
+that was mine end to end: **reporting the layers AROUND the answer.**
+TigerVNC, the unbonded pad, BlueZ's `Success (0)` -- and then my own
+status output doing it to him again.
+
+`--status` now leads with the verdict:
+
+    WORKING. Games can see the controller.
+    In mGBA: Settings -> Controllers, press Refresh, then Set all.
+
+    (Bluetooth is half-paired, but it is wired right now,
+     so that does not matter.)
+
+and when it is not working, says what to DO -- wake the pad first,
+then plug it into a **USB-A** port, because a sleeping pad only
+charges. A verdict with no next step just relocates the problem.
+
+**`PAD_INPUTS` makes the check testable.** `has_input_node` reads
+`/proc/bus/input/devices`, which is a property of the HOST -- exactly
+the thing that made two Jetson tests unrunnable off a Jetson. The path
+is overridable so the suite drives both "pad present" and "pad absent"
+from fixtures instead of asserting whatever is plugged in today.
 
 ## PAIRED IS NOT BONDED — and BlueZ logs Success on the rejection
 
