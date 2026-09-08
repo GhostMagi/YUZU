@@ -2788,6 +2788,56 @@ class TestMovementRule(unittest.TestCase):
                     f"{key} has no body, but an example acts: {reply!r}")
 
 
+class TestShiroDeck(unittest.TestCase):
+    """The live arm. Findings here come from Ghost's first real deck
+    conversation, Sept 8 -- four replies, on the Orin, through Ollama."""
+
+    def prompt(self):
+        return yuzu_personas.load("shiro_deck").prompt
+
+    def test_she_is_not_taught_the_words_she_must_not_say(self):
+        """MEASURED, and it is the pink elephant for the third time.
+
+        Rule 5 read: never undercut it: no "jk," no disclaimer, no
+        walking it back. Her very FIRST live reply was:
+
+            Hii! *whispers* You didn't even notice my warning: "no
+            jk"s and "disclaimers" are not allowed here...
+
+        She recited the rule back at Ghost, quoting its own tokens. The
+        repo has now measured this three times -- [winks] named as
+        forbidden turning up in 3 of 4 replies, the asterisk ban that
+        demonstrated an asterisk, and this. Naming the thing she must
+        not say is how she learns to say it.
+
+        The rule still forbids undercutting. It just describes the
+        behaviour ("let it stand exactly as you said it") instead of
+        listing the words, which is the same rewrite Byte's rule 5 got
+        when it said "No hype" in Yuzu's own vocabulary.
+        """
+        prompt = self.prompt()
+        for token in ('"jk', "disclaimer", "walking it back"):
+            self.assertNotIn(token, prompt,
+                             f"shiro_deck still quotes {token!r} -- she "
+                             f"read that back to Ghost verbatim")
+        # The rule itself must survive the rewrite; this is character,
+        # not formatting, and dropping it would flatten her.
+        self.assertIn("dark half", prompt)
+
+    def test_her_examples_never_show_a_stage_direction(self):
+        """3 of her first 4 live replies carried one (*whispers*,
+        *silence*, *giggle*) despite being told not to and never being
+        shown one. Examples beat rules in this repo, so the examples at
+        least must stay clean -- and yuzu_voice.strip_stage_directions
+        is the guarantee behind the reduction, because without it those
+        reach Piper as the bare words "whispers", "silence", "giggle".
+        """
+        for line in self.prompt().splitlines():
+            if line.startswith("Shiro:"):
+                self.assertNotIn("*", line)
+                self.assertNotIn("[", line)
+
+
 class TestPersonaSwitching(BrainTestCase):
     """Two characters, one box. Switching between them must not depend
     on anything having gone right earlier."""

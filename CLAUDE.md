@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 299 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 301 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 299 tests pass on it. Getting it
+(that repo path is confirmed working). 301 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -182,6 +182,59 @@ and he has no token on that box. **Any reflash of that SSD destroys
 them**, and the ROSpider plan he wrote says to flash right over it. Get
 that branch pushed, or `cat` the two persona files out, before anything
 touches the disk.
+
+## FIRST LIVE DECK CONVERSATION — Sept 8, Shiro on the Orin
+
+Four replies, `yuzu_brain.py --chat`, Ollama on the board. She works,
+and the horror story she gave unprompted is better than anything
+written for her ("a photo of myself, taken before I ever had a body").
+Two real faults in four replies, though, and both are now fixed.
+
+**1. She recited her own rule back at him. PINK ELEPHANT, THIRD
+MEASURED INSTANCE.** Rule 5 read *`never undercut it: no "jk," no
+disclaimer, no walking it back`*. Her very first reply:
+
+    Hii! *whispers* You didn't even notice my warning: "no jk"s and
+    "disclaimers" are not allowed here...
+
+She quoted the rule's own tokens at the user. This repo has now
+measured the pattern three times -- `[winks]` named as forbidden and
+appearing in 3 of 4 replies, the asterisk ban that displayed an
+asterisk, and this. **Naming the thing she must not say is how she
+learns to say it.** Rule 5 now describes the behaviour instead ("let it
+stand exactly as you said it"); the dark-half rule itself is untouched,
+because that is character, not formatting. Same rewrite Byte's rule 5
+got. `TestShiroDeck` pins it.
+
+**2. Asterisk stage directions, in 3 of 4 replies, on a persona that
+was never shown one and is told not to write them.** `*whispers*`,
+`*silence*`, `*giggle*`. The deck has no bracket layer, so nothing
+downstream was catching them, and `for_speech` only strips the `*`
+characters -- meaning Piper said the bare words **"whispers",
+"silence", "giggle"** out loud mid-sentence. `Hehe~ *silence*` was
+spoken as "Hehe silence", which is also a reply with nothing in it.
+
+`yuzu_voice.strip_stage_directions()` is the guarantee. It removes both
+wrappers and lives in yuzu_voice rather than `for_speech` because the
+callers differ: the robot pipeline has already dropped brackets by then,
+and `--raw`/`--tryout` must synthesise exactly what they are given. It
+carries `normalize_actions`' `\S` guard, so `"it's 2 * 3 * 4 babe"`
+still survives -- the version without that guard ate the middle of the
+sentence, and that lesson is old here.
+
+**Ghost pushed back on the finding first, and was right to.** He asked
+whether the asterisks were a UI artifact "like last time in PocketPal".
+They were not, and the reason is worth keeping: PocketPal renders
+`*word*` as italics with the markers HIDDEN, so it makes asterisks
+**under**-count, never over-count. A serial terminal prints raw bytes
+and does no markdown at all. Check it every time anyway -- the question
+is right even when the answer is no.
+
+**The prompt REDUCES, code GUARANTEES -- again.** She was told not to
+write stage directions, shown zero examples containing one, and wrote
+one in three replies out of four. That is the same shape as `[winks]`
+and it is the whole argument for keeping the code net under every
+prompt rule.
 
 ## The suite had never been run on a Jetson until Sept 8
 

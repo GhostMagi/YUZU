@@ -556,15 +556,15 @@ def _cli(argv):
                 spoken.append(piece)
             print("\n")
             if voice is not None and voice.ready:
-                # --chat deliberately PRINTS the raw model output --
-                # that is what it is for, seeing what she says before
-                # the whitelist touches it. But speaking it raw would
-                # read "[spins]" aloud as words. On the robot,
-                # handle_yuzu_reply strips brackets long before TTS;
-                # there is no such step here, so do it for the spoken
-                # copy only. Deck personas emit none of these, which is
-                # why this is a one-liner and not a parser.
-                voice.say(re.sub(r"\[[^\]]*\]", " ", "".join(spoken)))
+                # --chat deliberately PRINTS raw model output -- that is
+                # what it is for. But speaking it raw reads "[spins]"
+                # and "*whispers*" aloud as words. On the robot,
+                # normalize_actions and the whitelist have removed both
+                # long before TTS; there is no such step here, so strip
+                # them for the SPOKEN copy only. The printed one keeps
+                # everything, which is how you see her doing it.
+                voice.say(yuzu_voice.strip_stage_directions(
+                    "".join(spoken)))
         except BrainError as exc:
             print(f"\n{exc}\n")
             return 1

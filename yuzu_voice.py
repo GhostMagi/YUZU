@@ -79,6 +79,39 @@ PLAYERS = (
 TIMEOUT = int(os.environ.get("YUZU_VOICE_TIMEOUT", "60"))
 
 
+# Stage directions, in either wrapper. Lives HERE rather than in
+# for_speech because the two callers need different things: the robot
+# pipeline has already stripped brackets by the time it speaks, and
+# --raw / --tryout must synthesise exactly the string they are handed.
+# yuzu_brain's --chat is the one path that sees raw model output.
+#
+# The \S guard is not decoration. It is why "it's 2 * 3 * 4 babe"
+# survives -- yuzu_all_in_one.normalize_actions carries the same guard
+# for the same reason, because the version without it ate the middle of
+# the sentence.
+_STAGE_BOLD = re.compile(r'\*\*(\S[^*\n]*?)\*\*')
+_STAGE_EMPH = re.compile(r'\*(\S[^*\n]*?)\*')
+_STAGE_BRACKET = re.compile(r'\[[^\]]*\]')
+
+
+def strip_stage_directions(text):
+    """Drop [bracketed] and *asterisked* stage directions.
+
+    MEASURED, Sept 8, Ghost's first live deck conversation: 3 of 4
+    replies from Shiro carried one -- "*whispers*", "*silence*",
+    "*giggle*" -- and without this they reach Piper as the bare WORDS
+    "whispers", "silence", "giggle", said out loud in the middle of a
+    sentence. She had no bracket examples and was told not to write
+    them; the 3B brings the habit anyway, which is the same finding as
+    [winks] turning up in 3 of 4 replies while named as forbidden.
+
+    The prompt REDUCES, code GUARANTEES. This is the guarantee.
+    """
+    text = _STAGE_BOLD.sub(" ", text)
+    text = _STAGE_EMPH.sub(" ", text)
+    return _STAGE_BRACKET.sub(" ", text)
+
+
 class VoiceError(RuntimeError):
     """Piper or a voice file is missing. Carries what to do about it."""
 
