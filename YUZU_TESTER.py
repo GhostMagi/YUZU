@@ -2956,10 +2956,42 @@ class TestPadPairing(unittest.TestCase):
                          info="\tConnected: yes")
         self.assertIn("Gamepad:", done.stdout)
 
+    def test_pairing_happens_in_ONE_session_so_the_bond_completes(self):
+        """MEASURED, Sept 9, and it was the actual bug. The first
+        version ran `bluetoothctl pair`, `trust` and `connect` as three
+        separate commands. Each starts an agent and EXITS, so the agent
+        dies before bonding finishes:
+
+            Paired: yes
+            Bonded: no
+            hidp_add_connection() Rejected connection from !bonded device
+
+        BlueZ then logged `input-hid Success (0)` on the very
+        connection it had just rejected, so every layer above reported
+        a working controller and no gamepad ever appeared.
+
+        Piping the sequence keeps one session, and its agent, alive."""
+        body = self.SCRIPT.read_text()
+        self.assertNotIn("bluetoothctl pair ", body,
+                         "pairing as a one-shot command lets the agent die "
+                         "before the bond completes")
+        self.assertIn("bluetoothctl >", body,
+                      "pairing is not driven through a single session")
+        self.assertIn("default-agent", body)
+
+    def test_it_reports_BONDED_not_just_connected(self):
+        """`Connected: yes` is true while the gamepad is being refused.
+        `Bonded` is the only field that tells the truth, so --status
+        has to show it or it repeats the lie that cost this evening."""
+        done = self._run("--status", devices=self.PAIRED,
+                         info="\tConnected: yes\n\tBonded: no")
+        self.assertIn("Bonded:", done.stdout)
+        self.assertIn("NO", done.stdout)
+
     def test_it_trusts_the_pad_so_it_reconnects_by_itself(self):
         """Without `trust`, it needs re-pairing after every power-off --
         which on a deck means every time he closes the lid."""
-        self.assertIn("bluetoothctl trust", self.SCRIPT.read_text())
+        self.assertIn("trust $MAC", self.SCRIPT.read_text())
 
     def test_a_failed_search_lists_what_it_COULD_see(self):
         """Dead ends are where he gets stuck. Printing the visible

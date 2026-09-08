@@ -19,8 +19,24 @@ mac_of() {
 }
 
 connected() {
-    local mac="$1"
-    bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes"
+    bluetoothctl info "$1" 2>/dev/null | grep -q "Connected: yes"
+}
+
+# PAIRED IS NOT BONDED, and only bonding gets you a gamepad.
+#
+# Measured Sept 9. The pad paired, trusted and connected, and BlueZ
+# then refused the only part that matters:
+#
+#   hidp_add_connection() Rejected connection from !bonded device
+#   ...
+#   input-hid state changed: connecting -> connected (0)
+#   device_profile_connected() input-hid Success (0)
+#
+# It logs Success immediately after the rejection, so every layer above
+# reports a working controller. `Bonded: no` in `bluetoothctl info` is
+# the only field that tells the truth.
+bonded() {
+    bluetoothctl info "$1" 2>/dev/null | grep -q "Bonded: yes"
 }
 
 # SDL (what mGBA uses) reads evdev, so the honest check is whether the
@@ -38,6 +54,8 @@ case "${1:-}" in
     echo "Paired:     $MAC"
     connected "$MAC" && echo "Bluetooth:  connected" \
                      || echo "Bluetooth:  NOT connected"
+    bonded "$MAC" && echo "Bonded:     yes" \
+                  || echo "Bonded:     NO -- BlueZ will refuse the gamepad"
     has_input_node && echo "Gamepad:    visible to games" \
                    || echo "Gamepad:    NOT visible -- games will not see it"
     exit 0
@@ -80,12 +98,56 @@ if [ -z "$MAC" ]; then
 fi
 
 echo "  Found $MAC"
-bluetoothctl pair "$MAC"    >/dev/null 2>&1
-bluetoothctl trust "$MAC"   >/dev/null 2>&1   # so it reconnects by itself
-bluetoothctl connect "$MAC" >/dev/null 2>&1
-sleep 2
+
+# ONE bluetoothctl session, not three commands.
+#
+# `bluetoothctl pair` as a one-shot registers an agent, pairs, and
+# EXITS -- and the agent dies with it, so bonding never completes. You
+# get Paired: yes, Bonded: no, and a controller no game can see. Piping
+# the whole sequence keeps a single session (and its agent) alive from
+# `agent on` through `connect`.
+bluetoothctl >/tmp/pad-pair.log 2>&1 <<BT
+power on
+agent NoInputNoOutput
+default-agent
+pair $MAC
+trust $MAC
+connect $MAC
+BT
+sleep 3
+
+# A half-pairing cannot be repaired in place -- BlueZ keeps the bad
+# state until the device is removed entirely.
+if ! bonded "$MAC"; then
+    echo "  Paired but not bonded. Clearing and retrying once..."
+    bluetoothctl remove "$MAC" >/dev/null 2>&1
+    sleep 1
+    bluetoothctl --timeout $SCAN_SECS scan on >/dev/null 2>&1
+    MAC=$(mac_of)
+    [ -z "$MAC" ] && { echo "  Lost it. Put it back in pairing mode and rerun."
+                       exit 1; }
+    bluetoothctl >>/tmp/pad-pair.log 2>&1 <<BT
+power on
+agent NoInputNoOutput
+default-agent
+pair $MAC
+trust $MAC
+connect $MAC
+BT
+    sleep 3
+fi
 
 echo
+if ! bonded "$MAC"; then
+    echo "  Still NOT BONDED, which is why no gamepad appears."
+    echo "  BlueZ logs it as: Rejected connection from !bonded device"
+    echo
+    echo "  Make sure the light is FLASHING (pairing), not solid"
+    echo "  (already-on). A trusted pad reconnects without ever bonding."
+    echo "    ~/YUZU/pad --forget    then hold SELECT ~3s, then rerun"
+    exit 1
+fi
+
 if connected "$MAC"; then
     echo "  Connected, and trusted -- it will reconnect on its own from now on."
 else
@@ -99,8 +161,10 @@ if has_input_node; then
     echo "  Last step, inside mGBA (in AVNC):"
     echo "    Tools -> Settings -> Controllers, click each box, press that button."
 else
-    echo "  WARNING: connected over Bluetooth, but NO gamepad device appeared."
-    echo "  mGBA will not see it. Try:  ~/YUZU/pad --forget   then pair again"
-    echo "  in D-input mode (START + A) rather than Switch or keyboard mode."
+    echo "  Bonded and connected, but NO gamepad device appeared yet."
+    echo "  Sometimes the kernel needs a moment. Check again with:"
+    echo "    ~/YUZU/pad --status"
+    echo "  If it stays missing:  ~/YUZU/pad --forget   and pair once more"
+    echo "  with the light FLASHING."
 fi
 echo

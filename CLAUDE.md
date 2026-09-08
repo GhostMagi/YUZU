@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 327 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 329 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 327 tests pass on it. Getting it
+(that repo path is confirmed working). 329 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -648,8 +648,57 @@ every time it is put down.
 **Not verified: the button combos.** `START + A` for D-input and
 `START + B` for Switch mode are what the script tells him to use, taken
 from the standard 8BitDo convention rather than from this pad in his
-hands. If they are wrong, the fix is two strings and the card in the
-box is the authority.
+hands. The mode turned out NOT to be the problem (see below), so they
+have still never been tested.
+
+## PAIRED IS NOT BONDED — and BlueZ logs Success on the rejection
+
+The `pad` warning fired on the first real run: connected, no gamepad.
+Two wrong theories before the log gave it up (`uhid` not loaded --
+`/dev/uhid` was already there; wrong pairing mode -- `bluetoothctl
+info` showed a proper HID device advertising `Human Interface
+Device`). The answer was one line of `journalctl -u bluetooth`:
+
+    hidp_add_connection() Rejected connection from !bonded device
+    input-hid state changed: connecting -> connected (0)
+    device_profile_connected() input-hid Success (0)
+
+**BlueZ refuses HID to an unbonded device, then logs `Success (0)` on
+the connection it just rejected.** Every layer above -- `Connected:
+yes`, `bluetoothctl connect` printing "Connection successful", the
+policy plugin adding a reconnect entry -- reported a working
+controller. The single field telling the truth was `Bonded: no`.
+
+**The cause was in `pad` itself.** It ran `bluetoothctl pair`, `trust`
+and `connect` as three separate commands. Each one starts an agent,
+does its thing, and EXITS -- so **the pairing agent dies before bonding
+completes.** The fix is to pipe the whole sequence into ONE session:
+
+    bluetoothctl <<BT
+    power on
+    agent NoInputNoOutput
+    default-agent
+    pair $MAC
+    trust $MAC
+    connect $MAC
+    BT
+
+`--status` now prints `Bonded:` alongside `Connected:`, and a
+half-pairing is cleared with `remove` and retried once automatically,
+because BlueZ keeps the bad state until the device is removed entirely.
+
+**THIRD TIME IN ONE EVENING that the obvious check was true while the
+thing was broken.** TigerVNC bound to loopback with a live session and
+a happy `xdpyinfo`; a pad "connected" with no input device; and now
+BlueZ reporting Success on a refusal. The question that found all three
+is the same one: **what would this check say if the thing were broken
+in the way it actually is?** If the answer is "the same thing", it is
+not a check.
+
+The corollary, and the reason this cost an hour: **read the log of the
+layer that is failing, not the status of the layers around it.**
+`bluetoothctl info`, `vncserver -list` and `ps` all describe
+neighbours. `journalctl -u bluetooth` named it in one line.
 
 ## TigerVNC binds to LOOPBACK by default, and every local signal lied
 
