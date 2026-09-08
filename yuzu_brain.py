@@ -478,6 +478,37 @@ class YuzuBrain:
 # CLI -- exercise the brain on its own, with no robot and no audio.
 # ---------------------------------------------------------------------
 
+# The exit word, in one place, because two loops read it.
+#
+# Both interactive loops (here and yuzu_all_in_one.run_yuzu_forever)
+# already tested `text.lower() in ("quit", "exit")` -- and Ghost still
+# typed quit twice into a live Shiro session and watched her REPLY to
+# it. So the check was never the gap. What reaches input() from a phone
+# is the gap: a soft keyboard capitalises the first word, double-space
+# inserts a full stop, and Serial USB Terminal can hand over a trailing
+# \r. "Quit." is not "quit", and the difference is invisible on screen
+# -- which is exactly why it read as a missing feature.
+#
+# So: strip the punctuation and the control bytes a phone adds, accept
+# the words someone actually reaches for, and let a slash prefix
+# through because the other loop's commands all wear one.
+#
+# "stop" is deliberately NOT here. On the robot loop it is a whitelisted
+# MOVE -- nine phrasings alias to stand() and that was a measured fix --
+# and in a chat "stop it lol" is a thing you say to her, not to the
+# program. An exit word has to be one nobody says in conversation.
+_EXIT_WORDS = frozenset(("quit", "exit", "q", "bye", ":q", ":q!"))
+
+
+def is_exit_command(text):
+    """True when a typed line means 'end the session', phone included."""
+    word = "".join(ch for ch in text if ch.isprintable()).strip()
+    word = word.strip(".,!?;:\'\"()[]").strip().lower()
+    if word.startswith("/"):
+        word = word[1:]
+    return word in _EXIT_WORDS
+
+
 def _cli(argv):
     model = DEFAULT_MODEL
     persona = None
@@ -556,7 +587,7 @@ def _cli(argv):
         except (EOFError, KeyboardInterrupt):
             print()
             return 0
-        if text.lower() in ("quit", "exit"):
+        if is_exit_command(text):
             return 0
         if text.lower() == "reset":
             brain.reset()

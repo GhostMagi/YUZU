@@ -25,10 +25,22 @@ except ImportError:
     legs = None
 
 try:
-    from yuzu_brain import BrainError, YuzuBrain
+    from yuzu_brain import BrainError, YuzuBrain, is_exit_command
 except ImportError:
     YuzuBrain = None
     BrainError = Exception
+
+    # Deliberate second copy, same reasoning as the doctor's Jetson
+    # check: this file has to survive as a lone download with no
+    # siblings, and a loop you cannot get out of is the worst thing to
+    # lose to a missing import. TestExitCommand pins the two copies to
+    # the same answers so they cannot drift.
+    def is_exit_command(text):
+        word = "".join(ch for ch in text if ch.isprintable()).strip()
+        word = word.strip(".,!?;:\'\"()[]").strip().lower()
+        if word.startswith("/"):
+            word = word[1:]
+        return word in ("quit", "exit", "q", "bye", ":q", ":q!")
 
 try:
     import yuzu_personas
@@ -556,7 +568,7 @@ def run_yuzu_forever():
     while True:
         user_text = listen_and_transcribe()
         command = user_text.strip().lower()
-        if command in ("quit", "exit"):
+        if is_exit_command(command):
             print("Shutting down.")
             break
         if command == "/personas":

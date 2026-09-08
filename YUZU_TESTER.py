@@ -20,6 +20,7 @@ import shutil
 import struct
 import sys
 import tempfile
+import textwrap
 import threading
 import time
 from collections import Counter
@@ -2887,6 +2888,77 @@ class TestShiroDeck(unittest.TestCase):
             if line.startswith("Shiro:"):
                 self.assertNotIn("*", line)
                 self.assertNotIn("[", line)
+
+
+class TestExitCommand(unittest.TestCase):
+    """Getting OUT of the chat loop. Reported by Ghost, Sept 9: he typed
+    quit twice into a live Shiro session and she REPLIED to it, in
+    character, both times. The handoff called it a missing check and
+    proposed exactly the check both loops already had -- so the check
+    was never the gap. What a PHONE hands to input() is the gap: a soft
+    keyboard capitalises the first word, double-space makes a full stop,
+    and a serial terminal can add a trailing \\r. All three are
+    invisible on screen, which is why it read as a missing feature."""
+
+    PHONE_TYPED = ["quit", "Quit", "Quit.", "QUIT", "quit ", " quit",
+                   "quit\r", "quit\r\n", "exit", "Exit!", "q", "Q.",
+                   "bye", "Bye.", "/quit", "/exit", ":q"]
+
+    CONVERSATION = ["stop", "Stop.", "stop walking", "quit it",
+                    "what does quit mean", "i quit my job lol", "",
+                    "   ", "byebye", "exit strategy", "queen"]
+
+    def test_the_phone_shapes_of_the_word_all_get_out(self):
+        for typed in self.PHONE_TYPED:
+            with self.subTest(typed=typed):
+                self.assertTrue(
+                    yuzu_brain.is_exit_command(typed),
+                    f"{typed!r} was typed to leave and did not leave")
+
+    def test_things_you_say_to_HER_are_not_exit_commands(self):
+        """The other half, and the more dangerous one. `stop` is
+        deliberately excluded: on the robot loop it is a whitelisted
+        MOVE (nine phrasings alias to stand(), a measured fix), and in
+        a chat "stop it lol" is aimed at her, not at the program. An
+        exit word has to be one nobody uses in conversation."""
+        for typed in self.CONVERSATION:
+            with self.subTest(typed=typed):
+                self.assertFalse(
+                    yuzu_brain.is_exit_command(typed),
+                    f"{typed!r} would have ended the session mid-chat")
+
+    def test_the_two_copies_of_the_exit_check_agree(self):
+        """yuzu_all_in_one.py carries its own copy for the case its
+        guarded `from yuzu_brain import ...` fails -- that file has to
+        survive as a lone download, and a loop you cannot leave is the
+        worst thing to lose to a missing import. Same deliberate
+        duplication as the doctor's Jetson check, and the same risk:
+        if they drift, quit works in one place and not the other.
+
+        Read the FALLBACK out of the source rather than the imported
+        name, because with yuzu_brain present the module attribute is
+        just brain's function and the copy is never exercised."""
+        import inspect
+        src = inspect.getsource(yuzu)
+        start = src.index("except ImportError:\n    YuzuBrain = None")
+        end = src.index("\ntry:", start)
+        namespace = {}
+        exec(textwrap.dedent(src[src.index("def is_exit_command", start):end]),
+             namespace)
+        fallback = namespace["is_exit_command"]
+        for typed in self.PHONE_TYPED + self.CONVERSATION:
+            with self.subTest(typed=typed):
+                self.assertEqual(
+                    fallback(typed), yuzu_brain.is_exit_command(typed),
+                    f"the two copies disagree about {typed!r}")
+
+    def test_both_loops_actually_call_it(self):
+        """A helper nothing calls fixes nothing."""
+        import inspect
+        for func in (yuzu_brain._cli, yuzu.run_yuzu_forever):
+            self.assertIn("is_exit_command(", inspect.getsource(func),
+                          f"{func.__name__} still compares the word by "
+                          f"hand, so a phone's full stop gets sent to her")
 
 
 class TestPersonaSwitching(BrainTestCase):

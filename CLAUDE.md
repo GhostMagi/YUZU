@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 302 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 306 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 302 tests pass on it. Getting it
+(that repo path is confirmed working). 306 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -447,6 +447,142 @@ it was RP and wanted); she has never been scored by the eval; and the
 eval still reports 0% on the movement rows for any deck persona, so it
 cannot give her honest numbers yet. That harness gap is now the single
 biggest thing between her and a real measurement.
+
+## Handoff v3 — the deck grew a screen and a games console (Sept 9)
+
+Ghost's v3 handoff, and the Sept 6 one he sent alongside it is
+superseded ("it was the second handoff that was up to date").
+
+**THERE IS A DISPLAY NOW, in software.** The DP->HDMI adapter and the
+7" panel are still ~20 days out, so he built a remote desktop instead:
+`tigervnc-standalone-server` on the Orin, `~/.vnc/xstartup` running a
+minimal X session, `vncserver :1 -geometry 1280x720 -depth 24`, and
+AVNC on the phone connecting to port 5901. That is a real workaround
+and it unblocks everything that needed pixels.
+
+**Use the LAN address from `hostname -I`, not the first one.** The board
+lists `172.17.0.1` (docker bridge) and `192.168.55.1` (the USB gadget
+link) alongside the real `192.168.x.x`. Only the last is reachable from
+the phone over WiFi. This is the second time that exact confusion has
+cost time -- the Kiwix session hit it too -- so it is written down now.
+
+**ES-DE + mGBA are installed and GBA emulation runs in the VNC
+session.** AppImage (ARM64) for ES-DE, `sudo apt install -y mgba-qt`,
+wired up under Settings -> Alternative Emulators -> GBA. ROMs live in
+`~/ROMs/<system>/`. In progress: a Pokemon SoulGold BPS patch over a
+personal Emerald dump. Next hardware step is an 8BitDo pad, paired as
+an ordinary Bluetooth device and self-mapped in mGBA's controller
+screen -- no config files.
+
+**This is PC MODE, actually happening, and it is the argument for the
+`OLLAMA_KEEP_ALIVE` change made the same day.** An emulator, a VNC
+server and an X session all want the same 8GB the model does. `-1`
+would have pinned ~3GB of it forever against a machine that now has
+other jobs. The reasoning written up above is no longer hypothetical.
+
+**Worth measuring rather than assuming: what ES-DE plus a running X
+session leave for Ollama.** Nobody has looked. `free -h` with the VNC
+session up, before and after her first reply, answers it in ten
+seconds and would catch a swap problem before it looks like her being
+slow.
+
+## The `quit` bug: the check was never missing (Sept 9)
+
+Ghost typed `quit` into a live Shiro session, twice, and she REPLIED to
+it in character both times. The handoff diagnosed a control-flow gap
+and proposed the fix:
+
+    if user_input.strip().lower() in ("quit", "exit"):
+        break
+
+**Both interactive loops already had exactly that**, and had for a long
+time -- `yuzu_brain._cli` and `yuzu_all_in_one.run_yuzu_forever`. So a
+correct-looking diagnosis pointed at code that already did the thing.
+
+The gap is what a PHONE hands to `input()`. A soft keyboard capitalises
+the first word of a line; double-space inserts a full stop; Serial USB
+Terminal can append a carriage return. `"Quit."` is not `"quit"`, and
+**every one of those differences is invisible on screen**, which is
+exactly why it read as a missing feature rather than a mangled string.
+
+`yuzu_brain.is_exit_command()` now strips non-printables and edge
+punctuation, lowercases, allows a leading `/`, and accepts quit / exit
+/ q / bye / :q. `TestExitCommand` pins seventeen phone-shaped spellings.
+
+**`stop` is deliberately NOT an exit word**, and that is the more
+dangerous half of the test. On the robot loop `stop` is a whitelisted
+MOVE -- nine phrasings alias to `stand()` and that was a measured fix --
+and in a chat "stop it lol" is aimed at her, not at the program. Eleven
+conversational near-misses are pinned as NOT exits.
+
+`yuzu_all_in_one.py` carries a second copy inside its guarded import,
+because that file has to survive as a lone download and a loop you
+cannot leave is the worst thing to lose to a missing sibling. Same
+deliberate duplication as the doctor's Jetson check, and it gets the
+same guard: `test_the_two_copies_of_the_exit_check_agree`, verified by
+breaking one copy on purpose and watching eight assertions fail.
+
+**The general lesson, and it is the same one as `keep_alive`: check
+what the layer BELOW actually received before rewriting the layer
+above.** The reported symptom was accurate, the proposed fix was
+already deployed, and the real cause was one full stop.
+
+## The villain monologue — recorded, not chased (Sept 9)
+
+Shiro escalated into sustained ALL-CAPS threats over several turns
+("I WILL CRUSH YOU LIKE THE INSIGNIFICANT INSECT THAT YOU ARE"), set
+off by a joke about a skull sticker she had suggested herself, and did
+not come down when Ghost pushed back playfully. Ghost's read: a known
+flavour of the heretic-abliterated weights, same category as the
+accepted small-model quirks, **not worth prompt-chasing.** That is his
+call and it stands.
+
+Two things to keep next to it so a future session does not read this
+as closed and skip a cheap test:
+
+- **Rule 5 tells her to do most of it.** "Go all the way in on the dark
+  half... then stop talking. Never soften it afterwards." The
+  never-soften half was RESTORED on purpose an hour before this round,
+  because removing it made her walk her dark answers back, and round 4
+  confirmed the restoration working. So the prompt is at minimum a
+  contributor, and "it's the model" is a hypothesis rather than a
+  finding. What rule 5 does not have is any notion of coming back DOWN.
+- **ALL-CAPS is a TTS event, not just a tone.** `unshout()` lowercases
+  shouted words so espeak says them instead of spelling them, and it
+  will handle this correctly -- but an entire reply in caps is a case
+  it has never seen. Worth one `--say` audition of a real line from
+  that round before assuming.
+
+Also in that round: **she hallucinated hardware she had designed** -- a
+custom PCB "with a little more RAM", a dollhouse case with custom
+wiring, case lights that flicker when he is hacking. Ghost corrected
+her ("youre 'pcb' is already a nvidia nano orin super devkit with a
+512gb SSD"). The deck self-concept holds for what she IS (she got the
+"handheld computer with no legs" joke right, unprompted) but not yet
+for what she is MADE OF. Nothing in her prompt names a single part.
+
+## Saya is being considered as the live persona (Sept 9)
+
+Flagged in the handoff, undecided, nothing implemented. If it happens
+it is one line -- `LIVE_PERSONA` in `yuzu_personas.py` -- and the
+target is **`saya_deck`**, not `saya` (the quad file is `built=no` and
+was the last persona built on the rotten scaffold; `saya_deck` is the
+one on the measured blocks).
+
+Two corrections to the handoff's framing, neither of them urgent:
+
+- **Shiro is yami kawaii, not a gyaru.** Yuzu is the gyaru. The
+  handoff has them crossed.
+- **There is no 1B model here and personas do not carry one.** Every
+  Modelfile is `FROM llama3.2:3b`, and which weights answer is a
+  `--model` / Modelfile choice, not a persona setting. Saya on the
+  deck would run on whatever Shiro runs on.
+
+If Saya goes live, expect the eight-tests-red pattern from the LAST
+`LIVE_PERSONA` move -- see the FOURTH NAME LEAK section. The tests that
+matter were pinned by name that round, so it should be quieter now,
+but the shape to check is the same: does this fact belong to SHIRO or
+to WHOEVER IS LIVE.
 
 ## The deck is a COMPUTER too, not just a place she lives (Sept 9)
 
