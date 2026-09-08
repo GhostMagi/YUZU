@@ -93,6 +93,17 @@ _STAGE_BOLD = re.compile(r'\*\*(\S[^*\n]*?)\*\*')
 _STAGE_EMPH = re.compile(r'\*(\S[^*\n]*?)\*')
 _STAGE_BRACKET = re.compile(r'\[[^\]]*\]')
 
+# A FENCED CODE BLOCK IS NOT SPEECH. Asked to centre a div, Shiro
+# returned markdown headings and ```css blocks, and Piper read out
+# "backtick backtick backtick c s s hash my div open brace two hundred
+# p x". Dropped whole, exactly like pfft: a thing this voice cannot say
+# produces silence and the sentence around it survives.
+#
+# Inline `code` keeps its WORDS and loses its backticks -- "margin:
+# auto" is worth hearing, and dropping it would eat the answer.
+_FENCED_CODE = re.compile(r"```.*?```", re.S)
+_INLINE_CODE = re.compile(r"`([^`\n]+)`")
+
 
 def strip_stage_directions(text):
     """Drop [bracketed] and *asterisked* stage directions.
@@ -107,9 +118,11 @@ def strip_stage_directions(text):
 
     The prompt REDUCES, code GUARANTEES. This is the guarantee.
     """
+    text = _FENCED_CODE.sub(" ", text)
     text = _STAGE_BOLD.sub(" ", text)
     text = _STAGE_EMPH.sub(" ", text)
-    return _STAGE_BRACKET.sub(" ", text)
+    text = _STAGE_BRACKET.sub(" ", text)
+    return _INLINE_CODE.sub(r"\1", text)
 
 
 class VoiceError(RuntimeError):

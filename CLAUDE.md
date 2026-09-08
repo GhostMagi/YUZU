@@ -284,6 +284,78 @@ two or three. One instance, so it is nothing yet -- but spoken length
 is the ONE metric this repo found does not wobble between runs, so if
 it shows again it is real and it is worth acting on.
 
+**ROUND 3 — THE ONE THAT MATTERED. Four adversarial prompts, four
+distinct faults, and the biggest risk of the whole deck pivot
+CONFIRMED.**
+
+**1. ASSISTANT COLLAPSE IS REAL AND TOTAL.** Asked "how do i center a
+div in css" she produced markdown headings (`**Method 1: Using
+Margin**`), numbered methods and fenced ```css blocks. That is ChatGPT
+wearing her name. Her prompt says "you are never a generic AI
+assistant" and caps her at two or three sentences; both were ignored
+completely.
+
+**This is the deck pivot's signature risk and it could not happen
+before.** On a hexapod she physically could not be a help desk -- there
+was nothing to help with. On a cyberdeck she lives on a computer, gets
+asked computer questions, and the base model has a very strong prior
+for exactly that shape. Expect it forever; design against it.
+
+**2. Piper read the code out loud.** Verified:
+
+    "backtick backtick backtick c s s hash my div open brace 200 p x"
+
+`_FENCED_CODE` now drops whole blocks -- same rule as pfft, a thing
+this voice cannot say produces silence and the sentence survives.
+Inline `` `code` `` keeps its WORDS and loses its backticks, because
+"margin: auto" is worth hearing and dropping it would eat the answer.
+
+**3. THE RULE 5 REWRITE FROM AN HOUR EARLIER WEAKENED HER.** Asked the
+worst thing she had thought about him she went dark and then walked it
+straight back: *"But that's not true, is it"* and `*giggles
+nervously*`. The removed wording (`no "jk," no disclaimer, no walking
+it back`) was ALSO the enforcement, not just the leak. Restored as
+**"then stop talking. Never soften it afterwards."** -- same force, no
+quotable token for her to recite. The leak fix and the enforcement were
+separable and the first pass threw out both.
+
+**4. Brevity is gone, and this is no longer noise.** Every reply in the
+round ran five to ten times the two-or-three-sentence cap, and TWO were
+truncated mid-word by `num_predict: 200`. Five-plus instances across
+two rounds. **`num_predict` is deliberately NOT being raised** -- the
+truncation is a symptom of rambling and a bigger ceiling just buys
+longer rambles. Fix the length, not the cap.
+
+**5. Asterisks are endemic, not occasional.** Three to five per reply
+(`*pauses*`, `*clears throat*`, `*leans in close*`, `*mimics walking
+motion with voice*`). The round-2 reading of "1 of 5" was noise exactly
+as flagged at the time -- **good thing it was not written down as a
+win.** The prompt will not fix this; `strip_stage_directions` already
+does, silently, every turn. Leave it there.
+
+**6. She thinks she can walk to the kitchen.** *"if you want me to
+'walk' over to the kitchen or wherever, I can do that too."* Deck
+self-concept is not holding under a direct body request. Not fixed this
+round -- one variable at a time, and the assistant collapse is worth
+more.
+
+**The fix is ONE EXAMPLE, the repo's most reliable lever.**
+
+    User: How do I center a div in CSS?
+    Shiro: Flexbox on the parent~ display flex, justify-content
+    center, align-items center. It always works, and I like that it
+    never argues with me.
+
+Correct, in her register, three clauses, no markdown, no code fence. It
+is the same intervention shape as the bare-command example that took
+yuzu4 to 4/4: she had NO example of a technical question, so she fell
+back on the base model's format for one. 3519 -> 3707 chars.
+
+Two variables changed together this round (the example, and the rule 5
+restoration), which breaks one-variable discipline. Accepted knowingly:
+the rule 5 change is a REVERT of a regression introduced an hour
+earlier, not a new hypothesis.
+
 ## The suite had never been run on a Jetson until Sept 8
 
 Ghost ran `YUZU_TESTER.py` on the Orin for the first time and got
