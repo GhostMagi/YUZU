@@ -76,9 +76,28 @@ jack**, and draws up to ~25W in its top power mode. So:
 - Whether he wants it to run unthrottled on battery is a real choice —
   `nvpmodel` mode is the dial between runtime and speed.
 
-**2. Screen.** Needs confirming what video output the devkit actually
-has (DisplayPort vs HDMI — this changes which panels work, and cheap
-portable panels are usually HDMI). Size/resolution/touch are open.
+**2. Screen — DisplayPort only, and that shapes the build.**
+Ghost confirms the Orin Nano Super devkit is **DisplayPort out, no
+HDMI.**
+
+To be clear about what kind of problem this is: it is a PORT problem,
+not a power one. The Orin is far stronger than the Raspberry Pi most
+cyberdecks are built around. But the Pi has HDMI, so the whole cheap
+portable-panel ecosystem grew up around HDMI, and the Orin does not get
+to use it directly. Being faster does not help.
+
+The trap to check before buying: a **passive** DP-to-HDMI adapter only
+works if the source is dual-mode (DP++). If the Orin's port is not
+DP++, a passive adapter gives no picture at all and reads as a dead
+screen. An **active** adapter works either way for a few dollars more —
+buying active removes the variable entirely.
+
+Also worth checking rather than assuming: whether the devkit's USB-C
+port carries DisplayPort Alt Mode. If it does, USB-C portable monitors
+open up and this gets easy. If it is data/flashing only, they are out.
+
+Native-DisplayPort panels in small sizes exist but are rarer and dearer.
+Size, resolution and touch all still open.
 
 **3. Audio out — she has a voice and nothing to speak through.**
 This is arguably the highest-value missing piece, because the TTS
