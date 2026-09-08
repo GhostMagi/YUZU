@@ -561,6 +561,44 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
 
+## The board has no RTC, and it probably explains the TLS failure
+
+Ghost ran `journalctl -p 3 -xb` on the Orin, Sept 9. Four errors, none
+of them faults:
+
+- `optee` / `arm_ffa` -- a secure-boot driver looking for a bus NVIDIA
+  does not enable on the devkit. Once per boot, forever, harmless.
+- `camera-diag ... error: -19` -- ENODEV. There is no camera attached.
+- `nvidia-cdi-refresh.service` failed -- that service hands the GPU to
+  DOCKER CONTAINERS. Ollama runs natively. Irrelevant here.
+- `systemd-networkd-wait-online: Timeout` -- waits for every interface
+  (docker0, the USB gadget link, WiFi) and one never completes, so it
+  burns its full timeout at every boot. Likely the reason boot feels
+  slow. `sudo systemctl disable systemd-networkd-wait-online.service`.
+
+**The finding is in the TIMESTAMPS.** The log carries `Dec 31
+18:00:30` -- that is the Unix clock at zero, in UTC-6. **The Orin Nano
+devkit ships with no RTC battery**, so every boot starts at epoch and
+stays there until NTP reaches the network.
+
+**REVISES an earlier call.** This file recorded a `git pull` failing
+with `server certificate verification failed`, and recorded that the
+clock theory was checked and WRONG because `date` came back correct.
+That check was made minutes later, after NTP had already fixed it. A
+certificate is invalid if the clock thinks it is 1969, and the window
+where that is true is exactly the first minute of uptime -- which is
+when someone who just booted the board is typing.
+
+Not proof, and the original "transient, retry worked" is consistent
+with both readings. But it fits better than nothing, and the practical
+rule is the same either way: **a TLS failure on a freshly booted board
+is the clock. Wait thirty seconds and retry rather than debugging it.**
+
+The general lesson is one this file already has in another form:
+checking a symptom AFTER the system self-corrects proves nothing about
+the moment of failure. Same shape as the `keep_alive` layers, where
+both readings looked right on their own.
+
 ## SAYA IS LIVE (Sept 9). `LIVE_PERSONA = "saya_deck"`
 
 Ghost's call: *"lets just make saya the main for now if possible."*
