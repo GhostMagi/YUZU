@@ -1167,12 +1167,23 @@ class TestAsteriskFormatting(unittest.TestCase):
         self.assertEqual(sorted(ran), ["shakes legs", "spins", "stretches", "turns"])
 
     def test_prompt_still_forbids_asterisks(self):
-        # REGRESSION: v1 carried an explicit anti-asterisk rule and its
-        # live output was all brackets. The first v2 draft dropped that
-        # rule while simplifying, and asterisks came straight back.
+        """REGRESSION: v1 carried an explicit anti-asterisk rule and its
+        live output was all brackets. The first v2 draft dropped that
+        rule while simplifying, and asterisks came straight back.
+
+        SCOPED TO BODIES THAT MOVE, Sept 8. The regression this guards
+        is "*spins* did not reach the whitelist, so the robot stood
+        still" -- it needs a robot to be a regression at all. On the
+        cyberdeck an asterisk costs a word Piper would have read aloud,
+        and strip_stage_directions removes it in code every turn,
+        whatever wrapper she reaches for. Ghost's call on the prompt
+        rule: "im fine if she Rps a bit its all readble".
+        """
         for key in yuzu_personas.available():
-            prompt = yuzu_personas.load(key).prompt.lower()
-            self.assertIn("asterisk", prompt,
+            persona = yuzu_personas.load(key)
+            if not persona.moves:
+                continue
+            self.assertIn("asterisk", persona.prompt.lower(),
                           f"{key}: no anti-asterisk rule -- v2 proved the "
                           f"model reverts to *actions* without one")
 
@@ -1706,6 +1717,19 @@ class TestYuzu5(unittest.TestCase):
         "always-speak rule, fixed the freeze",
         "always-move rule, 50% -> 100% moves_at_all",
         "bare-command example, 4/4 moved",
+        # ADDED Sept 8. Both of these are about the BRACKET PROTOCOL,
+        # and the regression each one guards against is "the action did
+        # not run" -- impossible on a body with no actions. Ghost, on
+        # the deck: "do brackets/asterisks stuff even matter now that
+        # shes a cyberdeck ai? like im fine if she Rps a bit."
+        #
+        # On the hexapod an asterisk meant a servo stayed still, so the
+        # rule earned its place. On the deck it means a word Piper would
+        # have said out loud -- which strip_stage_directions removes in
+        # code, every turn, whatever wrapper she reaches for. Five of
+        # the nine measured wins turn out to be protocol, not character.
+        "anti-asterisk rule, removing it regressed",
+        "sounds rule names BOTH wrappers",
     }
 
     def test_v5_is_the_arm_that_lacked_the_sounds_enforcement_line(self):

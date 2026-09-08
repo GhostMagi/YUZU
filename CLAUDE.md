@@ -356,6 +356,45 @@ restoration), which breaks one-variable discipline. Accepted knowingly:
 the rule 5 change is a REVERT of a regression introduced an hour
 earlier, not a new hypothesis.
 
+**THE ANTI-STAGE-DIRECTION RULE IS RELAXED. Ghost's call, Sept 8:**
+*"do brackets/asterisks stuff even matter now that shes a cyberdeck
+ai? like im fine if she Rps a bit its all readble im 32 ive seen
+chatrooms."*
+
+He is right, and the reasoning is worth keeping because it retires a
+rule this repo defended hard.
+
+**On the hexapod an asterisk was a BUG WITH A COST**: `*spins*` never
+reached the whitelist, so the robot stood still while claiming to move.
+Dropping the rule from the first v2 draft brought asterisks straight
+back, which is why "removing it regressed" is in MEASURED_WINS.
+
+**On the deck an asterisk costs one word Piper would have read out
+loud** -- and `strip_stage_directions` removes it in code, every turn,
+whatever wrapper she reaches for. She proved the wrapper is
+interchangeable in the same session: three rounds of `*asterisks*`,
+then a round of `[loud, creepy whispering]` and `[pauses for dramatic
+effect]`. No prompt rule was ever going to catch both, and the code net
+catches both without one.
+
+So the rule became: *"A little stage direction is fine when it is
+genuinely you, but the words you actually SAY are what carries a
+reply—never let a gesture stand in for speaking."* That keeps the one
+thing that was a real fault (`Hehe~ *silence*`, a reply with nothing in
+it) and drops the part he does not want enforced. 3707 -> 3624 chars.
+
+**FIVE OF THE NINE MEASURED WINS TURN OUT TO BE PROTOCOL, NOT
+CHARACTER.** `anti-asterisk` and `sounds rule names BOTH wrappers` join
+`always-speak`, `always-move` and `bare-command` in
+`BODY_PROTOCOL_WINS`. Every one guards a regression whose failure mode
+is "the action did not run", which is not reachable on a body with no
+actions. `test_prompt_still_forbids_asterisks` is scoped the same way.
+
+**The wins list was written on a robot and needs re-reading on every
+new body, not inherited.** That is the generalisable lesson: a measured
+win is measured against a specific failure, and when the failure cannot
+happen the win is just prompt budget.
+
 ## The suite had never been run on a Jetson until Sept 8
 
 Ghost ran `YUZU_TESTER.py` on the Orin for the first time and got
