@@ -28,6 +28,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import muto_leg_control as legs
 import yuzu_all_in_one as yuzu
+import drop
 import gguf_inspect
 import yuzu_brain
 import yuzu_personas
@@ -2898,6 +2899,66 @@ class TestShiroDeck(unittest.TestCase):
             if line.startswith("Shiro:"):
                 self.assertNotIn("*", line)
                 self.assertNotIn("[", line)
+
+
+class TestDropBox(unittest.TestCase):
+    """drop.py -- getting a file from the phone onto the board.
+
+    Built Sept 9 because there was NO good path for it. Ghost patched a
+    ROM on his phone and the board could not reach it: no scp from
+    Serial USB Terminal, no URL to wget, and the microSD is the rescue
+    image. The same gap cost real time earlier when a push failed on
+    auth and two persona files had to be rescued by `cat` and paste.
+
+    Stdlib only, same as everything else here, so it runs anywhere the
+    rest of this project does."""
+
+    def _post(self, filename, payload, boundary=b"XbndX"):
+        body = (b"--" + boundary + b"\r\n"
+                b'Content-Disposition: form-data; name="f"; filename="'
+                + filename + b'"\r\n'
+                b"Content-Type: application/octet-stream\r\n\r\n"
+                + payload + b"\r\n--" + boundary + b"--\r\n")
+        return drop.one_file(body, 'multipart/form-data; boundary=XbndX')
+
+    def test_a_posted_file_survives_byte_for_byte(self):
+        """A ROM that arrives one byte short is a ROM that will not
+        boot, and nothing on screen would say why."""
+        blob = bytes(range(256)) * 40
+        name, data = self._post(b"SoulGold.gba", blob)
+        self.assertEqual(name, "SoulGold.gba")
+        self.assertEqual(data, blob)
+
+    def test_a_filename_can_never_write_outside_the_folder(self):
+        """The one genuinely dangerous line in the file. A crafted
+        filename must not escape the directory it was started in."""
+        for hostile in (b"../../../../etc/passwd", b"..\\..\\windows\\x",
+                        b"/etc/shadow", b"....//evil"):
+            with self.subTest(hostile=hostile):
+                name, _ = self._post(hostile, b"x")
+                safe = os.path.basename(name.replace("\\", "/"))
+                self.assertNotIn("/", safe)
+                self.assertNotIn("\\", safe)
+                self.assertFalse(os.path.isabs(safe))
+
+    def test_junk_is_refused_rather_than_written(self):
+        """No boundary, or a part with no filename, must return nothing
+        -- not an empty file, and not a traceback at the phone."""
+        self.assertEqual(drop.one_file(b"whatever", "text/plain"),
+                         (None, None))
+        self.assertEqual(
+            drop.one_file(b'--X\r\nContent-Disposition: form-data; '
+                          b'name="f"\r\n\r\nnofile\r\n--X--\r\n',
+                          'multipart/form-data; boundary=X'),
+            (None, None))
+
+    def test_it_reports_a_reachable_address(self):
+        """It must print the LAN address, not 127.0.0.1 -- the phone
+        cannot reach loopback, and this project has already lost time
+        twice to picking the wrong interface off hostname -I."""
+        ip = drop.lan_ip()
+        self.assertNotEqual(ip, "127.0.0.1")
+        self.assertRegex(ip, r"^\d+\.\d+\.\d+\.\d+$")
 
 
 class TestExitCommand(unittest.TestCase):

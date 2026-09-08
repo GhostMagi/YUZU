@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 306 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 310 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 306 tests pass on it. Getting it
+(that repo path is confirmed working). 310 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -560,6 +560,43 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 512gb SSD"). The deck self-concept holds for what she IS (she got the
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
+
+## drop.py — getting a file from the phone onto the board (Sept 9)
+
+Ghost patched a ROM on his phone and there was **no good way to get it
+across.** Serial USB Terminal has no scp, the file has no URL to
+`wget`, and the microSD is the rescue image. The same gap already cost
+real time once: when the board's `git push` failed on auth, two
+persona files had to be rescued by `cat` and hand-paste.
+
+`drop.py` closes it. Run it on the board, open the URL it prints on the
+phone, pick a file. Stdlib only, ~80 lines, no install.
+
+    cd ~/ROMs/gba && python3 ~/YUZU/drop.py
+
+**Files land in the folder you START it from**, which is the whole
+interface -- no path typing on a phone keyboard.
+
+**It prints the LAN address, not loopback**, computed by opening a UDP
+socket toward 8.8.8.8 and reading back which local address the routing
+table picked (no packet is sent). That is deliberate: this project has
+now lost time TWICE to picking the wrong line out of `hostname -I`
+(the Kiwix session and the VNC session both landed on `192.168.55.1`
+or the docker bridge). A test pins that it never returns 127.0.0.1.
+
+**The one dangerous line is the filename**, and it is tested with four
+hostile inputs. `os.path.basename` after normalising backslashes, so
+`../../../../etc/passwd` writes `passwd` into the current folder and
+nothing escapes. Verified live as well as in the suite.
+
+**It is deliberately NOT a general file server.** GET serves one page,
+POST accepts one file. Nothing lists or reads the disk, so leaving it
+running exposes an inbox, not a filesystem. Still: Ctrl-C when done.
+
+**Prefer `git pull` over pasting a long script into the serial
+terminal.** That link drops characters on anything long -- already
+recorded here -- and a silently truncated script is a worse failure
+than a slow transfer. Anything over a few lines goes in the repo.
 
 ## The microSD is the RESCUE IMAGE. Do not format it (Sept 9)
 
