@@ -561,6 +561,29 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
 
+## The microSD is the RESCUE IMAGE. Do not format it (Sept 9)
+
+Ghost asked how to reuse the card now that the system is cloned onto
+the NVMe and the card is physically out.
+
+**Answer: leave it alone.** It is a bootable clone of a WORKING, tuned
+Jetson -- Ollama env vars applied, un-throttled, personas present. If
+the NVMe dies, or something goes wrong during the case build, that
+card is a two-minute recovery. Nothing ~60GB of extra storage buys
+comes close, and the 512GB NVMe is mostly empty anyway.
+
+**The risk if it goes back in the slot: the board may BOOT FROM IT.**
+He would land in the old clone, everything would look subtly stale,
+and recent work would appear to have vanished -- it has not, it is on
+the other disk. That is the same confusion shape as running the wrong
+Shiro: right system, wrong body. `lsblk` before panicking.
+
+**Never put swap on it** -- sustained writes, which is what kills
+cards, and this file already says swap belongs on the NVMe.
+
+If it is ever repurposed anyway, read-heavy content only (Kiwix ZIMs,
+ROM backups). Not the model, not swap, not anything hot.
+
 ## The board has no RTC, and it probably explains the TLS failure
 
 Ghost ran `journalctl -p 3 -xb` on the Orin, Sept 9. Four errors, none
