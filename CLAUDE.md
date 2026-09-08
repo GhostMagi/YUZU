@@ -236,6 +236,54 @@ one in three replies out of four. That is the same shape as `[winks]`
 and it is the whole argument for keeping the code net under every
 prompt rule.
 
+**ROUND 2, same night, after both fixes. 5 replies.**
+
+    finding              round 1        round 2
+    recites her rules    1 of 4         0 of 5     FIXED, and provably
+    asterisks            3 of 4 (75%)   1 of 5 (20%)  NOT proven
+    near-empty reply     1 of 4         1 of 5     unchanged
+    over-long reply      0 of 4         1 of 5     NEW
+
+**Only the first line is a result.** The quoted tokens are gone from
+the prompt, so she cannot recite them -- that is a proof, not a
+measurement. The asterisk drop looks great and is NOT evidence:
+this repo measured its own noise floor at THREE replies at n=12, and
+this is n=4 against n=5. Two rounds of overconfidence are already
+recorded above (yuzu5, then the correction). Do not write the asterisk
+number down as a win. It is silent either way now, which is what
+actually matters.
+
+**The near-empty reply is the real open fault, and it has a
+diagnosis.** Both instances came after a WARM STATEMENT WITH NO
+QUESTION IN IT:
+
+    "thay actually gave me a tiny chill NICE ILY"  ->  Hehe~ *silence*
+    "Yay youre 97-100% done hiii"                 ->  Aww, Hii!
+
+Every example in her prompt is a question or a request. Handed warm
+praise with nothing to answer, she has no shape to copy and returns a
+token acknowledgement. **That is the same failure, and the same
+diagnosis, as the bare-command finding that produced yuzu4** -- "every
+example is a question or a social request... given a flat command with
+no social content, she supplies the missing conversation". The fix
+there was ONE example and it scored 4/4.
+
+So: one example added, same shape, one variable.
+
+    User: That actually gave me a chill, nice.
+    Shiro: Hehe~ Good. I was hoping it would sit with you a while
+    after you put me down.
+
+3416 -> 3519 chars. UNMEASURED. It is a bet on a pattern this repo has
+already measured once, not a proven fix, and the next round is what
+decides it.
+
+**Also new and worth watching: reply 5 ran long.** Asked about Ghost in
+the Shell she gave four-plus sentences against a rule capping her at
+two or three. One instance, so it is nothing yet -- but spoken length
+is the ONE metric this repo found does not wobble between runs, so if
+it shows again it is real and it is worth acting on.
+
 ## The suite had never been run on a Jetson until Sept 8
 
 Ghost ran `YUZU_TESTER.py` on the Orin for the first time and got
