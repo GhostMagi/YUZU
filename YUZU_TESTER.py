@@ -2901,6 +2901,83 @@ class TestShiroDeck(unittest.TestCase):
                 self.assertNotIn("[", line)
 
 
+class TestPadPairing(unittest.TestCase):
+    """`pad` -- pairing the 8BitDo without fighting bluetoothctl.
+
+    bluetoothctl is a REPL: type `scan on`, wait, read a wall of MAC
+    addresses, type `pair <mac>`. That is a bad time on a phone keyboard
+    over a serial link, and every step of it is scriptable."""
+
+    SCRIPT = Path(__file__).parent / "pad"
+
+    def _run(self, *args, devices="", info=""):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            binv = Path(tmp) / "bin"
+            binv.mkdir()
+            bt = binv / "bluetoothctl"
+            bt.write_text("#!/bin/bash\ncase \"$1\" in\n"
+                          f"  devices) printf '%s\\n' {devices!r} ;;\n"
+                          f"  info)    printf '%s\\n' {info!r} ;;\n"
+                          "  *) exit 0 ;;\nesac\n")
+            bt.chmod(0o755)
+            env = dict(os.environ, PATH=f"{binv}:{os.environ['PATH']}")
+            return subprocess.run(["bash", str(self.SCRIPT), *args],
+                                  capture_output=True, text=True,
+                                  env=env, input="\n", timeout=60)
+
+    PAIRED = "Device E4:17:D8:12:34:56 8BitDo Micro gamepad"
+
+    def test_it_is_valid_shell(self):
+        import subprocess
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_status_is_honest_when_nothing_is_paired(self):
+        done = self._run("--status")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("no 8bitdo controller is paired", done.stdout.lower(),
+                      done.stdout)
+
+    def test_it_checks_for_a_GAMEPAD_not_just_a_bluetooth_link(self):
+        """The failure this exists to catch: a pad linked at the
+        Bluetooth layer that exposes no input device. bluetoothctl says
+        `Connected: yes` and mGBA still sees nothing -- identical to
+        working from every angle bluetoothctl can see.
+
+        Same shape as the TigerVNC loopback bug an hour earlier: the
+        obvious check was true the whole time it was broken."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("/proc/bus/input/devices", body,
+                      "nothing verifies a real gamepad appeared, so a "
+                      "half-connected pad reports success")
+        done = self._run("--status", devices=self.PAIRED,
+                         info="\tConnected: yes")
+        self.assertIn("Gamepad:", done.stdout)
+
+    def test_it_trusts_the_pad_so_it_reconnects_by_itself(self):
+        """Without `trust`, it needs re-pairing after every power-off --
+        which on a deck means every time he closes the lid."""
+        self.assertIn("bluetoothctl trust", self.SCRIPT.read_text())
+
+    def test_a_failed_search_lists_what_it_COULD_see(self):
+        """Dead ends are where he gets stuck. Printing the visible
+        devices turns "it didn't work" into "the pad isn't in pairing
+        mode", which he can act on alone."""
+        done = self._run(devices="Device AA:BB:CC:DD:EE:FF Headphones")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("Headphones", done.stdout)
+        self.assertIn("FLASHING", done.stdout)
+
+    def test_there_is_a_way_to_start_over(self):
+        """A half-pairing that will not connect is the common bad state
+        and it cannot be fixed by trying harder."""
+        self.assertIn("--forget", self.SCRIPT.read_text())
+        done = self._run("--forget")
+        self.assertEqual(done.returncode, 0)
+
+
 class TestGbaLauncher(unittest.TestCase):
     """`gba` -- one word to play, because the real command was three
     lines with a DISPLAY prefix, a vncserver invocation and a glob.

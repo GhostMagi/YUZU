@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 321 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 327 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 321 tests pass on it. Getting it
+(that repo path is confirmed working). 327 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -606,6 +606,50 @@ rather than a quoting fault.
 
 **Grepping source text is a proxy; running the thing is the test.**
 Same lesson the Jetson round produced from the other direction.
+
+## `pad` — pairing the 8BitDo (Sept 9). SoulGold runs.
+
+**The deck plays games now.** SoulGold booted on the Orin, in mGBA,
+through the VNC session, from a ROM sent over by `drop.py`. Screenshot
+confirms the title screen.
+
+Ghost then produced an **8BitDo Micro**, so `pad` wraps the pairing.
+
+    ~/YUZU/pad            find, pair, trust and connect it
+    ~/YUZU/pad --status   is it actually usable right now
+    ~/YUZU/pad --forget   drop the pairing and start clean
+
+`bluetoothctl` is a REPL -- `scan on`, wait, read a wall of MAC
+addresses, `pair <mac>` -- which is a bad time on a phone keyboard over
+a serial link, and every step of it is scriptable.
+
+**It checks for a GAMEPAD, not a Bluetooth link, and that distinction
+is the whole point.** A pad can be connected at the BT layer and expose
+no input device: `bluetoothctl` says `Connected: yes`, mGBA sees
+nothing, and the two states are indistinguishable from anything
+bluetoothctl can show you. So `pad` also greps
+`/proc/bus/input/devices` -- SDL (what mGBA uses) reads evdev, so that
+is the layer that decides whether a game can see it.
+
+**That is the SECOND time in one hour.** TigerVNC's loopback bind was
+the same shape: the obvious check was true the entire time the thing
+was broken. Written down together because the pattern is now the most
+productive debugging question this project has -- *what would this
+check say if the thing were broken in the way it actually is?*
+
+**A failed search lists every device the board CAN see.** Dead ends are
+where he gets stuck, and "it didn't work" becomes "the pad isn't in
+pairing mode" the moment the alternatives are on screen.
+
+**It runs `trust` as well as `pair`.** Without it the pad needs
+re-pairing after every power cycle, which on a handheld deck means
+every time it is put down.
+
+**Not verified: the button combos.** `START + A` for D-input and
+`START + B` for Switch mode are what the script tells him to use, taken
+from the standard 8BitDo convention rather than from this pad in his
+hands. If they are wrong, the fix is two strings and the card in the
+box is the authority.
 
 ## TigerVNC binds to LOOPBACK by default, and every local signal lied
 

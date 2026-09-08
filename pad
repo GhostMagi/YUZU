@@ -1,0 +1,106 @@
+#!/bin/bash
+# Pair the controller. One word, no interactive bluetoothctl.
+#
+#   ~/YUZU/pad          find, pair, trust and connect an 8BitDo
+#   ~/YUZU/pad --forget drop the pairing and start clean
+#   ~/YUZU/pad --status is it connected right now
+#
+# bluetoothctl is a REPL: type scan on, wait, read a wall of MAC
+# addresses, type pair <mac>, agree to something. That is a bad time on
+# a phone keyboard over a serial link, and it is entirely scriptable.
+
+set -u
+WANT="${PAD_NAME:-8bitdo}"          # override for a different brand
+SCAN_SECS=15
+
+mac_of() {
+    bluetoothctl devices 2>/dev/null \
+        | grep -i -- "$WANT" | head -1 | awk '{print $2}'
+}
+
+connected() {
+    local mac="$1"
+    bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes"
+}
+
+# SDL (what mGBA uses) reads evdev, so the honest check is whether the
+# kernel actually created an input device -- not whether Bluetooth says
+# "connected". Those come apart: a pad can be linked at the BT layer
+# and still expose no gamepad, which looks identical from bluetoothctl.
+has_input_node() {
+    grep -i -- "$WANT" /proc/bus/input/devices >/dev/null 2>&1
+}
+
+case "${1:-}" in
+--status)
+    MAC=$(mac_of)
+    [ -z "$MAC" ] && { echo "No $WANT controller is paired yet."; exit 1; }
+    echo "Paired:     $MAC"
+    connected "$MAC" && echo "Bluetooth:  connected" \
+                     || echo "Bluetooth:  NOT connected"
+    has_input_node && echo "Gamepad:    visible to games" \
+                   || echo "Gamepad:    NOT visible -- games will not see it"
+    exit 0
+    ;;
+--forget)
+    MAC=$(mac_of)
+    [ -z "$MAC" ] && { echo "Nothing to forget."; exit 0; }
+    bluetoothctl remove "$MAC" >/dev/null 2>&1
+    echo "Forgot $MAC. Run ~/YUZU/pad to pair again."
+    exit 0
+    ;;
+esac
+
+echo
+echo "  Put the controller in pairing mode:"
+echo "    1. Hold  START + A   for a second  (D-input mode, what Linux wants)"
+echo "    2. Then hold  SELECT  ~3s until the light flashes fast"
+echo
+read -r -p "  Light flashing? Press Enter to search. " _
+
+bluetoothctl power on >/dev/null 2>&1
+
+MAC=$(mac_of)
+if [ -z "$MAC" ]; then
+    echo "  Searching ${SCAN_SECS}s..."
+    bluetoothctl --timeout $SCAN_SECS scan on >/dev/null 2>&1
+    MAC=$(mac_of)
+fi
+
+if [ -z "$MAC" ]; then
+    echo
+    echo "  No '$WANT' device found. Usually one of:"
+    echo "    - the light is not FLASHING (solid = on but not pairing)"
+    echo "    - it reconnected to your phone or a Switch instead"
+    echo "    - it is in the wrong mode; try START + B (Switch mode)"
+    echo
+    echo "  Everything the board can currently see:"
+    bluetoothctl devices | sed 's/^/    /' || echo "    nothing"
+    exit 1
+fi
+
+echo "  Found $MAC"
+bluetoothctl pair "$MAC"    >/dev/null 2>&1
+bluetoothctl trust "$MAC"   >/dev/null 2>&1   # so it reconnects by itself
+bluetoothctl connect "$MAC" >/dev/null 2>&1
+sleep 2
+
+echo
+if connected "$MAC"; then
+    echo "  Connected, and trusted -- it will reconnect on its own from now on."
+else
+    echo "  Paired but not connected. Try once more:  ~/YUZU/pad"
+    exit 1
+fi
+
+if has_input_node; then
+    echo "  The kernel sees it as a gamepad."
+    echo
+    echo "  Last step, inside mGBA (in AVNC):"
+    echo "    Tools -> Settings -> Controllers, click each box, press that button."
+else
+    echo "  WARNING: connected over Bluetooth, but NO gamepad device appeared."
+    echo "  mGBA will not see it. Try:  ~/YUZU/pad --forget   then pair again"
+    echo "  in D-input mode (START + A) rather than Switch or keyboard mode."
+fi
+echo
