@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 387 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 393 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 387 tests pass on it. Getting it
+(that repo path is confirmed working). 393 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -826,6 +826,91 @@ permanently), a TALKING face (currently `woahshock`, which is a
 reaction rather than speech), and `blink`. Three PNGs, same crop
 treatment, and the file names do the wiring.
 
+## HIS ART IS COMPLETE, and the mouth is painted properly (Sept 9)
+
+He went and made the three missing faces, named exactly right, no
+instructions needed: `idle`, `talking`, `blink`. Eight expressions now,
+and every ROLE resolves except `asleep`.
+
+**THE MOUTH IS THREE TONES.** Ghost: *"plz paint mouth like. pink
+tongue white teeth and black uhhh hole?"* Nothing is per-sprite -- the
+tone comes from WHERE a hole sits inside the mouth, measured across all
+eight faces, every one of which splits into an upper band and a lower
+one:
+
+    top third      teeth    white
+    bottom third   tongue   pink
+    the middle     cavity   near-black
+
+A hole spanning most of the mouth's height is the whole cavity (a
+shocked O with nothing in it) and goes dark rather than becoming one
+enormous tooth.
+
+**THE MOUTH DETECTOR PAINTED AN EYE, and that is the third time the
+same class of mistake landed today.** `idle.png` draws her mouth as two
+open lines with NO enclosed interior, so the lowest *enclosed* shape in
+the entire picture was an eye -- and the paint pass filled one iris
+pink and left the other black. **The cut iris ring, back by accident,
+on one side only.**
+
+The fix is a floor: `MOUTH_FLOOR = 0.58`, nothing above it is a mouth,
+and a face with nothing below it is painted NOWHERE. An empty layer is
+the right answer for a closed mouth; reaching further up the face for
+something to colour is exactly how you end up painting an eye. Two
+tests pin it, and one of them had to be RELAXED to allow zero paint --
+the earlier version demanded every sprite be painted, which is the
+assertion that would have kept the pink eye.
+
+**Caught the same way as the iris: by rendering it and looking.** Three
+for three today. For generated art there is no other check.
+
+**BLINK IS BACK, as a FRAME rather than an animation.** The vector
+version squashed the eyes with a CSS transform; you cannot do that to a
+flat sprite without smearing the line work. Ghost drew a closed-eye
+frame instead, so the page swaps the image for 120ms and back. Only
+while she is IDLE -- an expression she was put into on purpose must not
+be interrupted -- and at an irregular 2.6-6.4s, because a metronome
+blink reads as a broken GIF.
+
+**The page defaults to the `idle` ROLE, not to `expressions[0]`.** That
+list is alphabetical, so the first thing she ever did on boot was sit
+there with her eyes shut on `blink`.
+
+**One thing that is his art, not the code:** `mad.png` and a couple of
+others carry a soft grey halo from the crop. It shows against the neon
+backgrounds. Harmless, and a tighter crop or a threshold pass would fix
+it -- not worth touching unless it bothers him.
+
+## `tile` — Pop Shell, because a 10" panel is the wrong shape for floating windows
+
+Ghost floated it: *"Install a GNOME extension like Pop Shell or Forge...
+Ubuntu will auto-tile her avatar, terminal, and Kiwix into a clean,
+grid-like HUD layout with zero wasted screen space. maybe that too"*
+
+    ~/YUZU/tile            install and turn it on
+    ~/YUZU/tile --off      floating windows back, still installed
+    ~/YUZU/tile --remove   uninstall
+    ~/YUZU/tile --status   is it on
+
+**POP SHELL, not Forge, and the reason is his shell not the feature.**
+Both tile. Pop Shell is what System76 ships on hardware they sell, so
+Ubuntu packages it -- one `apt install`, no extension-store round trip
+in a browser on a phone. Forge is newer and more configurable and
+installs from a website: more steps, more to go wrong, over a serial
+link.
+
+**--off is a SEPARATE WORD from --remove, deliberately.** A GNOME
+extension can leave a desktop that will not draw, and his only shell is
+a serial cable. The cheap escape must not be the same word that throws
+the package away. Cheaper still and printed every time: **Super + Y**
+toggles tiling live, from inside the session, with no terminal at all.
+
+**It refuses politely off GNOME rather than failing inside apt**, and
+it says what it is about to do before doing it. UNVERIFIED on the
+board, same standing as `deckapps`.
+
+**Gaps are 2px.** On 1024x600 every pixel of gap is a pixel of Kiwix.
+
 ## `face` — you look at her on the PHONE until the panel lands (Sept 9)
 
 Ghost: *"leme plug her in and run that. then how do i look at her
@@ -1535,16 +1620,17 @@ anything that assumes the rest exists.
 
     power     Xiwai USB-C PD 65W -> 5.5x2.5mm barrel, centre +   ~$60
               JSAUX 20,000mAh 65W USB-C PD bank ($49.99)
-    display   7" 1024x600 IPS capacitive touch, HDMI in ($46.99) ~$56
+    display   HAMTYSAN 10.1" 1024x600 IPS touch, HDMI in ($56.99) ~$66
               BENFEI 4K DisplayPort->HDMI, PASSIVE ($8.99)
     audio     USB sound card, mic in + amplified 8ohm/5W out     ~$31
               on one JST header, driver-free ($18.99)
               Waveshare 8ohm 5W dual-driver speaker ($11.99)
     keyboard  Arteck Bluetooth. OWNED. Measured 10" x 6.5".       $0
     case      HUL 18" two-tone aluminium, Pick-N-Pluck foam      ~$55
+    board     KKSB aluminium devkit enclosure, VESA ($22.90)     ~$23
     mounting  Jiahezhi 440pc nylon standoff/screw kit, M2.5+M3   ~$10
     cables    ZIIYAN 163pc sleeve/clip/strap kit                 ~$10
-                                                        total  ~$222
+                                                        total  ~$255
 
 **MEASUREMENTS TAKEN. Do not re-ask for these.**
 
@@ -1556,6 +1642,41 @@ anything that assumes the rest exists.
 The 4.3" interior depth clears the devkit with real room to spare, and
 17.3 x 12.4 swallows a 10" keyboard and a 7" panel side by side. **This
 is a big deck** -- that was a looks-prioritised choice and it is his.
+
+**SCREEN CHANGED TO 10.1", Sept 9.** He looked at 13" and came back
+to 10.1" himself (HAMTYSAN, $56.99, same 1024x600 as the 7"). Same
+resolution on a bigger panel, so `ui/face.html` and the VNC session
+need no change at all -- everything already built for 1024x600 is
+still exactly right. Bigger and heavier in the lid, and the case
+swallows it: 17.3 x 12.4 interior takes a 10" keyboard and a 10"
+panel side by side, which the 7" was never the constraint on.
+
+**THE KKSB DEVKIT CASE IS A REAL FARADAY RISK, unlike the outer one.**
+$22.90, aluminium, VESA mount, and it wraps the board on ALL SIX SIDES.
+The outer HUL case was cleared because it is an aluminium FRAME with
+ABS panels -- cosmetic metal, no cage. This one is not cosmetic.
+
+The product photo answers it: the back panel is drilled for **two SMA
+antenna connectors**, which is what a metal box has to do. So before
+ordering, check the listing for what it actually includes:
+
+- If SMA pigtails and antennas are in the box: fine, and arguably
+  BETTER than stock -- external antennas outside a metal enclosure
+  beat internal ones inside it.
+- If they are not: the devkit's WiFi antennas end up sealed inside
+  aluminium, and WiFi and Bluetooth both degrade. He needs two
+  IPEX/U.FL-to-SMA pigtails and two 2.4/5GHz SMA antennas, about $10.
+
+**This is the one thing on the list that can quietly break the deck**,
+because WiFi is how the phone reaches her, how `face` is served, and
+how the Bluetooth keyboard connects. A range test after assembly was
+already the plan for the outer case; with this one it is mandatory.
+
+Also worth one look before it ships: **3.2 stars over 55 ratings** is
+low for a $23 part, and the devkit with its fan and heatsink measures
+~1.9-2" tall. Check the reviews specifically for fan clearance and
+thermals -- a case that traps heat costs performance on a board whose
+whole justification is compute.
 
 **THE FARADAY QUESTION WAS CHECKED AND ANSWERED.** This file warned
 that an all-metal enclosure is a cage, and his keyboard is Bluetooth

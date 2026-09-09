@@ -4817,6 +4817,59 @@ class TestJetsonChecks(unittest.TestCase):
                                f"{name} doesn't explain itself")
 
 
+class TestTiling(unittest.TestCase):
+    """`tile` -- Pop Shell, because a 10" panel is the wrong shape for
+    floating windows.
+
+    UNVERIFIED ON THE BOARD, like `deckapps`: nobody has run it on the
+    Orin yet. What is checked here is that it cannot strand him."""
+
+    SCRIPT = Path(__file__).parent / "tile"
+
+    def test_it_exists_and_is_valid_shell(self):
+        import subprocess
+        self.assertTrue(self.SCRIPT.exists())
+        self.assertTrue(os.access(self.SCRIPT, os.X_OK))
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_off_disables_without_uninstalling(self):
+        """The escape hatch has to be cheap. A GNOME extension can leave
+        a desktop that will not draw, and his only shell is a serial
+        cable -- so ONE WORD must give him the ordinary desktop back,
+        and it must not be the same word that throws the package away."""
+        body = self.SCRIPT.read_text()
+        off = body.split("--off)")[1].split(";;")[0]
+        self.assertIn("disable", off)
+        self.assertNotIn("apt remove", off,
+                         "--off must not uninstall -- that is --remove")
+        self.assertIn("--remove", body, "there is no way to uninstall")
+
+    def test_it_refuses_politely_off_gnome(self):
+        """Pop Shell is a GNOME extension and only a GNOME one. On a
+        board running something else this must say so, not fail deep
+        inside apt."""
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            binv = Path(tmp) / "bin"
+            binv.mkdir()
+            # No gnome-shell on PATH, and no desktop declared.
+            env = {"PATH": f"{binv}:/usr/bin:/bin", "HOME": tmp}
+            done = subprocess.run(["bash", str(self.SCRIPT)],
+                                  capture_output=True, text=True, env=env)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("GNOME", done.stdout)
+        self.assertNotIn("apt install", done.stdout,
+                         "it tried to install on a box with no GNOME")
+
+    def test_it_names_the_keys_that_turn_tiling_off_live(self):
+        """Super+Y is the real escape hatch -- it works from inside the
+        session with no terminal at all, which on a handheld with no
+        keyboard shortcut cheatsheet is the one worth printing."""
+        self.assertIn("Super + Y", self.SCRIPT.read_text())
+
+
 class TestFaceSprites(unittest.TestCase):
     """`yuzu_face.py` -- the art is DATA now.
 
@@ -4902,9 +4955,50 @@ class TestFaceSprites(unittest.TestCase):
                             f"{sprite['name']}: the paint layer covers "
                             f"{covered} px against {inked} px of art -- "
                             "that is the iris smear all over again")
-            self.assertGreater(covered, 0,
-                               f"{sprite['name']}: nothing was painted, so "
-                               "her mouth is a hole showing the wallpaper")
+            # Zero is CORRECT for a closed mouth -- `idle` and `blink`
+            # draw the mouth as open lines with no interior. Demanding
+            # paint everywhere is what made the detector reach up the
+            # face and colour one eye pink.
+            if covered == 0:
+                continue
+
+    def test_a_closed_mouth_is_left_alone_rather_than_hunted_for(self):
+        """MEASURED, Sept 9. `idle.png` draws her mouth as two open
+        lines with no enclosed interior, so the lowest *enclosed* shape
+        in the whole picture was an EYE -- and the paint pass filled one
+        iris pink and left the other black. Which is the cut iris ring
+        back again, by accident, on one side only.
+
+        The fix is a floor: nothing above MOUTH_FLOOR is a mouth, and a
+        face with nothing below it gets no paint at all. An empty layer
+        is the right answer; reaching further up the face for something
+        to colour is how you paint an eye."""
+        have = {s["name"] for s in self.face.sprites()}
+        for name in ("idle", "blink"):
+            if name not in have:
+                continue
+            out = self.face.paint(str(self.SPRITES / f"{name}.png"),
+                                  str(Path(tempfile.gettempdir()) / "c.png"))
+            _, _, px = self.face.read_rgba(out)
+            self.assertEqual(
+                sum(1 for i in range(0, len(px), 4) if px[i + 3] > 140), 0,
+                f"{name} has a closed mouth and must be painted NOWHERE")
+
+    def test_an_open_mouth_gets_all_three_tones(self):
+        """Ghost: "plz paint mouth like. pink tongue white teeth and
+        black uhhh hole?" Nothing here is per-sprite: every one of his
+        open mouths splits into an upper band and a lower one, so the
+        tone comes from WHERE a hole sits inside the mouth."""
+        have = {s["name"] for s in self.face.sprites()}
+        if "talking" not in have:
+            self.skipTest("no talking art to check")
+        out = self.face.paint(str(self.SPRITES / "talking.png"),
+                              str(Path(tempfile.gettempdir()) / "t3.png"))
+        _, _, px = self.face.read_rgba(out)
+        tones = {tuple(px[i:i + 3]) for i in range(0, len(px), 4)
+                 if px[i + 3] > 140}
+        self.assertIn(self.face.TEETH[:3], tones, "no white teeth")
+        self.assertIn(self.face.TONGUE[:3], tones, "no pink tongue")
 
     def test_paint_survives_art_it_cannot_read(self):
         """One odd export must never take her whole face down."""

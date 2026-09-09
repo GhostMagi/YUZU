@@ -150,9 +150,14 @@ def manifest(directory=None):
 # so painting on top of it is the same as painting behind.
 # ---------------------------------------------------------------------
 
-MOUTH = (214, 92, 116, 255)       # the one colour, inside her mouth
+# A mouth is three things, so it gets three colours. Ghost, Sept 9:
+# "plz paint mouth like. pink tongue white teeth and black uhhh hole?"
+TONGUE = (226, 106, 132, 255)
+TEETH  = (250, 247, 244, 255)
+CAVITY = (34, 18, 24, 255)        # the dark behind everything
 INK_MAX = 110                     # r,g,b under this, with alpha, is a line
 CLEAR_MAX = 60                    # alpha under this is a hole
+MOUTH_FLOOR = 0.58                # nothing above this fraction is a mouth
 
 
 def _unfilter(raw, w, h):
@@ -273,9 +278,10 @@ def _box(cells, w):
             sum(xs) / len(cells), sum(ys) / len(cells))
 
 
-def paint(path, out_path=None, mouth=MOUTH):
+def paint(path, out_path=None):
     """Write `<name>.paint.png` next to a sprite: her line art untouched,
-    with the inside of her mouth coloured in. Returns the path, or None
+    with the inside of her mouth coloured in -- white teeth, pink
+    tongue, dark cavity. Returns the path, or None
     if the art could not be read -- never raises, because one odd file
     must not take her whole face down."""
     got = read_rgba(path)
@@ -295,20 +301,54 @@ def paint(path, out_path=None, mouth=MOUTH):
         return None
     boxed = [(_box(c, w), c) for c in blobs]
 
-    # The mouth is the lowest centroid among the substantial blobs.
+    # The mouth is the lowest substantial blob -- but it must actually
+    # be DOWN THERE. Without that floor, `idle.png` (mouth drawn as two
+    # open lines with no interior) had its lowest *enclosed* shape be an
+    # EYE, and the paint pass filled one iris pink and left the other
+    # black. Which is the cut iris ring back again, by accident, on one
+    # side only.
     big = [b for b in boxed if len(b[1]) > 0.15 * len(blobs[0])]
-    mouth_box, _ = max(big, key=lambda b: b[0][5])
+    low = [b for b in big if b[0][5] > MOUTH_FLOOR * h]
+    if not low:
+        # A closed mouth with no interior. Nothing to colour, and an
+        # empty layer is the RIGHT answer -- reaching further up the
+        # face for something to paint is how you end up painting eyes.
+        write_rgba(out_path or os.path.splitext(path)[0] + ".paint.png",
+                   w, h, bytearray(w * h * 4))
+        return out_path or os.path.splitext(path)[0] + ".paint.png"
+    mouth_box, _ = max(low, key=lambda b: b[0][5])
 
     out = bytearray(w * h * 4)
 
-    # Mouth interior: enclosed holes inside the mouth blob's box.
+    # Mouth interior. Each enclosed hole inside the mouth blob is one of
+    # three things, decided by WHERE IT SITS in the mouth rather than by
+    # any per-sprite knowledge -- measured across all eight of his faces,
+    # every open mouth splits into an upper band and a lower one:
+    #
+    #     top third      teeth    white
+    #     bottom third   tongue   pink
+    #     the middle     cavity   near-black
+    #
+    # A hole spanning most of the mouth's height is the whole cavity --
+    # a shocked O with nothing in it -- and is dark, not a giant tooth.
     holes = _enclosed(w, h, clear)
     x0, y0, x1, y1 = mouth_box[0], mouth_box[1], mouth_box[2], mouth_box[3]
+    tall = max(1.0, y1 - y0)
     for cells in _components(w, h, holes):
-        cx, cy = _box(cells, w)[4], _box(cells, w)[5]
-        if x0 <= cx <= x1 and y0 <= cy <= y1:
-            for i in cells:
-                out[i * 4:i * 4 + 4] = bytes(mouth)
+        hx0, hy0, hx1, hy1, cx, cy = _box(cells, w)
+        if not (x0 <= cx <= x1 and y0 <= cy <= y1 and cy > MOUTH_FLOOR * h):
+            continue
+        where = (cy - y0) / tall
+        if (hy1 - hy0) / tall > 0.6:
+            colour = CAVITY               # the whole open mouth
+        elif where < 0.45:
+            colour = TEETH
+        elif where > 0.60:
+            colour = TONGUE
+        else:
+            colour = CAVITY
+        for i in cells:
+            out[i * 4:i * 4 + 4] = bytes(colour)
 
     out_path = out_path or os.path.splitext(path)[0] + ".paint.png"
     write_rgba(out_path, w, h, out)

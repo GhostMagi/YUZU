@@ -17,13 +17,12 @@
   keep in sync, no code to touch -- which is exactly what he asked for:
   "set it up as a sprite system so i can just swap out the image files".
 
-  Two layers, in this order, and the order is the whole trick:
-      1. the background colour  (his four swatches)
-      2. the paint layer        (inside of her mouth)
-      3. the line art           (black, untouched)
-  Her eye whites and the inside of her mouth are HOLES in the art, so
-  the background shows through them. That is why a flat black line
-  drawing looks coloured without anything being recoloured.
+  Three layers: the background colour, the black line art, and a paint
+  layer (white teeth, pink tongue, dark cavity). Paint goes on TOP and
+  that is safe -- verified by compositing both orders -- because every
+  region it fills is a HOLE in the art, so there is no line under it to
+  cover. The same holes are why her eyes look coloured: the background
+  is showing straight through them.
 
   No network, no fonts, no libraries. Works with the WiFi off, which is
   the entire point of this deck.
@@ -62,9 +61,9 @@ body {
   image-rendering: auto;
   pointer-events: none;
 }
-/* Blink is gone with the vector eyes: you cannot squash a flat sprite
-   without smearing the line work. A `blink.png` would bring it back
-   for free -- see the note in DECK_UI.md. */
+/* Blink is a FRAME, not an animation. You cannot squash a flat sprite
+   without smearing the line work, so squashing was never the answer --
+   swapping to a drawn closed-eye frame is, and Ghost drew one. */
 @keyframes breathe {
   0%, 100% { transform: translateY(0)     scale(1)     }
   50%      { transform: translateY(-10px) scale(1.012) }
@@ -183,9 +182,12 @@ fetch('sprites.json', { cache: 'no-store' })
       document.getElementById('states').append(b);
     });
     document.getElementById('face').hidden = false;
+    // Default to the IDLE role, not to expressions[0] -- that is
+    // alphabetical, so she would boot with her eyes shut on `blink`.
     let saved = null;
     try { saved = localStorage.getItem('saya-face'); } catch (err) {}
-    const at = expressions.findIndex(e => e.name === saved);
+    const wanted = saved || (m.roles && m.roles.idle);
+    const at = expressions.findIndex(e => e.name === wanted);
     show(at < 0 ? 0 : at);
   })
   .catch(() => {
@@ -198,6 +200,38 @@ fetch('sprites.json', { cache: 'no-store' })
 // A tap on her face cycles expressions, so the whole thing works on a
 // touchscreen with no keyboard anywhere near it.
 document.getElementById('face').onclick = () => show(current + 1);
+
+// ---- blink --------------------------------------------------------
+// The cheapest thing that makes a face look alive, and the difference
+// between "her face is on screen" and "she is sitting there".
+//
+// It only ever swaps the IMAGE, briefly, and only while she is idle --
+// an expression she was put into on purpose must not be interrupted by
+// a stray frame. Irregular on purpose: a metronome blink reads as a
+// broken GIF.
+function blinkLoop() {
+  const gap = 2600 + Math.random() * 3800;
+  setTimeout(() => {
+    const blink = expressions.find(e => e.name === 'blink');
+    const now = expressions[current];
+    if (blink && now && now.name === 'idle' && !document.hidden) {
+      const art = document.getElementById('art');
+      const paint = document.getElementById('paint');
+      art.src = blink.file;
+      paint.src = blink.file.replace(/\.[^.]+$/, '.paint.png');
+      setTimeout(() => {
+        // Re-read rather than closing over it: she may have been
+        // tapped to another face during the 120ms the eyes were shut.
+        if (expressions[current] && expressions[current].name === 'idle') {
+          art.src = now.file;
+          paint.src = now.file.replace(/\.[^.]+$/, '.paint.png');
+        }
+      }, 120);
+    }
+    blinkLoop();
+  }, gap);
+}
+blinkLoop();
 
 let bg = null;
 try { bg = localStorage.getItem('saya-bg'); } catch (err) {}

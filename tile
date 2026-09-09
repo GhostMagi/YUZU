@@ -1,0 +1,118 @@
+#!/bin/bash
+# Auto-tiling windows, one word.
+#
+#   ~/YUZU/tile            install and turn it on
+#   ~/YUZU/tile --off      turn it off (stays installed)
+#   ~/YUZU/tile --remove   uninstall it entirely
+#   ~/YUZU/tile --status   is it on
+#
+# WHY: on a 10" 1024x600 panel, floating windows are the wrong model.
+# Every window overlaps, every window needs dragging, and there is no
+# room to waste on the parts of a window you cannot see. Tiling gives
+# the whole screen to whatever is open and splits it automatically --
+# her face, a terminal and Kiwix become three panes instead of three
+# things to shuffle.
+#
+# POP SHELL, not Forge. Both do this; Pop Shell is the one System76
+# ships on hardware they sell, so it is packaged in Ubuntu's own repos
+# (`apt install`, no extension-store round trip on a phone) and it is
+# tested against exactly this: a small screen on a portable machine.
+# Forge is newer, more configurable, and installs from a website --
+# more steps, more to go wrong, over a serial link.
+#
+# NOT INSTALLED BLIND. GNOME extensions can leave you with a desktop
+# that will not draw, and his only shell is a serial cable. So this
+# checks it is really GNOME first, says what it is about to do, and
+# --off is a single word that gives him the ordinary desktop back
+# WITHOUT uninstalling anything.
+
+set -u
+EXT="pop-shell@system76.com"
+PKG="gnome-shell-extension-pop-shell"
+
+on_gnome() {
+    [ -n "${XDG_CURRENT_DESKTOP:-}" ] && \
+        echo "$XDG_CURRENT_DESKTOP" | grep -qi gnome && return 0
+    command -v gnome-shell >/dev/null 2>&1
+}
+
+installed() { command -v gnome-extensions >/dev/null 2>&1 \
+              && gnome-extensions list 2>/dev/null | grep -q "$EXT"; }
+enabled()   { command -v gnome-extensions >/dev/null 2>&1 \
+              && gnome-extensions list --enabled 2>/dev/null | grep -q "$EXT"; }
+
+say_state() {
+    echo
+    if enabled; then
+        echo "  ON.  Windows tile themselves."
+        echo
+        echo "  Super + Y            tiling on/off, any time"
+        echo "  Super + arrows       move between windows"
+        echo "  Super + Enter        grab a window, arrows resize, Enter drops it"
+        echo
+        echo "  Turn it off with:  ~/YUZU/tile --off"
+    elif installed; then
+        echo "  OFF (still installed).  Turn it on with:  ~/YUZU/tile"
+    else
+        echo "  NOT INSTALLED.  Install it with:  ~/YUZU/tile"
+    fi
+    echo
+}
+
+case "${1:-}" in
+--status) say_state; exit 0 ;;
+--off)
+    gnome-extensions disable "$EXT" 2>/dev/null \
+        && echo "Tiling off. Windows float again." \
+        || echo "It was not on."
+    exit 0 ;;
+--remove)
+    gnome-extensions disable "$EXT" 2>/dev/null
+    echo "Removing the package needs sudo:"
+    sudo apt remove -y "$PKG"
+    exit 0 ;;
+esac
+
+if ! on_gnome; then
+    echo
+    echo "  This board is not running GNOME, so there is nothing to"
+    echo "  extend. Pop Shell is a GNOME extension and only a GNOME one."
+    echo
+    exit 1
+fi
+
+if ! installed; then
+    echo
+    echo "  Installing Pop Shell. It tiles windows automatically."
+    echo "  Ubuntu ships it, so this is one apt package and no download."
+    echo
+    sudo apt install -y "$PKG" || {
+        echo
+        echo "  apt could not install it. Its own output is above."
+        echo "  If it says 'Unable to locate package', this Ubuntu does"
+        echo "  not carry Pop Shell and Forge is the fallback."
+        echo
+        exit 1
+    }
+fi
+
+# A GNOME extension only becomes visible to `gnome-extensions` after the
+# shell rescans, and on Xorg that means a shell restart. In the VNC
+# session that is Alt+F2 -> r; there is no way to do it from here that
+# is safe to run blind, so say so rather than failing mysteriously.
+if ! gnome-extensions enable "$EXT" 2>/dev/null; then
+    echo
+    echo "  Installed, but GNOME has not picked it up yet."
+    echo "  In the VNC session press Alt+F2, type  r , press Enter."
+    echo "  Then run  ~/YUZU/tile  again."
+    echo
+    exit 1
+fi
+
+# Gaps: a few pixels of breathing room, but only a few. On 1024x600
+# every pixel of gap is a pixel of Kiwix.
+gsettings set org.gnome.shell.extensions.pop-shell gap-inner 2 2>/dev/null
+gsettings set org.gnome.shell.extensions.pop-shell gap-outer 2 2>/dev/null
+gsettings set org.gnome.shell.extensions.pop-shell tile-by-default true 2>/dev/null
+
+say_state
