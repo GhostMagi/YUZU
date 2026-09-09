@@ -53,10 +53,18 @@ colour I can change; the background shows through her eyes.
 - **Black is a mode, not just a colour.** Her line art turns neon green,
   and the whole UI goes terminal: CRT scanlines, corner brackets, dark
   translucent dialogue box
+- A button on her face opens **the V-Pet** — see below
 - A small **status chip under her chin**: Jetson power mode, temperature,
   how fast she is generating (tokens/sec), and live power draw in watts
 
-**A home screen** — 2x2 tiles with hand-drawn line icons: Saya, Talk,
+**A V-Pet** — a pixel creature living on the deck, in its own full-colour
+page (everything else is green on black). No hunger, no needs, nothing
+that punishes me for being away: mood drifts back to neutral and bond
+only ever goes up. Poke him, play with him (he swings his blade), let
+him nap. Two characters so far, swapped with one button; a new one is
+just a folder of PNGs.
+
+**A home screen** — tiles with hand-drawn line icons: Saya, Talk,
 Wikipedia, Game Boy. Same five colours, same black mode. A battery
 indicator that shows a real percentage if the hardware ever reports one,
 and live watts plus runtime-from-full when it doesn't. A clock
@@ -77,7 +85,7 @@ that goes there. It can boot straight into it.
 one command, and it becomes a sprite: white background removed, squared,
 mouth coloured. The filename becomes the expression name.
 
-**464 tests** covering all of it, run in one command.
+**474 tests** covering all of it, run in one command.
 
 ## Hard-won rules — please respect these in any design idea
 

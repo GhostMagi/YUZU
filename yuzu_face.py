@@ -642,6 +642,26 @@ def stats():
     return out
 
 
+# The pet is a NICETY, exactly like the face: a missing or broken
+# yuzu_vpet.py must never be able to stop her talking, so the import is
+# guarded the same way Piper's and the wiki's are.
+def _pet_look():
+    try:
+        import yuzu_vpet
+        return yuzu_vpet.look()
+    except Exception as exc:
+        return {"frames": {}, "says": "The pet module is not here (%s)." % exc}
+
+
+def _pet_do(action):
+    try:
+        import yuzu_vpet
+        got = yuzu_vpet.do(action)
+        return got or {"ok": False, "says": "He does not know how to do that."}
+    except Exception as exc:
+        return {"frames": {}, "says": "The pet module is not here (%s)." % exc}
+
+
 _BRAIN = None
 
 
@@ -662,6 +682,9 @@ class _Handler(SimpleHTTPRequestHandler):
             return
         if self.path.split("?")[0].rstrip("/") == "/stats":
             self._json(stats())
+            return
+        if self.path.split("?")[0].rstrip("/") in ("/vpet.json", "/vpet"):
+            self._json(_pet_look())
             return
         if self.path.split("?")[0].rstrip("/") in ("/sprites.json", "/sprites"):
             body = json.dumps(manifest(), indent=1).encode()
@@ -685,6 +708,12 @@ class _Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0].rstrip("/")
+        if path.startswith("/vpet/"):
+            # Same allowlist discipline as /launch/: a NAME crosses and
+            # nothing else. yuzu_vpet.do() refuses anything not in its
+            # own tuple, so this route cannot grow a hole by accident.
+            self._json(_pet_do(path[len("/vpet/"):]))
+            return
         if path == "/say":
             try:
                 size = int(self.headers.get("Content-Length") or 0)

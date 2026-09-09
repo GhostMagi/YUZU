@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 464 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 474 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 464 tests pass on it. Getting it
+(that repo path is confirmed working). 474 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -447,6 +447,105 @@ it was RP and wanted); she has never been scored by the eval; and the
 eval still reports 0% on the movement rows for any deck persona, so it
 cannot give her honest numbers yet. That harness gap is now the single
 biggest thing between her and a real measurement.
+
+## THE V-PET, and the colour swap traded for it (Sept 11)
+
+Ghost, same evening: *"new idea. to replace the colors feature. (id
+like it removed. only use the cool green on black crt for ui"* plus a
+written handoff for a Digimon/Tamagotchi-style creature page.
+
+**THE COLOUR SWAP IS GONE AND THAT IS A GOOD TRADE.** It was never a
+feature -- it was a settings panel parked on her face, and this file
+already recorded shrinking it from four swatches to one dot for exactly
+that reason. Its button now opens the V-Pet. Both screens are locked to
+green on black, `body.hud` is gone rather than defaulted, and there is
+no stored preference to come back from.
+
+**HE IS NOT A CHORE, AND GHOST SAID SO BEFORE THE FIRST VERSION SET.**
+The first pass had hunger, energy and a feed button. He stopped it:
+*"dont make him require food id like it to be more of an interactive
+bare bones game almost. not a babysitting program per se (on the
+surface sure)."*
+
+Rewritten to two numbers, and the design is one line:
+
+    mood   drifts back to NEUTRAL, never to empty. A week away leaves
+           him quiet and aloof -- what Ghost asked for -- rather than
+           sad, starving or dead.
+    bond   only ever goes UP and never decays, so time spent is never
+           taken back off him. It is the hook evolution hangs off later.
+
+**Grumpy is the ONE negative and it is a REACTION, not a punishment.**
+Poke him five times and he is fed up for ninety seconds, then it wears
+off by itself. That is what the `sad` sprite is for -- a character beat
+instead of a guilt trip -- and it means the pack's `Hurt` animation
+earns its place.
+
+**Playing makes him swing the blade.** `happy` resolves to the pack's
+`Attack01`. Every one of these packs ships a great attack animation and
+no pet sim ever uses it; here it is what "play" looks like, which is
+funnier and free.
+
+**A FOLDER IS A CHARACTER.** Ghost: *"can you add the orc as an option
+to select from."* So `ui/vpet/<who>/<state>.png`, the cast is whatever
+folders exist, and one button cycles. Adding a fifth creature is
+copying five PNGs into a new folder -- no list, no menu, no code.
+**The button names the NEXT one**, not the current one, for the same
+reason the old colour dot did: the current creature is standing in the
+middle of the screen.
+
+**A SPRITE STRIP IS READ AS A STRIP, with no slicing step.** These
+packs ship one PNG per animation -- `Demon_A_Idle.png` is 600x100,
+which is six 100x100 cels. A width that is an exact multiple of the
+height IS that many frames, and the page walks across it with
+`background-position`. No PIL on the deck, no generated files, no build
+step: the PNG out of the zip is the PNG that runs.
+
+**And the pack's own filenames are accepted** -- `Demon_A_Idle.png`
+reads as `idle`, a trailing `_<number>` is a frame index. Making him
+rename fourteen files before anything appears on screen is the friction
+that stops a thing being used, which is the `/wiki` lesson again.
+
+**THE ART NEEDED CROPPING AND THAT IS THE ONE WORKBENCH STEP.**
+Measured: the demon filled **21% of his own 100x100 cel**, so he
+rendered as a thumbnail in a huge room. Every cel is cropped to a tight
+**square** -- square because "width is a multiple of height" is what
+counts the frames, and a content-tight 54x28 crop broke the reader
+immediately. ONE box across every state of a character, never one per
+state, or he changes size when his mood does.
+
+**The state file lives in `~/.yuzu/`, OUTSIDE the repo.** Not tidiness:
+a file inside the repo is a local change, and `~/YUZU/pull` stops on
+local changes rather than overwriting them. His pet's mood would have
+blocked every update Ghost ever ran.
+
+**No background process.** Mood drifts from a stored timestamp,
+computed when the page opens. A daemon would be one more thing to
+start, one more thing to leave running, and one more thing to explain
+when it is not.
+
+**`/vpet/<action>` is an allowlist, same as `/launch/`.** Four names --
+poke, play, rest, swap -- and swap CYCLES rather than taking a name, so
+nothing a caller sends can ever name a folder on this board.
+
+**EIGHTH TIME LOOKING IS WHAT FOUND IT.** The five tiles went into the
+two-column grid with the wide one in source order, mid-grid, which
+orphaned Wikipedia AND Game Boy onto rows of their own -- worse than
+the `auto-fit` bug it was avoiding. The test now pins the ORDER as well
+as the span. Also caught by looking: the thumbnail-sized demon, and the
+1.4MB background, which is downscaled to the panel's real 1024 wide and
+is now 214KB.
+
+**THE REAPER IS NOT IN EITHER FREE PACK.** He asked for *"the reaper
+looking one that summons skeletons"*. Pack 01 free is Soldier + Orc;
+pack 02 free is Demon_A + Blood Monster_A. A skeleton-summoning reaper
+is a paid-tier character. He picked Demon_A -- the one with the blade --
+off a rendered preview of both, and the Orc is the second cast member.
+
+**Not built, and named so it does not get lost:** evolution stages off
+`bond`, and the rare/hidden interactions from his handoff. Both want
+the bond number to mean something first, which is why it exists and
+never decays.
 
 ## BLACK + NEON GREEN, and the mouth paint is deleted (Sept 11)
 

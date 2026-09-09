@@ -1,0 +1,66 @@
+WHAT LIVES IN THIS FOLDER
+=========================
+
+THE FILENAME IS THE STATE. Drop files in, refresh the page, done.
+There is no list to edit and no build step.
+
+RIGHT NOW
+
+    idle.png    6 cels    what he does most of the time
+    walk.png    8 cels    wandering across the room
+    happy.png   7 cels    playing -- he swings the blade
+    sad.png     4 cels    poked one too many times
+    sleep.png   1 cel     napping
+    bg.jpg                the room
+
+All of it is Demon_A from the free Tiny RPG pack 02, cropped square.
+See assets/README.txt for exactly what came from where.
+
+A SPRITE STRIP IS READ AS A STRIP
+
+    idle.png  312x52  ->  six 52x52 cels, played in order
+    sleep.png  52x52  ->  one cel
+
+A file whose WIDTH IS AN EXACT MULTIPLE OF ITS HEIGHT is that many
+frames. That is the whole rule, it matches how every one of these packs
+ships, and it means the PNG out of the zip is the PNG that runs -- no
+slicing, no generated files, no PIL.
+
+Separate files still work too: idle_1.png, idle_2.png. Numbers sort
+properly, so a ten-frame pack does not play 1, 10, 2.
+
+THE PACK'S OWN NAMES ARE ACCEPTED
+
+    Demon_A_Idle.png     ->  idle
+    Blood Monster_A_Walk ->  walk
+
+The state is the last word; a trailing _<number> is a frame index. So a
+new pack can be dropped in unrenamed and it will mostly just work.
+
+SWAPPING HIM FOR SOMETHING ELSE
+
+    1. Copy the new character's Idle/Walk/Attack01/Hurt strips in as
+       idle/walk/happy/sad.png
+    2. python3 yuzu_vpet.py     -- says what it found and what is wired
+    3. Refresh the page
+
+If the new art is small inside its own frame, crop every state to ONE
+shared square box before committing -- per-state crops make him change
+size when his mood changes.
+
+RULES THAT MATTER
+
+    - Transparent PNG for the creature. bg is the only solid picture.
+    - Same footing across the cels of one state or he bobs about.
+    - Pixel art is rendered crisp, not smoothed. Deliberate.
+    - Anything called `neutral`, `stand`, `move`, `run`, `cheer`,
+      `attack01`, `hurt`, `angry` or `sleepy` is picked up too --
+      see ROLES in yuzu_vpet.py.
+
+WHERE MORE COME FROM
+
+    itch.io -> "monster sprites", "creature sprite pack", filter Free,
+    check the licence. OpenGameArt.org for rooms and backgrounds.
+
+    Avoid anything that IS an actual Digimon/Pokemon design. Generic
+    creature in that spirit only.

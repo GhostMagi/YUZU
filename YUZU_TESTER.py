@@ -3191,7 +3191,8 @@ class TestDeckApps(unittest.TestCase):
         button visible"."""
         done, names, on_desktop, _ = self._run(have=("chromium", "xterm"))
         self.assertEqual(names, ["yuzu-face.desktop", "yuzu-gba.desktop",
-                                 "yuzu-home.desktop", "yuzu-saya.desktop",
+                                 "yuzu-home.desktop", "yuzu-pet.desktop",
+                                 "yuzu-saya.desktop",
                                  "yuzu-wiki.desktop"], done.stdout)
         # and on the Desktop too, which is where a touchscreen user taps
         self.assertIn("yuzu-wiki.desktop", on_desktop)
@@ -5391,17 +5392,6 @@ class TestSheReacts(unittest.TestCase):
         page = self.PAGE.read_text()
         self.assertNotIn('id="states"', page, "the expression chips are back")
 
-    def test_the_colours_are_ONE_dot_not_a_row(self):
-        """"put those color options into 1 small bubble instead of
-        polluting screen" -- a row of swatches is a settings panel
-        parked on her face."""
-        page = self.PAGE.read_text()
-        self.assertNotIn('id="swatches"', page)
-        self.assertIn('id="tint"', page)
-        # his four plus black, and still only one control for them
-        block = page.split("const COLOURS")[1].split("];")[0]
-        self.assertEqual(block.count("['"), 5)
-
     def test_she_can_be_talked_to_from_the_page(self):
         page = self.PAGE.read_text()
         self.assertIn("'say'", page, "there is no way to talk to her")
@@ -5445,6 +5435,207 @@ class TestWikiBrevity(unittest.TestCase):
             for found in _re.findall(r"num_predict:\s*(\d+)", f.read_text()):
                 self.assertLessEqual(int(found), 200,
                                      f"{f.name} raised num_predict to {found}")
+
+
+class TestVPet(unittest.TestCase):
+    """The creature on the deck.
+
+    Ghost asked for a Tamagotchi-ish page and then immediately drew the
+    important line: *"dont make him require food id like it to be more
+    of an interactive bare bones game almost. not a babysitting program
+    per se (on the surface sure)."* Most of what follows pins that."""
+
+    import yuzu_vpet as vpet
+
+    PAGE = Path(__file__).parent / "ui" / "vpet.html"
+
+    def setUp(self):
+        self._real = self.vpet.STATE_FILE
+        self._tmp = tempfile.mkdtemp()
+        self.vpet.STATE_FILE = os.path.join(self._tmp, "vpet.json")
+
+    def tearDown(self):
+        self.vpet.STATE_FILE = self._real
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    # ---- the whole point --------------------------------------------
+
+    def test_nothing_gets_WORSE_for_being_ignored(self):
+        """NO NEEDS, NO FAIL STATE. Mood drifts toward NEUTRAL from
+        either side, so a week away leaves him quiet rather than
+        starving -- and bond, which is the thing that will drive
+        evolution later, never moves at all. A toy you owe nothing to
+        was the request; this is the assertion that keeps it one."""
+        now = time.time()
+        self.vpet.do("play", now)
+        self.vpet.do("play", now)
+        before = self.vpet.look(now)
+        self.assertGreater(before["mood"], self.vpet.NEUTRAL)
+
+        week = self.vpet.look(now + 7 * 86400)
+        self.assertEqual(week["mood"], self.vpet.NEUTRAL,
+                         "mood drifted past neutral -- that is a needs bar")
+        self.assertGreaterEqual(week["bond"], before["bond"],
+                                "time away took bond off him")
+        self.assertNotIn(week["state"], ("dead", "dying"))
+        # and from BELOW neutral it comes back up, unprompted
+        low = self.vpet.look(now)
+        self.vpet._write(dict(self.vpet._read(), mood=10, at=now))
+        self.assertGreater(self.vpet.look(now + 20 * 3600)["mood"], 10,
+                           "a low mood never recovers on its own")
+
+    def test_there_is_no_hunger_anywhere_in_the_model(self):
+        """"dont make him require food". Not softened, not renamed --
+        absent. A stat that exists is a stat something will eventually
+        be built on top of.
+
+        THIS ASSERTS THE MODEL, NOT THE PROSE. The first version grepped
+        the source for "hunger" and failed on the comment that EXPLAINS
+        why there is no hunger -- the same false positive as "remaining"
+        in the runtime note and "no hype" in Coco's rule. Grepping
+        source text is a proxy; the state file is the fact."""
+        self.assertEqual(
+            sorted(k for k in self.vpet.FRESH if k not in
+                   ("born", "at", "who", "pokes", "grumpy_until")),
+            ["bond", "mood", "sleeping"],
+            "a new stat appeared, and every stat is a future chore")
+        self.assertNotIn("feed", [a.lower() for a in self.vpet.ACTIONS])
+        buttons = re.findall(r'data-do="([a-z]+)"', self.PAGE.read_text())
+        self.assertNotIn("feed", buttons, "there is a Feed button")
+        self.assertTrue(set(buttons) <= set(self.vpet.ACTIONS),
+                        f"the page offers {buttons}, the deck allows "
+                        f"{self.vpet.ACTIONS}")
+
+    def test_grumpy_is_a_REACTION_and_it_wears_off(self):
+        """The one negative in the whole thing, and it is a character
+        beat rather than a punishment: poke him enough and he is fed up
+        for a minute. Nothing has to be won back."""
+        now = time.time()
+        for _ in range(self.vpet.POKES_BEFORE_GRUMPY):
+            got = self.vpet.do("poke", now)
+        self.assertEqual(got["state"], "sad")
+        later = self.vpet.look(now + self.vpet.GRUMPY_FOR + 1)
+        self.assertNotEqual(later["state"], "sad",
+                            "being fed up is permanent, which is a sulk")
+
+    def test_only_the_allowlisted_actions_can_ever_run(self):
+        """Same discipline as /launch/: a NAME crosses and nothing else.
+        The server binds 0.0.0.0, so this route must never be able to
+        take a path, an argument or a folder name from a request."""
+        for hostile in ("", "eat", "../../etc/passwd", "swap; rm -rf /",
+                        "poke ", "PLAY", "who/demon"):
+            self.assertIsNone(self.vpet.do(hostile),
+                              f"{hostile!r} was allowed to run")
+        self.assertEqual(sorted(self.vpet.ACTIONS),
+                         ["play", "poke", "rest", "swap"])
+
+    # ---- the art pipeline -------------------------------------------
+
+    def test_a_sprite_STRIP_is_counted_without_being_sliced(self):
+        """The packs ship one PNG per animation -- 600x100 is six cels.
+        A width that is an exact multiple of the height IS that many
+        frames, so the file out of the zip is the file that runs: no
+        slicing step, no generated art, no PIL on the deck."""
+        with tempfile.TemporaryDirectory() as tmp:
+            import yuzu_face
+            yuzu_face.write_rgba(os.path.join(tmp, "idle.png"),
+                                 300, 50, bytearray(300 * 50 * 4))
+            yuzu_face.write_rgba(os.path.join(tmp, "sleep.png"),
+                                 50, 50, bytearray(50 * 50 * 4))
+            got = self.vpet.frames(tmp)
+        self.assertEqual(len(got["idle"]), 6, "a 300x50 strip is six cels")
+        self.assertEqual(got["idle"][0], ["vpet/idle.png", 0, 6])
+        self.assertEqual(got["idle"][5], ["vpet/idle.png", 5, 6])
+        self.assertEqual(len(got["sleep"]), 1, "a square file is one cel")
+
+    def test_the_packs_own_filenames_are_accepted(self):
+        """`Demon_A_Idle.png` reads as `idle`. Making him rename
+        fourteen files before anything appears on screen is the kind of
+        friction that stops a thing being used -- the same call as
+        recognising /wiki anywhere in a line rather than only at the
+        start."""
+        for stem, want in (("idle", ("idle", 0)),
+                           ("Demon_A_Idle", ("idle", 0)),
+                           ("Blood Monster_A_Walk", ("walk", 0)),
+                           ("walk_2", ("walk", 2)),
+                           ("Demon_A_Walk_3", ("walk", 3))):
+            self.assertEqual(self.vpet._state_of(stem), want, stem)
+
+    def test_a_folder_is_a_character_and_one_button_cycles_them(self):
+        """Ghost: "can you add the orc as an option to select from."
+        Adding a fifth creature is copying PNGs into a new folder --
+        there is no list, no menu and no code to touch."""
+        everyone = self.vpet.cast()
+        self.assertIn("demon", everyone)
+        self.assertIn("orc", everyone)
+        for who, states in everyone.items():
+            self.assertIn("idle", states, f"{who} cannot stand still")
+            for cel in states["idle"]:
+                self.assertTrue(cel[0].startswith("vpet/" + who + "/"),
+                                f"{who} asks for {cel[0]}, which is not "
+                                "inside its own folder")
+        now = time.time()
+        first = self.vpet.look(now)["who"]
+        second = self.vpet.do("swap", now)["who"]
+        self.assertNotEqual(first, second)
+        # and it is a CYCLE, so it always comes back
+        for _ in range(len(everyone) - 1):
+            self.vpet.do("swap", now)
+        self.assertEqual(self.vpet.look(now)["who"], first)
+
+    def test_a_character_that_was_deleted_falls_back_rather_than_blanks(self):
+        """A remembered folder that is no longer there must not leave an
+        empty room. Same call yuzu_voice makes about a voice that was
+        uninstalled: fall back, never go silent."""
+        now = time.time()
+        self.vpet._write(dict(self.vpet._read(), who="a-thing-that-left",
+                              at=now))
+        got = self.vpet.look(now)
+        self.assertIn(got["who"], got["cast"])
+        self.assertTrue(got["frames"], "the room came back empty")
+
+    # ---- the rules this deck has already paid for --------------------
+
+    def test_the_state_file_is_OUTSIDE_the_repo(self):
+        """Not tidiness. A file inside the repo is a local change, and
+        `~/YUZU/pull` stops on local changes rather than overwriting
+        them -- so his pet's mood would have blocked every update he
+        ever ran."""
+        self.assertNotIn(str(Path(__file__).parent), self._real,
+                         "the pet writes into the repo")
+        self.assertIn(".yuzu", self._real)
+
+    def test_the_pet_page_always_has_a_way_out(self):
+        """The rule two power cycles paid for. A colourful page with no
+        exit is still a page with no exit."""
+        page = self.PAGE.read_text()
+        self.assertIn('id="home"', page, "there is no way off this page")
+        self.assertIn("home.html", page)
+
+    def test_the_pet_page_is_the_ONE_allowed_to_be_in_colour(self):
+        """Everything else on the deck is green on black, permanently.
+        This page is the deliberate exception -- "its own little world"
+        -- so it must NOT inherit the CRT palette, and no other page may
+        start quietly borrowing its colours."""
+        page = self.PAGE.read_text()
+        self.assertNotIn("#39ff5e", page,
+                         "the pet page went green like everything else")
+        for other in ("face.html", "home.html"):
+            body = (Path(__file__).parent / "ui" / other).read_text()
+            self.assertIn("#39ff5e", body, f"{other} lost the CRT ink")
+
+    def test_the_pet_is_a_nicety_and_cannot_take_her_face_down(self):
+        """Same guard as Piper and the wiki. If yuzu_vpet.py is missing
+        or broken the face server keeps serving her face -- the reply is
+        the product, the pet is not."""
+        import yuzu_face
+        body = (Path(__file__).parent / "yuzu_face.py").read_text()
+        block = body.split("def _pet_look(")[1].split("def _pet_do(")[0]
+        self.assertIn("except Exception", block, "the import is not guarded")
+        with unittest.mock.patch.dict("sys.modules", {"yuzu_vpet": None}):
+            got = yuzu_face._pet_look()
+        self.assertEqual(got["frames"], {})
+        self.assertTrue(got["says"], "it fails without saying anything")
 
 
 class TestTelemetry(unittest.TestCase):
@@ -5742,30 +5933,26 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn('id="saya"', page, "there is no Saya button")
         self.assertIn('data-go="face.html"', page)
 
-    def test_both_pages_share_one_colour_key(self):
-        """Recolouring one must recolour the other -- two screens of the
-        same object disagreeing about its colour reads as a bug."""
-        for f in (self.PAGE, self.FACE):
-            self.assertIn("'saya-bg'", f.read_text(),
-                          f"{f.name} does not share the colour setting")
+    def test_the_pet_tile_is_there_and_does_not_orphan_the_others(self):
+        """FIVE tiles into a two-column grid. The fifth spans the width
+        along the BOTTOM, and both halves of that matter -- the first
+        attempt put the wide tile in source order, mid-grid, which
+        orphaned Wikipedia AND Game Boy onto rows of their own. Worse
+        than the auto-fit bug it was avoiding, and only a screenshot at
+        1024x600 caught it.
 
-    def test_both_pages_offer_the_SAME_colours(self):
-        """Sharing the storage key is not enough: a colour one page can
-        set and the other cannot render is a screen that comes back
-        wrong after a tap. The black theme made this real -- it carries
-        an INK as well as a screen colour, and both pages have to agree
-        about both."""
-        rows = {}
-        for f in (self.PAGE, self.FACE):
-            block = f.read_text().split("const COLOURS")[1].split("];")[0]
-            rows[f.name] = [tuple(x.lower() for x in
-                                  re.findall(r"#[0-9a-fA-F]{6}", line))
-                            for line in block.splitlines()
-                            if line.strip().startswith("[")]
-        self.assertEqual(rows["home.html"], rows["face.html"],
-                         "the two screens disagree about the palette")
-        self.assertIn(("#000000", "#39ff5e"), rows["home.html"],
-                      "the black theme is not on the home screen")
+        So this pins the ORDER as well as the span: nothing may follow
+        the tile that spans two columns."""
+        page = self.PAGE.read_text()
+        self.assertIn('id="pet" data-go="vpet.html"', page,
+                      "there is no Pet tile")
+        self.assertIn("grid-column: span 2", page,
+                      "the fifth tile does not span the row")
+        tiles = re.findall(r'<div class="tile"[^>]*>', page)
+        self.assertEqual(len(tiles), 5, "there are not five tiles")
+        self.assertIn('id="pet"', tiles[-1],
+                      "the spanning tile is not last, so it orphans the "
+                      "tiles after it")
 
     def test_the_icons_are_line_art_and_not_emoji(self):
         """Ghost wanted "clean single-color line icons... rather than
@@ -5777,7 +5964,7 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 4, "not four line icons")
+        self.assertEqual(page.count("<svg"), 5, "not five line icons")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):
@@ -6139,45 +6326,41 @@ class TestFaceServer(unittest.TestCase):
             self.assertNotIn(reach, page,
                              f"face.html reaches outside itself: {reach!r}")
 
-    def test_it_offers_his_four_colours_and_black(self):
-        """Ghost, Sept 9: "Please add the homescreen colors as Hot pink,
-        Cyan, Neon green, And a Lavender or purple color. ONLY those
-        colors." Then, Sept 11: "add the color option for a black
-        colored screen."
+    def test_there_is_no_colour_control_left_anywhere(self):
+        """Ghost, Sept 11: "id like it removed. only use the cool green
+        on black crt for ui."
 
-        Five now, and the count is still pinned -- quietly adding a
-        SIXTH is the same fault the original test existed to catch."""
+        It was never a feature -- it was a settings panel parked on her
+        face, and its button now opens the V-Pet, which is a thing you
+        can actually do. Gone means gone: no swatches, no dot, no
+        stored preference to come back from."""
+        for page in (self.PAGE, Path(__file__).parent / "ui" / "home.html"):
+            body = page.read_text()
+            for gone in ("const COLOURS", "setColour", "saya-bg",
+                         'id="swatches"', 'id="tint"'):
+                self.assertNotIn(gone, body,
+                                 f"{page.name} still carries {gone}")
+
+    def test_the_deck_is_green_on_black_and_says_so_once(self):
+        """One palette, declared in one place per page, and the two
+        pages have to agree -- two screens of the same object
+        disagreeing about its colour reads as a bug, which is exactly
+        why the old shared-storage-key test existed."""
+        for page in (self.PAGE, Path(__file__).parent / "ui" / "home.html"):
+            head = page.read_text().split("</style>")[0]
+            root = head.split(":root {")[1].split("}")[0]
+            self.assertIn("#000000", root, f"{page.name} is not black")
+            self.assertIn("#39ff5e", root, f"{page.name} has no neon green")
+
+    def test_the_CRT_look_is_no_longer_a_mode_you_can_leave(self):
+        """Scanlines and corner brackets used to be tied to a theme you
+        could tap out of. There is nothing to tap out of now, so a
+        leftover `body.hud` gate would hide the whole look behind a
+        class nothing ever sets."""
         page = self.PAGE.read_text()
-        for want in ("hot pink", "cyan", "neon green", "lavender", "black"):
-            self.assertIn(want, page, f"{want} is not a colour")
-        block = page.split("const COLOURS")[1].split("];")[0]
-        self.assertEqual(block.count("['"), 5,
-                         "there are not exactly five colours")
-
-    def test_black_is_the_one_colour_that_changes_her_INK(self):
-        """THE POINT OF THE BLACK THEME. Ghost: "When pressed the screen
-        colors black but her lineart should be neon green. To make up
-        for black on black obv."
-
-        Her art is black line work on transparency, so on a black screen
-        it is nothing at all. Every colour therefore carries an INK as
-        well as a screen, and black is the one that is not dark."""
-        page = self.PAGE.read_text()
-        block = page.split("const COLOURS")[1].split("];")[0]
-        rows = [r for r in block.splitlines() if r.strip().startswith("[")]
-        self.assertEqual(len(rows), 5)
-        for row in rows:
-            hexes = re.findall(r"#[0-9a-fA-F]{6}", row)
-            self.assertEqual(len(hexes), 2,
-                             f"{row.strip()} has no ink colour")
-            screen, ink = hexes
-            if "black" in row:
-                self.assertEqual(screen.lower(), "#000000")
-                self.assertEqual(ink.lower(), "#39ff5e",
-                                 "black must give her NEON GREEN line "
-                                 "art or she is invisible")
-            else:
-                self.assertNotEqual(screen.lower(), ink.lower())
+        self.assertIn("repeating-linear-gradient", page, "no scanlines")
+        self.assertNotIn("body.hud", page,
+                         "the CRT look is still gated on a class")
 
     def test_her_line_art_is_recoloured_by_a_MASK_not_a_second_copy(self):
         """How the ink colour is possible at all. Each sprite is used as
@@ -6209,24 +6392,21 @@ class TestFaceServer(unittest.TestCase):
         hold = int(re.search(r"GAZE_HOLD\s*=\s*(\d+)", page).group(1))
         self.assertGreater(hold, 500, "she snaps back before you let go")
 
-    def test_the_cyberpunk_pass_belongs_to_the_black_theme(self):
-        """Scanlines and corner brackets are tied to black rather than
-        being a separate switch, so one tap is a MODE. His four colours
-        were picked on purpose and scanlines over hot pink is mud."""
-        page = self.PAGE.read_text()
-        self.assertIn("body.hud", page, "there is no HUD mode")
-        self.assertIn("repeating-linear-gradient", page, "no scanlines")
-        self.assertIn("'hud', COLOURS[at][0] === 'black'", page,
-                      "the HUD is not tied to the black theme")
-
     def test_the_page_draws_no_art_of_its_own(self):
         """The vector face is GONE, not disabled. Ghost: "she looks like
         MS Paint tbh" and then "just use the art i gave u". A leftover
         <path> would render behind or beside his sprites and there is
-        no version of that which looks intentional."""
+        no version of that which looks intentional.
+
+        SCOPED TO THE STAGE, deliberately. The invariant is that nothing
+        is drawn WHERE HER ART GOES -- it was never "this file may not
+        contain a vector", and reading it that way would ban the line
+        icon on the button beside the ask bar, which is the same icon
+        set the home screen uses and is not her face."""
         page = self.PAGE.read_text()
+        stage = page.split('<form id="ask"')[0].split("</style>")[-1]
         for drawn in ("<path", "<circle", "viewBox"):
-            self.assertNotIn(drawn, page,
+            self.assertNotIn(drawn, stage,
                              f"face.html still draws its own art: {drawn}")
 
     def test_the_server_is_launched_detached(self):

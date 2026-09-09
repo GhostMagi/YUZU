@@ -1,0 +1,326 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pet</title>
+<!--
+  THE ONE PAGE ON THIS DECK THAT IS ALLOWED TO BE IN COLOUR.
+
+  Everything else is green on black, deliberately and permanently.
+  Ghost, Sept 11: the pet page "is allowed to be its own little world."
+  So the CRT look stops at the door and this is a lit room with a
+  creature in it.
+
+  HE IS NOT A CHORE. "dont make him require food id like it to be more
+  of an interactive bare bones game almost. not a babysitting program
+  per se (on the surface sure)." There is no hunger, no fail state and
+  nothing that is worse for having been ignored -- see yuzu_vpet.py for
+  the whole model, which is two numbers and a nap.
+
+      ui/vpet/<who>/<state>.png  demon/idle.png, orc/walk.png ...
+      ui/vpet/bg.jpg             the room, shared
+
+  A FOLDER IS A CHARACTER and the name button cycles between them.
+
+  THE FILENAME IS THE STATE, and a SPRITE STRIP IS READ AS A STRIP --
+  `idle.png` at 600x100 is six 100x100 cels and this page walks across
+  it with background-position. Nothing is sliced, nothing is generated,
+  and the PNG that came out of the zip is the PNG that runs.
+
+  No network, no fonts, no libraries -- it works with the WiFi off like
+  everything else here.
+-->
+<style>
+:root {
+  --ink: #f4f1ea;
+  --panel: rgba(18,16,28,.72);
+  --edge: rgba(255,255,255,.22);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  background: #1b2b3a linear-gradient(180deg, #24405c 0%, #16212e 70%, #0f1620 100%);
+  color: var(--ink);
+  font: 15px system-ui, -apple-system, sans-serif;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- the room ----------------------------------------------------- */
+#room {
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
+  background-position: center bottom; background-size: cover;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;      /* sprite packs are pixel art */
+}
+#pet {
+  /* THE PACK DRAWS A SMALL CHARACTER ON A BIG CANVAS -- the demon
+     fills maybe a third of his own 100x100 cel -- so the box has to be
+     generous or he renders as a thumbnail in a huge room. Measured by
+     rendering it at 1024x600 and looking, which is the only way this
+     kind of thing is ever caught. */
+  position: absolute; bottom: 1%; left: 50%;
+  width: min(38%, 340px); aspect-ratio: 1;
+  transform: translateX(-50%);
+  transition: left 2.4s linear;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+#pet.left { transform: translateX(-50%) scaleX(-1); }
+#pet.bounce { animation: bounce .5s ease; }
+@keyframes bounce {
+  0%, 100% { margin-bottom: 0 }
+  40%      { margin-bottom: 22px }
+}
+
+/* ---- what he is doing --------------------------------------------- */
+#says {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: 14px; max-width: 90%;
+  background: var(--panel); border: 1px solid var(--edge);
+  border-radius: 999px; padding: 7px 16px; font-size: 14px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- the bar under the room --------------------------------------- */
+#bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(10,9,16,.85);
+  border-top: 1px solid var(--edge);
+}
+.stat { flex: 1; min-width: 0; max-width: 150px; }
+.stat b { font-size: 11px; letter-spacing: .1em; opacity: .65;
+          text-transform: uppercase; }
+.track {
+  height: 8px; margin-top: 4px; border-radius: 99px;
+  background: rgba(255,255,255,.14); overflow: hidden;
+}
+.track i { display: block; height: 100%; border-radius: 99px;
+           transition: width .5s ease; }
+#moodbar i { background: #ffcf5c; }
+#bondbar i { background: #ff7ab8; }
+#day { font-size: 12px; opacity: .6; white-space: nowrap; }
+
+#acts { display: flex; gap: 8px; }
+#acts button {
+  font: inherit; font-weight: 700; font-size: 15px; color: var(--ink);
+  padding: 10px 16px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,.12);
+  border: 1px solid var(--edge);
+}
+#acts button:active { transform: scale(.96); }
+#acts button:disabled { opacity: .45; }
+/* The cast button wears the current name, so the control and the label
+   are the same pixels rather than a button plus a caption telling you
+   what it did. */
+#who { text-transform: capitalize; letter-spacing: .02em;
+       background: rgba(255,255,255,.06); }
+#who:only-child { display: none; }
+
+/* The way out. Every page on this deck has one, and this one is no
+   exception -- a screen with no exit has already cost two power
+   cycles of this board. */
+#home {
+  width: 44px; height: 44px; flex: none; border-radius: 50%;
+  border: 1px solid var(--edge); background: rgba(255,255,255,.12);
+  color: var(--ink); font-size: 20px; cursor: pointer;
+  display: grid; place-items: center;
+}
+
+/* ---- no art yet: say exactly what to do --------------------------- */
+#empty {
+  margin: auto; padding: 26px; max-width: 34em; line-height: 1.65;
+  text-align: left; font-size: 14.5px; display: none;
+}
+#empty.on { display: block; }
+#empty h2 { font-size: 17px; margin-bottom: 10px; }
+#empty code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  background: rgba(255,255,255,.12); padding: 1px 6px; border-radius: 5px;
+}
+#empty ul { margin: 10px 0 0 18px; }
+#empty li { margin-bottom: 3px; }
+</style>
+
+<div id="room">
+  <div id="says">…</div>
+  <div id="pet" hidden></div>
+  <div id="empty">
+    <h2>Nobody lives here yet</h2>
+    Make a folder in <code>ui/vpet/</code> — the folder is the
+    creature's name — and put its states in it.
+    <b>The filename is the state.</b>
+    <ul>
+      <li><code>orc/idle.png</code> — what he does most of the time</li>
+      <li><code>orc/walk.png</code> — wandering</li>
+      <li><code>orc/happy.png</code> — after you play with him</li>
+      <li><code>orc/sad.png</code> — poked one too many times</li>
+      <li><code>orc/sleep.png</code> — napping</li>
+      <li><code>bg.jpg</code> — the room, shared by everyone</li>
+    </ul>
+    A sprite strip works as-is: a 600×100 PNG is six frames. Missing
+    states fall back to whatever exists, so one
+    <code>idle.png</code> is enough to start, and a second folder
+    turns the name button on.
+  </div>
+</div>
+
+<div id="bar">
+  <div class="stat"><b>Mood</b><div class="track" id="moodbar"><i></i></div></div>
+  <div class="stat"><b>Bond</b><div class="track" id="bondbar"><i></i></div></div>
+  <div id="day"></div>
+  <div id="acts">
+    <button data-do="poke">Poke</button>
+    <button data-do="play">Play</button>
+    <button data-do="rest">Rest</button>
+    <button data-do="swap" id="who" title="another creature">—</button>
+  </div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<script>
+const room = document.getElementById('room');
+const pet  = document.getElementById('pet');
+const says = document.getElementById('says');
+
+let frames = {};       // role -> [file, ...]
+let playing = [];      // the frames currently cycling
+let at = 0;
+let state = 'idle';
+let asleep = false;
+
+document.getElementById('home').onclick = () => { location.href = 'home.html'; };
+
+function draw() {
+  if (!playing.length) return;
+  at = (at + 1) % playing.length;
+  paint(playing[at]);
+}
+
+// A cel is [file, index, of]. One picture is [file, 0, 1] and takes the
+// simple path; a strip is positioned so cel `index` of `of` fills the
+// box. The percentage maths is the standard one and it is exact at both
+// ends: 0% pins the first cel, 100% pins the last.
+function paint(cel) {
+  const [file, index, of] = cel;
+  pet.style.backgroundImage = 'url("' + file + '")';
+  if (of > 1) {
+    pet.style.backgroundSize = (of * 100) + '% 100%';
+    pet.style.backgroundPosition = (index / (of - 1) * 100) + '% center';
+  } else {
+    pet.style.backgroundSize = 'contain';
+    pet.style.backgroundPosition = 'center bottom';
+  }
+}
+
+function setState(name) {
+  const shots = frames[name] || frames.idle;
+  if (!shots) return;
+  state = name;
+  playing = shots;
+  at = -1;
+  draw();
+}
+
+// Frame rate is per state on purpose: an idle sprite breathing at
+// walking speed reads as agitated, and a walk cycle at idle speed
+// reads as broken.
+const FPS = { walk: 8, happy: 9, idle: 5, sad: 6, sleep: 1 };
+let tick = 0;
+setInterval(() => {
+  tick++;
+  const every = Math.max(1, Math.round(12 / (FPS[state] || 5)));
+  if (playing.length > 1 && tick % every === 0) draw();
+}, 1000 / 12);
+
+// ---- he wanders on his own -----------------------------------------
+// The cheapest thing that makes a room feel occupied, and the reason
+// `walk` is worth sourcing. Only while he is idle and awake: a
+// creature that strolls off mid-nap reads as a bug.
+function wander() {
+  setTimeout(() => {
+    if (state === 'idle' && !asleep && frames.walk && !document.hidden) {
+      const to = 15 + Math.random() * 70;
+      const now = parseFloat(pet.style.left) || 50;
+      pet.classList.toggle('left', to < now);
+      setState('walk');
+      pet.style.left = to + '%';
+      setTimeout(() => { if (state === 'walk') setState('idle'); }, 2400);
+    }
+    wander();
+  }, 4000 + Math.random() * 6000);
+}
+
+// ---- talking to the deck --------------------------------------------
+function apply(s) {
+  if (!s) return;
+  asleep = !!s.sleeping;
+  says.textContent = s.says || '';
+  document.getElementById('moodbar').firstElementChild.style.width =
+    (s.mood || 0) + '%';
+  // Bond has no ceiling in the model, so the bar shows the CURRENT
+  // stage rather than a fraction of some number nobody agreed on.
+  document.getElementById('bondbar').firstElementChild.style.width =
+    Math.min(100, (s.bond || 0)) + '%';
+  document.getElementById('day').textContent =
+    'day ' + (s.days || 0) + ' · bond ' + (s.bond || 0);
+  document.querySelector('[data-do="rest"]').textContent =
+    asleep ? 'Wake' : 'Rest';
+  // THE BUTTON NAMES THE NEXT ONE, not the current one. The current
+  // creature is standing in the middle of the screen, so a button
+  // repeating his name says nothing -- exactly the reasoning that made
+  // the old colour dot show the colour a tap would GIVE you.
+  const who = document.getElementById('who');
+  const list = s.cast || [];
+  const here = list.indexOf(s.who);
+  who.textContent = list.length > 1
+    ? list[(here + 1) % list.length] : (s.who || '—');
+  // ONE creature is not a choice, so the button is not offered. A
+  // control that cannot change anything reads as broken.
+  who.style.display = list.length > 1 ? '' : 'none';
+
+  frames = s.frames || {};
+  if (!Object.keys(frames).length) {
+    document.getElementById('empty').classList.add('on');
+    pet.hidden = true;
+    says.textContent = 'Nobody lives here yet.';
+    return;
+  }
+  document.getElementById('empty').classList.remove('on');
+  pet.hidden = false;
+  if (s.bg) room.style.backgroundImage = 'url("' + s.bg + '")';
+  setState(s.state || 'idle');
+}
+
+function ask(path, method) {
+  return fetch(path, { method: method || 'GET', cache: 'no-store' })
+    .then(r => r.json())
+    .then(apply)
+    .catch(() => { says.textContent =
+      'No answer from the deck. Is ~/YUZU/face running?'; });
+}
+
+// A tap on HIM is a poke. That is the whole toy: the thing on screen
+// is the button.
+pet.onclick = () => act('poke');
+
+function act(what) {
+  const buttons = document.querySelectorAll('#acts button');
+  buttons.forEach(b => b.disabled = true);
+  if (what !== 'rest' && what !== 'swap') {
+    pet.classList.remove('bounce');
+    void pet.offsetWidth;             // restart the animation
+    pet.classList.add('bounce');
+  }
+  ask('vpet/' + what, 'POST')
+    .then(() => buttons.forEach(b => b.disabled = false));
+}
+
+document.querySelectorAll('#acts button').forEach(b => {
+  b.onclick = () => act(b.dataset.do);
+});
+
+ask('vpet.json').then(wander);
+</script>

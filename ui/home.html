@@ -17,9 +17,10 @@
   local web server that executes what it is told, on a board sitting on
   his WiFi.
 
-  Same colours as her face, same storage key, so changing it in one
-  place changes it in both -- INCLUDING the black theme, which turns
-  both screens into a terminal in one tap.
+  ONE LOOK. Ghost, Sept 11: "id like it removed. only use the cool
+  green on black crt for ui." The swatches are gone from both screens
+  and there is no control for it anywhere -- the exception, on purpose,
+  is the V-Pet page, which is its own little world in full colour.
 
   The icons are line drawings in this file, not emoji. Ghost wanted
   "clean single-color line icons... rather than smartphone", and the
@@ -30,10 +31,10 @@
 -->
 <style>
 :root {
-  --bg:   #ff2d95;
-  --ink:  #10080d;
-  --tile: rgba(255,255,255,.82);
-  --edge: rgba(0,0,0,.30);
+  --bg:   #000000;
+  --ink:  #39ff5e;
+  --tile: rgba(13,13,17,.85);
+  --edge: color-mix(in srgb, var(--ink) 45%, transparent);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100vh; overflow: hidden; }
@@ -89,11 +90,20 @@ body {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: 1fr;
-  gap: 14px;
-  padding: 8px 20px 16px;
+  grid-template-rows: 1fr 1fr .62fr;
+  gap: 12px;
+  padding: 8px 20px 14px;
   min-height: 0;
 }
+/* FIVE tiles into a two-column grid: the fifth spans the width along
+   the BOTTOM. Both halves of that matter and a screenshot proved it --
+   the first attempt put the wide tile in source order, mid-grid, which
+   orphaned Wikipedia AND Game Boy on rows of their own. Worse than the
+   `auto-fit` bug it was avoiding. An odd number of tiles needs a
+   decision about WHERE, not just about width. */
+#pet { grid-column: span 2; flex-direction: row; gap: 14px; }
+#pet .big svg { width: 34px; height: 34px; }
+#pet .words { display: flex; flex-direction: column; align-items: flex-start; }
 @media (max-width: 560px) { #grid { grid-template-columns: 1fr; } }
 .tile {
   background: var(--tile);
@@ -120,39 +130,21 @@ body {
 .tile.busy { opacity: .55; }
 
 /* Her tile is the one he asked for by name, so it is the bright one --
-   same size as the rest, because four equal targets is what a thumb
-   wants, but unmistakably the main thing. */
-#saya { background: #fff; }
+   same size as the rest, because equal targets are what a thumb wants,
+   but unmistakably the main thing. */
+#saya { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 
-/* ---- bottom: the swatches, same four ------------------------------ */
+/* ---- bottom: what a tap is doing ---------------------------------- */
 #bar {
   display: flex; align-items: center; gap: 10px;
   padding: 0 20px calc(16px + env(safe-area-inset-bottom));
 }
-#swatches { display: flex; gap: 9px; }
-#swatches i {
-  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
-  border: 2px solid var(--edge);
-}
-#swatches i.on { box-shadow: 0 0 0 3px rgba(0,0,0,.55); }
-#note { margin-left: auto; font-size: 13px; opacity: .7; min-height: 1.2em; }
+#note { font-size: 13px; opacity: .75; min-height: 1.2em; }
 
-/* ---- the black theme, shared with her face ------------------------
-   Ghost: "I do really love neon green and black." Pure #000 also kills
-   glare on a panel and hides the bezel edge, which is the practical
-   half of why it is worth having on a handheld.                     */
-body.hud {
-  --tile: rgba(13,13,17,.85);
-  --edge: color-mix(in srgb, var(--ink) 45%, transparent);
-  color: var(--ink);
-}
-body.hud .tile { border-radius: 4px; }
-body.hud #saya {
-  background: rgba(13,13,17,.85);
-  border-color: var(--ink);
-}
-body.hud #swatches i.on { box-shadow: inset 0 0 0 3px currentColor,
-                                      0 0 0 3px var(--ink); }
+/* Pure #000 also kills glare on a panel and hides the bezel edge,
+   which is the practical half of why green on black is worth having on
+   a handheld rather than just the good-looking half. */
+.tile { border-radius: 4px; }
 </style>
 
 <div id="top">
@@ -183,49 +175,21 @@ body.hud #swatches i.on { box-shadow: inset 0 0 0 3px currentColor,
     <b>Game Boy</b>
     <span>newest ROM</span>
   </div>
+  <div class="tile" id="pet" data-go="vpet.html">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
+    <div class="words"><b>Pet</b><span>he lives here</span></div>
+  </div>
 </div>
 
 <div id="bar">
-  <div id="swatches"></div>
   <div id="note"></div>
 </div>
 
 <script>
-// The same four, and the same storage key her face uses, so recolouring
-// either one recolours both.
-const COLOURS = [
-  ['hot pink',   '#ff2d95', '#10080d'],
-  ['cyan',       '#22e0e8', '#10080d'],
-  ['neon green', '#39ff5e', '#10080d'],
-  ['lavender',   '#b98cff', '#10080d'],
-  ['black',      '#000000', '#39ff5e'],
-];
-
-function setColour(hex) {
-  const at = Math.max(0, COLOURS.findIndex(c => c[1] === hex));
-  document.documentElement.style.setProperty('--bg', COLOURS[at][1]);
-  document.documentElement.style.setProperty('--ink', COLOURS[at][2]);
-  document.body.classList.toggle('hud', COLOURS[at][0] === 'black');
-  document.querySelectorAll('#swatches i').forEach(i =>
-    i.classList.toggle('on', i.dataset.hex === COLOURS[at][1]));
-  try { localStorage.setItem('saya-bg', COLOURS[at][1]); } catch (e) {}
-}
-COLOURS.forEach(([name, hex, ink]) => {
-  const i = document.createElement('i');
-  i.style.background = hex;
-  // ONLY the black one gets an ink ring. It needs one -- black on a
-  // dark border is an invisible control -- but ringing the others as
-  // well made every swatch look muddy and made the SELECTED ring
-  // impossible to pick out, which a screenshot caught immediately.
-  if (hex === '#000000') i.style.boxShadow = 'inset 0 0 0 4px ' + ink;
-  i.title = name;
-  i.dataset.hex = hex;
-  i.onclick = () => setColour(hex);
-  document.getElementById('swatches').append(i);
-});
-let bg = null;
-try { bg = localStorage.getItem('saya-bg'); } catch (e) {}
-setColour(COLOURS.some(c => c[1] === bg) ? bg : COLOURS[0][1]);
+// THERE IS NO COLOUR CONTROL. "only use the cool green on black crt
+// for ui" -- so the palette is two CSS variables at the top of this
+// file and nothing on screen offers to change them. The one page
+// allowed to break the rule is vpet.html, deliberately.
 
 // ---- clock ---------------------------------------------------------
 // 1969 on screen is the board telling you it has not reached NTP yet.

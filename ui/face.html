@@ -17,12 +17,14 @@
   "set it up as a sprite system so i can just swap out the image files".
 
   HER LINE WORK IS PAINTED BY CSS, NOT BY A SECOND IMAGE. Each sprite
-  is used as a MASK and the ink is one variable, so black on his four
-  colours and neon green on black. That is what makes the black theme
-  possible at all -- black art on a black screen is nothing.
+  is used as a MASK and the ink is one variable -- neon green on black.
+  Black art on a black screen is nothing, so the mask is what makes this
+  look possible at all.
 
-      Ghost, Sept 11: "When pressed the screen colors black but her
-      lineart should be neon green. To make up for black on black obv."
+  THE COLOUR SWAP IS GONE. Ghost, Sept 11: "id like it removed. only use
+  the cool green on black crt for ui." He is right, and it was never a
+  feature -- it was a settings panel parked on her face. The button it
+  used to own now opens the V-PET, which is a thing you can actually do.
 
   THE MOUTH PAINT IS GONE, same message: "Revert back to strictly
   lineart on a colored background. No need for tongue/teeth paint."
@@ -35,8 +37,8 @@
 -->
 <style>
 :root {
-  --bg:   #ff2d95;      /* the screen. tap the dot to change */
-  --ink:  #10080d;      /* HER LINE WORK. the mask is filled with this */
+  --bg:   #000000;      /* the deck has ONE look and this is it */
+  --ink:  #39ff5e;      /* HER LINE WORK. the mask is filled with this */
   --face: min(76vw, 74vh);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -101,18 +103,15 @@ body { display: flex; flex-direction: column;
 /* thinking gets a slower, heavier drift -- she is busy, not idle. */
 body.thinking #face { animation-duration: 2.6s; }
 
-/* ---- HUD MODE, and it belongs to the black theme only -------------
-   Ghost liked a cyberpunk pass: scanlines, corner brackets, a dark
-   translucent dialogue box. All of it is CSS and none of it fetches
-   anything.
+/* ---- THE CRT LOOK, which is now the only look ---------------------
+   Scanlines, corner brackets, a dark translucent dialogue box. All of
+   it is CSS and none of it fetches anything.
 
-   It is tied to BLACK rather than switched separately because that is
-   what makes it a mode instead of a setting: one tap turns the whole
-   deck into a terminal, and one more tap gives him hot pink back. His
-   four colours are untouched by any of it -- scanlines over hot pink
-   is mud, and he picked those colours on purpose.                   */
-#hud { position: fixed; inset: 10px; display: none; pointer-events: none; }
-body.hud #hud { display: block; }
+   It used to be a mode you could tap out of. It is not any more: the
+   deck is green on black everywhere, and the ONE page allowed to break
+   that rule is the V-Pet, deliberately, because it is its own little
+   world.                                                            */
+#hud { position: fixed; inset: 10px; pointer-events: none; }
 #hud i {
   position: absolute; width: 26px; height: 26px;
   border: 2px solid var(--ink); opacity: .55;
@@ -122,12 +121,11 @@ body.hud #hud { display: block; }
 #hud i:nth-child(3) { bottom: 0; left: 0;  border-right: 0; border-top: 0; }
 #hud i:nth-child(4) { bottom: 0; right: 0; border-left: 0;  border-top: 0; }
 #scan {
-  position: fixed; inset: 0; pointer-events: none; display: none;
+  position: fixed; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(
       to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);
   mix-blend-mode: multiply;
 }
-body.hud #scan { display: block; }
 
 /* ---- the telemetry chip -------------------------------------------
    Power mode, temperature, and how fast she is actually generating.
@@ -168,7 +166,7 @@ body.hud #scan { display: block; }
   content: '·'; margin-right: 10px; opacity: .55;
 }
 #badge.warn { background: #d81b3a; color: #fff; border-color: #d81b3a; }
-body.hud #badge {
+#badge {
   background: rgba(0,0,0,.55); color: var(--ink);
   border-color: color-mix(in srgb, var(--ink) 45%, transparent);
 }
@@ -183,7 +181,7 @@ body.hud #badge {
   display: none;
 }
 #says.on { display: block; }
-body.hud #says {
+#says {
   background: rgba(13,13,17,.85); color: var(--ink);
   border-color: color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 4px;
@@ -207,38 +205,37 @@ body.hud #says {
   white-space: nowrap;
 }
 #ask button:disabled { opacity: .45; }
-body.hud #ask input {
+#ask input {
   background: rgba(13,13,17,.85); color: var(--ink);
   border-color: color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 4px;
 }
-body.hud #ask input::placeholder {
+#ask input::placeholder {
   color: color-mix(in srgb, var(--ink) 50%, transparent);
 }
-body.hud #ask button {
+#ask button {
   background: var(--ink); color: #06080a; border-color: var(--ink);
   border-radius: 4px;
 }
-body.hud #tint, body.hud #home {
-  border-color: color-mix(in srgb, var(--ink) 55%, transparent);
-}
-body.hud #home { color: var(--ink); background: rgba(13,13,17,.85); }
-
-/* ONE dot, not four. "put those color options into 1 small bubble
-   instead of polluting screen" -- and he is right: four swatches is a
-   settings panel parked on her face. Tap it and it moves to the next. */
-#tint, #home {
+/* Two buttons, both round, both the same weight: one goes home, one
+   opens the V-Pet. The colour dot that used to sit here is GONE --
+   "id like it removed" -- and this is what its pixels bought. */
+#pet, #home {
   width: 42px; height: 42px; flex: none; border-radius: 50%;
-  border: 2px solid rgba(0,0,0,.28); cursor: pointer;
-  display: grid; place-items: center;
+  cursor: pointer; display: grid; place-items: center;
+  background: rgba(13,13,17,.85); color: var(--ink); font-size: 19px;
+  border: 2px solid color-mix(in srgb, var(--ink) 55%, transparent);
 }
-#home { background: rgba(0,0,0,.16); color: rgba(0,0,0,.6); font-size: 19px; }
+#pet svg {
+  width: 24px; height: 24px; fill: none; stroke: var(--ink);
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
 
 #empty {
   padding: 28px; max-width: 30em; line-height: 1.6; margin: auto;
   color: rgba(0,0,0,.7); text-align: center;
 }
-body.hud #empty { color: var(--ink); }
+#empty { color: var(--ink); }
 </style>
 
 <div id="stage">
@@ -254,28 +251,19 @@ body.hud #empty { color: var(--ink); }
 <form id="ask" autocomplete="off">
   <input id="text" placeholder="Say something to her..." maxlength="2000">
   <button id="send" type="submit">Send</button>
-  <div id="tint" title="background colour"></div>
+  <div id="pet" title="her pet"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
   <div id="home" title="home">⌂</div>
 </form>
 
 <script>
-// His four, plus black. "Please add the homescreen colors as Hot pink,
-// Cyan, Neon green, And a Lavender or purple color. Only those colors."
-// Then, Sept 11: "add the color option for a black colored screen...
-// When pressed the screen colors black but her lineart should be neon
-// green."
+// ONE LOOK, and no control for it. Ghost, Sept 11: "id like it
+// removed. only use the cool green on black crt for ui." The colour
+// swap was a settings panel parked on her face, and the button it owned
+// now opens the V-Pet -- a thing you can actually do.
 //
-// So a colour is a PAIR -- screen and ink -- rather than one hex. That
-// is the whole mechanism: black art on a black screen is nothing, and
-// the mask is what lets the same PNG be drawn in another colour with no
-// second copy of the art.
-const COLOURS = [
-  ['hot pink',   '#ff2d95', '#10080d'],
-  ['cyan',       '#22e0e8', '#10080d'],
-  ['neon green', '#39ff5e', '#10080d'],
-  ['lavender',   '#b98cff', '#10080d'],
-  ['black',      '#000000', '#39ff5e'],
-];
+// The ink is still a CSS variable and her art is still a MASK, because
+// that is what makes green line work possible at all: her PNGs are
+// black on transparency, and black on a black screen is nothing.
 
 let expressions = [];
 let roles = null;
@@ -292,38 +280,13 @@ function show(i) {
   const e = expressions[current];
   paintSprite(e.file);
   document.body.classList.remove(...[...document.body.classList]
-    .filter(c => c !== 'hud' && c !== 'thinking'));
+    .filter(c => c !== 'thinking'));
   document.body.classList.add(e.name);
   try { localStorage.setItem('saya-face', e.name); } catch (err) {}
 }
 
-let current_bg = COLOURS[0][1];
-function setColour(hex) {
-  const at = Math.max(0, COLOURS.findIndex(c => c[1] === hex));
-  current_bg = COLOURS[at][1];
-  document.documentElement.style.setProperty('--bg', COLOURS[at][1]);
-  document.documentElement.style.setProperty('--ink', COLOURS[at][2]);
-  // HUD mode is the black theme. One tap is the whole terminal look.
-  document.body.classList.toggle('hud', COLOURS[at][0] === 'black');
-  // The dot shows the NEXT colour, not the current one -- the current
-  // one is the whole screen behind it, so showing it again says
-  // nothing. This way the button is a preview of what a tap does.
-  const next = COLOURS[(at + 1) % COLOURS.length];
-  const dot = document.getElementById('tint');
-  dot.style.background = next[1];
-  // Pure black next to a dark border is invisible, so the dot that
-  // offers black shows its INK as a ring -- a control you cannot see
-  // is the same fault as a tap that does nothing. Only black needs it;
-  // ringing every colour just made them all look muddy.
-  dot.style.boxShadow = next[1] === '#000000'
-    ? 'inset 0 0 0 5px ' + next[2] : 'none';
-  try { localStorage.setItem('saya-bg', COLOURS[at][1]); } catch (err) {}
-}
-
-const tint = document.getElementById('tint');
-tint.onclick = () => {
-  const at = COLOURS.findIndex(c => c[1] === current_bg);
-  setColour(COLOURS[(at + 1) % COLOURS.length][1]);
+document.getElementById('pet').onclick = () => {
+  location.href = 'vpet.html';
 };
 
 fetch('sprites.json', { cache: 'no-store' })
@@ -581,8 +544,4 @@ function blinkLoop() {
   }, gap);
 }
 blinkLoop();
-
-let bg = null;
-try { bg = localStorage.getItem('saya-bg'); } catch (err) {}
-setColour(COLOURS.some(c => c[1] === bg) ? bg : COLOURS[0][1]);
 </script>

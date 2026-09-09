@@ -182,8 +182,10 @@ APP
         "$YUZU/.face-app face.html" "face-smile" "yuzu-face"
     write_app "Deck" "Home screen" \
         "$YUZU/.face-app home.html" "go-home" "yuzu-home"
+    write_app "Pet" "The creature on the deck" \
+        "$YUZU/.face-app vpet.html" "applications-games" "yuzu-pet"
 else
-    echo "  SKIPPED Saya's Face and Deck: no browser found."
+    echo "  SKIPPED Saya's Face, Deck and Pet: no browser found."
     echo "    sudo apt install -y chromium-browser"
 fi
 
