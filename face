@@ -117,10 +117,11 @@ esac
 
 [ -f "$DIR/face.html" ] || { echo "No $DIR/face.html -- run: git pull origin main"; exit 1; }
 
-# Paint any sprite that has no mouth colour yet. Idempotent and fast,
-# so it just runs -- a face he dropped in five seconds ago should work
-# without him knowing a build step exists.
-python3 "$(dirname "$DIR")/yuzu_face.py" --paint >/dev/null 2>&1
+# THERE IS NO BUILD STEP. A sprite dropped in ui/sprites/ five seconds
+# ago is live on the next page refresh -- the manifest is generated per
+# request and the page colours her line art itself with CSS. The mouth
+# paint that used to be generated here is gone: "Revert back to strictly
+# lineart on a colored background."
 
 if ! up; then
     # nohup + & always. A foreground server on a serial link reads as a

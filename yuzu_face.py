@@ -20,9 +20,9 @@ HIS ART IS BLACK LINE WORK ON HOLES -- measured, not assumed: 92% of
 `wink.png` is fully transparent and there is not ONE opaque white pixel
 in it. The eye whites and the inside of her mouth are gaps, so whatever
 colour is behind her shows straight through them. That is why the
-background swatches work at all, and it is why the only paint this adds
-goes INSIDE the mouth: everywhere else, the background is already doing
-the colouring for free.
+background swatches work at all -- the background is doing the colouring
+for free -- and it is why the page can recolour her LINE WORK by using
+each sprite as a mask, which is what makes the black theme legible.
 """
 
 import json
@@ -34,7 +34,6 @@ import subprocess
 import zlib
 import struct
 import sys
-from collections import deque
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -125,43 +124,30 @@ def manifest(directory=None):
 
 
 # ---------------------------------------------------------------------
-# PAINT: black line art stays black; the colour goes where a colourist
-# would put it. Ghost, Sept 9: "make the art black lines for like where
-# itd normally be so. lineart typa deal. but you can feel free to color
-# the mouth appropriatly and maybe add a ring of pink color to her eyes"
+# READING AND WRITING PNGs, in the stdlib.
 #
-# Nothing is hand-positioned. The features are FOUND in the art, so a
-# new PNG dropped in the folder gets painted too, which is the whole
-# reason this is a sprite system and not five hard-coded faces:
+# This is here so the workbench converter has something to fall back
+# on when its image library is absent, and so the suite can look at what
+# a sprite actually contains rather than trusting a filename. Nothing
+# the deck SHOWS depends on it.
 #
-#   the mouth   the ink blob whose centroid sits lowest
-#   its inside  the enclosed transparent holes within that blob's box
+# THE MOUTH PAINT IS GONE. Ghost, Sept 11: "her mouth paint seems kinda
+# weird still. Revert back to strictly lineart on a colored background.
+# No need for tongue/teeth paint."
 #
-# A PINK IRIS RING WAS BUILT AND CUT THE SAME MINUTE. It found each eye
-# blob and laid a ring of colour over its outer band. Rendered, it read
-# as a smear: the ring flooded the pupil on the open eye and painted the
-# CLOSED one, which has no iris to ring. Ghost, seeing it: "remove the
-# pink iris idea my bad entirely. just use the art i gave u."
+# It generated a `<name>.paint.png` companion -- white teeth, pink
+# tongue, dark cavity -- found by detecting the lowest enclosed ink blob.
+# Every one of those tones was a guess about art he draws himself, and
+# it read as weird next to line work that is deliberately flat. The
+# whole feature is deleted rather than disabled: a dead subsystem you
+# still have to read around is worse than no subsystem, which is the
+# same call this repo made on the LEDs. `git show` has it if the idea
+# ever comes back.
 #
-# Worth keeping as a note rather than a scar: the detection was right
-# (it found both eyes) and the RENDERING was wrong, and the only reason
-# that was knowable in one pass was compositing a preview and LOOKING at
-# it. A geometry check would have passed. Same rule as the rest of this
-# repo -- a check that cannot observe the actual failure is not a check.
-#
-# Output is one companion file, `<name>.paint.png`, stacked OVER the
-# line art by the page. Over works because the mouth interior is a hole,
-# so painting on top of it is the same as painting behind.
+# What replaced it costs nothing and is not a guess: the page paints
+# the LINE ART itself, by using each sprite as a MASK. Ink is one CSS
+# variable, so black on his four colours and neon green on black.
 # ---------------------------------------------------------------------
-
-# A mouth is three things, so it gets three colours. Ghost, Sept 9:
-# "plz paint mouth like. pink tongue white teeth and black uhhh hole?"
-TONGUE = (226, 106, 132, 255)
-TEETH  = (250, 247, 244, 255)
-CAVITY = (34, 18, 24, 255)        # the dark behind everything
-INK_MAX = 110                     # r,g,b under this, with alpha, is a line
-CLEAR_MAX = 60                    # alpha under this is a hole
-MOUTH_FLOOR = 0.58                # nothing above this fraction is a mouth
 
 
 def _unfilter(raw, w, h):
@@ -194,7 +180,8 @@ def read_rgba(path):
 
     Deliberately narrow: it handles what his exporter produces and
     returns None for anything else rather than guessing. A sprite this
-    cannot read is still DISPLAYED -- it just goes unpainted."""
+    cannot read is still DISPLAYED -- this is a workbench convenience,
+    never something the page depends on."""
     try:
         with open(path, "rb") as fh:
             data = fh.read()
@@ -233,130 +220,6 @@ def write_rgba(path, w, h, px):
         fh.write(chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)))
         fh.write(chunk(b"IDAT", zlib.compress(raw, 9)))
         fh.write(chunk(b"IEND", b""))
-
-
-def _components(w, h, mask):
-    """Connected runs of True in `mask`, as lists of pixel indices."""
-    seen = bytearray(w * h)
-    groups = []
-    for start in range(w * h):
-        if not mask[start] or seen[start]:
-            continue
-        queue = deque([start]); seen[start] = 1; cells = []
-        while queue:
-            i = queue.popleft(); cells.append(i)
-            x, y = i % w, i // w
-            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if 0 <= nx < w and 0 <= ny < h:
-                    j = ny * w + nx
-                    if mask[j] and not seen[j]:
-                        seen[j] = 1; queue.append(j)
-        groups.append(cells)
-    return groups
-
-
-def _enclosed(w, h, clear):
-    """Transparent pixels the outside cannot reach -- eye highlights and
-    the inside of a mouth. Flooding from the border is what separates a
-    hole from the empty space around her face."""
-    seen = bytearray(w * h)
-    queue = deque()
-    edge = ([y * w for y in range(h)] + [y * w + w - 1 for y in range(h)]
-            + list(range(w)) + [(h - 1) * w + x for x in range(w)])
-    for i in edge:
-        if clear[i] and not seen[i]:
-            seen[i] = 1; queue.append(i)
-    while queue:
-        i = queue.popleft(); x, y = i % w, i // w
-        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-            if 0 <= nx < w and 0 <= ny < h:
-                j = ny * w + nx
-                if clear[j] and not seen[j]:
-                    seen[j] = 1; queue.append(j)
-    return bytearray(clear[i] and not seen[i] for i in range(w * h))
-
-
-def _box(cells, w):
-    xs = [i % w for i in cells]; ys = [i // w for i in cells]
-    return (min(xs), min(ys), max(xs), max(ys),
-            sum(xs) / len(cells), sum(ys) / len(cells))
-
-
-def paint(path, out_path=None):
-    """Write `<name>.paint.png` next to a sprite: her line art untouched,
-    with the inside of her mouth coloured in -- white teeth, pink
-    tongue, dark cavity. Returns the path, or None
-    if the art could not be read -- never raises, because one odd file
-    must not take her whole face down."""
-    got = read_rgba(path)
-    if not got:
-        return None
-    w, h, px = got
-    ink = bytearray(w * h); clear = bytearray(w * h)
-    for i in range(w * h):
-        r, g, b, a = px[i * 4:i * 4 + 4]
-        if a > 140 and r < INK_MAX and g < INK_MAX and b < INK_MAX:
-            ink[i] = 1
-        if a < CLEAR_MAX:
-            clear[i] = 1
-
-    blobs = sorted(_components(w, h, ink), key=len, reverse=True)[:8]
-    if not blobs:
-        return None
-    boxed = [(_box(c, w), c) for c in blobs]
-
-    # The mouth is the lowest substantial blob -- but it must actually
-    # be DOWN THERE. Without that floor, `idle.png` (mouth drawn as two
-    # open lines with no interior) had its lowest *enclosed* shape be an
-    # EYE, and the paint pass filled one iris pink and left the other
-    # black. Which is the cut iris ring back again, by accident, on one
-    # side only.
-    big = [b for b in boxed if len(b[1]) > 0.15 * len(blobs[0])]
-    low = [b for b in big if b[0][5] > MOUTH_FLOOR * h]
-    if not low:
-        # A closed mouth with no interior. Nothing to colour, and an
-        # empty layer is the RIGHT answer -- reaching further up the
-        # face for something to paint is how you end up painting eyes.
-        write_rgba(out_path or os.path.splitext(path)[0] + ".paint.png",
-                   w, h, bytearray(w * h * 4))
-        return out_path or os.path.splitext(path)[0] + ".paint.png"
-    mouth_box, _ = max(low, key=lambda b: b[0][5])
-
-    out = bytearray(w * h * 4)
-
-    # Mouth interior. Each enclosed hole inside the mouth blob is one of
-    # three things, decided by WHERE IT SITS in the mouth rather than by
-    # any per-sprite knowledge -- measured across all eight of his faces,
-    # every open mouth splits into an upper band and a lower one:
-    #
-    #     top third      teeth    white
-    #     bottom third   tongue   pink
-    #     the middle     cavity   near-black
-    #
-    # A hole spanning most of the mouth's height is the whole cavity --
-    # a shocked O with nothing in it -- and is dark, not a giant tooth.
-    holes = _enclosed(w, h, clear)
-    x0, y0, x1, y1 = mouth_box[0], mouth_box[1], mouth_box[2], mouth_box[3]
-    tall = max(1.0, y1 - y0)
-    for cells in _components(w, h, holes):
-        hx0, hy0, hx1, hy1, cx, cy = _box(cells, w)
-        if not (x0 <= cx <= x1 and y0 <= cy <= y1 and cy > MOUTH_FLOOR * h):
-            continue
-        where = (cy - y0) / tall
-        if (hy1 - hy0) / tall > 0.6:
-            colour = CAVITY               # the whole open mouth
-        elif where < 0.45:
-            colour = TEETH
-        elif where > 0.60:
-            colour = TONGUE
-        else:
-            colour = CAVITY
-        for i in cells:
-            out[i * 4:i * 4 + 4] = bytes(colour)
-
-    out_path = out_path or os.path.splitext(path)[0] + ".paint.png"
-    write_rgba(out_path, w, h, out)
-    return out_path
 
 
 # ---------------------------------------------------------------------
@@ -454,16 +317,23 @@ STATE_FILE = os.path.join(tempfile.gettempdir(), "yuzu-face-state")
 STATES = ("idle", "thinking", "talking")
 
 
-def set_state(state, said=""):
+def set_state(state, said="", rate=None):
     """Say what she is doing. NEVER raises -- this is called from the
     reply path, and a face that cannot be updated must not be able to
-    stop her talking."""
+    stop her talking.
+
+    `rate` is tokens per second for the turn that just finished, when
+    the caller happens to know it. It is carried here rather than
+    measured here because only the brain sees Ollama's own numbers, and
+    a rate this deck GUESSED would be worse than no rate at all."""
     if state not in STATES:
         return
+    body = {"state": state, "said": said[:600], "at": time.time()}
+    if rate:
+        body["rate"] = round(float(rate), 1)
     try:
         with open(STATE_FILE, "w") as fh:
-            json.dump({"state": state, "said": said[:600],
-                       "at": time.time()}, fh)
+            json.dump(body, fh)
     except Exception:
         pass
 
@@ -503,11 +373,100 @@ def answer(text):
             _BRAIN = yuzu_brain.YuzuBrain()
         set_state("thinking")
         reply = _BRAIN.ask(text)
-        set_state("talking", reply)
+        # The brain already wrote `talking` WITH the token rate it just
+        # measured. Re-stating it here without one would blank the
+        # badge on every reply that came through this page.
+        set_state("talking", reply, get_state().get("rate"))
         return reply, None
     except Exception as exc:
         set_state("idle")
         return None, str(exc)
+
+
+# ---------------------------------------------------------------------
+# TELEMETRY -- what the board is actually doing, under her chin.
+#
+# Ghost picked this off a hardware pass: power mode, temperature, and
+# how fast she is generating. It earns its pixels for one reason above
+# the rest: **the Orin ships throttled and forgetting `nvpmodel -m 0`
+# makes everything slow with no visible cause.** That reminder already
+# lives in the README, the doctor and the boot line; this is the first
+# place it can be seen WITHOUT running anything, on the screen he is
+# already looking at.
+#
+# Every field is optional and ABSENT rather than wrong. On his phone or
+# a laptop there is no nvpmodel status and no thermal zone, so the chip
+# does not appear at all -- an empty badge saying nothing is the same
+# fault as `pad --status` reporting on layers around the answer.
+# ---------------------------------------------------------------------
+
+THERMAL = "/sys/class/thermal"
+
+
+def power_mode():
+    """(number, name) from nvpmodel's own status file, or None.
+
+    Reads the FILE rather than shelling out to `nvpmodel -q`: no sudo,
+    nothing that can hang, and this is served to a page that polls."""
+    try:
+        with open("/var/lib/nvpmodel/status") as fh:
+            raw = fh.read()
+    except Exception:
+        return None
+    for token in raw.split():
+        if token.startswith("pmode:"):
+            try:
+                mode = int(token.split(":", 1)[1])
+            except ValueError:
+                return None
+            return (mode, "MAXN" if mode == 0 else "mode %d" % mode)
+    return None
+
+
+def temperature():
+    """Hottest named thermal zone in whole degrees C, or None.
+
+    The hottest is the honest one: the Orin exposes CPU, GPU and SOC
+    zones and the number worth showing on a handheld is whichever is
+    closest to throttling."""
+    best = None
+    try:
+        zones = sorted(os.listdir(THERMAL))
+    except Exception:
+        return None
+    for zone in zones:
+        if not zone.startswith("thermal_zone"):
+            continue
+        try:
+            with open(os.path.join(THERMAL, zone, "temp")) as fh:
+                milli = int(fh.read().strip())
+        except Exception:
+            continue
+        # Some zones report an unpopulated -256000. Ignore nonsense
+        # rather than showing a confidently wrong minus number.
+        if milli <= 0 or milli > 150000:
+            continue
+        best = max(best or 0, milli // 1000)
+    return best
+
+
+def stats():
+    """Everything the badge can say, with absent fields simply missing."""
+    out = {}
+    mode = power_mode()
+    if mode:
+        out["power"] = mode[1]
+        # The whole reason this badge exists. A number he has to
+        # interpret is a number he will ignore.
+        if mode[0] != 0:
+            out["throttled"] = "THROTTLED -- sudo nvpmodel -m 0"
+    temp = temperature()
+    if temp:
+        out["temp"] = temp
+    rate = get_state().get("rate")
+    if rate:
+        out["rate"] = rate
+    return out
 
 
 _BRAIN = None
@@ -527,6 +486,9 @@ class _Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.split("?")[0].rstrip("/") == "/state":
             self._json(get_state())
+            return
+        if self.path.split("?")[0].rstrip("/") == "/stats":
+            self._json(stats())
             return
         if self.path.split("?")[0].rstrip("/") in ("/sprites.json", "/sprites"):
             body = json.dumps(manifest(), indent=1).encode()
@@ -606,33 +568,8 @@ def _report():
     return 0
 
 
-def paint_all(directory=None):
-    """Paint every sprite that has no companion yet. Returns the names
-    painted. Cheap to call: it skips art whose paint file is newer."""
-    directory = directory or SPRITE_DIR
-    done = []
-    for s in sprites(directory):
-        src = os.path.join(directory, os.path.basename(s["file"]))
-        if src.endswith(".paint.png"):
-            continue
-        out = os.path.splitext(src)[0] + ".paint.png"
-        try:
-            if (os.path.exists(out)
-                    and os.path.getmtime(out) >= os.path.getmtime(src)):
-                continue
-        except OSError:
-            pass
-        if paint(src):
-            done.append(s["name"])
-    return done
-
-
 if __name__ == "__main__":
-    if "--paint" in sys.argv:
-        painted = paint_all()
-        print(f"painted {len(painted)}: {', '.join(painted)}" if painted
-              else "nothing to paint")
-    elif "--serve" in sys.argv:
+    if "--serve" in sys.argv:
         port = 8081
         for i, a in enumerate(sys.argv):
             if a == "--port" and i + 1 < len(sys.argv):

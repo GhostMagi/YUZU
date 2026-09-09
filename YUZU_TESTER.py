@@ -5391,16 +5391,16 @@ class TestSheReacts(unittest.TestCase):
         page = self.PAGE.read_text()
         self.assertNotIn('id="states"', page, "the expression chips are back")
 
-    def test_the_colours_are_ONE_dot_not_four(self):
+    def test_the_colours_are_ONE_dot_not_a_row(self):
         """"put those color options into 1 small bubble instead of
-        polluting screen" -- four swatches is a settings panel parked on
-        her face."""
+        polluting screen" -- a row of swatches is a settings panel
+        parked on her face."""
         page = self.PAGE.read_text()
         self.assertNotIn('id="swatches"', page)
         self.assertIn('id="tint"', page)
-        # still exactly his four, just not all on screen at once
+        # his four plus black, and still only one control for them
         block = page.split("const COLOURS")[1].split("];")[0]
-        self.assertEqual(block.count("#"), 4)
+        self.assertEqual(block.count("['"), 5)
 
     def test_she_can_be_talked_to_from_the_page(self):
         page = self.PAGE.read_text()
@@ -5447,6 +5447,105 @@ class TestWikiBrevity(unittest.TestCase):
                                      f"{f.name} raised num_predict to {found}")
 
 
+class TestTelemetry(unittest.TestCase):
+    """The chip under her chin: power mode, temperature, tokens/sec.
+
+    It earns its pixels for one reason above the others -- **the Orin
+    ships THROTTLED and forgetting `sudo nvpmodel -m 0` makes everything
+    slow with no visible cause.** That reminder already lives in the
+    README, the doctor and the boot line; this is the first place it is
+    visible without running anything."""
+
+    import yuzu_face as face
+    import yuzu_brain as brain
+
+    PAGE = Path(__file__).parent / "ui" / "face.html"
+
+    def test_nothing_readable_means_no_badge_at_all(self):
+        """On his phone and on any laptop there is no nvpmodel status and
+        no thermal zone. An empty chip saying nothing is the same fault
+        as `pad --status` reporting on the layers around the answer, so
+        a field that cannot be read is ABSENT."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with unittest.mock.patch.object(self.face, "THERMAL", tmp):
+                with unittest.mock.patch.object(self.face, "power_mode",
+                                                lambda: None):
+                    with unittest.mock.patch.object(
+                            self.face, "get_state", lambda: {"state": "idle"}):
+                        self.assertEqual(self.face.stats(), {})
+        page = self.PAGE.read_text()
+        self.assertIn("classList.toggle('on', !!badge.textContent)", page,
+                      "an empty badge would still be drawn")
+
+    def test_a_throttled_board_says_the_command_not_the_number(self):
+        """"mode 1" is a number he has to interpret, and a number he has
+        to interpret is a number he will ignore. This is the fourth
+        place the reminder lives and the only one that appears without
+        being asked for."""
+        with unittest.mock.patch.object(self.face, "power_mode",
+                                        lambda: (1, "mode 1")):
+            with unittest.mock.patch.object(self.face, "temperature",
+                                            lambda: 44):
+                got = self.face.stats()
+        self.assertIn("nvpmodel -m 0", got.get("throttled", ""))
+        with unittest.mock.patch.object(self.face, "power_mode",
+                                        lambda: (0, "MAXN")):
+            with unittest.mock.patch.object(self.face, "temperature",
+                                            lambda: 44):
+                got = self.face.stats()
+        self.assertNotIn("throttled", got, "MAXN is not a warning")
+        self.assertEqual(got["power"], "MAXN")
+
+    def test_the_power_mode_is_read_from_the_file_not_from_a_command(self):
+        """No sudo, nothing that can hang. This is served to a page that
+        polls it every few seconds, so shelling out to `nvpmodel -q` is
+        the wrong shape as well as the slower one."""
+        body = (Path(__file__).parent / "yuzu_face.py").read_text()
+        block = body.split("def power_mode(")[1].split("def temperature(")[0]
+        self.assertIn("/var/lib/nvpmodel/status", block)
+        self.assertNotIn("subprocess", block)
+
+    def test_a_nonsense_thermal_zone_is_ignored(self):
+        """Some zones report an unpopulated -256000. A confidently wrong
+        minus number on screen is worse than no temperature."""
+        with tempfile.TemporaryDirectory() as tmp:
+            for i, milli in enumerate(("-256000", "48200", "51900", "999999")):
+                zone = Path(tmp) / ("thermal_zone%d" % i)
+                zone.mkdir()
+                (zone / "temp").write_text(milli + "\n")
+            with unittest.mock.patch.object(self.face, "THERMAL", tmp):
+                self.assertEqual(self.face.temperature(), 51)
+
+    def test_the_rate_is_MEASURED_by_the_brain_not_guessed_here(self):
+        """Only the brain sees Ollama's own eval_count / eval_duration.
+        A rate this deck estimated would be worse than no rate, so the
+        number crosses with the state and is simply absent when an older
+        Ollama does not report it."""
+        self.assertAlmostEqual(
+            self.brain._token_rate({"eval_count": 200,
+                                    "eval_duration": 11_000_000_000}),
+            18.18, places=1)
+        for empty in ({}, {"eval_count": 0, "eval_duration": 5},
+                      {"eval_count": 5, "eval_duration": 0},
+                      {"eval_count": None, "eval_duration": None}):
+            self.assertIsNone(self.brain._token_rate(empty))
+
+    def test_the_state_file_carries_the_rate_without_breaking_readers(self):
+        """`set_state` is called from the reply path, so a new field must
+        never be able to stop her talking -- and a caller that does not
+        pass one must not blank it either."""
+        real = self.face.STATE_FILE
+        with tempfile.TemporaryDirectory() as tmp:
+            self.face.STATE_FILE = os.path.join(tmp, "state")
+            try:
+                self.face.set_state("talking", "hi", 18.24)
+                self.assertEqual(self.face.get_state()["rate"], 18.2)
+                self.face.set_state("idle")
+                self.assertNotIn("rate", self.face.get_state())
+            finally:
+                self.face.STATE_FILE = real
+
+
 class TestHomeScreen(unittest.TestCase):
     """`ui/home.html` -- the desktop behind her face.
 
@@ -5488,6 +5587,40 @@ class TestHomeScreen(unittest.TestCase):
         for f in (self.PAGE, self.FACE):
             self.assertIn("'saya-bg'", f.read_text(),
                           f"{f.name} does not share the colour setting")
+
+    def test_both_pages_offer_the_SAME_colours(self):
+        """Sharing the storage key is not enough: a colour one page can
+        set and the other cannot render is a screen that comes back
+        wrong after a tap. The black theme made this real -- it carries
+        an INK as well as a screen colour, and both pages have to agree
+        about both."""
+        rows = {}
+        for f in (self.PAGE, self.FACE):
+            block = f.read_text().split("const COLOURS")[1].split("];")[0]
+            rows[f.name] = [tuple(x.lower() for x in
+                                  re.findall(r"#[0-9a-fA-F]{6}", line))
+                            for line in block.splitlines()
+                            if line.strip().startswith("[")]
+        self.assertEqual(rows["home.html"], rows["face.html"],
+                         "the two screens disagree about the palette")
+        self.assertIn(("#000000", "#39ff5e"), rows["home.html"],
+                      "the black theme is not on the home screen")
+
+    def test_the_icons_are_line_art_and_not_emoji(self):
+        """Ghost wanted "clean single-color line icons... rather than
+        smartphone". Emoji are full-colour bitmaps that ignore the ink
+        colour entirely, so on the black theme they stayed as glossy
+        3D blobs while everything else went neon.
+
+        They are DRAWN HERE rather than pulled from Lucide or Feather,
+        because a library is a download and this deck has to work with
+        the WiFi off."""
+        page = self.PAGE.read_text()
+        self.assertEqual(page.count("<svg"), 4, "not four line icons")
+        self.assertIn("stroke: var(--ink)", page,
+                      "the icons do not take the ink colour")
+        for emoji in ("💬", "📖", "🎮", "☺"):
+            self.assertNotIn(emoji, page, f"{emoji} is still a tile icon")
 
     # ---- the launcher, which is the only risky thing here ------------
 
@@ -5777,84 +5910,32 @@ class TestFaceSprites(unittest.TestCase):
                          "there is no asleep art, so the role must be "
                          "ABSENT rather than pointing at the wrong face")
 
-    def test_every_sprite_paints_and_the_line_art_stays_black(self):
-        """THE FINDING THIS TEST EXISTS FOR. A pink iris ring was built
-        and cut in the same minute: it found both eyes correctly and
-        rendered as a smear, flooding the pupil and painting the CLOSED
-        eye. What caught it was compositing a preview and LOOKING at
-        it; every geometry assertion passed.
+    def test_the_mouth_paint_is_GONE_not_disabled(self):
+        """Ghost, Sept 11: "her mouth paint seems kinda weird still.
+        Revert back to strictly lineart on a colored background. No need
+        for tongue/teeth paint."
 
-        So this checks the thing that broke: paint must be a small
-        MINORITY of the art's own pixels. A layer that covers the face
-        is the smear, whatever the geometry says."""
-        for sprite in self.face.sprites():
-            src = self.SPRITES / Path(sprite["file"]).name
-            got = self.face.read_rgba(str(src))
-            if not got:
-                continue
-            w, h, px = got
-            inked = sum(1 for i in range(0, len(px), 4) if px[i + 3] > 140)
-            out = self.face.paint(str(src),
-                                  str(Path(tempfile.gettempdir()) / "t.png"))
-            self.assertTrue(out, f"{sprite['name']} would not paint")
-            _, _, painted = self.face.read_rgba(out)
-            covered = sum(1 for i in range(0, len(painted), 4)
-                          if painted[i + 3] > 140)
-            self.assertLess(covered, inked * 0.5,
-                            f"{sprite['name']}: the paint layer covers "
-                            f"{covered} px against {inked} px of art -- "
-                            "that is the iris smear all over again")
-            # Zero is CORRECT for a closed mouth -- `idle` and `blink`
-            # draw the mouth as open lines with no interior. Demanding
-            # paint everywhere is what made the detector reach up the
-            # face and colour one eye pink.
-            if covered == 0:
-                continue
+        Deleted rather than switched off, which is the call this repo
+        made on the LEDs for the same reason: a dead subsystem you still
+        have to read around is worse than no subsystem. The companion
+        files go too -- one left in ui/sprites/ would render a floating
+        mouth over her face."""
+        body = (Path(__file__).parent / "yuzu_face.py").read_text()
+        for gone in ("def paint(", "def paint_all(", "TONGUE", "TEETH",
+                     "CAVITY", "MOUTH_FLOOR"):
+            self.assertNotIn(gone, body,
+                             f"the mouth paint is still here: {gone}")
+        self.assertEqual(list(self.SPRITES.glob("*.paint.png")), [],
+                         "a generated paint layer is still in the repo")
+        page = (Path(__file__).parent / "ui" / "face.html").read_text()
+        self.assertNotIn('id="paint"', page,
+                         "the page still stacks a paint layer")
 
-    def test_a_closed_mouth_is_left_alone_rather_than_hunted_for(self):
-        """MEASURED, Sept 9. `idle.png` draws her mouth as two open
-        lines with no enclosed interior, so the lowest *enclosed* shape
-        in the whole picture was an EYE -- and the paint pass filled one
-        iris pink and left the other black. Which is the cut iris ring
-        back again, by accident, on one side only.
-
-        The fix is a floor: nothing above MOUTH_FLOOR is a mouth, and a
-        face with nothing below it gets no paint at all. An empty layer
-        is the right answer; reaching further up the face for something
-        to colour is how you paint an eye."""
-        have = {s["name"] for s in self.face.sprites()}
-        for name in ("idle", "blink"):
-            if name not in have:
-                continue
-            out = self.face.paint(str(self.SPRITES / f"{name}.png"),
-                                  str(Path(tempfile.gettempdir()) / "c.png"))
-            _, _, px = self.face.read_rgba(out)
-            self.assertEqual(
-                sum(1 for i in range(0, len(px), 4) if px[i + 3] > 140), 0,
-                f"{name} has a closed mouth and must be painted NOWHERE")
-
-    def test_an_open_mouth_gets_all_three_tones(self):
-        """Ghost: "plz paint mouth like. pink tongue white teeth and
-        black uhhh hole?" Nothing here is per-sprite: every one of his
-        open mouths splits into an upper band and a lower one, so the
-        tone comes from WHERE a hole sits inside the mouth."""
-        have = {s["name"] for s in self.face.sprites()}
-        if "talking" not in have:
-            self.skipTest("no talking art to check")
-        out = self.face.paint(str(self.SPRITES / "talking.png"),
-                              str(Path(tempfile.gettempdir()) / "t3.png"))
-        _, _, px = self.face.read_rgba(out)
-        tones = {tuple(px[i:i + 3]) for i in range(0, len(px), 4)
-                 if px[i + 3] > 140}
-        self.assertIn(self.face.TEETH[:3], tones, "no white teeth")
-        self.assertIn(self.face.TONGUE[:3], tones, "no pink tongue")
-
-    def test_paint_survives_art_it_cannot_read(self):
+    def test_odd_art_is_survived_rather_than_raised_on(self):
         """One odd export must never take her whole face down."""
         with tempfile.TemporaryDirectory() as tmp:
             junk = Path(tmp) / "junk.png"
             junk.write_bytes(b"not a png at all")
-            self.assertIsNone(self.face.paint(str(junk)))
             self.assertIsNone(self.face.read_rgba(str(junk)))
 
 
@@ -5897,18 +5978,85 @@ class TestFaceServer(unittest.TestCase):
             self.assertNotIn(reach, page,
                              f"face.html reaches outside itself: {reach!r}")
 
-    def test_it_offers_exactly_the_four_colours_he_asked_for(self):
+    def test_it_offers_his_four_colours_and_black(self):
         """Ghost, Sept 9: "Please add the homescreen colors as Hot pink,
         Cyan, Neon green, And a Lavender or purple color. ONLY those
-        colors." The old dark-mauve set is what he meant by "i dislike
-        the color choices" -- so this pins the count as well as the
-        names, because quietly adding a sixth is the same fault."""
+        colors." Then, Sept 11: "add the color option for a black
+        colored screen."
+
+        Five now, and the count is still pinned -- quietly adding a
+        SIXTH is the same fault the original test existed to catch."""
         page = self.PAGE.read_text()
-        for want in ("hot pink", "cyan", "neon green", "lavender"):
-            self.assertIn(want, page, f"{want} is not a swatch")
+        for want in ("hot pink", "cyan", "neon green", "lavender", "black"):
+            self.assertIn(want, page, f"{want} is not a colour")
         block = page.split("const COLOURS")[1].split("];")[0]
-        self.assertEqual(block.count("#"), 4,
-                         "there are not exactly four swatches")
+        self.assertEqual(block.count("['"), 5,
+                         "there are not exactly five colours")
+
+    def test_black_is_the_one_colour_that_changes_her_INK(self):
+        """THE POINT OF THE BLACK THEME. Ghost: "When pressed the screen
+        colors black but her lineart should be neon green. To make up
+        for black on black obv."
+
+        Her art is black line work on transparency, so on a black screen
+        it is nothing at all. Every colour therefore carries an INK as
+        well as a screen, and black is the one that is not dark."""
+        page = self.PAGE.read_text()
+        block = page.split("const COLOURS")[1].split("];")[0]
+        rows = [r for r in block.splitlines() if r.strip().startswith("[")]
+        self.assertEqual(len(rows), 5)
+        for row in rows:
+            hexes = re.findall(r"#[0-9a-fA-F]{6}", row)
+            self.assertEqual(len(hexes), 2,
+                             f"{row.strip()} has no ink colour")
+            screen, ink = hexes
+            if "black" in row:
+                self.assertEqual(screen.lower(), "#000000")
+                self.assertEqual(ink.lower(), "#39ff5e",
+                                 "black must give her NEON GREEN line "
+                                 "art or she is invisible")
+            else:
+                self.assertNotEqual(screen.lower(), ink.lower())
+
+    def test_her_line_art_is_recoloured_by_a_MASK_not_a_second_copy(self):
+        """How the ink colour is possible at all. Each sprite is used as
+        a CSS mask and the box behind it is filled with --ink, so one
+        variable recolours every expression -- including a blink frame
+        and any PNG he draws next week -- with no second copy of his art
+        anywhere and nothing generated at runtime."""
+        page = self.PAGE.read_text()
+        self.assertIn("mask-image", page, "nothing masks the sprite")
+        self.assertIn("var(--ink)", page, "the ink colour is not used")
+        self.assertNotIn("<img", page,
+                         "a plain <img> cannot be recoloured, so the "
+                         "black theme would show her in black on black")
+
+    def test_she_looks_toward_a_touch_and_settles_back(self):
+        """Ghost wanted her pupils to track his touch. They cannot: her
+        eyes are HOLES in flat line art and there is no pupil layer to
+        move -- cutting one out at runtime is the iris-ring smear again.
+        The whole face leans instead, a few pixels, and returns to
+        centre when left alone.
+
+        The clamp is the part worth pinning. Unclamped this is her face
+        sliding off the screen; at five pixels it reads as attention."""
+        page = self.PAGE.read_text()
+        self.assertIn("GAZE_MAX", page, "she does not look at anything")
+        clamp = int(re.search(r"GAZE_MAX\s*=\s*(\d+)", page).group(1))
+        self.assertLessEqual(clamp, 8,
+                             "that is a face sliding around, not a glance")
+        hold = int(re.search(r"GAZE_HOLD\s*=\s*(\d+)", page).group(1))
+        self.assertGreater(hold, 500, "she snaps back before you let go")
+
+    def test_the_cyberpunk_pass_belongs_to_the_black_theme(self):
+        """Scanlines and corner brackets are tied to black rather than
+        being a separate switch, so one tap is a MODE. His four colours
+        were picked on purpose and scanlines over hot pink is mud."""
+        page = self.PAGE.read_text()
+        self.assertIn("body.hud", page, "there is no HUD mode")
+        self.assertIn("repeating-linear-gradient", page, "no scanlines")
+        self.assertIn("'hud', COLOURS[at][0] === 'black'", page,
+                      "the HUD is not tied to the black theme")
 
     def test_the_page_draws_no_art_of_its_own(self):
         """The vector face is GONE, not disabled. Ghost: "she looks like

@@ -40,7 +40,7 @@ the encyclopedia, plays games. It is not a plan, it is running.
 
 **Her face** — a web page served locally, opened in a browser or on the
 phone. Nine hand-drawn expressions as transparent PNGs (idle, blink,
-talking, thinking, mad, cry, smug, wink, woahshock). Black line art on a
+talking, thinking, mad, cry, smug, wink, woahshock). Line art on a
 colour I can change; the background shows through her eyes.
 
 - She **blinks** on her own, and **breathes**
@@ -48,9 +48,16 @@ colour I can change; the background shows through her eyes.
   generates → talking when words start. Driven by the brain, not by me
 - I can **type to her right on that page** and her reply appears under
   her face
-- Four background colours only: hot pink, cyan, neon green, lavender
+- She **leans toward where I touch** the screen and settles back
+- Five backgrounds: hot pink, cyan, neon green, lavender, and **black**
+- **Black is a mode, not just a colour.** Her line art turns neon green,
+  and the whole UI goes terminal: CRT scanlines, corner brackets, dark
+  translucent dialogue box
+- A small **status chip under her chin**: Jetson power mode, temperature,
+  and how fast she is generating (tokens/sec)
 
-**A home screen** — 2x2 tiles: Saya, Talk, Wikipedia, Game Boy. A clock
+**A home screen** — 2x2 tiles with hand-drawn line icons: Saya, Talk,
+Wikipedia, Game Boy. Same five colours, same black mode. A clock
 that says when the board hasn't reached the network. Her face has a ⌂
 that goes there. It can boot straight into it.
 
@@ -68,7 +75,7 @@ that goes there. It can boot straight into it.
 one command, and it becomes a sprite: white background removed, squared,
 mouth coloured. The filename becomes the expression name.
 
-**446 tests** covering all of it, run in one command.
+**456 tests** covering all of it, run in one command.
 
 ## Hard-won rules — please respect these in any design idea
 

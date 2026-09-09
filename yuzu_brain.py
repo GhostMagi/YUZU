@@ -207,6 +207,26 @@ def _post(url, payload, timeout):
     return urllib.request.urlopen(request, timeout=timeout)
 
 
+def _token_rate(data):
+    """Tokens per second for the turn Ollama just finished, or None.
+
+    Ollama reports `eval_count` and `eval_duration` (nanoseconds) on the
+    final object of either a streamed or a plain reply. This is the
+    honest number for "how fast is she on this board" -- generation
+    only, not counting the prompt -- and it is MEASURED rather than
+    estimated, which is the only reason it is worth putting on screen.
+    Returns None when the fields are absent, so an older Ollama simply
+    shows no rate instead of a made-up one."""
+    try:
+        count = int(data.get("eval_count") or 0)
+        nanos = int(data.get("eval_duration") or 0)
+    except (TypeError, ValueError):
+        return None
+    if count <= 0 or nanos <= 0:
+        return None
+    return count / (nanos / 1e9)
+
+
 class YuzuBrain:
     def __init__(self, model=DEFAULT_MODEL, host=DEFAULT_HOST,
                  system_prompt=None, options=None,
@@ -327,10 +347,10 @@ class YuzuBrain:
     # wiki: the face is a nicety and the reply is the product, so a
     # missing or broken face module must never be able to stop her
     # talking. `_face_state` swallows everything on purpose.
-    def _face(self, state, said=""):
+    def _face(self, state, said="", rate=None):
         try:
             import yuzu_face
-            yuzu_face.set_state(state, said)
+            yuzu_face.set_state(state, said, rate)
         except Exception:
             pass
 
@@ -371,7 +391,7 @@ class YuzuBrain:
             ) from exc
 
         reply = (data.get("message") or {}).get("content", "").strip()
-        self._face("talking", reply)
+        self._face("talking", reply, _token_rate(data))
         if remember:
             self._remember(user_text, reply)
         self._check_drift(reply)
@@ -394,6 +414,7 @@ class YuzuBrain:
         }
         collected = []
         self._face("thinking")
+        rate = None
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as response:
                 for line in response:
@@ -413,6 +434,7 @@ class YuzuBrain:
                         collected.append(piece)
                         yield piece
                     if chunk.get("done"):
+                        rate = _token_rate(chunk)
                         break
         except urllib.error.URLError as exc:
             raise BrainError(
@@ -425,7 +447,7 @@ class YuzuBrain:
                 f"Try: export YUZU_TIMEOUT=600"
             ) from exc
         full_reply = "".join(collected).strip()
-        self._face("talking", full_reply)
+        self._face("talking", full_reply, rate)
         if remember:
             self._remember(user_text, full_reply)
         # ask() scored drift and ask_stream() didn't, so streaming

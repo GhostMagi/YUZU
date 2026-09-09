@@ -5,39 +5,44 @@
 <!--
   Her face.
 
-  THE ART IS NOT IN THIS FILE ANY MORE. Ghost drew/cropped real anime
+  THE ART IS NOT IN THIS FILE. Ghost drew/cropped real anime
   expressions into transparent PNGs, because the hand-drawn SVG version
   read as MS Paint and he was right. So this page draws nothing: it
   asks `yuzu_face.py` what art exists and renders it.
 
       ui/sprites/<name>.png      drop a file in, it is an expression
-      ui/sprites/<name>.paint.png   generated, the mouth colour
 
   Adding a face is adding a file. No list here to update, nothing to
   keep in sync, no code to touch -- which is exactly what he asked for:
   "set it up as a sprite system so i can just swap out the image files".
 
-  Three layers: the background colour, the black line art, and a paint
-  layer (white teeth, pink tongue, dark cavity). Paint goes on TOP and
-  that is safe -- verified by compositing both orders -- because every
-  region it fills is a HOLE in the art, so there is no line under it to
-  cover. The same holes are why her eyes look coloured: the background
-  is showing straight through them.
+  HER LINE WORK IS PAINTED BY CSS, NOT BY A SECOND IMAGE. Each sprite
+  is used as a MASK and the ink is one variable, so black on his four
+  colours and neon green on black. That is what makes the black theme
+  possible at all -- black art on a black screen is nothing.
+
+      Ghost, Sept 11: "When pressed the screen colors black but her
+      lineart should be neon green. To make up for black on black obv."
+
+  THE MOUTH PAINT IS GONE, same message: "Revert back to strictly
+  lineart on a colored background. No need for tongue/teeth paint."
+  Her eyes and the inside of her mouth are HOLES in the art, so the
+  background still shows straight through them -- that was never the
+  paint layer's doing.
 
   No network, no fonts, no libraries. Works with the WiFi off, which is
   the entire point of this deck.
 -->
 <style>
 :root {
-  --bg:   #ff2d95;      /* hot pink. tap a swatch to change */
-  --chip: rgba(0,0,0,.30);
+  --bg:   #ff2d95;      /* the screen. tap the dot to change */
+  --ink:  #10080d;      /* HER LINE WORK. the mask is filled with this */
   --face: min(76vw, 74vh);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }
 body {
   background: var(--bg);
-  display: grid; place-items: center;
   font: 15px system-ui, -apple-system, sans-serif;
   transition: background .45s ease;
   -webkit-user-select: none; user-select: none;
@@ -52,7 +57,7 @@ body {
 
    The chips are GONE. Ghost: "remove the visual clues i can change her
    expression i want that automatic." The brain drives her face now, so
-   a row of buttons offering to do it by hand was advertising the wrong
+   a row of buttons offering to do it by hand advertised the wrong
    thing. Tapping her face still cycles, because that costs no pixels
    and is how you check new art.                                     */
 /* stretch, explicitly: the old layout set place-items:center and it
@@ -61,18 +66,30 @@ body {
 body { display: flex; flex-direction: column;
        align-items: stretch; justify-content: flex-end; }
 
+#stage {
+  flex: 1; min-height: 0; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
 #face {
-  flex: 1; min-height: 0;
   position: relative;
-  align-self: center; width: min(78vw, 100%);
+  height: 100%; width: min(78vw, 100%);
   animation: breathe 4.6s ease-in-out infinite;
   cursor: pointer;
 }
-#face img {
+/* HER INK. The sprite is the MASK and this box is the colour, which is
+   why one variable recolours every expression, including the blink
+   frame, with no second copy of the art anywhere. */
+#art {
   position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: contain;
+  background-color: var(--ink);
+  -webkit-mask-image: var(--sprite); mask-image: var(--sprite);
+  -webkit-mask-size: contain;   mask-size: contain;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
   pointer-events: none;
+  /* the gaze offset. Small on purpose -- see the note by the code. */
+  transform: translate(var(--gx, 0px), var(--gy, 0px));
+  transition: transform .5s ease-out, background-color .45s ease;
 }
 /* Blink is a FRAME, not an animation. You cannot squash a flat sprite
    without smearing the line work, so squashing was never the answer --
@@ -84,6 +101,57 @@ body { display: flex; flex-direction: column;
 /* thinking gets a slower, heavier drift -- she is busy, not idle. */
 body.thinking #face { animation-duration: 2.6s; }
 
+/* ---- HUD MODE, and it belongs to the black theme only -------------
+   Ghost liked a cyberpunk pass: scanlines, corner brackets, a dark
+   translucent dialogue box. All of it is CSS and none of it fetches
+   anything.
+
+   It is tied to BLACK rather than switched separately because that is
+   what makes it a mode instead of a setting: one tap turns the whole
+   deck into a terminal, and one more tap gives him hot pink back. His
+   four colours are untouched by any of it -- scanlines over hot pink
+   is mud, and he picked those colours on purpose.                   */
+#hud { position: fixed; inset: 10px; display: none; pointer-events: none; }
+body.hud #hud { display: block; }
+#hud i {
+  position: absolute; width: 26px; height: 26px;
+  border: 2px solid var(--ink); opacity: .55;
+}
+#hud i:nth-child(1) { top: 0; left: 0;  border-right: 0; border-bottom: 0; }
+#hud i:nth-child(2) { top: 0; right: 0; border-left: 0;  border-bottom: 0; }
+#hud i:nth-child(3) { bottom: 0; left: 0;  border-right: 0; border-top: 0; }
+#hud i:nth-child(4) { bottom: 0; right: 0; border-left: 0;  border-top: 0; }
+#scan {
+  position: fixed; inset: 0; pointer-events: none; display: none;
+  background: repeating-linear-gradient(
+      to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);
+  mix-blend-mode: multiply;
+}
+body.hud #scan { display: block; }
+
+/* ---- the telemetry chip -------------------------------------------
+   Power mode, temperature, and how fast she is actually generating.
+   It sits under her chin because that is where he looks while waiting.
+
+   THE REASON IT EARNS THE PIXELS is the power mode. The Orin ships
+   THROTTLED and forgetting `sudo nvpmodel -m 0` makes everything slow
+   with no visible cause -- so this is the first place that is visible
+   without running anything. Fields that cannot be read are ABSENT, so
+   on his phone the chip simply does not appear.                     */
+#badge {
+  align-self: center; margin: 0 auto 8px; display: none;
+  font-size: 12.5px; letter-spacing: .04em; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px;
+  background: rgba(0,0,0,.16); color: rgba(0,0,0,.62);
+  border: 1px solid rgba(0,0,0,.16);
+}
+#badge.on { display: block; }
+#badge.warn { background: #d81b3a; color: #fff; border-color: #d81b3a; }
+body.hud #badge {
+  background: rgba(0,0,0,.55); color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
 /* ---- what she said ------------------------------------------------ */
 #says {
   margin: 0 auto 10px; max-width: min(92vw, 46em);
@@ -94,6 +162,11 @@ body.thinking #face { animation-duration: 2.6s; }
   display: none;
 }
 #says.on { display: block; }
+body.hud #says {
+  background: rgba(13,13,17,.85); color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 55%, transparent);
+  border-radius: 4px;
+}
 
 /* ---- saying something back ---------------------------------------- */
 #ask {
@@ -113,6 +186,22 @@ body.thinking #face { animation-duration: 2.6s; }
   white-space: nowrap;
 }
 #ask button:disabled { opacity: .45; }
+body.hud #ask input {
+  background: rgba(13,13,17,.85); color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 55%, transparent);
+  border-radius: 4px;
+}
+body.hud #ask input::placeholder {
+  color: color-mix(in srgb, var(--ink) 50%, transparent);
+}
+body.hud #ask button {
+  background: var(--ink); color: #06080a; border-color: var(--ink);
+  border-radius: 4px;
+}
+body.hud #tint, body.hud #home {
+  border-color: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+body.hud #home { color: var(--ink); background: rgba(13,13,17,.85); }
 
 /* ONE dot, not four. "put those color options into 1 small bubble
    instead of polluting screen" -- and he is right: four swatches is a
@@ -128,11 +217,17 @@ body.thinking #face { animation-duration: 2.6s; }
   padding: 28px; max-width: 30em; line-height: 1.6; margin: auto;
   color: rgba(0,0,0,.7); text-align: center;
 }
+body.hud #empty { color: var(--ink); }
 </style>
 
-<div id="face" hidden><img id="art" alt=""><img id="paint" alt=""></div>
+<div id="stage">
+  <div id="face" hidden><div id="art"></div></div>
+  <div id="hud"><i></i><i></i><i></i><i></i></div>
+</div>
 <div id="empty" hidden></div>
+<div id="scan"></div>
 
+<div id="badge"></div>
 <div id="says"></div>
 
 <form id="ask" autocomplete="off">
@@ -143,47 +238,65 @@ body.thinking #face { animation-duration: 2.6s; }
 </form>
 
 <script>
-// His four, and only his four. "Please add the homescreen colors as Hot
-// pink, Cyan, Neon green, And a Lavender or purple color. Only those
-// colors." Black line art reads on every one of them, which is why the
-// art could stay black.
+// His four, plus black. "Please add the homescreen colors as Hot pink,
+// Cyan, Neon green, And a Lavender or purple color. Only those colors."
+// Then, Sept 11: "add the color option for a black colored screen...
+// When pressed the screen colors black but her lineart should be neon
+// green."
+//
+// So a colour is a PAIR -- screen and ink -- rather than one hex. That
+// is the whole mechanism: black art on a black screen is nothing, and
+// the mask is what lets the same PNG be drawn in another colour with no
+// second copy of the art.
 const COLOURS = [
-  ['hot pink',   '#ff2d95'],
-  ['cyan',       '#22e0e8'],
-  ['neon green', '#39ff5e'],
-  ['lavender',   '#b98cff'],
+  ['hot pink',   '#ff2d95', '#10080d'],
+  ['cyan',       '#22e0e8', '#10080d'],
+  ['neon green', '#39ff5e', '#10080d'],
+  ['lavender',   '#b98cff', '#10080d'],
+  ['black',      '#000000', '#39ff5e'],
 ];
 
 let expressions = [];
 let roles = null;
 let current = 0;
 
+function paintSprite(file) {
+  document.getElementById('art').style.setProperty(
+    '--sprite', 'url("' + file + '")');
+}
+
 function show(i) {
   if (!expressions.length) return;
   current = (i + expressions.length) % expressions.length;
   const e = expressions[current];
-  document.getElementById('art').src = e.file;
-  // The paint layer is optional: a sprite yuzu_face.py could not read
-  // still SHOWS, it just has no mouth colour. Missing art must never
-  // be a blank screen.
-  const paint = document.getElementById('paint');
-  paint.src = e.file.replace(/\.[^.]+$/, '.paint.png');
-  paint.onerror = () => { paint.removeAttribute('src'); };
-  document.body.className = e.name;
+  paintSprite(e.file);
+  document.body.classList.remove(...[...document.body.classList]
+    .filter(c => c !== 'hud' && c !== 'thinking'));
+  document.body.classList.add(e.name);
   try { localStorage.setItem('saya-face', e.name); } catch (err) {}
 }
 
 let current_bg = COLOURS[0][1];
 function setColour(hex) {
-  current_bg = hex;
-  document.documentElement.style.setProperty('--bg', hex);
+  const at = Math.max(0, COLOURS.findIndex(c => c[1] === hex));
+  current_bg = COLOURS[at][1];
+  document.documentElement.style.setProperty('--bg', COLOURS[at][1]);
+  document.documentElement.style.setProperty('--ink', COLOURS[at][2]);
+  // HUD mode is the black theme. One tap is the whole terminal look.
+  document.body.classList.toggle('hud', COLOURS[at][0] === 'black');
   // The dot shows the NEXT colour, not the current one -- the current
   // one is the whole screen behind it, so showing it again says
   // nothing. This way the button is a preview of what a tap does.
-  const at = COLOURS.findIndex(c => c[1] === hex);
-  document.getElementById('tint').style.background =
-    COLOURS[(at + 1) % COLOURS.length][1];
-  try { localStorage.setItem('saya-bg', hex); } catch (err) {}
+  const next = COLOURS[(at + 1) % COLOURS.length];
+  const dot = document.getElementById('tint');
+  dot.style.background = next[1];
+  // Pure black next to a dark border is invisible, so the dot that
+  // offers black shows its INK as a ring -- a control you cannot see
+  // is the same fault as a tap that does nothing. Only black needs it;
+  // ringing every colour just made them all look muddy.
+  dot.style.boxShadow = next[1] === '#000000'
+    ? 'inset 0 0 0 5px ' + next[2] : 'none';
+  try { localStorage.setItem('saya-bg', COLOURS[at][1]); } catch (err) {}
 }
 
 const tint = document.getElementById('tint');
@@ -233,6 +346,46 @@ document.getElementById('face').onclick = () => {
 // touchscreen reads as a broken deck.
 document.getElementById('home').onclick = () => { location.href = 'home.html'; };
 
+// ---- she looks at where you touch -----------------------------------
+// Ghost wanted her pupils to track his touch. THEY CANNOT: her eyes are
+// holes in flat line art, there is no pupil layer to move, and cutting
+// one out of a drawing at runtime is the iris-ring smear all over
+// again. So the WHOLE face leans a few pixels toward the touch instead
+// -- same intent, no surgery on his art, and it works on every sprite
+// he will ever draw including ones with the eyes shut.
+//
+// Small and slow on purpose. Anything bigger reads as the picture
+// sliding around; at five pixels it reads as attention. It decays back
+// to centre after two seconds of being left alone, so her resting state
+// is always looking straight out.
+const GAZE_MAX = 5;          // pixels. more than this looks like drift
+const GAZE_HOLD = 2000;      // ms before she settles back
+let gazeTimer = null;
+
+function gaze(x, y) {
+  const face = document.getElementById('face');
+  const box = face.getBoundingClientRect();
+  if (!box.width) return;
+  const dx = x - (box.left + box.width / 2);
+  const dy = y - (box.top + box.height / 2);
+  const len = Math.hypot(dx, dy) || 1;
+  const art = document.getElementById('art');
+  art.style.setProperty('--gx', (dx / len * GAZE_MAX).toFixed(1) + 'px');
+  art.style.setProperty('--gy', (dy / len * GAZE_MAX).toFixed(1) + 'px');
+  clearTimeout(gazeTimer);
+  gazeTimer = setTimeout(() => {
+    art.style.setProperty('--gx', '0px');
+    art.style.setProperty('--gy', '0px');
+  }, GAZE_HOLD);
+}
+addEventListener('pointerdown', (e) => gaze(e.clientX, e.clientY));
+addEventListener('pointermove', (e) => {
+  // Touch only reports while a finger is down, which is what we want.
+  // A mouse would otherwise drag her eyes around constantly.
+  if (e.pointerType !== 'touch' && !e.buttons) return;
+  gaze(e.clientX, e.clientY);
+});
+
 // ---- she reacts -----------------------------------------------------
 // The face was a picture until now: it did not know she existed. The
 // brain writes what it is doing to a file, the server serves it, and
@@ -274,6 +427,29 @@ function watch() {
     .catch(() => {})
     .then(() => setTimeout(watch, 900));
 }
+
+// ---- what the board is doing ----------------------------------------
+// Slower than the face poll on purpose: a temperature that updates
+// every second is a number nobody can read.
+function telemetry() {
+  fetch('stats', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(s => {
+      const badge = document.getElementById('badge');
+      const bits = [];
+      if (s.power) bits.push(s.power);
+      if (s.temp) bits.push(s.temp + '°C');
+      if (s.rate) bits.push(s.rate + ' t/s');
+      // The throttle warning REPLACES the row rather than joining it.
+      // It is the only thing on this chip he has to act on.
+      badge.textContent = s.throttled || bits.join('  ·  ');
+      badge.classList.toggle('warn', !!s.throttled);
+      badge.classList.toggle('on', !!badge.textContent);
+    })
+    .catch(() => {})
+    .then(() => setTimeout(telemetry, 5000));
+}
+telemetry();
 
 function speech(text) {
   const box = document.getElementById('says');
@@ -336,16 +512,12 @@ function blinkLoop() {
     const blink = expressions.find(e => e.name === 'blink');
     const now = expressions[current];
     if (blink && now && now.name === 'idle' && !document.hidden) {
-      const art = document.getElementById('art');
-      const paint = document.getElementById('paint');
-      art.src = blink.file;
-      paint.src = blink.file.replace(/\.[^.]+$/, '.paint.png');
+      paintSprite(blink.file);
       setTimeout(() => {
         // Re-read rather than closing over it: she may have been
         // tapped to another face during the 120ms the eyes were shut.
         if (expressions[current] && expressions[current].name === 'idle') {
-          art.src = now.file;
-          paint.src = now.file.replace(/\.[^.]+$/, '.paint.png');
+          paintSprite(now.file);
         }
       }, 120);
     }

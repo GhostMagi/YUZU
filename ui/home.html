@@ -17,8 +17,14 @@
   local web server that executes what it is told, on a board sitting on
   his WiFi.
 
-  Same four colours as her face, same storage key, so changing it in
-  one place changes it in both.
+  Same colours as her face, same storage key, so changing it in one
+  place changes it in both -- INCLUDING the black theme, which turns
+  both screens into a terminal in one tap.
+
+  The icons are line drawings in this file, not emoji. Ghost wanted
+  "clean single-color line icons... rather than smartphone", and the
+  libraries that ship them (Lucide, Feather) are a download -- so these
+  are drawn here, four paths, no dependency, any colour.
 
   No network, no fonts, no libraries.
 -->
@@ -81,7 +87,15 @@ body {
   transition: transform .12s ease, opacity .2s;
 }
 .tile:active { transform: scale(.96); }
-.tile .big { font-size: 40px; line-height: 1; }
+/* The icons are stroked line drawings, so they take the ink colour and
+   need no second copy for the black theme -- same trick as her face. */
+.tile .big { line-height: 0; }
+.tile .big svg {
+  width: 46px; height: 46px;
+  fill: none; stroke: var(--ink); stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+#saya .big svg { width: 58px; height: 58px; }
 .tile b { font-size: 17px; font-weight: 700; }
 .tile span { font-size: 12.5px; opacity: .6; text-align: center; }
 .tile.busy { opacity: .55; }
@@ -90,7 +104,6 @@ body {
    same size as the rest, because four equal targets is what a thumb
    wants, but unmistakably the main thing. */
 #saya { background: #fff; }
-#saya .big { font-size: 54px; }
 
 /* ---- bottom: the swatches, same four ------------------------------ */
 #bar {
@@ -104,6 +117,23 @@ body {
 }
 #swatches i.on { box-shadow: 0 0 0 3px rgba(0,0,0,.55); }
 #note { margin-left: auto; font-size: 13px; opacity: .7; min-height: 1.2em; }
+
+/* ---- the black theme, shared with her face ------------------------
+   Ghost: "I do really love neon green and black." Pure #000 also kills
+   glare on a panel and hides the bezel edge, which is the practical
+   half of why it is worth having on a handheld.                     */
+body.hud {
+  --tile: rgba(13,13,17,.85);
+  --edge: color-mix(in srgb, var(--ink) 45%, transparent);
+  color: var(--ink);
+}
+body.hud .tile { border-radius: 4px; }
+body.hud #saya {
+  background: rgba(13,13,17,.85);
+  border-color: var(--ink);
+}
+body.hud #swatches i.on { box-shadow: inset 0 0 0 3px currentColor,
+                                      0 0 0 3px var(--ink); }
 </style>
 
 <div id="top">
@@ -114,22 +144,22 @@ body {
 
 <div id="grid">
   <div class="tile" id="saya" data-go="face.html">
-    <div class="big">☺</div>
+    <div class="big"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="3"/><path d="M9 2v4M15 2v4"/><path d="M9 12h.01M15 12h.01"/><path d="M9.5 15.5h5"/></svg></div>
     <b>Saya</b>
     <span>her face</span>
   </div>
   <div class="tile" data-launch="chat">
-    <div class="big">💬</div>
+    <div class="big"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2.5L7 14"/><path d="M12.5 14.5H17"/></svg></div>
     <b>Talk</b>
     <span>chat with her</span>
   </div>
   <div class="tile" data-launch="wiki">
-    <div class="big">📖</div>
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2z"/><path d="M12 6.5v13"/></svg></div>
     <b>Wikipedia</b>
     <span>offline</span>
   </div>
   <div class="tile" data-launch="gba">
-    <div class="big">🎮</div>
+    <div class="big"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 10.5v4M5 12.5h4"/><path d="M16 11.5h.01M18.5 14h.01"/></svg></div>
     <b>Game Boy</b>
     <span>newest ROM</span>
   </div>
@@ -144,21 +174,30 @@ body {
 // The same four, and the same storage key her face uses, so recolouring
 // either one recolours both.
 const COLOURS = [
-  ['hot pink',   '#ff2d95'],
-  ['cyan',       '#22e0e8'],
-  ['neon green', '#39ff5e'],
-  ['lavender',   '#b98cff'],
+  ['hot pink',   '#ff2d95', '#10080d'],
+  ['cyan',       '#22e0e8', '#10080d'],
+  ['neon green', '#39ff5e', '#10080d'],
+  ['lavender',   '#b98cff', '#10080d'],
+  ['black',      '#000000', '#39ff5e'],
 ];
 
 function setColour(hex) {
-  document.documentElement.style.setProperty('--bg', hex);
+  const at = Math.max(0, COLOURS.findIndex(c => c[1] === hex));
+  document.documentElement.style.setProperty('--bg', COLOURS[at][1]);
+  document.documentElement.style.setProperty('--ink', COLOURS[at][2]);
+  document.body.classList.toggle('hud', COLOURS[at][0] === 'black');
   document.querySelectorAll('#swatches i').forEach(i =>
-    i.classList.toggle('on', i.dataset.hex === hex));
-  try { localStorage.setItem('saya-bg', hex); } catch (e) {}
+    i.classList.toggle('on', i.dataset.hex === COLOURS[at][1]));
+  try { localStorage.setItem('saya-bg', COLOURS[at][1]); } catch (e) {}
 }
-COLOURS.forEach(([name, hex]) => {
+COLOURS.forEach(([name, hex, ink]) => {
   const i = document.createElement('i');
   i.style.background = hex;
+  // ONLY the black one gets an ink ring. It needs one -- black on a
+  // dark border is an invisible control -- but ringing the others as
+  // well made every swatch look muddy and made the SELECTED ring
+  // impossible to pick out, which a screenshot caught immediately.
+  if (hex === '#000000') i.style.boxShadow = 'inset 0 0 0 4px ' + ink;
   i.title = name;
   i.dataset.hex = hex;
   i.onclick = () => setColour(hex);

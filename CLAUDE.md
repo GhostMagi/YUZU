@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 446 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 456 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 446 tests pass on it. Getting it
+(that repo path is confirmed working). 456 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -447,6 +447,117 @@ it was RP and wanted); she has never been scored by the eval; and the
 eval still reports 0% on the movement rows for any deck persona, so it
 cannot give her honest numbers yet. That harness gap is now the single
 biggest thing between her and a real measurement.
+
+## BLACK + NEON GREEN, and the mouth paint is deleted (Sept 11)
+
+Ghost, in one message: *"add the color option for a black colored
+screen for sayas face color change button. When pressed the screen
+colors black but her lineart should be neon green. To make up for black
+on black obv."* And: *"her mouth paint seems kinda weird still. Revert
+back to strictly lineart on a colored background. No need for
+tongue/teeth paint."*
+
+**THE INK IS A VARIABLE NOW, and that is the whole change.** Her art is
+black line work on transparency, so on a black screen it is nothing at
+all. The page no longer renders a sprite as an `<img>`: it uses each
+PNG as a **CSS mask** over a box filled with `--ink`. One variable
+recolours every expression, the blink frame, and any face he draws next
+week -- no second copy of his art, nothing generated, no PIL, no build
+step.
+
+    hot pink / cyan / neon green / lavender   ->  ink #10080d
+    black                                     ->  ink #39ff5e
+
+A colour is a PAIR now (screen, ink) rather than one hex, on both
+pages, and a test pins that the two screens agree about both halves --
+a colour one page can set and the other cannot render is a tap that
+comes back wrong.
+
+**THE MOUTH PAINT IS DELETED, not switched off.** `paint()`, the
+mouth detector, `TONGUE`/`TEETH`/`CAVITY`, `paint_all()`, the `--paint`
+flag, the build step in `face`, and every `<name>.paint.png` are gone.
+Same call as the LEDs and for the same reason: a dead subsystem you
+still have to read around is worse than no subsystem. `git show` has it.
+
+Worth being straight about why it lost. The detector was RIGHT -- it
+found the mouth, it respected `MOUTH_FLOOR`, it never painted an eye
+again. What it could not be right about was the three tones, because
+those were a guess about art he draws himself, and flat line work does
+not want a colourist. **Her eyes and mouth still read as coloured: they
+are HOLES, and the background shows through them.** That was never the
+paint layer's doing, which is exactly why removing it costs nothing.
+
+**HUD MODE IS TIED TO BLACK, deliberately.** Ghost forwarded a design
+pass he liked -- scanlines, corner brackets, a dark translucent dialogue
+box, "#0D0D11 at 85%" -- and said it went hand in hand with black and
+neon green. It does, so it is not a separate switch: **one tap turns the
+whole deck into a terminal, one more gives him hot pink back.** His four
+colours are untouched by any of it, because he picked them on purpose
+and scanlines over hot pink is mud.
+
+**HER PUPILS CANNOT TRACK HIS TOUCH, and the whole face leans
+instead.** He asked for a 3-5px pupil offset toward the touch point.
+There is no pupil layer: her eyes are holes in a flat drawing, and
+cutting an iris out at runtime to move it is the pink-iris-ring smear
+with extra steps. So the sprite itself offsets, clamped to 5px, decaying
+back to centre after two seconds. Same intent, no surgery on his art,
+and it works on every face he will ever draw -- including the ones with
+the eyes shut. Two tests pin the clamp, because unclamped this is her
+face sliding off the screen.
+
+**THE TELEMETRY CHIP IS THE nvpmodel REMINDER, WEARING A HARDWARE
+BADGE.** `/stats` serves power mode, hottest thermal zone and tokens per
+second; the page shows them under her chin.
+
+Everything else on that chip is nice. The power mode is the reason it
+exists: **the Orin ships throttled and forgetting `sudo nvpmodel -m 0`
+makes everything slow with no visible cause.** That reminder already
+lives in the README, the doctor's summary and the boot line -- all three
+of which require running something. This is the first place it appears
+on a screen he is already looking at, and a throttled board does not
+print "mode 1" (a number he has to interpret is a number he will
+ignore); it prints `THROTTLED -- sudo nvpmodel -m 0` in red, replacing
+the row.
+
+**Every field is ABSENT rather than wrong.** No nvpmodel status and no
+thermal zone means no chip at all, which is what happens on his phone
+and on the laptop. An empty badge reporting nothing is the same fault
+as `pad --status` reporting on the layers around the answer.
+
+**The token rate is MEASURED, by the brain, or it is not shown.** Only
+the brain sees Ollama's `eval_count` / `eval_duration`, so `_token_rate`
+lives there and the number crosses in the state file. An older Ollama
+that does not report them shows no rate rather than an estimate. And
+`answer()` had to re-read the rate when it re-stated `talking`, or every
+reply typed on the page blanked the badge it had just set.
+
+**THE HOME SCREEN ICONS ARE LINE ART, DRAWN IN THE FILE.** Emoji are
+full-colour bitmaps that ignore `--ink` entirely, so on the black theme
+they stayed glossy 3D blobs while everything else went neon. Lucide and
+Feather are the right shapes and both are a download, which this deck
+cannot have -- so the four are four inline paths, stroked with the ink
+colour, and they recolour with everything else.
+
+**SIXTH AND SEVENTH TIME LOOKING IS WHAT FOUND IT.** Both screens were
+rendered headless at the panel's real 1024x600 in both themes before
+anything was committed:
+
+- Ringing every swatch with its ink made all five look muddy and made
+  the SELECTED ring impossible to pick out. Only black needs a ring
+  (black on a dark border is an invisible control); the others are
+  solid again.
+- The corner brackets were inset inside the face area, so the bottom
+  pair sat on top of the ask bar. They frame the whole screen now.
+
+Neither would have failed an assertion. Same rule, sixth and seventh
+instance: **render it and look.**
+
+**Still not done, and named so it does not get lost:** the quick-toggle
+dock (fan boost, volume, WiFi, mute) is NOT built -- every one of those
+wants sudo or a system daemon, and the `/launch/` allowlist is the one
+thing on this board that must not grow a "run what you are told" hole
+while the server binds 0.0.0.0. The always-on-top floating rail is a
+window-manager job, not a page one, and `tile` is where it would live.
 
 ## Handoff v3 — the deck grew a screen and a games console (Sept 9)
 
@@ -1016,6 +1127,9 @@ treatment, and the file names do the wiring.
 He went and made the three missing faces, named exactly right, no
 instructions needed: `idle`, `talking`, `blink`. Eight expressions now,
 and every ROLE resolves except `asleep`.
+
+**SUPERSEDED Sept 11 -- the mouth paint is deleted. Kept because the
+detector reasoning and the painted-eye finding are still the record.**
 
 **THE MOUTH IS THREE TONES.** Ghost: *"plz paint mouth like. pink
 tongue white teeth and black uhhh hole?"* Nothing is per-sprite -- the
