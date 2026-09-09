@@ -620,6 +620,53 @@ def _is_kill_attempt(line):
         ("yuzu" in lowered or "brain" in lowered or lowered.endswith("kill"))
 
 
+def ground(text):
+    """Substitute a `/wiki` lookup into what he typed. (text, problem).
+
+    `problem` is a sentence to show INSTEAD of asking her; None means
+    carry on with `text`, whether or not a lookup happened.
+
+    ONE COPY, TWO CALLERS, and that is the whole point of it living
+    here. It was written inside `_cli`, and the face page was built
+    afterwards -- so `POST /say` never had it. Ghost typed "/wiki cats"
+    into the chat bar under her face, the literal string went to her as
+    ordinary conversation, and she answered out of her own head about
+    "wiki cats". **That is the EXACT Sept 9 failure one layer up**: the
+    lookup silently did not happen and nothing on screen said so. He
+    read it as her being in character, which is the worst version of
+    this bug -- a missing feature that looks like a personality.
+
+    A second copy in yuzu_face.py would just have been a third place to
+    forget. A shared function cannot drift.
+
+    ANYWHERE IN THE LINE, and CASE-INSENSITIVE. Both are measured phone
+    behaviours. He types a sentence and then the thing he wants looked
+    up ("wana try sumn? /wiki ice cream"), and **a soft keyboard
+    capitalises the first word of a line** -- so `/Wiki cats` is what
+    his phone produces whenever the command starts the message. The old
+    code passed the lowercased `in` check and then called
+    `text.partition("/wiki")` on the ORIGINAL, which finds nothing and
+    silently hands her the whole line. Same mechanism that made `Quit.`
+    fail to quit, and just as invisible on screen."""
+    if "/wiki" not in text.lower():
+        return text, None
+    if yuzu_wiki is None:
+        return text, "yuzu_wiki.py isn't here"
+
+    at = text.lower().find("/wiki")
+    head = text[:at].strip()
+    tail = text[at + len("/wiki"):].strip()
+    if not tail:
+        return text, "/wiki what? Try: /wiki cats"
+
+    grounded, why = yuzu_wiki.as_context(tail)
+    if grounded is None:
+        return text, why
+    # Keep whatever he said around it -- that is the conversation, and
+    # dropping it would answer a question he did not ask on its own.
+    return (f"{head}\n\n{grounded}" if head else grounded), None
+
+
 def _cli(argv):
     model = DEFAULT_MODEL
     persona = None
@@ -717,31 +764,10 @@ def _cli(argv):
             brain.reset()
             print("(history cleared)\n")
             continue
-        if "/wiki" in text.lower():
-            # ANYWHERE in the line, not just at the start.
-            #
-            # MEASURED, Sept 9. He typed "hey saya we got u all pimped
-            # out wana try sumn? /wiki ice cream" and the old
-            # startswith() check missed it silently -- the whole line
-            # went to her as ordinary chat and she answered about ice
-            # cream out of her own head. Nothing said a lookup had been
-            # skipped.
-            #
-            # That is how a person actually talks: a sentence, then the
-            # thing they want looked up. Make the parser fit him rather
-            # than making him fit the parser.
-            if yuzu_wiki is None:
-                print("(yuzu_wiki.py isn't here)\n")
-                continue
-            head, _, tail = text.partition("/wiki")
-            grounded, why = yuzu_wiki.as_context(tail.strip())
-            if grounded is None:
-                print(f"({why})\n")
-                continue
-            # Keep whatever he said around it -- that is the
-            # conversation, and dropping it would answer a question he
-            # did not ask on its own.
-            text = f"{head.strip()}\n\n{grounded}" if head.strip() else grounded
+        text, problem = ground(text)
+        if problem:
+            print(f"({problem})\n")
+            continue
         if not text:
             continue
         print(f"{who}: ", end="", flush=True)

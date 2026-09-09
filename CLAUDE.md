@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 489 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 493 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 489 tests pass on it. Getting it
+(that repo path is confirmed working). 493 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -513,6 +513,94 @@ for a tsundere is the same feeling.
 `test_every_sprite_he_drew_can_actually_be_reached` is the guard worth
 keeping: art in the repo that no state resolves to is art made for
 nothing, and it went unnoticed for two days.
+
+## `/wiki` DID NOTHING ON HER FACE PAGE, and it looked like character
+
+Ghost, Sept 11, with a screenshot: *"double check /wiki works? i tried
+/wiki cats. (i suppose i dont fully underdtand how it works tho she
+could be just doing her job as a tsundere)"*
+
+She was not. **She was telling the truth.** He typed it into the chat
+bar under her face, and `POST /say` handed the literal string `/wiki
+cats` straight to the model -- her reply even says "wiki cats", because
+that is the phrase she was given. No lookup was attempted and nothing
+on screen said so.
+
+**THIS IS THE EXACT SEPT 9 FAILURE, ONE LAYER UP.** That entry reads:
+*"`/wiki` AT THE END OF A LINE DID NOTHING, SILENTLY... Nothing said a
+lookup had been skipped -- it just looked like the feature did not
+work."* The fix went into `_cli`. The face page was built the next day
+and never got it.
+
+**And this is the worst shape the bug has taken: a missing feature that
+looks like a PERSONALITY.** He had a reasonable explanation for the
+wrong behaviour -- she is a tsundere, being dismissive is her whole
+register -- so the fault had perfect cover. Worth remembering as a
+class: **on a character product, a broken feature can hide inside the
+character.** He was right to ask rather than accept it.
+
+**THE TESTS COULD NEVER HAVE CAUGHT IT, and why is the real lesson.**
+Both wiki tests read `inspect.getsource(yuzu_brain._cli)` and asserted
+the literal strings `"/wiki" in text.lower()` and `partition` appeared
+in it. Both were true the entire time the feature was unreachable from
+the screen he actually uses. That is **a check that cannot observe the
+failure**, and it is grep-as-proxy again -- the fifth instance in two
+days, after the four in `TestCalculator` an hour earlier.
+
+They now DRIVE `ground()` with the strings his phone produces, and
+`test_BOTH_ways_of_talking_to_her_do_the_lookup` asserts the property
+rather than either copy: every way in reaches the same function. A
+third way in has to as well.
+
+**`yuzu_brain.ground(text)` is ONE COPY, TWO CALLERS.** Duplicating the
+block into `yuzu_face.py` would only have created a third place to
+forget. It returns `(text, problem)`; `problem` is a sentence to show
+INSTEAD of asking her, so a miss reaches the bubble as
+`(Nothing in the archive about 'qqqq')` rather than as her inventing an
+answer. The verdict goes where he is already looking.
+
+**A SECOND, UNHIT BUG WAS FOUND WHILE FIXING THE FIRST, and his phone
+would have hit it soon.** The old code tested `"/wiki" in text.lower()`
+and then called `text.partition("/wiki")` on the ORIGINAL string. So
+**`/Wiki cats` passed the check and then found nothing to split on**,
+and the whole line went to her -- silently, again. A soft keyboard
+capitalises the first word of a line, so that is exactly what his phone
+types whenever the command STARTS the message. Same mechanism as
+`Quit.` failing to quit, and equally invisible on screen. `ground()`
+finds the index case-insensitively; five spellings are pinned.
+
+**The placeholder is where the feature is taught now** -- `Say
+something, or /wiki cats`. It is the one piece of text on that screen
+he reads while deciding what to type, and a feature nobody knows about
+is a feature that does not exist. Same reasoning as accepting the asset
+pack's own filenames.
+
+## TALK OPENED A TERMINAL NOBODY COULD SEE (Sept 11)
+
+Same message: *"also noticed the chat in the ui ismt actually
+clickable. like u can but it doesnt take you to a chat... id love to
+have this plug and play ready for the screen and DP to HMDI."*
+
+The tile POSTed `/launch/chat`, which starts **an xterm on the DECK'S
+screen**. From his phone that is a window on another machine with no
+display attached -- the tap genuinely did something and he could never
+see it. And on the panel it would have worked and still been wrong:
+**it lands him in a terminal on a touchscreen with no keyboard**, which
+this file already calls the weakest part of the whole deck.
+
+**Talk goes to `face.html#say` now** -- her face, with the chat box
+focused. One tap, works identically on the phone and on the panel,
+needs no terminal installed, and it is the same page the Saya tile
+opens: two tiles, one file, no second screen to give its own exit to.
+The focus is gated on the hash, because arriving to LOOK at her must
+not throw a soft keyboard over half her face.
+
+**The terminal chat is not lost.** `deckapps` installs it as its own
+app icon, which is where a keyboard program belongs once the Arteck is
+in the case. Nothing was removed from the `/launch/` allowlist.
+
+**The icon was a terminal prompt and is a speech bubble now.** A tile
+that says `>_` and opens a chat is a smaller version of the same lie.
 
 ## ☆Misc☆ IS A DRAWER, and the calculator in it (Sept 11)
 

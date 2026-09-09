@@ -9,8 +9,10 @@ behaviour worth locking down so a future edit can't quietly break it.
 """
 
 import json
+import inspect
 import unittest
 import unittest.mock
+from unittest import mock
 from pathlib import Path
 
 import itertools
@@ -3401,32 +3403,104 @@ class TestWikiLookup(unittest.TestCase):
         self.assertIn("import yuzu_wiki", head)
         self.assertIn("except ImportError", head)
 
-    def test_wiki_is_recognised_ANYWHERE_in_the_line(self):
-        """MEASURED, Sept 9. He typed:
+    def _grounded(self, typed):
+        """What `ground()` hands the model, with a stub archive."""
+        with mock.patch.object(
+                yuzu_brain.yuzu_wiki, "as_context",
+                lambda t: ("I looked up %s and it says: FACTS." % t, None)):
+            return yuzu_brain.ground(typed)
 
-            hey saya we got u all pimped out wana try sumn? /wiki ice cream
+    def test_wiki_is_recognised_ANYWHERE_in_the_line_and_in_ANY_case(self):
+        """TWO MEASURED PHONE BEHAVIOURS, one test.
 
-        and the old startswith() check missed it SILENTLY -- the whole
-        line went to her as ordinary chat and she answered about ice
-        cream out of her own head. Nothing said a lookup was skipped.
+        Sept 9: he typed "hey saya we got u all pimped out wana try
+        sumn? /wiki ice cream" and a startswith() check missed it
+        SILENTLY -- the whole line went to her as ordinary chat and she
+        answered about ice cream out of her own head.
 
-        That is how a person actually talks: a sentence, then the thing
-        they want looked up. The parser fits him now."""
+        And the CASE. A soft keyboard capitalises the first word of a
+        line, so `/Wiki cats` is what his phone produces whenever the
+        command starts the message. The fix for the first bug checked
+        `text.lower()` and then split the ORIGINAL, so `/Wiki` passed
+        the check, found nothing to split on, and handed her the whole
+        line anyway -- the same mechanism that made `Quit.` fail to
+        quit, and just as invisible on screen.
+
+        THIS TEST DRIVES THE REAL FUNCTION rather than grepping it. The
+        version it replaces asserted the literal strings
+        `"/wiki" in text.lower()` and `partition` were present in
+        `_cli`'s source -- which was true the entire time the face page
+        had no lookup at all."""
+        for typed in ('/wiki cats', '/Wiki cats', '/WIKI cats',
+                      'hey saya wana try sumn? /wiki cats',
+                      'oh /wiki cats pls'):
+            got, problem = self._grounded(typed)
+            self.assertIsNone(problem, typed)
+            self.assertIn("I looked up cats", got,
+                          "no lookup happened for %r" % typed)
+
+    def test_whatever_he_said_around_the_lookup_is_KEPT(self):
+        """Dropping his own words answers a question he never asked on
+        its own."""
+        got, _ = self._grounded('hey saya wana try sumn? /wiki cats')
+        self.assertIn("hey saya wana try sumn?", got)
+        self.assertIn("I looked up cats", got)
+
+    def test_a_lookup_that_finds_nothing_SAYS_SO(self):
+        """Silence is the failure mode this whole area keeps producing.
+        A miss must come back as a sentence, never as her answering
+        from her own head with nobody told a lookup was skipped."""
+        with mock.patch.object(yuzu_brain.yuzu_wiki, "as_context",
+                               lambda t: (None, "Nothing about '%s'" % t)):
+            got, problem = yuzu_brain.ground('/wiki qqqq')
+        self.assertEqual(problem, "Nothing about 'qqqq'")
+        self.assertEqual(got, '/wiki qqqq', "it mangled what he typed")
+
+    def test_ordinary_chat_is_left_completely_alone(self):
+        for typed in ('hey saya', 'what is a wiki anyway',
+                      'i read that on wikipedia lol'):
+            self.assertEqual(yuzu_brain.ground(typed), (typed, None), typed)
+
+    def test_it_still_uses_the_user_turn_phrasing(self):
+        """A raw extract arriving as a system message is the shortest
+        path back to assistant collapse -- measured once already."""
         import inspect
-        body = inspect.getsource(yuzu_brain._cli)
-        self.assertIn('"/wiki" in text.lower()', body,
-                      "it still only matches /wiki at the start of a line")
-        self.assertIn("partition", body,
-                      "it does not split the line, so whatever he said "
-                      "around the lookup is thrown away")
+        self.assertIn("as_context", inspect.getsource(yuzu_brain.ground))
 
-    def test_the_chat_loop_actually_wires_it_up(self):
-        import inspect
-        body = inspect.getsource(yuzu_brain._cli)
-        self.assertIn("/wiki", body)
-        self.assertIn("as_context", body,
-                      "it does not use the user-turn phrasing, so a raw "
-                      "extract reaches her and invites assistant collapse")
+    def test_BOTH_ways_of_talking_to_her_do_the_lookup(self):
+        """THE TEST THAT WAS MISSING, and its absence cost the feature.
+
+        `/wiki` was written into the terminal loop; the face page was
+        built afterwards and `POST /say` never got it. Ghost typed
+        "/wiki cats" into the chat bar under her face, the literal
+        string reached her as ordinary conversation, and she answered
+        about "wiki cats" out of her own head -- he read it as her being
+        a tsundere about being asked. **A missing feature that looks
+        like a personality.**
+
+        So this asserts the PROPERTY rather than either copy: every way
+        in reaches the same `ground()`. A third way in has to as well."""
+        self.assertIn("ground(", inspect.getsource(yuzu_brain._cli),
+                      "the terminal chat no longer looks anything up")
+
+        asked = []
+        class FakeBrain:
+            def ask(self, text):
+                asked.append(text)
+                return "..."
+        import yuzu_face
+        was, yuzu_face._BRAIN = yuzu_face._BRAIN, FakeBrain()
+        try:
+            with mock.patch.object(
+                    yuzu_brain.yuzu_wiki, "as_context",
+                    lambda t: ("I looked up %s and it says: FACTS." % t, None)):
+                yuzu_face.answer("/wiki cats")
+        finally:
+            yuzu_face._BRAIN = was
+            yuzu_face.set_state("idle")
+        self.assertIn("I looked up cats", asked[-1],
+                      "the chat bar under her face still hands her the "
+                      "raw string -- the bug Ghost hit on Sept 11")
 
 
 class TestWikiServer(unittest.TestCase):
@@ -6020,9 +6094,20 @@ class TestHomeScreen(unittest.TestCase):
         self.assertEqual(spans, ["#screen"],
                          "a spanning tile is back, and an odd row with it")
         for wanted in ('data-go="face.html"', 'data-go="vpet.html"',
-                       'data-launch="chat"'):
+                       'data-go="face.html#say"'):
             self.assertIn(wanted, "".join(views["main"]) + page,
                           f"{wanted} left the front page")
+        # TALK IS NOT A TERMINAL. It used to POST /launch/chat, which
+        # starts an xterm ON THE DECK'S SCREEN -- from the phone that is
+        # a window nobody can see, and on the panel it lands him in a
+        # terminal with no keyboard. Ghost, Sept 11: "the chat in the ui
+        # ismt actually clickable. like u can but it doesnt take you to
+        # a chat." The chat bar under her face is the one that works on
+        # both, so Talk goes there. `deckapps` still installs the
+        # terminal chat as its own app icon, for when the keyboard is
+        # in the case.
+        self.assertNotIn('data-launch="chat"', page,
+                         "Talk opens a terminal again")
         self.assertIn("☆Misc☆", page, "the stars are gone")
 
     def test_the_drawer_has_a_way_back_and_needs_no_second_page(self):

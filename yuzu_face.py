@@ -435,6 +435,22 @@ def answer(text):
         import yuzu_brain
     except Exception as exc:
         return None, "The brain is not importable here (%s)." % exc
+    # `/wiki cats` HAS TO WORK HERE TOO. It was written into the
+    # terminal loop and this page was built afterwards, so for two days
+    # the chat bar under her face took the literal string and handed it
+    # to her as ordinary conversation -- she answered about "wiki cats"
+    # out of her own head and Ghost, fairly, read it as her being a
+    # tsundere about it. A missing feature that looks like a
+    # personality is the worst shape this bug has taken yet.
+    #
+    # yuzu_brain.ground() is the ONE copy. Calling it rather than
+    # repeating it is what stops there being a third place to forget.
+    text, problem = yuzu_brain.ground(text)
+    if problem:
+        # The VERDICT, in the bubble, where he is already looking --
+        # not silence, and not a sentence she never said.
+        set_state("idle")
+        return "(%s)" % problem, None
     try:
         if _BRAIN is None:
             _BRAIN = yuzu_brain.YuzuBrain()

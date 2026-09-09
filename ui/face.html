@@ -249,7 +249,12 @@ body.thinking #face { animation-duration: 2.6s; }
 <div id="says"></div>
 
 <form id="ask" autocomplete="off">
-  <input id="text" placeholder="Say something to her..." maxlength="2000">
+  <!-- The placeholder is where /wiki gets taught. It is the one
+       piece of text on this screen he reads while deciding what to
+       type, and a feature nobody knows about is a feature that does
+       not exist -- the same lesson as the pack filenames. -->
+  <input id="text" placeholder="Say something, or /wiki cats"
+         maxlength="2000">
   <button id="send" type="submit">Send</button>
   <div id="pet" title="her pet"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
   <div id="home" title="home">⌂</div>
@@ -492,6 +497,13 @@ function speech(text) {
 const form = document.getElementById('ask');
 const input = document.getElementById('text');
 const send = document.getElementById('send');
+
+// The home screen's Talk tile arrives at face.html#say. Focusing the
+// box is the whole difference between "her face" and "talk to her" --
+// two tiles, one page, and no second file to give its own way out of.
+// Only on that hash: landing here to LOOK at her must not throw a soft
+// keyboard over half her face.
+if (location.hash === '#say') input.focus();
 
 form.onsubmit = (event) => {
   event.preventDefault();
