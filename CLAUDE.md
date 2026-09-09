@@ -693,9 +693,26 @@ face' with a passcode screen right before it and a homescreen button on
 bottom right corner... and her face screen could be interactive or talk
 toable."* Plus: *"lmk if ud like design notes on the actual face art."*
 
-**Nothing is written. `DECK_UI.md` holds the shape of it** and the
-seven questions whose answers change the build. Do not start coding
-this before he has answered at least the first one.
+**ANSWERED SAME DAY, and `ui/face.html` is the first draft.** He wants
+**eyes and a mouth on a changeable background, not a face** -- his
+reference is the eye SHAPE (sharp almond, heavy lash line, amber iris,
+angled brows), static art, five expressions. The passcode is `ghost`
+and is pure flair; **the case will have a physical key lock**, which is
+the real security and settles that question.
+
+That spec is better than what was asked for: vector costs nothing,
+scales to any panel, makes expressions geometry rather than artwork,
+and sidesteps the uncanny valley -- which is why every good robot face
+is two eyes and a mouth.
+
+`ui/face.html` is 10KB, one file, **zero external references** (grep
+verified -- "offline" has to survive the WiFi being off). Five
+expressions, plus a blink, a breathe, and `thinking` as a MODIFIER that
+layers over any face. Tap to cycle, tap a swatch to recolour, no
+keyboard needed. Open it in the VNC session; it needs nothing running.
+
+**The only question that matters now is whether the eye shape reads as
+hers.** Every number is a `--variable` at the top of the file.
 
 **The one big call: it is a WEB PAGE**, served by a stdlib HTTP server
 and opened with `chromium --app=` -- the pattern `deckapps` already

@@ -98,35 +98,74 @@ is a room off it.
 - **Nothing blocks.** Same rule as `gba` and `wiki` -- if the brain is
   slow, the face keeps blinking. It never freezes and waits.
 
-## WHAT I NEED FROM HIM (the design-note list)
+## ANSWERED, Sept 9 — and `ui/face.html` is the first draft
 
-He offered to deep-think the face art on his break. These are the
-answers that actually change what gets built:
+He came back with a spec that is better and easier than what was asked
+for:
 
-1. **How much of the screen is her?** Full-bleed face, a portrait with
-   room around it, or head-and-shoulders? This decides the whole layout
-   and it is the first thing to know.
-2. **How many drawn states?** The five above is the ideal. **Two is
-   enough to start** (open eyes / closed eyes = blinking, and that
-   alone reads as alive). Say what he wants to draw, not what he thinks
-   is required.
-3. **Static art with effects, or drawn frames?** A single image plus
-   CSS can blink, breathe, glitch and glow. Real frame animation looks
-   better and is a lot more drawing. Either works; they are different
-   amounts of his time.
-4. **Style.** Anime portrait, pixel art, vector, CRT/scanline, glitchy?
-   Reference images beat adjectives here -- if he has seen a face he
-   likes, that is worth more than three paragraphs.
-5. **Her palette.** NOT the chassis -- that rule stands, colours stay
-   out of the repo for the case. Her FACE is character, same as Yuzu's
-   hot pink living in her persona file, so a palette here is fine and
-   useful.
-6. **Does she look AT him?** A face that meets your eyes is a very
-   different object from one gazing off. For a tsundere specifically,
-   "looks away when embarrassed" is a state worth having.
-7. **Passcode: ritual or real?** See above.
+- **NOT her face.** *"anime eyes and mouth on a screen with a
+  background color i can change... doesnt have to be her face i just
+  like her eyeshape."*
+- **Eye shape off his references** -- sharp almond, heavy dark upper
+  lash line, outer corner lifted, amber iris, angled brows.
+- **Static art, at least 5 expressions.**
+- **Passcode is `ghost`, pure flair.** *"its more a visual message to
+  not mess w my stuff... she will have the option to be locked
+  physically with a key so its mostly for flair."* So the ritual
+  reading was right, and there IS real security -- a physical lock on
+  the case. Nothing about the lock screen needs to pretend otherwise.
 
-**None of these block each other.** Answer one and that part can be
-built. The layout and the state machine can go in with placeholder
-art -- coloured rectangles -- so the whole thing is testable before he
-draws a line.
+**Eyes-and-mouth is a much better design than a drawn face**, and not
+only because it is less work:
+
+- **It is VECTOR, so it costs nothing and scales to any panel.** No
+  image files, no asset pipeline, nothing to redraw at a new size.
+- **Expressions become geometry, not artwork.** Five faces is five sets
+  of path data, and a sixth is ten minutes rather than a drawing
+  session.
+- **It sidesteps the uncanny valley entirely.** A stylised eye pair
+  reads as alive at a glance; a rendered face that is slightly wrong
+  reads as dead. This is why every good robot face in the world is two
+  eyes and a mouth.
+- **Colour is one variable.** `--bg` and `--iris` are CSS custom
+  properties, so "I want it teal today" is one line and a reload.
+
+### `ui/face.html` — built, opens in any browser, no server
+
+10KB, one file, **zero external references** -- no CDN, no web font, no
+network. Verified by grep, because "offline" has to survive the WiFi
+being off.
+
+Five expressions, exactly as asked: **idle, happy, annoyed, talking,
+asleep.** Annoyed is the tsundere default and it is the one with brows.
+
+Three things in it that were NOT asked for and are worth keeping:
+
+- **She blinks.** One CSS keyframe, and it is the single cheapest thing
+  that makes a face look alive rather than like a wallpaper.
+- **She breathes.** Six pixels of drift. Invisible until it stops --
+  and then the screen looks dead, which is the point.
+- **`thinking` is a MODIFIER, not an expression.** Three pulsing dots
+  that layer over whatever face she is wearing, so she can think while
+  annoyed. Per the note above, this is the most valuable thing on the
+  screen: it answers "is it working or is it stuck" with no text.
+
+**Tap her face to cycle expressions, tap a swatch to change the
+background.** Both work with no keyboard, which is the whole point of a
+touchscreen. The state buttons across the top are DEMO controls and
+come out once the brain drives the face.
+
+**To look at it:** open `ui/face.html` in the VNC session. It needs
+nothing running -- no Ollama, no server, no wiki.
+
+### Still open, and none of it blocks looking at the draft
+
+1. **Does the eye shape read as hers?** That is the only question that
+   matters right now, and it is a taste call only he can make. Every
+   number is a `--variable` at the top of the file.
+2. **Wiring it to the brain.** The face is static until a tiny stdlib
+   server pushes state at it -- `idle` -> `thinking` -> `talking` as
+   she actually generates. That is the next build.
+3. **The lock screen and the home page.** Not drawn yet. The passcode
+   is `ghost` and it is decoration.
+4. **Boot straight into it.** Autostart, once the rest is real.
