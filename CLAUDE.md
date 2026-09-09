@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 432 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 434 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 432 tests pass on it. Getting it
+(that repo path is confirmed working). 434 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -755,6 +755,41 @@ generously (a `path` key when offered, otherwise built from the title).
 NAME rather than by shape. Verified against stub servers of BOTH eras:
 modern returns `/content/wikipedia_en_simple/Cat`, old returns
 `/wikipedia/A/Cat`, neither breaks the other.
+
+**CONFIRMED ON HIS ARCHIVE, Sept 10.** `~/YUZU/wiki --test` on the
+board:
+
+    server:   answering on http://127.0.0.1:8080
+    book:     wikipedia_en_simple_all
+    suggest:  FAILED (HTTP Error 404: Not Found)
+    search:   24984 bytes, 25 article links
+    result:   25 paths  first: /content/wikipedia_en_simple_all_nopic_2026-05/Munchkin_cat
+
+**25 articles for "cat". The `/A/` diagnosis was right and the fix
+works on real hardware.** His build has no `/suggest` endpoint at all,
+which is what the fallback is for.
+
+**AND I MADE THE SAME MISTAKE FOR THE THIRD TIME.** He read that output
+as a failure -- *"says failed but sometimes it be lyin"* -- because
+`suggest: FAILED` sits in the middle, above the line that says it
+worked. That is `pad --status` on a working controller and `face` on a
+serving server, again, and this one was mine end to end with the lesson
+already written down twice.
+
+`diagnose()` now opens with `WORKING. 25 articles found for 'cat'.` and
+says in advance that a FAILED line below is an endpoint this build does
+not have. **The verdict goes first. Writing the rule down is not the
+same as following it.**
+
+**A second real fault was visible in that same output and nearly
+missed:** the catalog reported the book as `wikipedia_en_simple_all`
+while the articles actually live under
+`wikipedia_en_simple_all_nopic_2026-05`. Close enough to look right,
+wrong enough that every scoped query would miss. `_suggest` now LEARNS
+the book from an article path that actually resolved -- **a path that
+exists is ground truth; a catalogue entry is a claim.**
+
+**The stub-versus-board note below still stands for everything else:**
 
 **PROBABLY, not certainly.** Everything here is still against stubs --
 his archive is the only thing that can confirm it, which is the standing

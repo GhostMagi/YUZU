@@ -203,6 +203,16 @@ def _suggest(term):
             continue
         found = _article_links(page)
         if found:
+            # LEARN THE BOOK FROM THE ANSWER. The catalog gave
+            # `wikipedia_en_simple_all` on his board while the real
+            # articles live under `wikipedia_en_simple_all_nopic_2026-05`
+            # -- close enough to look right, wrong enough that every
+            # scoped query would miss. An article path that actually
+            # exists is ground truth; a catalogue entry is a claim.
+            global _BOOK
+            real = re.match(r"/content/([^/]+)/", found[0])
+            if real:
+                _BOOK = real.group(1)
             return found
     return []
 
@@ -236,7 +246,24 @@ def diagnose():
     hits = _suggest("cat")
     lines.append("result:   %d paths%s" %
                  (len(hits), ("  first: " + hits[0]) if hits else ""))
-    return lines
+
+    # THE VERDICT GOES FIRST. Measured on his board, Sept 10: this
+    # printed `suggest: FAILED (404)` in the middle -- one endpoint his
+    # kiwix build does not have, fully covered by the fallback -- above a
+    # last line saying 25 articles were found. He read it as broken.
+    #
+    # That is the third time in this project I have reported the layers
+    # AROUND the answer and put the answer last: `pad --status` on a
+    # working controller, `face` on a serving server, and now this. The
+    # rule is not new and it was mine to follow.
+    if hits:
+        head = ["WORKING. %d articles found for 'cat'." % len(hits),
+                "A FAILED line below is one endpoint this kiwix build",
+                "does not have. Something else answered. Ignore it.", ""]
+    else:
+        head = ["NOT WORKING -- nothing came back for 'cat'.",
+                "The lines below say which part went quiet.", ""]
+    return head + lines
 
 
 def start_server(wait=12):

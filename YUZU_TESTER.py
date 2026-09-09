@@ -4874,6 +4874,72 @@ class TestWikiNamespace(unittest.TestCase):
         script = (Path(__file__).parent / "wiki").read_text()
         self.assertIn("--test", script, "no one-word diagnostic")
 
+    def test_the_diagnostic_leads_with_the_VERDICT(self):
+        """MEASURED ON HIS BOARD, Sept 10, and it was mine end to end.
+
+            server:   answering on http://127.0.0.1:8080
+            book:     wikipedia_en_simple_all
+            suggest:  FAILED (HTTP Error 404: Not Found)
+            search:   24984 bytes, 25 article links
+            result:   25 paths  first: /content/.../Munchkin_cat
+
+        It WORKED -- 25 articles. `suggest` 404s because his kiwix build
+        does not have that endpoint and the fallback covered it. He read
+        the whole thing as broken, and said so: "says failed but
+        sometimes it be lyin".
+
+        Third time in this project I have reported the layers AROUND the
+        answer and put the answer last: `pad --status` on a working
+        controller, `face` on a serving server, now this."""
+        import http.server, threading, importlib
+        table = {"/": "<html>x</html>",
+                 "/search": '<a href="/content/book_2026/Cat">Cat</a>'}
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                key = self.path.split("?")[0]
+                body = table.get(self.path) or table.get(key) or ""
+                self.send_response(200 if body else 404)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body.encode())
+
+            def log_message(self, *a):
+                pass
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        old_base, self.wiki.BASE = self.wiki.BASE, \
+            "http://127.0.0.1:%d" % srv.server_port
+        try:
+            importlib.reload  # noqa - kept explicit for the reader
+            self.wiki._BOOK = None
+            lines = self.wiki.diagnose()
+        finally:
+            self.wiki.BASE = old_base
+            srv.shutdown()
+        self.assertIn("WORKING", lines[0],
+                      f"the verdict is not first: {lines[0]!r}")
+        joined = " ".join(lines)
+        self.assertLess(joined.index("WORKING"), joined.index("FAILED"),
+                        "an alarming line about an unused endpoint comes "
+                        "above the answer -- which is how he read a "
+                        "working wiki as broken")
+
+    def test_the_book_is_learned_from_a_real_article_path(self):
+        """His catalog said `wikipedia_en_simple_all` while the articles
+        actually live under `wikipedia_en_simple_all_nopic_2026-05` --
+        close enough to look right, wrong enough that every scoped query
+        would miss. A path that exists is ground truth; a catalogue
+        entry is a claim."""
+        self.wiki._BOOK = "wrong_name"
+        links = self.wiki._article_links(
+            '<a href="/content/the_real_book_2026/Cat">Cat</a>')
+        self.assertTrue(links)
+        body = (Path(__file__).parent / "yuzu_wiki.py").read_text()
+        self.assertIn("LEARN THE BOOK FROM THE ANSWER", body,
+                      "the book name is still only ever the catalog's")
+
     def test_the_diagnostic_never_raises_with_no_server(self):
         """It runs precisely when things are broken, so it has to be the
         one thing that cannot add a traceback to his screen."""
