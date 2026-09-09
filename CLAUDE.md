@@ -480,11 +480,23 @@ server and an X session all want the same 8GB the model does. `-1`
 would have pinned ~3GB of it forever against a machine that now has
 other jobs. The reasoning written up above is no longer hypothetical.
 
-**Worth measuring rather than assuming: what ES-DE plus a running X
-session leave for Ollama.** Nobody has looked. `free -h` with the VNC
-session up, before and after her first reply, answers it in ten
-seconds and would catch a swap problem before it looks like her being
-slow.
+**MEASURED at last, Sept 9, ~02:26, GNOME running, model not loaded:**
+
+    Mem:   7.4Gi total   1.0Gi used   1.5Gi buff/cache   6.4Gi available
+    Swap:  15Gi total    0B used
+
+**There is plenty of room and the board is not swapping at all.** A 3B
+Q4_K_M wants roughly 2.5-3GB, so it fits inside 6.4Gi available with a
+desktop already up, and 0B of 15Gi swap touched means nothing has been
+pushed to disk. The `OLLAMA_KEEP_ALIVE` worry -- that pinning her
+forever would starve PC mode -- is real but not urgent: the pressure it
+was guarding against does not exist yet at this workload.
+
+**Still not measured, and it is the number that would actually
+decide things: the same reading WITH the model resident and an
+emulator running.** This one is the floor, not the ceiling. Take it
+again mid-conversation with ES-DE open and it answers the real
+question.
 
 ## The `quit` bug: the check was never missing (Sept 9)
 
@@ -880,6 +892,52 @@ there with her eyes shut on `blink`.
 others carry a soft grey halo from the crop. It shows against the neon
 backgrounds. Harmless, and a tighter crop or a threshold pass would fix
 it -- not worth touching unless it bothers him.
+
+## OPEN, and Ghost asked to be reminded: the right-angle adapters
+
+Sept 9, from a Gemini hardware pass he forwarded. Not ordered yet, and
+the only thing on that list worth spending money on:
+
+- **90-degree DisplayPort adapter.** His BENFEI DP->HDMI dongle IS the
+  adapter, so this is a 90-degree DP->HDMI **or** a right-angle HDMI
+  extension after it -- not both doing the same job.
+- **Right-angle 5.5x2.5mm DC power adapter.** The most valuable of the
+  three. A barrel jack is the easiest connector on that board to snap,
+  and a stiff cable leaving a rigid metal case is pure leverage on it.
+- **Angled USB-A / USB-C adapters** for the panel's touch feed.
+
+**The KKSB case is what makes these matter.** A cable sticking straight
+out of a metal enclosure has nowhere to bend, so every knock goes into
+the port. Cheap parts, real failure mode, and the one that breaks is
+the one that stops the whole deck.
+
+The rest of that Gemini pass is recorded under "Kokoro and WhisperTRT"
+below. **He asked to be reminded about the adapters specifically** --
+*"maybe remind me soon ill forget that bit"* -- so it goes at the top
+of the next hardware conversation, the same way `nvpmodel -m 0` does.
+
+## Kokoro TTS and WhisperTRT — worth it, and NOT yet
+
+Same forwarded pass. Both are good calls on the merits and both are
+being held, for reasons that are about this project rather than about
+the tools:
+
+- **Kokoro TTS (82M params).** Piper works and sounds like a robot;
+  Kokoro sounds like a person and still fits in memory. The real cost
+  is that it is a PyTorch dependency, and "installs nothing" is what
+  lets `yuzu_all_in_one.py` run in Pydroid on his phone. Worth breaking
+  that rule LATER, behind exactly the guard Piper already has -- one
+  module, one try/except, prints if absent.
+- **WhisperTRT.** Speech-in is the last real stub in the project and
+  the Orin is why it is possible at all. But that is four models
+  sharing 8GB, and the memory reading above is the FLOOR (idle, no
+  model loaded), not the ceiling. Measure with the model resident
+  before designing around it.
+
+**Rive / Lottie for the face: NO.** It is a library fetched from a CDN,
+and this deck's whole point is that it works with the WiFi off. The
+web-UI route Gemini recommends is what already exists -- and his own
+PNGs beat the SVG it suggests.
 
 ## `tile` — Pop Shell, because a 10" panel is the wrong shape for floating windows
 
