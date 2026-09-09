@@ -2844,12 +2844,32 @@ class TestBootBanner(unittest.TestCase):
         self.assertNotEqual(shiro.key, deck.key)
 
         import inspect
-        banner = inspect.getsource(yuzu_brain._cli)
-        self.assertIn("brain.persona.key", banner,
+        body = inspect.getsource(yuzu_brain._cli)
+        self.assertIn("brain.persona.key", body,
                       "the boot banner does not print the key, so two "
                       "personas sharing a name are indistinguishable")
-        self.assertIn("no body", banner,
+        self.assertIn("no body", body,
                       "the banner should say when the body cannot move")
+        self.assertIn("persona: {banner}", body,
+                      "the boot banner no longer prints the disambiguated "
+                      "label, so shiro and shiro_deck look identical again")
+
+    def test_the_REPLY_prefix_is_only_her_name(self):
+        """Ghost, Sept 9: "plz plz for my sanitys sake make her name
+        just Saya lol."
+
+        Right. Every reply was prefixed `Saya (saya_deck) [no body]:` --
+        that is a database row talking, not a character. The banner
+        needs the key because two personas share a name; a nametag in a
+        conversation does not. One variable was doing both jobs."""
+        import inspect
+        body = inspect.getsource(yuzu_brain._cli)
+        self.assertIn('who = brain.persona.name', body)
+        # the reply prefix must use the plain name, never the banner
+        for line in body.splitlines():
+            if 'print(f"{' in line and '}: "' in line:
+                self.assertIn("{who}", line, line.strip())
+                self.assertNotIn("{banner}", line, line.strip())
 
 
 class TestShiroDeck(unittest.TestCase):
@@ -3343,6 +3363,25 @@ class TestWikiLookup(unittest.TestCase):
         head = inspect.getsource(yuzu_brain)[:2000]
         self.assertIn("import yuzu_wiki", head)
         self.assertIn("except ImportError", head)
+
+    def test_wiki_is_recognised_ANYWHERE_in_the_line(self):
+        """MEASURED, Sept 9. He typed:
+
+            hey saya we got u all pimped out wana try sumn? /wiki ice cream
+
+        and the old startswith() check missed it SILENTLY -- the whole
+        line went to her as ordinary chat and she answered about ice
+        cream out of her own head. Nothing said a lookup was skipped.
+
+        That is how a person actually talks: a sentence, then the thing
+        they want looked up. The parser fits him now."""
+        import inspect
+        body = inspect.getsource(yuzu_brain._cli)
+        self.assertIn('"/wiki" in text.lower()', body,
+                      "it still only matches /wiki at the start of a line")
+        self.assertIn("partition", body,
+                      "it does not split the line, so whatever he said "
+                      "around the lookup is thrown away")
 
     def test_the_chat_loop_actually_wires_it_up(self):
         import inspect

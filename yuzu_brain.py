@@ -546,14 +546,24 @@ def _cli(argv):
     # was the right character on a body that no longer exists, and the
     # banner gave him nothing to catch it with.
     if brain.persona:
+        # TWO different labels, and conflating them was the bug.
+        #
+        # The BOOT BANNER needs the key: `shiro` and `shiro_deck` share
+        # a name, and printing only "Shiro" once cost an evening of
+        # "is that bleed?" -- see the fifth name-leak.
+        #
+        # But the PER-REPLY prefix is a nametag in a conversation. She
+        # is Saya. "Saya (saya_deck) [no body]:" in front of every line
+        # is a database row talking, not a character.
         who = brain.persona.name
+        banner = who
         if brain.persona.key != who.lower():
-            who = f"{who} ({brain.persona.key})"
+            banner = f"{who} ({brain.persona.key})"
         if not brain.persona.moves:
-            who += " [no body]"
+            banner += " [no body]"
     else:
         who = "custom prompt"
-    print(f"persona: {who}   model: {brain.model}   host: {brain.host}")
+    print(f"persona: {banner}   model: {brain.model}   host: {brain.host}")
     try:
         brain.check()
     except BrainError as exc:
@@ -602,18 +612,31 @@ def _cli(argv):
             brain.reset()
             print("(history cleared)\n")
             continue
-        if text.lower().startswith("/wiki"):
-            # Hand her real facts to answer FROM, still fully offline.
-            # The lookup is substituted for what he typed, so the rest
-            # of the turn -- history, streaming, voice -- is unchanged.
+        if "/wiki" in text.lower():
+            # ANYWHERE in the line, not just at the start.
+            #
+            # MEASURED, Sept 9. He typed "hey saya we got u all pimped
+            # out wana try sumn? /wiki ice cream" and the old
+            # startswith() check missed it silently -- the whole line
+            # went to her as ordinary chat and she answered about ice
+            # cream out of her own head. Nothing said a lookup had been
+            # skipped.
+            #
+            # That is how a person actually talks: a sentence, then the
+            # thing they want looked up. Make the parser fit him rather
+            # than making him fit the parser.
             if yuzu_wiki is None:
                 print("(yuzu_wiki.py isn't here)\n")
                 continue
-            grounded, why = yuzu_wiki.as_context(text[5:].strip())
+            head, _, tail = text.partition("/wiki")
+            grounded, why = yuzu_wiki.as_context(tail.strip())
             if grounded is None:
                 print(f"({why})\n")
                 continue
-            text = grounded
+            # Keep whatever he said around it -- that is the
+            # conversation, and dropping it would answer a question he
+            # did not ask on its own.
+            text = f"{head.strip()}\n\n{grounded}" if head.strip() else grounded
         if not text:
             continue
         print(f"{who}: ", end="", flush=True)

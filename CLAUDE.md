@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 356 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 358 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 356 tests pass on it. Getting it
+(that repo path is confirmed working). 358 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -560,6 +560,61 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 512gb SSD"). The deck self-concept holds for what she IS (she got the
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
+
+## FIRST SAYA CONVERSATION — and two of my parser decisions were wrong
+
+Sept 9, 21:16, on the Orin. First live turn as the live persona.
+
+**She is GOOD, and the predicted failure did not happen.** The note
+above warned a tsundere would come back curt enough to read as
+stonewalling. She did not:
+
+    O-oh, shut up... *ahem* You know I'm not exactly built for...
+    "fun" stuff like that. My battery's always running low just
+    thinking about it... But... *pauses* Ice cream...? What kind?
+    Don't even think about suggesting any weird flavors, I don't want
+    to hear it. *trails off* Mochi ice cream... I guess that sounds
+    okay...
+
+Denial, then a real question, then giving ground without ever doing it
+smoothly. That is the archetype working, and **"my battery's always
+running low" is deck self-concept arriving unprompted** -- the same
+win Shiro got, on a character who has never been scored. n=1, but the
+shape is right. Asterisks throughout, silent through Piper as designed.
+
+**1. `/wiki` AT THE END OF A LINE DID NOTHING, SILENTLY.** He typed:
+
+    hey saya we got u all pimped out wana try sumn? /wiki ice cream
+
+`text.lower().startswith("/wiki")` missed it, the whole line went to
+her as ordinary chat, and she answered about ice cream out of her own
+head. **Nothing said a lookup had been skipped** -- it just looked like
+the feature did not work.
+
+That is how a person actually talks: a sentence, then the thing they
+want looked up. Now `/wiki` is recognised ANYWHERE in the line, the
+text is `partition`ed on it, and **whatever he said around it is kept**
+-- dropping his own words would answer a question he never asked on
+its own. Make the parser fit him rather than making him fit the parser.
+
+**2. THE REPLY PREFIX WAS A DATABASE ROW TALKING.** Ghost: *"plz plz
+for my sanitys sake make her name just Saya lol."*
+
+Every line came out as `Saya (saya_deck) [no body]:`. That string is
+the FIFTH-name-leak fix -- correct for the boot banner, where `shiro`
+and `shiro_deck` share a name and printing only "Shiro" cost an
+evening. But one variable was doing both jobs, and a nametag in a
+conversation is not a disambiguator.
+
+Split: `banner` keeps the key and the `[no body]` marker at boot,
+`who` is her plain name on every reply. Both are pinned, so neither
+can quietly take the other's job back.
+
+**Generalisable, and this is the third time it has come up here: the
+same fact needs different SHAPES in different places.** The doctor
+needed the unit file, not the environment. The wiki extract needed to
+be a user turn, not a system message. And an identity needs the key at
+boot and the name in dialogue.
 
 ## `deckapps` — real app icons, because a touchscreen is not a terminal
 
