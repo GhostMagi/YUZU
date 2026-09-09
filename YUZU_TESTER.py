@@ -5561,25 +5561,68 @@ class TestTelemetry(unittest.TestCase):
         self.assertEqual(got, {"percent": 78, "charging": True})
 
     def test_the_jetsons_own_rail_gives_WATTS_which_are_measured(self):
-        """What the board can actually answer today. The Orin carries
-        INA3221 monitors on hwmon; two kernel shapes exist (microwatts
-        directly, or millivolts x milliamps) and both are handled.
+        """What the board can actually answer today, and it does --
+        CONFIRMED on the real Orin, Sept 11: `deck --check` reported
+        `5.6W now` at idle with a desktop up.
 
-        Only the INPUT rail counts -- summing every channel double
-        counts, because the GPU rail sits inside VDD_IN."""
+        The Orin carries INA3221 monitors on hwmon; two kernel shapes
+        exist (microwatts directly, or millivolts x milliamps) and both
+        are handled. Only the INPUT rail counts."""
         with tempfile.TemporaryDirectory() as tmp:
             box = Path(tmp) / "hwmon0"
             box.mkdir()
             (box / "in1_label").write_text("VDD_IN\n")
             (box / "in1_input").write_text("12000\n")     # mV
             (box / "curr1_input").write_text("1180\n")    # mA
-            # a second rail that must be ignored
+            # a rail that is not an input rail at all, and must be
+            # ignored however low its channel number
             (box / "in2_label").write_text("VDD_CPU\n")
             (box / "power2_input").write_text("9000000\n")
             with unittest.mock.patch.object(self.face, "HWMON", tmp):
+                self.assertEqual(self.face.input_rail(), ("VDD_IN", 14.2))
                 self.assertEqual(self.face.power_draw(), 14.2)
                 (box / "power1_input").write_text("15500000\n")   # uW
                 self.assertEqual(self.face.power_draw(), 15.5)
+
+    def test_a_SUB_rail_can_never_be_mistaken_for_the_whole_board(self):
+        """THE BUG THIS EXISTS FOR, and it shipped for one commit.
+        `VDD_GPU_SOC` was in the input-rail list -- but that is the GPU
+        and SOC block, which sits INSIDE VDD_IN. Reading it reports part
+        of the board as the whole and makes every runtime estimate too
+        optimistic, and the number looks perfectly reasonable while
+        being wrong.
+
+        Two guards: the sub-rail is not a candidate at all, and the
+        choice is by PRIORITY rather than by whichever channel happened
+        to come first -- so a board that lists a sub-rail on a lower
+        channel than VDD_IN still reports VDD_IN."""
+        self.assertNotIn("VDD_GPU_SOC", self.face.INPUT_RAILS)
+        with tempfile.TemporaryDirectory() as tmp:
+            box = Path(tmp) / "hwmon0"
+            box.mkdir()
+            # the sub-rail FIRST, on the lower channel, deliberately
+            (box / "in1_label").write_text("VDD_GPU_SOC\n")
+            (box / "power1_input").write_text("3100000\n")
+            (box / "in2_label").write_text("POM_5V_IN\n")
+            (box / "power2_input").write_text("7000000\n")
+            (box / "in3_label").write_text("VDD_IN\n")
+            (box / "power3_input").write_text("9400000\n")
+            with unittest.mock.patch.object(self.face, "HWMON", tmp):
+                # VDD_IN wins on priority even though it is listed last
+                self.assertEqual(self.face.input_rail(), ("VDD_IN", 9.4))
+                # and with VDD_IN absent, the older name is next -- but
+                # the sub-rail is still never the answer
+                (box / "in3_label").write_text("VDD_SOC\n")
+                self.assertEqual(self.face.input_rail(), ("POM_5V_IN", 7.0))
+
+    def test_deck_check_names_the_rail_it_read(self):
+        """A watt figure off the wrong rail looks perfectly reasonable,
+        so the only way to know it is the whole board is to SEE which
+        rail answered. Same reason `pad --status` prints Bonded."""
+        body = (Path(__file__).parent / "deck").read_text()
+        block = body.split("POWER=$(")[1].split('")')[0]
+        self.assertIn("input_rail", block, "deck --check hides the rail")
+        self.assertIn("rail[0]", block, "the rail name is not printed")
 
     def test_the_runtime_says_FROM_FULL_and_never_remaining(self):
         """The wording is the whole point. Hours REMAINING needs a state

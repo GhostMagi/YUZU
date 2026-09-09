@@ -75,12 +75,20 @@ printf "    %-12s %s expressions\n" "her face" "$SPRITES"
 POWER=$(python3 -c "
 import sys; sys.path.insert(0, '$YUZU')
 import yuzu_face as f
-c = f.charge()
-if 'percent' in c:
-    print('%d%% (real battery)' % c['percent'])
-elif 'watts' in c:
-    print('%sW now%s' % (c['watts'],
-          ', ~%sh from a full bank' % c['hours'] if 'hours' in c else ''))
+b = f.battery()
+if b:
+    print('%d%% (real battery)' % b[0])
+else:
+    rail = f.input_rail()
+    if rail:
+        c = f.charge()
+        # The RAIL NAME is printed, not just the number. A watt figure
+        # read off the wrong rail looks perfectly reasonable, so the
+        # only way to know it is the whole board is to see which one
+        # answered.
+        print('%sW on %s%s' % (rail[1], rail[0],
+              ', ~%sh from a full bank at this draw' % c['hours']
+              if 'hours' in c else ''))
 " 2>/dev/null)
 printf "    %-12s %s\n" "power" \
     "${POWER:-nothing to read -- no battery node, no rail (fine on mains)}"

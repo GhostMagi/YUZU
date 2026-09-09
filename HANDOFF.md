@@ -77,7 +77,7 @@ that goes there. It can boot straight into it.
 one command, and it becomes a sprite: white background removed, squared,
 mouth coloured. The filename becomes the expression name.
 
-**462 tests** covering all of it, run in one command.
+**464 tests** covering all of it, run in one command.
 
 ## Hard-won rules — please respect these in any design idea
 

@@ -492,9 +492,17 @@ HWMON = "/sys/class/hwmon"
 BANK_WH = float(os.environ.get("YUZU_BANK_WH", "74"))
 BANK_EFFICIENCY = 0.8
 
-# What the Jetson calls its input rail. VDD_IN is the whole board on
-# Orin; the others are what older Jetsons and some kernels use.
-INPUT_RAILS = ("VDD_IN", "VDD_SYS_IN", "POM_5V_IN", "VDD_GPU_SOC")
+# What the Jetson calls its INPUT rail, in order of preference. VDD_IN
+# is the whole board on Orin; the others are what older Jetsons and some
+# kernels call the same thing.
+#
+# VDD_GPU_SOC IS DELIBERATELY NOT HERE, and it was, for one commit. It
+# is a SUB-rail -- the GPU and SOC block, which sits INSIDE VDD_IN -- so
+# reading it would report part of the board as the whole board and make
+# every runtime estimate too optimistic. The first version's own
+# docstring said "the GPU rail is inside VDD_IN" while the list it
+# guarded contained the GPU rail.
+INPUT_RAILS = ("VDD_IN", "VDD_SYS_IN", "POM_5V_IN")
 
 
 def battery():
@@ -531,14 +539,24 @@ def battery():
     return None
 
 
-def power_draw():
-    """Watts the board is pulling right now, or None.
+def input_rail():
+    """(label, watts) for the board's whole-input rail, or None.
 
     The Jetson carries INA3221 monitors and exposes them through hwmon.
     Two shapes exist: some kernels give `power1_input` in microwatts,
-    others give millivolts and milliamps to multiply. Both are handled,
-    and a rail that is not the INPUT rail is ignored -- summing every
-    channel double-counts, because the GPU rail is inside VDD_IN."""
+    others give millivolts and milliamps to multiply. Both are handled.
+
+    EVERY candidate is collected before one is chosen, and the choice is
+    by the PRIORITY in INPUT_RAILS rather than by whichever channel came
+    first. A board that lists a sub-rail on a lower channel number than
+    VDD_IN would otherwise report part of itself as the whole, and the
+    number would look perfectly reasonable while being wrong -- which is
+    this repo's most common shape of bug.
+
+    CONFIRMED on the real Orin, Sept 11: `deck --check` reported
+    `5.6W now` at idle with a desktop up. The reading works; the rail it
+    picks is what this function has to get right."""
+    found = {}
     try:
         boxes = sorted(os.listdir(HWMON))
     except Exception:
@@ -555,22 +573,38 @@ def power_draw():
 
         for channel in range(0, 8):
             label = field("in%d_label" % channel) or field("curr%d_label" % channel)
-            if not label or label.strip().upper() not in INPUT_RAILS:
+            if not label:
                 continue
+            label = label.strip().upper()
+            if label not in INPUT_RAILS or label in found:
+                continue
+            watts = None
             micro = field("power%d_input" % channel)
             if micro:
                 try:
-                    return round(int(micro) / 1e6, 1)
+                    watts = int(micro) / 1e6
                 except ValueError:
-                    pass
-            milli_v = field("in%d_input" % channel)
-            milli_a = field("curr%d_input" % channel)
-            if milli_v and milli_a:
-                try:
-                    return round(int(milli_v) * int(milli_a) / 1e6, 1)
-                except ValueError:
-                    pass
+                    watts = None
+            if watts is None:
+                milli_v = field("in%d_input" % channel)
+                milli_a = field("curr%d_input" % channel)
+                if milli_v and milli_a:
+                    try:
+                        watts = int(milli_v) * int(milli_a) / 1e6
+                    except ValueError:
+                        watts = None
+            if watts:
+                found[label] = round(watts, 1)
+    for name in INPUT_RAILS:
+        if name in found:
+            return (name, found[name])
     return None
+
+
+def power_draw():
+    """Watts on the input rail, or None."""
+    rail = input_rail()
+    return rail[1] if rail else None
 
 
 def charge():

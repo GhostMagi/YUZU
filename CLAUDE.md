@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 462 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 464 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 462 tests pass on it. Getting it
+(that repo path is confirmed working). 464 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -600,13 +600,36 @@ The capacity is his locked spec: JSAUX 20,000mAh at a nominal 3.7V is
 chain. `YUZU_BANK_WH` overrides it; `0` turns the estimate off and
 leaves the watts.
 
-**UNVERIFIED ON THE BOARD.** Every path here is driven from fixtures in
-both directions -- that is the rule this repo learned from the two
-Jetson tests that could only pass on a Jetson -- but whether the Orin
-Nano Super actually exposes `VDD_IN` through hwmon, and under which of
-the two kernel shapes, is not something a laptop can answer. **`deck
---check` now has a `power` row**, which is the one-word way to find
-out without typing Python at a phone keyboard.
+**CONFIRMED ON THE BOARD, Sept 11, in one word.** `deck --check`:
+
+    power        5.6W now, ~10.6h from a full bank
+
+**The Orin does expose its input rail through hwmon and the reading
+works on real hardware.** 5.6W is idle with a desktop up, which is the
+right order for that board -- MAXN under load is four to five times it,
+so the runtime figure moves with what she is actually doing. That is
+the point of showing watts rather than a made-up percentage.
+
+**AND THE CONFIRMATION IMMEDIATELY EXPOSED A REAL BUG OF MINE.**
+`INPUT_RAILS` contained `VDD_GPU_SOC`, which is a SUB-rail -- the GPU
+and SOC block, which sits INSIDE VDD_IN. The function's own docstring
+said "the GPU rail is inside VDD_IN" while the list it guarded
+contained the GPU rail. Worse, the first match won, so a board listing
+a sub-rail on a lower channel number than VDD_IN would have reported
+**part of the board as the whole board** -- an optimistic runtime
+estimate that looks perfectly reasonable and is simply wrong. That is
+this project's most common shape of fault, and it survived a green
+suite because every fixture put VDD_IN first.
+
+Fixed both ways: the sub-rail is not a candidate at all, and the choice
+is by PRIORITY over all candidates rather than by whichever channel
+came first. `test_a_SUB_rail_can_never_be_mistaken_for_the_whole_board`
+puts the sub-rail on the lowest channel on purpose.
+
+**`deck --check` now prints the RAIL NAME, not just the number** --
+`5.6W on VDD_IN` -- because a watt figure read off the wrong rail looks
+entirely reasonable, and the only way to know it is the whole board is
+to see which rail answered. Same reason `pad --status` prints `Bonded`.
 
 **The battery is DRAWN, not an emoji** -- same finding as the home
 screen icons an hour earlier: an emoji is a full-colour bitmap that
