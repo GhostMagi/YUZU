@@ -727,6 +727,53 @@ the fix is right either way -- but the confidence was not earned.
 session.** Check what the person can actually reach before calling
 something a workaround.
 
+## `/wiki` WORKS, AND SHE IS FUNNY WITH IT (Sept 10)
+
+First real lookup, Munchkin cats, `saya_deck`:
+
+    *sigh* Fine, I'll talk about these... annoyingly cute cats...
+    [muttering to self] Short legs, really? That's what I'm supposed
+    to care about?
+
+    So, apparently, there's this breed of cat called the Munchkin cat,
+    and they're like, super small, weighing only 4-9 pounds. Because,
+    you know, that's not just a toy cat or something... [eye roll]
+
+    Apparently, they're like, super loving and friendly, and they just
+    can't get enough of human attention. Because, you know, cats don't
+    already have an inherent right to ignore us all the time...
+    [shaking head] No, no, these Munchkin cats need to be petted and
+    hugged all day long... [whiny tone]
+
+**She is annoyed BY the article and still delivers it.** Every fact is
+correct and every one arrives through her register. That is the whole
+design of the extract-as-a-user-turn decision working -- she is not
+reciting an encyclopedia, she is complaining about one. Ghost: *"it was
+funny she goes really short legs thats what im supposed to care
+about?"*
+
+**AND SHE RAN LONG, and this time it truncated.** Three paragraphs, cut
+mid-sentence at `And don't even get me started on the prices. $500 to`
+-- `num_predict: 200` again. That is the brevity fault, now measured on
+a `/wiki` reply specifically, and it matters more here than in chat:
+**a reply this long does not fit a 1024x600 face screen**, so the UI
+work and the brevity work are the same problem.
+
+Two things worth trying, one variable at a time, whenever he is next
+up for it:
+
+- The wiki turn asks her to *"Tell me about it in your own words"* and
+  says nothing about LENGTH, while her own brevity rule is about
+  ordinary conversation. One clause -- "in a sentence or two" -- is the
+  cheapest thing to try and it is a prompt change with no code.
+- Her ONE EXAMPLE lever has worked three times. She has no example of
+  answering from a looked-up article, so she has no shape to copy and
+  falls back on summarising at length. That is the same diagnosis as
+  the bare command, the warm statement and the technical question.
+
+**Do NOT raise `num_predict`.** Already recorded: the truncation is a
+symptom of rambling and a bigger ceiling just buys longer rambles.
+
 ## SOLVED (probably): `/wiki` found nothing because of the `/A/` namespace
 
 Ghost, Sept 10: *"she cant access the wiki and i dont think i can either
