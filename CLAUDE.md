@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 333 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 334 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 333 tests pass on it. Getting it
+(that repo path is confirmed working). 334 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -701,11 +701,36 @@ status output doing it to him again.
 
 `--status` now leads with the verdict:
 
-    WORKING. Games can see the controller.
-    In mGBA: Settings -> Controllers, press Refresh, then Set all.
+    WORKING. The kernel sees the controller.
+    If mGBA is ALREADY RUNNING it will not notice -- restart it.
 
-    (Bluetooth is half-paired, but it is wired right now,
-     so that does not matter.)
+**RESTART mGBA, do not press Refresh.** The pad appeared at 17:38;
+mGBA had been running since 17:20. Its controller dropdown stayed empty
+and every mapping box refused input, so it read as a broken UI. **SDL
+enumerates controllers at STARTUP** and mGBA's Refresh button is
+unreliable for hotplug -- telling him to press it sent him clicking at
+a screen that could not work. Every message now says
+`~/YUZU/gba --off && ~/YUZU/gba` instead.
+
+## 8BITDO IS PARKED. Ghost's call, Sept 9
+
+*"also gave up on 8bitdo for now. lets focus on PC stuff and Ai stuff
+and kiwix."* Fair -- it cost well over an hour across bonding failures,
+two wrong theories of mine, and button combos I should never have
+stated as instructions.
+
+**Where it actually stands, for whoever picks it up:**
+
+- **USB WORKS.** `N: Name="8BitDo 8BitDo Micro gamepad"` appeared the
+  moment it was plugged into a **USB-A** port awake. That is the path.
+- **The pad sleeps and then only charges.** Red LED = charging, not
+  connected. Wake it BEFORE plugging in.
+- **mGBA was never restarted after the pad appeared**, so the last
+  known state is "pad works, emulator never looked". That is the very
+  next thing to try, and it may simply be done.
+- **Bluetooth is unresolved** and the real error is in
+  `/tmp/pad-pair.log` on the board, never read. `Bonded: no` with
+  BlueZ logging `Success` on its own rejection is as far as it got.
 
 and when it is not working, says what to DO -- wake the pad first,
 then plug it into a **USB-A** port, because a sleeping pad only

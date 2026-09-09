@@ -67,8 +67,13 @@ case "${1:-}" in
     # every bug this evening: reporting the layers around the answer.
     if has_input_node; then
         echo
-        echo "  WORKING. Games can see the controller."
-        echo "  In mGBA: Settings -> Controllers, press Refresh, then Set all."
+        echo "  WORKING. The kernel sees the controller."
+        echo
+        echo "  If mGBA is ALREADY RUNNING it will not notice -- SDL only"
+        echo "  looks for controllers at startup, and Refresh is unreliable"
+        echo "  for hotplug. Restart it:"
+        echo "    ~/YUZU/gba --off && ~/YUZU/gba"
+        echo "  Then: Settings -> Controllers -> Set all."
         MAC=$(mac_of)
         if [ -n "$MAC" ] && ! bonded "$MAC"; then
             echo
@@ -118,8 +123,11 @@ esac
 if has_input_node; then
     echo
     echo "  A $WANT gamepad is ALREADY connected (USB) and working."
-    echo "  Nothing to pair. In mGBA: Settings -> Controllers,"
-    echo "  press Refresh, then Set all."
+    echo "  Nothing to pair."
+    echo
+    echo "  If mGBA is already running, restart it so SDL sees the pad:"
+    echo "    ~/YUZU/gba --off && ~/YUZU/gba"
+    echo "  Then: Settings -> Controllers -> Set all."
     echo
     echo "  Unplug it and rerun this if you want it over Bluetooth."
     echo
@@ -218,8 +226,9 @@ fi
 if has_input_node; then
     echo "  The kernel sees it as a gamepad."
     echo
-    echo "  Last step, inside mGBA (in AVNC):"
-    echo "    Tools -> Settings -> Controllers, click each box, press that button."
+    echo "  Restart mGBA so SDL picks it up (it only scans at startup):"
+    echo "    ~/YUZU/gba --off && ~/YUZU/gba"
+    echo "  Then: Settings -> Controllers -> Set all."
 else
     echo "  Bonded and connected, but NO gamepad device appeared yet."
     echo "  Sometimes the kernel needs a moment. Check again with:"

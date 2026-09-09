@@ -2959,6 +2959,23 @@ class TestPadPairing(unittest.TestCase):
                         done.stdout.index("Bluetooth"),
                         "bluetooth noise still comes before the verdict")
 
+    def test_it_says_to_RESTART_mgba_not_to_press_Refresh(self):
+        """MEASURED Sept 9. The pad appeared at 17:38; mGBA had been
+        running since 17:20. Its controller dropdown stayed empty and
+        every mapping box refused input, so it read as a broken UI.
+
+        SDL enumerates controllers at STARTUP. mGBA's Refresh button is
+        unreliable for hotplug, and telling him to press it sent him
+        clicking at a screen that could not work."""
+        for kwargs in ({"inputs": self.WIRED},                    # --status
+                       {"inputs": self.WIRED, "args": True}):     # pair flow
+            args = ("--status",) if "args" not in kwargs else ()
+            done = self._run(*args, inputs=self.WIRED)
+            self.assertIn("gba --off", done.stdout,
+                          "it does not tell him to restart mGBA, so a "
+                          "pad plugged in later is invisible to the game")
+            self.assertNotIn("press Refresh, then Set all", done.stdout)
+
     def test_a_missing_pad_says_what_to_DO_about_it(self):
         """A verdict with no next step just relocates the problem."""
         done = self._run("--status", inputs="", devices="", info="")
