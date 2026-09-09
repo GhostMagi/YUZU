@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 394 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 395 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 394 tests pass on it. Getting it
+(that repo path is confirmed working). 395 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -892,7 +892,41 @@ grid-like HUD layout with zero wasted screen space. maybe that too"*
     ~/YUZU/tile --remove   uninstall
     ~/YUZU/tile --status   is it on
 
-**POP SHELL, not Forge, and the reason is his shell not the feature.**
+**POP SHELL IS NOT PACKAGED ON UBUNTU. Measured on the board:**
+
+    E: Unable to locate package gnome-shell-extension-pop-shell
+
+I wrote "Ubuntu ships it, so this is one apt package" into the script's
+own output and it was simply wrong -- Pop Shell lives in **Pop!_OS's**
+repos, not Ubuntu's. The good part is that the script said what to do
+next in the same breath ("If it says 'Unable to locate package', this
+Ubuntu does not carry Pop Shell and Forge is the fallback"), so a wrong
+claim cost one apt run instead of an evening. **Write the fallback into
+the failure message, not into a doc he will not open.**
+
+**FORGE NOW INSTALLS AUTOMATICALLY, AND WITHOUT A BROWSER.** That is
+the constraint that actually mattered -- not which extension wins. The
+obvious route is extensions.gnome.org in a browser, and he has one
+serial terminal. So `tile` asks the site's JSON endpoint which zip
+matches THIS GNOME version and hands it to `gnome-extensions install`.
+Asking rather than guessing a URL is what survives the next GNOME
+release. Pop Shell is still tried first, because it is one apt line and
+costs two seconds.
+
+**Forge's keyboard shortcuts are NOT printed**, deliberately. They were
+never verified on this board, and unverified keystrokes stated as steps
+already cost an hour on the 8BitDo -- they send a person debugging
+their own hands. Pop Shell's `Super + Y` is documented and is printed;
+Forge's branch says where to look instead. `~/YUZU/tile --off` is the
+escape either way and needs no shortcut at all.
+
+**GNOME IS RUNNING ON THAT BOARD.** The prediction above -- that the
+VNC session is a bare X session and tiling would have nothing to do --
+was wrong: `tile` got past `pgrep -x gnome-shell` and went straight to
+apt. Good news, and worth correcting rather than leaving as a warning
+about a problem that does not exist.
+
+**The original reasoning, kept because the shape of it still holds:**
 Both tile. Pop Shell is what System76 ships on hardware they sell, so
 Ubuntu packages it -- one `apt install`, no extension-store round trip
 in a browser on a phone. Forge is newer and more configurable and

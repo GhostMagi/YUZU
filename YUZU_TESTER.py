@@ -4882,11 +4882,42 @@ class TestTiling(unittest.TestCase):
         self.assertNotIn("apt install", done.stdout,
                          "it tried to install on a box with no GNOME")
 
-    def test_it_names_the_keys_that_turn_tiling_off_live(self):
-        """Super+Y is the real escape hatch -- it works from inside the
-        session with no terminal at all, which on a handheld with no
-        keyboard shortcut cheatsheet is the one worth printing."""
-        self.assertIn("Super + Y", self.SCRIPT.read_text())
+    def test_it_falls_back_to_forge_without_a_browser(self):
+        """MEASURED ON THE BOARD, Sept 9: `E: Unable to locate package
+        gnome-shell-extension-pop-shell`. Pop Shell ships in Pop!_OS's
+        repos, not Ubuntu's, and "Ubuntu ships it" was simply wrong.
+
+        Forge is the fallback, and the interesting constraint is not
+        which extension wins -- it is that his only shell is a serial
+        cable. So it must install WITHOUT a store page: ask
+        extensions.gnome.org which zip matches this GNOME version, then
+        `gnome-extensions install`. Asking rather than guessing a URL is
+        what survives the next GNOME update."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("forge@jmmaranan.com", body, "there is no fallback")
+        self.assertIn("extension-info", body,
+                      "it guesses a download URL instead of asking which "
+                      "build matches this shell version")
+        self.assertIn("gnome-extensions install", body)
+        for browsery in ("xdg-open", "firefox", "chromium"):
+            self.assertNotIn(browsery, body,
+                             "installing must not need a browser -- his "
+                             "only session is a serial terminal")
+
+    def test_it_states_no_unverified_keystrokes_for_forge(self):
+        """The 8BitDo lesson, applied before it costs anything. Generic
+        button combos printed as numbered steps sent him hunting for
+        buttons his pad does not have while the real fault was
+        elsewhere. Pop Shell's Super+Y is documented and is printed;
+        Forge's shortcuts were never verified on this board, so its
+        branch names where to LOOK instead of inventing keys."""
+        body = self.SCRIPT.read_text()
+        forge_branch = body.split("Its shortcuts")[0].split("else")[-1]
+        self.assertNotIn("Super +", forge_branch,
+                         "unverified Forge keystrokes stated as fact")
+        self.assertIn("--off", body,
+                      "there must always be a way out that needs no "
+                      "keyboard shortcut at all")
 
 
 class TestFaceSprites(unittest.TestCase):
