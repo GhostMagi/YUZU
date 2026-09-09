@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 393 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 394 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 393 tests pass on it. Getting it
+(that repo path is confirmed working). 394 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -904,6 +904,23 @@ extension can leave a desktop that will not draw, and his only shell is
 a serial cable. The cheap escape must not be the same word that throws
 the package away. Cheaper still and printed every time: **Super + Y**
 toggles tiling live, from inside the session, with no terminal at all.
+
+**It checks GNOME is RUNNING, not that it is INSTALLED, and that
+distinction probably decides whether it does anything tonight.** Ubuntu
+ships `gnome-shell`, so the package check is true on that board -- but
+the only desktop he has today is the VNC session, started from
+`~/.vnc/xstartup`, and the handoff describes that as "a minimal X
+session". A bare X session has no shell for an extension to live in.
+`command -v gnome-shell` would have said yes the entire time nothing
+was tiling: the same shape as `xdpyinfo` answering happily through a
+loopback-only VNC bind. `pgrep -x gnome-shell` is the honest check, and
+the two failures get DIFFERENT messages because they have different
+fixes -- installed-but-not-running names `~/.vnc/xstartup` as the place
+the desktop is chosen.
+
+**So the likely outcome on his board right now is "GNOME is installed
+but not running", and that is correct rather than broken.** Tiling
+needs a real desktop; the 10.1" panel is what makes it worth having.
 
 **It refuses politely off GNOME rather than failing inside apt**, and
 it says what it is about to do before doing it. UNVERIFIED on the

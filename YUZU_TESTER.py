@@ -4846,6 +4846,25 @@ class TestTiling(unittest.TestCase):
                          "--off must not uninstall -- that is --remove")
         self.assertIn("--remove", body, "there is no way to uninstall")
 
+    def test_it_checks_gnome_is_RUNNING_not_merely_installed(self):
+        """THE REPO'S MOST-REPEATED BUG, caught before shipping this
+        time. Ubuntu ships gnome-shell, but his only desktop today is a
+        VNC session started from ~/.vnc/xstartup, which may be a bare X
+        session with no GNOME in it. `command -v gnome-shell` would say
+        yes the whole time nothing was tiling -- exactly like xdpyinfo
+        answering happily through a loopback-only VNC bind.
+
+        So the check is on the RUNNING process, and the two cases get
+        different messages because they have different fixes."""
+        body = self.SCRIPT.read_text()
+        check = body.split("on_gnome()")[1].split("}")[0]
+        self.assertIn("pgrep", check,
+                      "it checks whether GNOME is installed, which is "
+                      "true on a board where nothing is tiling")
+        self.assertIn("xstartup", body,
+                      "it must say where the VNC session's desktop is "
+                      "chosen -- otherwise 'not running' has no next step")
+
     def test_it_refuses_politely_off_gnome(self):
         """Pop Shell is a GNOME extension and only a GNOME one. On a
         board running something else this must say so, not fail deep

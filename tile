@@ -30,11 +30,14 @@ set -u
 EXT="pop-shell@system76.com"
 PKG="gnome-shell-extension-pop-shell"
 
-on_gnome() {
-    [ -n "${XDG_CURRENT_DESKTOP:-}" ] && \
-        echo "$XDG_CURRENT_DESKTOP" | grep -qi gnome && return 0
-    command -v gnome-shell >/dev/null 2>&1
-}
+# "Is GNOME Shell RUNNING", not "is it installed". Those come apart on
+# exactly this board: Ubuntu ships gnome-shell, but the VNC desktop is
+# started from ~/.vnc/xstartup and may be a minimal X session with no
+# GNOME in it at all. Checking the package would say yes the whole time
+# nothing was tiling -- the same shape as xdpyinfo answering happily
+# through a loopback-only VNC bind, which cost an evening.
+on_gnome() { pgrep -x gnome-shell >/dev/null 2>&1; }
+gnome_installed() { command -v gnome-shell >/dev/null 2>&1; }
 
 installed() { command -v gnome-extensions >/dev/null 2>&1 \
               && gnome-extensions list 2>/dev/null | grep -q "$EXT"; }
@@ -75,8 +78,24 @@ esac
 
 if ! on_gnome; then
     echo
-    echo "  This board is not running GNOME, so there is nothing to"
-    echo "  extend. Pop Shell is a GNOME extension and only a GNOME one."
+    if gnome_installed; then
+        echo "  GNOME is INSTALLED but is not RUNNING right now."
+        echo
+        echo "  Pop Shell tiles a live desktop, so there is nothing for"
+        echo "  it to do until you are looking at one. Two ways to get"
+        echo "  there, and the second is the one that lasts:"
+        echo
+        echo "    - plug the panel in and log into the desktop, or"
+        echo "    - make the VNC session start GNOME instead of a bare"
+        echo "      X session. What it starts now is in ~/.vnc/xstartup"
+        echo
+        echo "  Nothing was installed or changed. Run this again once a"
+        echo "  GNOME desktop is up."
+    else
+        echo "  This board is not running GNOME, so there is nothing to"
+        echo "  extend. Pop Shell is a GNOME extension and only a GNOME"
+        echo "  one -- a bare X session has no shell to put it in."
+    fi
     echo
     exit 1
 fi
