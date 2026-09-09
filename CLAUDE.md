@@ -492,11 +492,45 @@ pushed to disk. The `OLLAMA_KEEP_ALIVE` worry -- that pinning her
 forever would starve PC mode -- is real but not urgent: the pressure it
 was guarding against does not exist yet at this workload.
 
-**Still not measured, and it is the number that would actually
-decide things: the same reading WITH the model resident and an
-emulator running.** This one is the floor, not the ceiling. Take it
-again mid-conversation with ES-DE open and it answers the real
-question.
+**AND THE CEILING, four minutes later -- model resident, straight after
+a live Saya conversation:**
+
+    Mem:   7.4Gi total   4.0Gi used   1.8Gi buff/cache   3.4Gi available
+    Swap:  15Gi total    0B used
+
+**She costs ~3GB and there is still 3.4Gi free with the desktop up. Not
+one byte of swap has been touched, at either reading.** That is the
+whole memory question answered, in two commands, by Ghost.
+
+What it settles:
+
+- **`OLLAMA_KEEP_ALIVE=30m` is comfortable, not a compromise.** The
+  worry was that pinning her would starve PC mode. With 3.4Gi spare
+  while she is loaded, PC mode is not starved -- so `-1` would be
+  survivable too if he ever wants her instant permanently.
+- **Whisper alongside her is plausible rather than hypothetical.** A
+  small Whisper is a few hundred MB; 3.4Gi is real room. Still measure
+  again with it loaded before designing around it -- but "it may simply
+  not fit" is no longer the default assumption.
+- **The swap-on-NVMe advice stays right and stays unused.** 0B of 15Gi
+  at both readings means nothing is being pushed to disk at this
+  workload, so a swap problem is not what any future slowness is.
+
+**`quit` WORKED, live, first confirmation.** `02:30:28 quit` ->
+`02:30:30 You: (bye)`, two seconds, clean exit. The read_turn work came
+out of the night that cost two power cycles and had never actually been
+exercised by him until now.
+
+**He typed `free -h` at HER prompt and she answered it** -- charmingly
+("Don't even think about it! *ahem* thanks for the compliment"). Not a
+trap this time, because `quit` worked. But it is the third shell
+command he has typed into her chat (after `pkill -f yuzu_brain` and the
+12-line diagnostic paste), which makes it a pattern rather than a slip:
+**the chat prompt and the shell prompt look identical on that
+terminal.** Not fixing it now -- guessing at "was that meant for the
+shell?" risks eating real messages -- but if it costs him anything, the
+cheap version is a one-line hint when a message is exactly a known
+command name, never an auto-run.
 
 ## The `quit` bug: the check was never missing (Sept 9)
 
