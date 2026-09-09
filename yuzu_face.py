@@ -450,6 +450,144 @@ def temperature():
     return best
 
 
+# ---------------------------------------------------------------------
+# THE BATTERY, and the honest version of it.
+#
+# Ghost's little brother's idea, and it is a good one -- a handheld with
+# no charge indicator is a handheld you cannot plan around. The problem
+# is that **the deck has nothing to ask.** The power path is
+#
+#     USB-C PD bank  ->  PD-to-barrel cable  ->  5.5x2.5mm jack
+#
+# and a barrel jack carries volts and nothing else. No data line, no
+# fuel gauge, no state of charge. The devkit has no battery management
+# chip either. So a percentage would be a NUMBER THIS DECK INVENTED,
+# which is the one thing this project refuses to put on a screen.
+#
+# What is real, in order of preference:
+#
+#   1. A battery node in /sys/class/power_supply. There is none today,
+#      but a UPS HAT or any bank that speaks over a DATA link appears
+#      here, and then the percentage is the kernel's, not ours. This
+#      lights up the day he adds one, with no code change.
+#   2. The Jetson's own INA3221 rail monitor, via hwmon. That is
+#      WATTS BEING DRAWN RIGHT NOW -- measured, on the board, today --
+#      and on a handheld it is arguably the more useful number: it is
+#      the difference between "idle" and "she is generating at MAXN".
+#   3. Nothing. Then nothing is shown.
+#
+# The runtime figure is `~Nh/full` and the wording is deliberate: it is
+# hours FROM A FULL BANK at the draw measured this second, not hours
+# remaining -- because remaining needs a state of charge nothing here
+# can see. Labelling it "remaining" would be the confident lie.
+# ---------------------------------------------------------------------
+
+POWER_SUPPLY = "/sys/class/power_supply"
+HWMON = "/sys/class/hwmon"
+
+# His locked spec: JSAUX 20,000mAh 65W PD bank. Cells are nominally
+# 3.7V, so 20Ah x 3.7V = 74Wh on the label. What reaches the board is
+# less -- the bank boosts to 20V, the cable bucks to 12V, and neither
+# is free. 0.8 is the usual real-world figure for that chain.
+BANK_WH = float(os.environ.get("YUZU_BANK_WH", "74"))
+BANK_EFFICIENCY = 0.8
+
+# What the Jetson calls its input rail. VDD_IN is the whole board on
+# Orin; the others are what older Jetsons and some kernels use.
+INPUT_RAILS = ("VDD_IN", "VDD_SYS_IN", "POM_5V_IN", "VDD_GPU_SOC")
+
+
+def battery():
+    """(percent, charging) from a REAL battery node, or None.
+
+    Nothing on the board reports one today. This exists so that the day
+    he adds a UPS HAT or a bank with a data link, the indicator simply
+    appears -- and so that until then it is ABSENT rather than made up."""
+    try:
+        names = sorted(os.listdir(POWER_SUPPLY))
+    except Exception:
+        return None
+    for name in names:
+        node = os.path.join(POWER_SUPPLY, name)
+
+        def field(what):
+            try:
+                with open(os.path.join(node, what)) as fh:
+                    return fh.read().strip()
+            except Exception:
+                return None
+
+        if (field("type") or "").lower() != "battery":
+            continue
+        raw = field("capacity")
+        if raw is None:
+            continue
+        try:
+            percent = int(raw)
+        except ValueError:
+            continue
+        status = (field("status") or "").lower()
+        return (max(0, min(100, percent)), status in ("charging", "full"))
+    return None
+
+
+def power_draw():
+    """Watts the board is pulling right now, or None.
+
+    The Jetson carries INA3221 monitors and exposes them through hwmon.
+    Two shapes exist: some kernels give `power1_input` in microwatts,
+    others give millivolts and milliamps to multiply. Both are handled,
+    and a rail that is not the INPUT rail is ignored -- summing every
+    channel double-counts, because the GPU rail is inside VDD_IN."""
+    try:
+        boxes = sorted(os.listdir(HWMON))
+    except Exception:
+        return None
+    for box in boxes:
+        node = os.path.join(HWMON, box)
+
+        def field(what):
+            try:
+                with open(os.path.join(node, what)) as fh:
+                    return fh.read().strip()
+            except Exception:
+                return None
+
+        for channel in range(0, 8):
+            label = field("in%d_label" % channel) or field("curr%d_label" % channel)
+            if not label or label.strip().upper() not in INPUT_RAILS:
+                continue
+            micro = field("power%d_input" % channel)
+            if micro:
+                try:
+                    return round(int(micro) / 1e6, 1)
+                except ValueError:
+                    pass
+            milli_v = field("in%d_input" % channel)
+            milli_a = field("curr%d_input" % channel)
+            if milli_v and milli_a:
+                try:
+                    return round(int(milli_v) * int(milli_a) / 1e6, 1)
+                except ValueError:
+                    pass
+    return None
+
+
+def charge():
+    """What the battery indicator can honestly say, or {}."""
+    real = battery()
+    if real:
+        return {"percent": real[0], "charging": real[1]}
+    watts = power_draw()
+    if not watts:
+        return {}
+    out = {"watts": watts}
+    # Hours FROM FULL, never "remaining" -- see the note above.
+    if BANK_WH > 0:
+        out["hours"] = round(BANK_WH * BANK_EFFICIENCY / watts, 1)
+    return out
+
+
 def stats():
     """Everything the badge can say, with absent fields simply missing."""
     out = {}
@@ -466,6 +604,7 @@ def stats():
     rate = get_state().get("rate")
     if rate:
         out["rate"] = rate
+    out.update(charge())
     return out
 
 

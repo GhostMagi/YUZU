@@ -5474,8 +5474,12 @@ class TestTelemetry(unittest.TestCase):
                             self.face, "get_state", lambda: {"state": "idle"}):
                         self.assertEqual(self.face.stats(), {})
         page = self.PAGE.read_text()
-        self.assertIn("classList.toggle('on', !!badge.textContent)", page,
-                      "an empty badge would still be drawn")
+        shown = page.split("badge.classList.toggle('on',")[1].split(";")[0]
+        self.assertIn("board.textContent", shown)
+        self.assertIn("batt", shown,
+                      "the chip ignores the battery when deciding to show")
+        self.assertNotIn("true", shown,
+                         "an empty badge would still be drawn")
 
     def test_a_throttled_board_says_the_command_not_the_number(self):
         """"mode 1" is a number he has to interpret, and a number he has
@@ -5515,6 +5519,120 @@ class TestTelemetry(unittest.TestCase):
                 (zone / "temp").write_text(milli + "\n")
             with unittest.mock.patch.object(self.face, "THERMAL", tmp):
                 self.assertEqual(self.face.temperature(), 51)
+
+    def test_no_battery_hardware_means_no_battery_shown(self):
+        """THE HONEST DEFAULT, and it is what his board does today. The
+        power path is a PD bank -> a barrel jack, and a barrel jack
+        carries volts and nothing else: no data line, no fuel gauge, no
+        state of charge. A percentage here would be a number this deck
+        INVENTED."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with unittest.mock.patch.object(self.face, "POWER_SUPPLY", tmp):
+                with unittest.mock.patch.object(self.face, "HWMON", tmp):
+                    self.assertIsNone(self.face.battery())
+                    self.assertIsNone(self.face.power_draw())
+                    self.assertEqual(self.face.charge(), {})
+
+    def test_a_real_battery_node_is_used_the_day_one_exists(self):
+        """A UPS HAT, or any bank that speaks over a DATA link, appears
+        in /sys/class/power_supply and then the percentage is the
+        KERNEL'S rather than ours. The indicator lights up with no code
+        change, which is the whole reason it is written this way."""
+        with tempfile.TemporaryDirectory() as tmp:
+            node = Path(tmp) / "BAT0"
+            node.mkdir()
+            (node / "type").write_text("Battery\n")
+            (node / "capacity").write_text("78\n")
+            (node / "status").write_text("Discharging\n")
+            # A mains node alongside it must not be mistaken for one.
+            mains = Path(tmp) / "ADP1"
+            mains.mkdir()
+            (mains / "type").write_text("Mains\n")
+            (mains / "online").write_text("1\n")
+            with unittest.mock.patch.object(self.face, "POWER_SUPPLY", tmp):
+                self.assertEqual(self.face.battery(), (78, False))
+                (node / "status").write_text("Charging\n")
+                self.assertEqual(self.face.battery(), (78, True))
+                # A real percentage WINS over the watts estimate: it is
+                # measured charge, and the estimate is not.
+                with unittest.mock.patch.object(self.face, "power_draw",
+                                                lambda: 14.2):
+                    got = self.face.charge()
+        self.assertEqual(got, {"percent": 78, "charging": True})
+
+    def test_the_jetsons_own_rail_gives_WATTS_which_are_measured(self):
+        """What the board can actually answer today. The Orin carries
+        INA3221 monitors on hwmon; two kernel shapes exist (microwatts
+        directly, or millivolts x milliamps) and both are handled.
+
+        Only the INPUT rail counts -- summing every channel double
+        counts, because the GPU rail sits inside VDD_IN."""
+        with tempfile.TemporaryDirectory() as tmp:
+            box = Path(tmp) / "hwmon0"
+            box.mkdir()
+            (box / "in1_label").write_text("VDD_IN\n")
+            (box / "in1_input").write_text("12000\n")     # mV
+            (box / "curr1_input").write_text("1180\n")    # mA
+            # a second rail that must be ignored
+            (box / "in2_label").write_text("VDD_CPU\n")
+            (box / "power2_input").write_text("9000000\n")
+            with unittest.mock.patch.object(self.face, "HWMON", tmp):
+                self.assertEqual(self.face.power_draw(), 14.2)
+                (box / "power1_input").write_text("15500000\n")   # uW
+                self.assertEqual(self.face.power_draw(), 15.5)
+
+    def test_the_runtime_says_FROM_FULL_and_never_remaining(self):
+        """The wording is the whole point. Hours REMAINING needs a state
+        of charge nothing on this board can read; hours FROM FULL is
+        arithmetic on a measured draw and a bank whose capacity is on
+        its label. Calling the second one the first is the confident lie
+        this project keeps refusing to print."""
+        with unittest.mock.patch.object(self.face, "battery", lambda: None):
+            with unittest.mock.patch.object(self.face, "power_draw",
+                                            lambda: 14.2):
+                got = self.face.charge()
+        self.assertEqual(got["watts"], 14.2)
+        # 74Wh label x 0.8 for the boost-and-buck chain
+        self.assertAlmostEqual(got["hours"], 4.2, places=1)
+        for page in (self.PAGE, Path(__file__).parent / "ui" / "home.html"):
+            # The RENDERED string only. The comment above it uses the
+            # word "remaining" to explain why it is never printed, and
+            # a whole-file grep read that as the fault it warns about --
+            # the same false positive this repo has hit before by
+            # matching source text instead of behaviour.
+            shown = page.read_text().split("function charge(box, s)")[1]
+            self.assertIn("h/full", shown,
+                          f"{page.name} does not say FROM FULL")
+            self.assertNotIn("remaining", shown.lower(),
+                             f"{page.name} claims to know what is left")
+
+    def test_both_pages_draw_the_SAME_battery(self):
+        """Two pages and no build step, so the renderer is duplicated on
+        purpose -- same deliberate copy as the doctor's Jetson check and
+        the exit check, and it gets the same guard: if they drift, the
+        battery reads one way on her face and another on the home
+        screen, which is exactly the sort of thing nobody notices until
+        it matters."""
+        copies = []
+        for page in (self.PAGE, Path(__file__).parent / "ui" / "home.html"):
+            body = page.read_text()
+            self.assertIn("function charge(box, s)", body,
+                          f"{page.name} has no battery renderer")
+            copies.append(body.split("function charge(box, s)")[1]
+                              .split("\n}")[0])
+        self.assertEqual(copies[0], copies[1],
+                         "the two battery renderers have drifted apart")
+
+    def test_the_battery_is_DRAWN_not_an_emoji(self):
+        """An emoji is a full-colour bitmap that ignores --ink, so on the
+        black theme it would sit there as a glossy blob while everything
+        around it went neon. Same finding as the home screen icons."""
+        for page in (self.PAGE, Path(__file__).parent / "ui" / "home.html"):
+            body = page.read_text()
+            self.assertIn("class=\"cell\"", body, f"{page.name}: no cell")
+            for emoji in ("\U0001F50B", "\U0001F50C", "\u26A1"):
+                self.assertNotIn(emoji, body,
+                                 f"{page.name} uses an emoji battery")
 
     def test_the_rate_is_MEASURED_by_the_brain_not_guessed_here(self):
         """Only the brain sees Ollama's own eval_count / eval_duration.

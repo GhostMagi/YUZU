@@ -68,6 +68,22 @@ row "kiwix"    "$(have kiwix-serve && echo kiwix-serve)" "kiwix-tools"
 # so they get checked separately and loudly.
 SPRITES=$(ls "$YUZU"/ui/sprites/*.png 2>/dev/null | grep -v '\.paint\.' | wc -l)
 printf "    %-12s %s expressions\n" "her face" "$SPRITES"
+
+# The battery row. UNVERIFIED on the real board, which is exactly why it
+# is here: this is how he finds out in one word whether the Orin's power
+# rail is readable, without typing any Python at a phone keyboard.
+POWER=$(python3 -c "
+import sys; sys.path.insert(0, '$YUZU')
+import yuzu_face as f
+c = f.charge()
+if 'percent' in c:
+    print('%d%% (real battery)' % c['percent'])
+elif 'watts' in c:
+    print('%sW now%s' % (c['watts'],
+          ', ~%sh from a full bank' % c['hours'] if 'hours' in c else ''))
+" 2>/dev/null)
+printf "    %-12s %s\n" "power" \
+    "${POWER:-nothing to read -- no battery node, no rail (fine on mains)}"
 printf "    %-12s %s\n" "home screen" \
     "$([ -f "$YUZU/ui/home.html" ] && echo present || echo 'MISSING -- git pull')"
 

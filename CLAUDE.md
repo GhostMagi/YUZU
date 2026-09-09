@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 456 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 462 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 456 tests pass on it. Getting it
+(that repo path is confirmed working). 462 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -558,6 +558,75 @@ wants sudo or a system daemon, and the `/launch/` allowlist is the one
 thing on this board that must not grow a "run what you are told" hole
 while the server binds 0.0.0.0. The always-on-top floating rail is a
 window-manager job, not a page one, and `tile` is where it would live.
+
+## THE BATTERY INDICATOR, and the honest version of it (Sept 11)
+
+Ghost: *"wana add a working battery indicator for the cyberdeck if
+possible? doesnt have to work on mobile obv. (battery indicator was my
+little bros idea i like it)"* Good idea, and the reason it is hard is
+worth writing down because it is not a software problem.
+
+**THE DECK HAS NOTHING TO ASK.** The locked power path is
+
+    USB-C PD bank  ->  PD-to-barrel cable  ->  5.5x2.5mm jack
+
+and **a barrel jack carries volts and nothing else** -- no data line, no
+fuel gauge, no state of charge. The devkit has no battery management
+chip either. So a percentage on that screen would be a number this deck
+INVENTED, which is the one thing this project keeps refusing to print.
+
+So it is three tiers, and today his board lands on the second:
+
+    1. a battery node in /sys/class/power_supply   -> the KERNEL's
+       percentage. Nothing reports one today, but a UPS HAT or any bank
+       with a data link appears there and the indicator lights up with
+       no code change.
+    2. the Jetson's own INA3221 rail, via hwmon    -> WATTS being drawn
+       right now. Measured, on the board, today.
+    3. neither                                     -> nothing shown.
+
+**Watts are arguably the more useful number on a handheld anyway**: it
+is the live difference between idle and generating at MAXN, and it is
+the only honest input to a runtime figure.
+
+**`~4.2h/full` is worded that way deliberately.** It is hours FROM A
+FULL BANK at the draw measured this second -- NOT hours remaining.
+Remaining needs a state of charge nothing here can see, and calling the
+first thing the second is exactly the confident lie. A test pins the
+wording in both pages.
+
+The capacity is his locked spec: JSAUX 20,000mAh at a nominal 3.7V is
+74Wh on the label, times 0.8 for the boost-to-20V-then-buck-to-12V
+chain. `YUZU_BANK_WH` overrides it; `0` turns the estimate off and
+leaves the watts.
+
+**UNVERIFIED ON THE BOARD.** Every path here is driven from fixtures in
+both directions -- that is the rule this repo learned from the two
+Jetson tests that could only pass on a Jetson -- but whether the Orin
+Nano Super actually exposes `VDD_IN` through hwmon, and under which of
+the two kernel shapes, is not something a laptop can answer. **`deck
+--check` now has a `power` row**, which is the one-word way to find
+out without typing Python at a phone keyboard.
+
+**The battery is DRAWN, not an emoji** -- same finding as the home
+screen icons an hour earlier: an emoji is a full-colour bitmap that
+ignores `--ink`, so it would sit on the black theme as a glossy blob.
+It is a bordered box with a fill bar and a nub, in `currentColor`, and
+it goes red under 20% when not charging.
+
+**The renderer is duplicated in both pages on purpose** -- two pages,
+no build step -- and gets the same guard as the doctor's Jetson check
+and the exit check: `test_both_pages_draw_the_SAME_battery` compares
+the two copies character for character.
+
+**THE CLOCK STAYS. It works, and the failure is the feature.** He asked
+whether to drop it. The page reads the browser's clock, which on the
+deck IS the board's clock -- so once NTP lands it is simply correct.
+Before that the board thinks it is 1969, and the `clock not set` line
+is the fastest signal that **the deck has not reached the network yet**,
+which is the exact condition that silently broke a `git pull` and cost
+him a session. It costs one line of the top bar and it is the only
+always-visible network indicator on the deck.
 
 ## Handoff v3 — the deck grew a screen and a games console (Sept 9)
 

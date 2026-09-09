@@ -60,6 +60,25 @@ body {
 #date  { font-size: 14px; opacity: .65; }
 #warn  { margin-left: auto; font-size: 13px; font-weight: 600;
          opacity: .8; display: none; }
+/* The battery sits with the clock, because that is where a handheld
+   wears it. A DRAWN cell rather than an emoji: an emoji is a
+   full-colour bitmap that would ignore --ink and sit on the black
+   theme as a glossy blob. */
+#batt { margin-left: auto; font-size: 14px; font-weight: 600; opacity: .85; }
+#warn:not([style*="none"]) ~ #batt { margin-left: 12px; }
+.cell {
+  display: inline-block; vertical-align: -2px;
+  width: 24px; height: 12px; margin-right: 5px;
+  border: 1.5px solid currentColor; border-radius: 3px;
+  position: relative;
+}
+.cell::after {
+  content: ''; position: absolute; right: -4px; top: 3px;
+  width: 2.5px; height: 6px; background: currentColor;
+  border-radius: 0 1px 1px 0;
+}
+.cell b { display: block; height: 100%; background: currentColor; }
+#batt.low { color: #ff4d6a; }
 
 /* ---- the tiles ---------------------------------------------------- */
 /* 2x2, filling the screen. The first layout used auto-fit and left
@@ -140,6 +159,7 @@ body.hud #swatches i.on { box-shadow: inset 0 0 0 3px currentColor,
   <div id="clock">--:--</div>
   <div id="date"></div>
   <div id="warn">clock not set — no network yet</div>
+  <div id="batt"></div>
 </div>
 
 <div id="grid">
@@ -221,6 +241,47 @@ function tick() {
 }
 tick();
 setInterval(tick, 20000);
+
+// ---- the battery ----------------------------------------------------
+// THIS DECK CANNOT SEE A PERCENTAGE TODAY and does not pretend to. The
+// power path is a PD bank -> a barrel jack, and a barrel jack carries
+// volts and nothing else: no data line, no fuel gauge, no state of
+// charge. So there are exactly two honest displays and one absence:
+//
+//   a real battery node   ->  the kernel's percentage. Appears by
+//                             itself the day a UPS HAT is added.
+//   the Jetson's own rail ->  WATTS being drawn, measured, right now,
+//                             plus hours FROM FULL at that draw.
+//   neither               ->  nothing at all.
+//
+// "~4.1h/full" is worded that way on purpose. It is not hours
+// REMAINING -- remaining needs a state of charge nothing here can read,
+// and inventing one is the confident lie this project keeps refusing.
+//
+// Identical in home.html, deliberately: two pages, no build step, and a
+// test asserts the two copies agree.
+function charge(box, s) {
+  if (typeof s.percent === 'number') {
+    box.innerHTML = '<i class="cell"><b></b></i>';
+    box.querySelector('b').style.width = s.percent + '%';
+    box.append(s.percent + '%' + (s.charging ? ' chg' : ''));
+    box.classList.toggle('low', s.percent < 20 && !s.charging);
+    return;
+  }
+  box.classList.remove('low');
+  box.textContent = s.watts
+    ? s.watts + 'W' + (s.hours ? '  ·  ~' + s.hours + 'h/full' : '')
+    : '';
+}
+
+function power() {
+  fetch('stats', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(s => charge(document.getElementById('batt'), s))
+    .catch(() => {})
+    .then(() => setTimeout(power, 10000));
+}
+power();
 
 // ---- launching -----------------------------------------------------
 // A tap that appears to do nothing is the worst outcome on a

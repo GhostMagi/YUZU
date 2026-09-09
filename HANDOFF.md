@@ -54,10 +54,12 @@ colour I can change; the background shows through her eyes.
   and the whole UI goes terminal: CRT scanlines, corner brackets, dark
   translucent dialogue box
 - A small **status chip under her chin**: Jetson power mode, temperature,
-  and how fast she is generating (tokens/sec)
+  how fast she is generating (tokens/sec), and live power draw in watts
 
 **A home screen** — 2x2 tiles with hand-drawn line icons: Saya, Talk,
-Wikipedia, Game Boy. Same five colours, same black mode. A clock
+Wikipedia, Game Boy. Same five colours, same black mode. A battery
+indicator that shows a real percentage if the hardware ever reports one,
+and live watts plus runtime-from-full when it doesn't. A clock
 that says when the board hasn't reached the network. Her face has a ⌂
 that goes there. It can boot straight into it.
 
@@ -75,7 +77,7 @@ that goes there. It can boot straight into it.
 one command, and it becomes a sprite: white background removed, squared,
 mouth coloured. The filename becomes the expression name.
 
-**456 tests** covering all of it, run in one command.
+**462 tests** covering all of it, run in one command.
 
 ## Hard-won rules — please respect these in any design idea
 

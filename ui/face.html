@@ -145,7 +145,28 @@ body.hud #scan { display: block; }
   background: rgba(0,0,0,.16); color: rgba(0,0,0,.62);
   border: 1px solid rgba(0,0,0,.16);
 }
-#badge.on { display: block; }
+#badge.on { display: flex; gap: 10px; align-items: center; }
+/* A DRAWN battery, not an emoji: an emoji is a full-colour bitmap that
+   ignores --ink, so it would sit on the black theme as a glossy blob
+   while everything around it went neon. */
+.cell {
+  display: inline-block; vertical-align: -2px;
+  width: 22px; height: 11px; margin-right: 5px;
+  border: 1.5px solid currentColor; border-radius: 3px;
+  position: relative;
+}
+.cell::after {
+  content: ''; position: absolute; right: -4px; top: 3px;
+  width: 2.5px; height: 5px; background: currentColor;
+  border-radius: 0 1px 1px 0;
+}
+.cell b { display: block; height: 100%; background: currentColor; }
+#batt.low { color: #ff4d6a; }
+/* One separator style across the whole chip -- the flex gap alone made
+   the board stats and the battery read as two different rows. */
+#board:not(:empty) + #batt:not(:empty)::before {
+  content: '·'; margin-right: 10px; opacity: .55;
+}
 #badge.warn { background: #d81b3a; color: #fff; border-color: #d81b3a; }
 body.hud #badge {
   background: rgba(0,0,0,.55); color: var(--ink);
@@ -227,7 +248,7 @@ body.hud #empty { color: var(--ink); }
 <div id="empty" hidden></div>
 <div id="scan"></div>
 
-<div id="badge"></div>
+<div id="badge"><span id="board"></span><span id="batt"></span></div>
 <div id="says"></div>
 
 <form id="ask" autocomplete="off">
@@ -428,6 +449,38 @@ function watch() {
     .then(() => setTimeout(watch, 900));
 }
 
+// ---- the battery ----------------------------------------------------
+// THIS DECK CANNOT SEE A PERCENTAGE TODAY and does not pretend to. The
+// power path is a PD bank -> a barrel jack, and a barrel jack carries
+// volts and nothing else: no data line, no fuel gauge, no state of
+// charge. So there are exactly two honest displays and one absence:
+//
+//   a real battery node   ->  the kernel's percentage. Appears by
+//                             itself the day a UPS HAT is added.
+//   the Jetson's own rail ->  WATTS being drawn, measured, right now,
+//                             plus hours FROM FULL at that draw.
+//   neither               ->  nothing at all.
+//
+// "~4.1h/full" is worded that way on purpose. It is not hours
+// REMAINING -- remaining needs a state of charge nothing here can read,
+// and inventing one is the confident lie this project keeps refusing.
+//
+// Identical in home.html, deliberately: two pages, no build step, and a
+// test asserts the two copies agree.
+function charge(box, s) {
+  if (typeof s.percent === 'number') {
+    box.innerHTML = '<i class="cell"><b></b></i>';
+    box.querySelector('b').style.width = s.percent + '%';
+    box.append(s.percent + '%' + (s.charging ? ' chg' : ''));
+    box.classList.toggle('low', s.percent < 20 && !s.charging);
+    return;
+  }
+  box.classList.remove('low');
+  box.textContent = s.watts
+    ? s.watts + 'W' + (s.hours ? '  ·  ~' + s.hours + 'h/full' : '')
+    : '';
+}
+
 // ---- what the board is doing ----------------------------------------
 // Slower than the face poll on purpose: a temperature that updates
 // every second is a number nobody can read.
@@ -436,15 +489,18 @@ function telemetry() {
     .then(r => r.json())
     .then(s => {
       const badge = document.getElementById('badge');
+      const board = document.getElementById('board');
       const bits = [];
       if (s.power) bits.push(s.power);
       if (s.temp) bits.push(s.temp + '°C');
       if (s.rate) bits.push(s.rate + ' t/s');
       // The throttle warning REPLACES the row rather than joining it.
       // It is the only thing on this chip he has to act on.
-      badge.textContent = s.throttled || bits.join('  ·  ');
+      board.textContent = s.throttled || bits.join('  ·  ');
       badge.classList.toggle('warn', !!s.throttled);
-      badge.classList.toggle('on', !!badge.textContent);
+      charge(document.getElementById('batt'), s);
+      badge.classList.toggle('on',
+        !!(board.textContent || document.getElementById('batt').textContent));
     })
     .catch(() => {})
     .then(() => setTimeout(telemetry, 5000));
