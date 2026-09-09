@@ -4830,6 +4830,153 @@ class TestJetsonChecks(unittest.TestCase):
                                f"{name} doesn't explain itself")
 
 
+class TestWikiNamespace(unittest.TestCase):
+    """THE `/wiki` BUG, and it was the parser as predicted.
+
+    Ghost, Sept 10: *"she cant access the wiki and i dont think i can
+    either in that sense"* -- `/wiki cats` came back "Nothing in the
+    archive about 'cats'" in three seconds, so the server ANSWERED and
+    the lookup found nothing in what it said."""
+
+    import yuzu_wiki as wiki
+
+    MODERN = ('<a href="/skin/x.css">s</a>'
+              '<a href="/content/wikipedia_en_simple/Cat">Cat</a>')
+    OLD = '<a href="/wikipedia/A/Cat">Cat</a>'
+
+    def test_the_A_namespace_is_no_longer_REQUIRED(self):
+        """The old regex demanded `/A/`, and modern ZIMs do not have it
+        -- articles live at `/content/<book>/<Article>` with nothing in
+        between. A search that worked returned links the parser could
+        not see, and the miss read as a missing article rather than as a
+        parser that had stopped matching."""
+        self.assertTrue(self.wiki._article_links(self.MODERN),
+                        "a modern kiwix article link is still invisible")
+
+    def test_the_OLD_shape_still_works(self):
+        """His board's version is unknown and cannot be pinned, so the
+        fix must not trade one era for the other."""
+        self.assertTrue(self.wiki._article_links(self.OLD))
+
+    def test_furniture_is_not_mistaken_for_an_article(self):
+        for junk in ('<a href="/skin/style.css">x</a>',
+                     '<a href="/search?pattern=cat">x</a>',
+                     '<a href="/catalog/v2/entries">x</a>',
+                     '<a href="https://example.com/content/x/Cat">x</a>'):
+            self.assertEqual(self.wiki._article_links(junk), [], junk)
+
+    def test_there_is_a_ONE_WORD_diagnostic(self):
+        """The twelve-line diagnostic that would have settled this a day
+        earlier was pasted into HER CHAT instead of the shell, and that
+        is what started the night with no way out. `~/YUZU/wiki --test`
+        is the same information without a paste."""
+        self.assertTrue(hasattr(self.wiki, "diagnose"))
+        script = (Path(__file__).parent / "wiki").read_text()
+        self.assertIn("--test", script, "no one-word diagnostic")
+
+    def test_the_diagnostic_never_raises_with_no_server(self):
+        """It runs precisely when things are broken, so it has to be the
+        one thing that cannot add a traceback to his screen."""
+        old = self.wiki.BASE
+        try:
+            self.wiki.BASE = "http://127.0.0.1:1"
+            lines = self.wiki.diagnose()
+        finally:
+            self.wiki.BASE = old
+        self.assertTrue(lines)
+        self.assertIn("~/YUZU/wiki", " ".join(lines),
+                      "it does not say how to start the server")
+
+
+class TestPull(unittest.TestCase):
+    """`pull` -- get the latest, and SAY whether it worked.
+
+    MEASURED, Sept 10, four seconds after he logged in:
+
+        fatal: unable to access '.../YUZU.git/': server certificate
+        verification failed. CAfile: none CRLfile: none
+
+    He then ran `face`, got the OLD art, and asked why the new faces had
+    not arrived. They had not arrived because the pull FAILED -- but the
+    failure scrolled past above a wall of Ubuntu login banner and the
+    next command printed a cheerful "UP. Open this on your phone."
+
+    A failed update that looks like a successful one costs a whole
+    session wondering why nothing changed."""
+
+    SCRIPT = Path(__file__).parent / "pull"
+
+    def _with_git(self, script_body, timeout=90):
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        try:
+            binv = Path(tmp) / "bin"
+            binv.mkdir()
+            (binv / "git").write_text(script_body)
+            (binv / "git").chmod(0o755)
+            done = subprocess.run(
+                ["bash", str(self.SCRIPT)], capture_output=True, text=True,
+                timeout=timeout,
+                env=dict(os.environ, YUZU_PULL_WAITS="0",
+                         PATH=f"{binv}:{os.environ['PATH']}"))
+            return done
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    TLS_FAIL = ('#!/bin/bash\ncase "$*" in\n'
+                '"rev-parse HEAD") echo abc ;;\n'
+                '"pull origin main") echo "fatal: unable to access: server '
+                'certificate verification failed. CAfile: none" >&2; exit 128 ;;\n'
+                '*) exit 0 ;;\nesac\n')
+
+    def test_it_is_valid_shell_and_executable(self):
+        import subprocess
+        self.assertTrue(os.access(self.SCRIPT, os.X_OK))
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_a_failed_pull_is_LOUD_and_exits_nonzero(self):
+        """The whole point. His terminal showed the failure and then a
+        happy message from the next command, so it read as success."""
+        done = self._with_git(self.TLS_FAIL)
+        self.assertEqual(done.returncode, 1, "a failed pull looked fine")
+        self.assertIn("PULL FAILED", done.stdout)
+        self.assertIn("Nothing was updated", done.stdout)
+
+    def test_a_certificate_failure_names_the_CLOCK(self):
+        """CONFIRMED on the board rather than theorised. The Orin devkit
+        has no RTC battery, so every boot starts at the epoch and a
+        certificate cannot be valid before it was issued. The window is
+        the first minute of uptime -- exactly when someone who just
+        booted is typing.
+
+        Naming the cause is the difference between a thirty-second wait
+        and an evening debugging TLS."""
+        done = self._with_git(self.TLS_FAIL)
+        self.assertIn("clock", done.stdout.lower(),
+                      "it did not name the one cause it can be sure of")
+
+    def test_the_verdict_comes_first(self):
+        """Same rule `pad --status` had to learn: the answer goes above
+        the evidence, not under it."""
+        done = self._with_git(self.TLS_FAIL)
+        text = done.stdout
+        self.assertIn("PULL FAILED", text)
+        # Progress lines are fine. What must not happen is the raw git
+        # error appearing ABOVE the verdict -- that is the shape his
+        # terminal already had, and he read it as success.
+        self.assertLess(text.index("PULL FAILED"), text.index("fatal:"),
+                        "the verdict is buried under the git output")
+
+    def test_it_says_when_HER_FACE_changed(self):
+        """The art is what he notices, and a cached page will show the
+        old faces after a successful pull -- which is the same confusion
+        all over again, one layer up."""
+        self.assertIn("ui/sprites/", self.SCRIPT.read_text())
+        self.assertIn("reload", self.SCRIPT.read_text().lower())
+
+
 class TestDeckSetup(unittest.TestCase):
     """`deck` -- one word, get ready for the screen.
 

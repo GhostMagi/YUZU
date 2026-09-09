@@ -94,38 +94,149 @@ def available():
         return False
 
 
+# The book's short name. Modern kiwix-serve scopes /search and /suggest
+# to a BOOK, and answers a bare query with nothing at all -- which is
+# indistinguishable from "no such article" and is the likeliest reason
+# `/wiki cats` came back empty on a Simple English Wikipedia.
+_BOOK = None
+
+
+def book_name(force=False):
+    """The name kiwix-serve knows his archive by, or "" if it will not
+    say. Asked once and remembered: it cannot change while the server
+    is up, and every lookup would otherwise pay for it."""
+    global _BOOK
+    if _BOOK is not None and not force:
+        return _BOOK
+    _BOOK = ""
+    for path in ("/catalog/v2/entries?count=-1", "/catalog/searchdescription.xml",
+                 "/"):
+        try:
+            page = _get(path, timeout=6)
+        except Exception:
+            continue
+        # The catalog gives it plainly; the root page only ever mentions
+        # it inside a link. Both are worth trying before giving up.
+        for pattern in (r"<name>([^<]+)</name>",
+                        r"bookName=([^&\"'\s]+)",
+                        r"/viewer#([^\"'?&/]+)",
+                        r"/content/([^/\"'?#]+)"):
+            found = re.search(pattern, page)
+            if found:
+                _BOOK = html.unescape(found.group(1)).strip()
+                return _BOOK
+    return _BOOK
+
+
+def _article_links(page):
+    """Article paths out of a search results page.
+
+    **THE `/A/` REQUIREMENT WAS THE BUG.** The old regex demanded that
+    namespace, and modern ZIMs do not have it -- articles live at
+    `/content/<book>/<Article>` with nothing in between. So a search that
+    worked returned links this could not see, and the answer came back
+    `Nothing in the archive`, which reads as a missing article rather
+    than as a parser that stopped matching.
+
+    Now anything under /content/ or /A/ counts, and the obvious
+    furniture is excluded by name rather than by shape."""
+    out, seen = [], set()
+    for href in re.findall(r'href="([^"]+)"', page):
+        href = html.unescape(href)
+        if not href.startswith("/"):
+            continue
+        if "/content/" not in href and "/A/" not in href:
+            continue
+        if any(skip in href for skip in ("/skin/", "/search?", "/suggest?",
+                                         "/catalog/", "/random", "/viewer",
+                                         ".css", ".js", ".png", ".svg")):
+            continue
+        if href not in seen:
+            seen.add(href)
+            out.append(href)
+    return out
+
+
 def _suggest(term):
     """Ask Kiwix for matching article paths.
 
-    Two endpoints because kiwix-serve has changed shape across
-    versions and this project cannot pin the one on his board: newer
-    builds answer /suggest with JSON, older ones only have /search
-    returning HTML. Try the clean one, fall back to scraping links.
-    """
+    Several shapes, because kiwix-serve has changed across versions and
+    this project cannot pin the one on his board. Each is cheap and the
+    first that answers wins."""
     quoted = urllib.parse.quote(term)
-    try:
-        raw = _get(f"/suggest?term={quoted}")
-        hits = json.loads(raw)
-        paths = [h["path"] for h in hits
-                 if isinstance(h, dict) and h.get("path")]
+    book = book_name()
+    scoped = ("&books.name=" + urllib.parse.quote(book)) if book else ""
+
+    for path in (f"/suggest?term={quoted}&count=10{scoped}",
+                 f"/suggest?term={quoted}{scoped}",
+                 f"/suggest?term={quoted}"):
+        try:
+            hits = json.loads(_get(path))
+        except Exception:
+            continue
+        if isinstance(hits, dict):
+            hits = hits.get("suggestions") or hits.get("items") or []
+        paths = []
+        for hit in hits:
+            if not isinstance(hit, dict):
+                continue
+            # `path` when it is offered; otherwise build one from the
+            # title, which is what the newer JSON gives back.
+            if hit.get("path"):
+                where = hit["path"]
+                paths.append(where if where.startswith("/") else "/" + where)
+            elif hit.get("value") and book:
+                paths.append("/content/%s/%s" % (
+                    book, urllib.parse.quote(hit["value"].replace(" ", "_"))))
         if paths:
             return paths
-    except Exception:
-        pass
 
+    for path in (f"/search?books.name={urllib.parse.quote(book)}&pattern={quoted}"
+                 if book else None,
+                 f"/search?pattern={quoted}",
+                 f"/search?books.filter.lang=eng&pattern={quoted}"):
+        if not path:
+            continue
+        try:
+            page = _get(path)
+        except Exception:
+            continue
+        found = _article_links(page)
+        if found:
+            return found
+    return []
+
+
+def diagnose():
+    """What the server ACTUALLY says, short enough for a phone terminal.
+
+    The 12-line diagnostic that would have settled this a day ago was
+    pasted into her chat instead of the shell, and that is what started
+    the night with no way out. One word, four lines of output, no
+    paste."""
+    lines = []
     try:
-        page = _get(f"/search?pattern={quoted}")
-    except Exception:
-        return []
-    # Article links look like /content/<book>/A/<Article> or /<book>/A/...
-    found = re.findall(r'href="(/[^"]*?/A/[^"#?]+)"', page)
-    seen, paths = set(), []
-    for href in found:
-        cleaned = html.unescape(href)
-        if cleaned not in seen:
-            seen.add(cleaned)
-            paths.append(cleaned)
-    return paths
+        _get("/", timeout=4)
+        lines.append("server:   answering on " + BASE)
+    except Exception as exc:
+        lines.append("server:   NOT ANSWERING (%s)" % exc)
+        lines.append("          start it with:  ~/YUZU/wiki")
+        return lines
+    book = book_name(force=True)
+    lines.append("book:     " + (book or "COULD NOT FIND ONE -- see below"))
+    for label, path in (("suggest", "/suggest?term=cat&count=5"),
+                        ("search", "/search?pattern=cat")):
+        try:
+            body = _get(path, timeout=6)
+            links = len(_article_links(body))
+            lines.append("%-9s %d bytes, %d article links" %
+                         (label + ":", len(body), links))
+        except Exception as exc:
+            lines.append("%-9s FAILED (%s)" % (label + ":", exc))
+    hits = _suggest("cat")
+    lines.append("result:   %d paths%s" %
+                 (len(hits), ("  first: " + hits[0]) if hits else ""))
+    return lines
 
 
 def start_server(wait=12):
@@ -219,6 +330,15 @@ def as_context(term):
 def _cli(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
+        return 0
+    if argv[0] in ("--test", "--why"):
+        # One word instead of a twelve-line paste. The paste is what
+        # went into her chat by mistake and started the night that cost
+        # two power cycles.
+        print()
+        for line in diagnose():
+            print("   ", line)
+        print()
         return 0
     if argv[0] == "--check":
         print("wiki is UP" if available()

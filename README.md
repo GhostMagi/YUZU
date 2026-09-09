@@ -48,7 +48,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 422 tests, ~18 seconds
+python YUZU_TESTER.py         # 432 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 ```
 
@@ -94,7 +94,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 422 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 432 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -106,9 +106,10 @@ $400.
 | `yuzu_voice.py` | Piper TTS. The project's one dependency boundary |
 | **The deck** | One word each, no arguments to remember |
 | `face` | Serve her face; open the address on the phone |
-| `wiki` | Offline Wikipedia (kiwix-serve), finds the .zim itself |
+| `wiki` | Offline Wikipedia (kiwix-serve). `--test` says why a lookup missed |
 | `gba` | VNC desktop + mGBA on the newest ROM |
 | `pad` | Pair the 8BitDo. Try the USB cable first |
+| `pull` | **Get the latest and say whether it worked.** Waits for the clock |
 | `deck` | **Get ready for the screen. One word.** `--check` for an inventory |
 | `deckapps` | Install touch app icons. `--autostart` boots into the home screen |
 | `tile` | Auto-tiling windows (Pop Shell). `--off` gives floating back |

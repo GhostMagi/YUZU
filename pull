@@ -1,0 +1,101 @@
+#!/bin/bash
+# Get the latest, and SAY whether it worked.
+#
+#   ~/YUZU/pull
+#
+# WHY THIS EXISTS. Sept 10, four seconds after logging in:
+#
+#   fatal: unable to access 'https://github.com/GhostMagi/YUZU.git/':
+#   server certificate verification failed. CAfile: none CRLfile: none
+#
+# Then he ran `face`, got the OLD art, and asked why the new faces had
+# not arrived. They had not arrived because THE PULL FAILED -- but the
+# failure scrolled past above a wall of Ubuntu login banner, and the
+# next command printed a cheerful "UP. Open this on your phone."
+#
+# **The Orin Nano devkit ships with no RTC battery.** Every boot starts
+# at the epoch and stays there until NTP reaches the network, and a
+# certificate cannot be valid before it was issued. The window where
+# that is true is the first minute of uptime -- exactly when someone who
+# just booted the board is typing. CLAUDE.md carried this as a theory
+# for a day; this is the confirmation.
+#
+# So: wait for the clock, retry, and put the VERDICT FIRST. A failed
+# update that looks like a successful one costs him a whole session
+# wondering why nothing changed.
+
+set -u
+cd "$(cd "$(dirname "$0")" && pwd)" || exit 1
+
+# --- wait for the clock ------------------------------------------------
+# Not a sleep: it watches, tells him why, and gives up saying something
+# useful rather than hanging forever on a board with no network.
+year=$(date +%Y)
+if [ "$year" -lt 2020 ]; then
+    echo
+    echo "  This board thinks it is $year -- it has no clock battery and"
+    echo "  has not reached the network yet. HTTPS cannot work until it"
+    echo "  does. Waiting..."
+    for _ in $(seq 1 24); do
+        sleep 5
+        year=$(date +%Y)
+        [ "$year" -ge 2020 ] && break
+    done
+    if [ "$year" -lt 2020 ]; then
+        echo
+        echo "  Still $year after two minutes, so this board is not on"
+        echo "  the network at all. Check WiFi, then run this again."
+        echo
+        exit 1
+    fi
+    echo "  Clock is set. Carrying on."
+fi
+
+# --- pull, with retries ------------------------------------------------
+before=$(git rev-parse HEAD 2>/dev/null)
+# Overridable so the SUITE does not sit through 14 seconds of backoff
+# three times over. The default is what he actually gets.
+WAITS=${YUZU_PULL_WAITS:-"0 2 4 8"}
+out=""; ok=0
+for wait in $WAITS; do
+    [ "$wait" -gt 0 ] && sleep "$wait"
+    out=$(git pull origin main 2>&1) && { ok=1; break; }
+    echo "  retrying..."
+done
+after=$(git rev-parse HEAD 2>/dev/null)
+
+# --- the verdict, FIRST ------------------------------------------------
+echo
+if [ "$ok" = 0 ]; then
+    echo "  PULL FAILED. Nothing was updated."
+    echo
+    echo "$out" | sed 's/^/    /' | tail -6
+    echo
+    case "$out" in
+        *certificate*) echo "  That is the clock again. Wait a minute and retry." ;;
+        *"Could not resolve"*|*"unable to access"*)
+            echo "  The board cannot reach GitHub. Check WiFi." ;;
+        *conflict*|*"local changes"*)
+            echo "  You have edits on the board that would be overwritten."
+            echo "  Nothing was touched. Ask before forcing anything." ;;
+    esac
+    echo
+    exit 1
+fi
+
+if [ "$before" = "$after" ]; then
+    echo "  ALREADY UP TO DATE. Nothing changed."
+else
+    echo "  UPDATED."
+    echo
+    git log --oneline "$before..$after" 2>/dev/null | head -6 | sed 's/^/    /'
+    changed=$(git diff --name-only "$before" "$after" 2>/dev/null | wc -l)
+    echo
+    echo "    $changed files changed."
+    # Her art is the thing he notices, so name it when it moved.
+    if git diff --name-only "$before" "$after" 2>/dev/null \
+        | grep -q '^ui/sprites/'; then
+        echo "    HER FACE CHANGED -- reload the page, do not just look at it."
+    fi
+fi
+echo

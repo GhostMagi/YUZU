@@ -4,6 +4,7 @@
 #   ~/YUZU/wiki           start it, print the address to open
 #   ~/YUZU/wiki --off     stop it
 #   ~/YUZU/wiki --status  is it up, and where
+#   ~/YUZU/wiki --test    WHY a lookup found nothing
 #
 # The last attempt at this ran kiwix-serve in the FOREGROUND. It held
 # the terminal, which on a phone serial link is indistinguishable from
@@ -38,6 +39,9 @@ find_zim() {
 }
 
 case "${1:-}" in
+--test|--why)
+    # What the server actually says, four lines, no paste.
+    exec python3 "$(cd "$(dirname "$0")" && pwd)/yuzu_wiki.py" --test ;;
 --off)
     pkill -f kiwix-serve 2>/dev/null && echo "Wiki stopped." \
                                      || echo "It was not running."

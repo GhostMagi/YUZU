@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 422 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 432 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 422 tests pass on it. Getting it
+(that repo path is confirmed working). 432 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -727,7 +727,50 @@ the fix is right either way -- but the confidence was not earned.
 session.** Check what the person can actually reach before calling
 something a workaround.
 
-## STILL OPEN: `/wiki` finds nothing in his archive
+## SOLVED (probably): `/wiki` found nothing because of the `/A/` namespace
+
+Ghost, Sept 10: *"she cant access the wiki and i dont think i can either
+in that sense."* `/wiki cats` -> `Nothing in the archive about 'cats'`
+in three seconds, so **the server answered and the parser found nothing
+in what it said.**
+
+**The prediction below was right.** `_suggest`'s fallback regex demanded
+`/A/` in every article link, and modern ZIMs do not have that namespace
+-- articles live at `/content/<book>/<Article>` with nothing in between.
+A search that worked perfectly returned links the parser could not see,
+and the miss reported as a MISSING ARTICLE rather than as a parser that
+had stopped matching. Same shape as everything else this week: the
+failure did not look like what it was.
+
+**A second cause was found while fixing the first, and it may matter
+more.** Modern kiwix-serve scopes `/search` and `/suggest` to a BOOK,
+and answers an unscoped query with nothing at all -- again
+indistinguishable from "no such article". `book_name()` now discovers it
+from `/catalog/v2/entries`, falling back to scraping the root page, and
+every query carries it.
+
+`_suggest` now tries several endpoint shapes and parses the JSON
+generously (a `path` key when offered, otherwise built from the title).
+`_article_links` accepts `/content/` OR `/A/` and excludes furniture by
+NAME rather than by shape. Verified against stub servers of BOTH eras:
+modern returns `/content/wikipedia_en_simple/Cat`, old returns
+`/wikipedia/A/Cat`, neither breaks the other.
+
+**PROBABLY, not certainly.** Everything here is still against stubs --
+his archive is the only thing that can confirm it, which is the standing
+limit on every "tested in a sim" claim in this file.
+
+**`~/YUZU/wiki --test` is the confirmation, in one word.** The twelve-
+line diagnostic that would have settled this a day earlier was pasted
+into HER CHAT instead of the shell, and that is what started the night
+that cost two power cycles. Four lines of output, no paste: whether the
+server answers, what book it found, how many article links each endpoint
+gives back, and what a real lookup returns.
+
+**The generalisable bit: when a diagnostic is too long to run, it does
+not get run.** Its length was the reason it never happened.
+
+## The original note, kept because the reasoning is what found it:
 
 The server starts correctly (measured: 3 seconds, then an answer), so
 `Nothing in the archive about 'ice cream'` on a Simple English
@@ -1892,10 +1935,35 @@ certificate is invalid if the clock thinks it is 1969, and the window
 where that is true is exactly the first minute of uptime -- which is
 when someone who just booted the board is typing.
 
-Not proof, and the original "transient, retry worked" is consistent
-with both readings. But it fits better than nothing, and the practical
-rule is the same either way: **a TLS failure on a freshly booted board
-is the clock. Wait thirty seconds and retry rather than debugging it.**
+**CONFIRMED, Sept 10, and it cost him a session.** Four seconds after
+logging in:
+
+    fatal: unable to access 'https://github.com/GhostMagi/YUZU.git/':
+    server certificate verification failed. CAfile: none CRLfile: none
+
+He then ran `face`, got the OLD art, and asked why the new faces had
+not arrived. **They had not arrived because the pull failed** -- but
+the failure scrolled past above a wall of Ubuntu login banner, and the
+very next command printed a cheerful "UP. Open this on your phone."
+
+So the theory below is now a finding, and the practical rule stands:
+**a TLS failure on a freshly booted board is the clock. Wait thirty
+seconds and retry rather than debugging it.**
+
+**`~/YUZU/pull` exists so it cannot happen again.** It waits for the
+clock (watching `date +%Y`, not sleeping blind), retries with backoff,
+and **puts the VERDICT FIRST** -- `UPDATED`, `ALREADY UP TO DATE` or
+`PULL FAILED` -- above the git output rather than under it. A
+certificate error names the clock; an unresolved host names WiFi; local
+changes say nothing was touched. And when `ui/sprites/` moved it says
+HER FACE CHANGED, because a cached page showing the old art is the same
+confusion one layer up.
+
+**The general shape, and this project keeps meeting it: a failure that
+scrolls past is a failure that did not happen, as far as the person is
+concerned.** The next command's success message is what he read. Same
+family as `pad --status` burying its verdict, and the fix is the same
+one: the answer goes above the evidence.
 
 The general lesson is one this file already has in another form:
 checking a symptom AFTER the system self-corrects proves nothing about
