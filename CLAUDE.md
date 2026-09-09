@@ -527,10 +527,24 @@ trap this time, because `quit` worked. But it is the third shell
 command he has typed into her chat (after `pkill -f yuzu_brain` and the
 12-line diagnostic paste), which makes it a pattern rather than a slip:
 **the chat prompt and the shell prompt look identical on that
-terminal.** Not fixing it now -- guessing at "was that meant for the
-shell?" risks eating real messages -- but if it costs him anything, the
-cheap version is a one-line hint when a message is exactly a known
-command name, never an auto-run.
+terminal.** **CLOSED, and NOT as a compromise. Ghost's call:** *"yea no leave the
+prompts alone she feels reactive and quick witted dw bro"*
+
+That is a better read than mine. I logged it as an input-routing fault;
+he experienced it as her being FAST -- he typed something odd and she
+came straight back with something in character. **A command that lands
+in her chat is a free adversarial prompt, and she keeps passing it.**
+
+So this is a DECISION, not an open item. Do not add command detection,
+do not add a "did you mean the shell?" hint, do not special-case
+anything. A guess about intent can only ever eat real messages, and the
+thing it would be protecting is a trap that `quit` already closes --
+confirmed live in the same session.
+
+**The generalisable bit: he is the one using it, and "this is a bug"
+is a hypothesis until he says so.** The `pkill` night was a real trap
+and he said so immediately, in capitals. This was not, and he said that
+too.
 
 ## The `quit` bug: the check was never missing (Sept 9)
 
