@@ -158,14 +158,60 @@ PY
     fi
 fi
 
+# ENABLING WITHOUT A KEYBOARD.
+#
+# `gnome-extensions enable` only works on an extension the running shell
+# has already LOADED, and a shell loads new ones at startup. The usual
+# advice is Alt+F2 -> r, which assumes a keyboard and a screen. Ghost
+# has neither yet: "i cant hit alt-f2-r-enter until i get the keyboard
+# and screen goin".
+#
+# So fall back to what `enable` writes anyway -- the uuid in
+# org.gnome.shell enabled-extensions. That key is read at every GNOME
+# startup, so the extension comes on BY ITSELF the first time he logs
+# into the desktop with the panel plugged in. No keyboard, no restart,
+# nothing to remember later.
+enable_ext() {
+    gnome-extensions enable "$1" 2>/dev/null && return 0
+    command -v gsettings >/dev/null 2>&1 || return 1
+    local key=org.gnome.shell
+    local now; now=$(gsettings get $key enabled-extensions 2>/dev/null) || return 1
+    case "$now" in *"$1"*) return 0 ;; esac      # already listed
+    if [ "$now" = "@as []" ] || [ "$now" = "[]" ]; then
+        gsettings set $key enabled-extensions "['$1']" 2>/dev/null
+    else
+        gsettings set $key enabled-extensions \
+            "$(echo "$now" | sed "s/]$/, '$1']/")" 2>/dev/null
+    fi
+}
+
 ext=$(which_ext)
-if [ -z "$ext" ] || ! gnome-extensions enable "$ext" 2>/dev/null; then
+if [ -z "$ext" ]; then
     echo
-    echo "  Installed, but GNOME has not picked it up yet."
-    echo "  In the desktop press Alt+F2, type  r , press Enter."
-    echo "  Then run  ~/YUZU/tile  again."
+    echo "  Nothing installed itself. Its output is above."
     echo
     exit 1
+fi
+
+if ! enable_ext "$ext"; then
+    echo
+    echo "  Installed, but it could not be switched on from here."
+    echo "  Run  ~/YUZU/tile  again once a desktop is up."
+    echo
+    exit 1
+fi
+
+if ! live "$ext"; then
+    echo
+    echo "  Installed and SET TO COME ON, but this GNOME has not loaded"
+    echo "  it yet -- a shell only picks up new extensions at startup."
+    echo
+    echo "  Nothing for you to do. It turns itself on the first time you"
+    echo "  log into the desktop with the screen plugged in."
+    echo
+    echo "  If you want it sooner and have a keyboard: Alt+F2, r, Enter."
+    echo
+    exit 0
 fi
 
 # A few pixels of breathing room, but only a few. On 1024x600 every

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 395 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 396 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 395 tests pass on it. Getting it
+(that repo path is confirmed working). 396 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -912,6 +912,28 @@ matches THIS GNOME version and hands it to `gnome-extensions install`.
 Asking rather than guessing a URL is what survives the next GNOME
 release. Pop Shell is still tried first, because it is one apt line and
 costs two seconds.
+
+**FORGE INSTALLED CLEANLY ON THE BOARD -- and then the enable step was
+a dead end.** Verified live: `Forge downloaded and installed.` followed
+immediately by *"Installed, but GNOME has not picked it up yet. In the
+desktop press Alt+F2, type r, press Enter."* Ghost: *"i cant hit
+alt-f2-r-enter until i get the keyboard and screen goin"*.
+
+**Correct advice, and useless, which is this project's oldest mistake
+in a new costume.** `pkill` in another terminal, SSH as a second
+session, mGBA's Refresh button -- every one of them was true and out of
+his reach. **Never ship an instruction that needs hardware he does not
+have.**
+
+The fix is that the restart was never necessary. `gnome-extensions
+enable` only works on an extension the running shell has already
+LOADED, and shells load new ones at startup -- but all it ultimately
+does is put the uuid in `org.gnome.shell enabled-extensions`, and THAT
+key is read at every GNOME startup. So `tile` writes it directly and
+says the true thing: nothing to do, it turns itself on the first time
+he logs into the desktop with the panel attached. Alt+F2 stays, as an
+aside for when he has a keyboard, and a test pins that it appears
+AFTER the sentence saying waiting is enough.
 
 **Forge's keyboard shortcuts are NOT printed**, deliberately. They were
 never verified on this board, and unverified keystrokes stated as steps

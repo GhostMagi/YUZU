@@ -4882,6 +4882,33 @@ class TestTiling(unittest.TestCase):
         self.assertNotIn("apt install", done.stdout,
                          "it tried to install on a box with no GNOME")
 
+    def test_it_can_be_switched_on_without_a_keyboard(self):
+        """Ghost, Sept 9: "i cant hit alt-f2-r-enter until i get the
+        keyboard and screen goin". The standard advice for a freshly
+        installed GNOME extension assumes both.
+
+        `gnome-extensions enable` only works on an extension the running
+        shell has already LOADED, and shells load them at startup. But
+        all `enable` ultimately does is put the uuid in
+        org.gnome.shell enabled-extensions, and THAT key is read at
+        every startup -- so writing it directly means tiling switches
+        itself on the first time he logs in with the panel attached.
+
+        Same rule as the whole project: never ship an escape hatch that
+        depends on something he cannot reach."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("enabled-extensions", body,
+                      "the only way to switch it on needs a keyboard")
+        # And Alt+F2 must be an ASIDE, not the instruction. He hit the
+        # old message live: "Installed, but GNOME has not picked it up
+        # yet. In the desktop press Alt+F2..." -- correct, useless, and
+        # a dead end on a board with no keyboard attached.
+        self.assertIn("turns itself on", body,
+                      "it does not tell him that waiting is enough")
+        self.assertLess(body.index("turns itself on"), body.index("Alt+F2, r"),
+                        "the keyboard workaround is offered before the "
+                        "thing that needs no keyboard")
+
     def test_it_falls_back_to_forge_without_a_browser(self):
         """MEASURED ON THE BOARD, Sept 9: `E: Unable to locate package
         gnome-shell-extension-pop-shell`. Pop Shell ships in Pop!_OS's
