@@ -201,6 +201,11 @@ fetch('sprites.json', { cache: 'no-store' })
 // touchscreen with no keyboard anywhere near it.
 document.getElementById('face').onclick = () => show(current + 1);
 
+// ⌂ goes to the home screen. It was decoration until now, which is
+// worse than not being there: a button that does nothing on a
+// touchscreen reads as a broken deck.
+document.getElementById('home').onclick = () => { location.href = 'home.html'; };
+
 // ---- blink --------------------------------------------------------
 // The cheapest thing that makes a face look alive, and the difference
 // between "her face is on screen" and "she is sitting there".

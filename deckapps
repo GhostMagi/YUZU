@@ -2,6 +2,7 @@
 # Put real APP ICONS on the deck. Run once.
 #
 #   ~/YUZU/deckapps            install the launchers
+#   ~/YUZU/deckapps --autostart boot straight into the home screen
 #   ~/YUZU/deckapps --remove   take them back off
 #
 # Ghost, Sept 9: "as far as the https blah blah number number in a
@@ -20,9 +21,35 @@ APPS="$HOME/.local/share/applications"
 DESKTOP="$HOME/Desktop"
 YUZU="$HOME/YUZU"
 
+AUTO="$HOME/.config/autostart"
+
 if [ "${1:-}" = "--remove" ]; then
     rm -f "$APPS"/yuzu-*.desktop "$DESKTOP"/yuzu-*.desktop
-    echo "Launchers removed."
+    rm -f "$AUTO/yuzu-home.desktop"
+    echo "Launchers removed, and the deck boots to the plain desktop."
+    exit 0
+fi
+
+# --autostart makes the deck BOOT into the home screen instead of a bare
+# Ubuntu desktop. Deliberately opt-in and deliberately reversible with
+# --remove: a machine that boots straight into a kiosk page is a bad
+# place to be if the page is broken, and his only other way in is a
+# serial cable.
+#
+# It is a plain browser window, NOT a locked kiosk. He can close it and
+# he is on the normal desktop -- that matters more than the effect, and
+# CLAUDE.md is blunt about why: a UI that can trap him is strictly worse
+# than a terminal.
+if [ "${1:-}" = "--autostart" ]; then
+    [ -f "$APPS/yuzu-home.desktop" ] || {
+        echo "Install the apps first:  ~/YUZU/deckapps"; exit 1; }
+    mkdir -p "$AUTO"
+    cp "$APPS/yuzu-home.desktop" "$AUTO/yuzu-home.desktop"
+    echo "X-GNOME-Autostart-enabled=true" >> "$AUTO/yuzu-home.desktop"
+    echo
+    echo "  The deck will open the home screen when you log in."
+    echo "  Undo with:  ~/YUZU/deckapps --remove  (then rerun deckapps)"
+    echo
     exit 0
 fi
 
@@ -105,6 +132,41 @@ APP
         "$YUZU/.wiki-app" "accessories-dictionary" "yuzu-wiki"
 else
     echo "  SKIPPED Wikipedia: no browser found."
+    echo "    sudo apt install -y chromium-browser"
+fi
+
+# --- Her face, and the home screen ------------------------------------
+# Both are pages served by yuzu_face.py, so ONE wrapper starts the
+# server and waits for the port before opening anything. A tap landing
+# on a dead port is the same dead end as typing the address wrong, just
+# prettier -- the wiki launcher already learned this.
+#
+# 127.0.0.1, not the LAN address: on the deck's own screen the client
+# IS the deck, and loopback never changes with the network.
+if [ -n "$BROWSER" ]; then
+    cat > "$YUZU/.face-app" <<APP
+#!/bin/bash
+# \$1 is the page to open: face.html or home.html
+"$YUZU/face" >/dev/null 2>&1
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    python3 -c "
+import socket,sys
+s=socket.socket(); s.settimeout(1)
+try: s.connect(('127.0.0.1', 8081))
+except Exception: sys.exit(1)
+finally: s.close()
+" 2>/dev/null && break
+    sleep 1
+done
+exec ${BROWSER/URL/http://127.0.0.1:8081/\$1}
+APP
+    chmod +x "$YUZU/.face-app"
+    write_app "Saya's Face" "Her face on the screen" \
+        "$YUZU/.face-app face.html" "face-smile" "yuzu-face"
+    write_app "Deck" "Home screen" \
+        "$YUZU/.face-app home.html" "go-home" "yuzu-home"
+else
+    echo "  SKIPPED Saya's Face and Deck: no browser found."
     echo "    sudo apt install -y chromium-browser"
 fi
 

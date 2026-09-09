@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 397 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 407 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 397 tests pass on it. Getting it
+(that repo path is confirmed working). 407 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -940,6 +940,73 @@ there with her eyes shut on `blink`.
 others carry a soft grey halo from the crop. It shows against the neon
 backgrounds. Harmless, and a tighter crop or a threshold pass would fix
 it -- not worth touching unless it bothers him.
+
+## THE HOME SCREEN — the deck is an object now (Sept 10)
+
+Ghost, before bed: *"id like home button to take me to a desktop with
+my apps and a saya button visible... so i can wake up to a git pull and
+plug and play features"*.
+
+    ~/YUZU/face                serve it
+    ui/home.html               the home screen
+    ui/face.html               her face; the ⌂ goes home
+    ~/YUZU/deckapps            five icons now
+    ~/YUZU/deckapps --autostart   boot into the home screen
+
+**FIRST: I CANNOT WORK WHILE HE SLEEPS.** There is no background mode
+-- I run only while a turn is open. He asked whether I could and the
+honest answer is no, so the whole thing was built in ONE turn before he
+went to bed rather than promised for the morning. Worth keeping because
+he will ask again: **the cheapest shape for his budget is one long turn,
+not many short ones.**
+
+**A WEB PAGE CANNOT START mGBA, and that is the only hard problem in
+it.** The page POSTs a NAME to `/launch/<name>` and `yuzu_face.py`
+looks it up in a fixed dict. Nothing from the request reaches a shell
+-- no arguments, no path, no interpolation, no `shell=True`. Everything
+it can run is a script he could already tap in the app menu, so this
+adds a ROUTE to existing things rather than new power.
+
+**That matters because the server binds 0.0.0.0.** Anything looser is a
+box on his WiFi that runs what it is told. Verified against the real
+server with raw sockets, not just the test suite: `gba;rm -rf /`,
+`../../etc/passwd`, a NUL byte and `wiki'&&touch /tmp/pwned` all come
+back *"not a thing this deck knows how to open"*, and `/tmp/pwned` was
+never created.
+
+**THE FIRST LAYOUT WAS WRONG AND A SCREENSHOT CAUGHT IT.** `auto-fit`
+left Game Boy orphaned on a row of its own with half the panel empty.
+Every test passed. Rendering it headless at the panel's real 1024x600
+and LOOKING took ten seconds -- fourth time in two days that looking is
+what found it, after the iris ring, the painted eye, and the mouth
+tones. **For anything with a layout or a picture, render it and look.**
+It is a 2x2 now, four equal thumb targets, her tile white so it is
+unmistakably the main one.
+
+**The clock says when the board has not reached the network.** It has
+no RTC and starts at 1969 until NTP lands -- already recorded as the
+likely cause of a TLS failure. On screen that is a `clock not set` line
+rather than a time that is quietly, confidently wrong.
+
+**A tap that appears to do nothing reads as a broken deck**, so every
+tile says what it is doing and says it long enough to read. The failure
+messages name the fix: no terminal installed says `sudo apt install -y
+xterm`, and a dead server says to start `~/YUZU/face`.
+
+**Autostart is OPT-IN and it is a WINDOW, not a kiosk.** `--autostart`
+is a separate word from installing the icons, `--remove` undoes it, and
+the page opens in an ordinary browser window he can close onto the
+normal desktop. CLAUDE.md is blunt about why and it has been earned:
+**a UI that can trap him is strictly worse than a terminal**, because
+there is not even a keyboard to type an exit into. Two power cycles
+already paid for that rule.
+
+**STILL NOT BUILT: the `ghost` passcode screen.** Deliberately left,
+and not from lack of time. A lock screen wants text entry, and on a
+touchscreen with no keyboard attached that means building an on-screen
+keypad -- which is exactly the kind of thing that traps him if it has a
+bug. It needs to be designed as something he can always get out of
+before it is worth writing. `DECK_UI.md` still holds the shape of it.
 
 ## OPEN, and Ghost asked to be reminded: the right-angle adapters
 

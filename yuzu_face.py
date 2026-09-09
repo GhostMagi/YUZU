@@ -27,6 +27,8 @@ the colouring for free.
 
 import json
 import os
+import shutil
+import subprocess
 import zlib
 import struct
 import sys
@@ -355,6 +357,82 @@ def paint(path, out_path=None):
     return out_path
 
 
+# ---------------------------------------------------------------------
+# LAUNCHING NATIVE APPS FROM THE HOME PAGE.
+#
+# Ghost, Sept 10: "id like home button to take me to a desktop with my
+# apps and a saya button visible."
+#
+# A web page cannot start mGBA, so the page POSTs a NAME and this runs
+# the matching script. The whole design is in one word: ALLOWLIST.
+# `launch()` takes a key, looks it up in a fixed dict, and runs what is
+# there. Nothing from the request reaches a shell -- no arguments, no
+# path, no string interpolation. Anything looser is a local web server
+# that executes what it is told, on a board sitting on his WiFi.
+#
+# Everything it can run is a script he could already tap in the app
+# menu, so this adds a route to existing things rather than new power.
+# ---------------------------------------------------------------------
+
+TERMINALS = ("xfce4-terminal", "lxterminal", "mate-terminal",
+             "gnome-terminal", "xterm")
+
+
+def _terminal():
+    for t in TERMINALS:
+        found = shutil.which(t)
+        if found:
+            return found
+    return None
+
+
+def launchers():
+    """key -> (argv, what to say, where to send the browser next).
+
+    Built fresh each call so a terminal installed after boot is picked
+    up without a restart -- and so a MISSING one is reported as missing
+    rather than silently doing nothing."""
+    here = HERE
+    plans = {
+        "gba": ([os.path.join(here, "gba")],
+                "Game Boy is starting on the deck's screen.", None),
+        "wiki": ([os.path.join(here, "wiki")],
+                 "Wikipedia is starting.", "http://127.0.0.1:8080"),
+    }
+    term = _terminal()
+    if term:
+        plans["chat"] = (
+            [term, "-e", "bash", "-c",
+             "cd %s && python3 yuzu_brain.py --chat; exec bash" % here],
+            "She is opening in a terminal on the deck's screen.", None)
+    return plans
+
+
+def launch(name):
+    """(ok, message, open_url). Never raises and never runs anything
+    that is not in the dict."""
+    plans = launchers()
+    if name not in plans:
+        if name == "chat":
+            return (False, "No terminal emulator on this board -- "
+                           "install one: sudo apt install -y xterm", None)
+        return (False, "Not a thing this deck knows how to open.", None)
+    argv, said, opens = plans[name]
+    if not os.path.exists(argv[0]) and not shutil.which(argv[0]):
+        return (False, "%s is missing from ~/YUZU." % os.path.basename(argv[0]),
+                None)
+    try:
+        # Detached, always. A launcher that holds this server hostage
+        # would take her face down with it, and a foreground process on
+        # this board has already cost two power cycles.
+        subprocess.Popen(argv, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+    except Exception as exc:
+        return (False, "It would not start: %s" % exc, None)
+    return (True, said, opens)
+
+
 class _Handler(SimpleHTTPRequestHandler):
     """Static files out of ui/, plus one generated endpoint.
 
@@ -377,6 +455,19 @@ class _Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         return super().do_GET()
+
+    def do_POST(self):
+        path = self.path.split("?")[0].rstrip("/")
+        if not path.startswith("/launch/"):
+            self.send_error(404)
+            return
+        ok, said, opens = launch(path[len("/launch/"):])
+        body = json.dumps({"ok": ok, "said": said, "open": opens}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def log_message(self, *a):
         pass                      # the shell script prints what matters

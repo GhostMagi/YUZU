@@ -1,0 +1,223 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deck</title>
+<!--
+  The home screen. Ghost, Sept 10: "id like home button to take me to a
+  desktop with my apps and a saya button visible."
+
+  This is the thing the ⌂ on her face goes to, and the thing the deck
+  boots into. Big touch targets, no text entry anywhere, no scrolling
+  on 1024x600.
+
+  A WEB PAGE CANNOT START mGBA. That is the one real problem here, and
+  the answer is a POST to `/launch/<name>` which yuzu_face.py runs
+  against a HARD-CODED ALLOWLIST -- three names, no arguments from the
+  page, nothing that can become "run this string". Anything else is a
+  local web server that executes what it is told, on a board sitting on
+  his WiFi.
+
+  Same four colours as her face, same storage key, so changing it in
+  one place changes it in both.
+
+  No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --bg:   #ff2d95;
+  --ink:  #10080d;
+  --tile: rgba(255,255,255,.82);
+  --edge: rgba(0,0,0,.30);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100vh; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px system-ui, -apple-system, sans-serif;
+  transition: background .45s ease;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- top bar: the clock, and nothing else -------------------------
+   The board has no RTC and starts at 1969 until NTP lands, so a wrong
+   clock here is a KNOWN state rather than a bug -- see CLAUDE.md. It
+   is still worth showing: it is the fastest way to notice the board
+   has not reached the network yet.                                  */
+#top {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 14px 20px 4px;
+}
+#clock { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+#date  { font-size: 14px; opacity: .65; }
+#warn  { margin-left: auto; font-size: 13px; font-weight: 600;
+         opacity: .8; display: none; }
+
+/* ---- the tiles ---------------------------------------------------- */
+/* 2x2, filling the screen. The first layout used auto-fit and left
+   Game Boy orphaned on a row of its own with half the panel empty --
+   caught by screenshotting it at the panel's real 1024x600 rather than
+   by reading the CSS. Same rule as the art: look at it. */
+#grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 14px;
+  padding: 8px 20px 16px;
+  min-height: 0;
+}
+@media (max-width: 560px) { #grid { grid-template-columns: 1fr; } }
+.tile {
+  background: var(--tile);
+  border: 2px solid var(--edge);
+  border-radius: 18px;
+  display: flex; flex-direction: column; justify-content: center;
+  align-items: center; gap: 6px;
+  padding: 18px 12px;
+  cursor: pointer;
+  transition: transform .12s ease, opacity .2s;
+}
+.tile:active { transform: scale(.96); }
+.tile .big { font-size: 40px; line-height: 1; }
+.tile b { font-size: 17px; font-weight: 700; }
+.tile span { font-size: 12.5px; opacity: .6; text-align: center; }
+.tile.busy { opacity: .55; }
+
+/* Her tile is the one he asked for by name, so it is the bright one --
+   same size as the rest, because four equal targets is what a thumb
+   wants, but unmistakably the main thing. */
+#saya { background: #fff; }
+#saya .big { font-size: 54px; }
+
+/* ---- bottom: the swatches, same four ------------------------------ */
+#bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px calc(16px + env(safe-area-inset-bottom));
+}
+#swatches { display: flex; gap: 9px; }
+#swatches i {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 2px solid var(--edge);
+}
+#swatches i.on { box-shadow: 0 0 0 3px rgba(0,0,0,.55); }
+#note { margin-left: auto; font-size: 13px; opacity: .7; min-height: 1.2em; }
+</style>
+
+<div id="top">
+  <div id="clock">--:--</div>
+  <div id="date"></div>
+  <div id="warn">clock not set — no network yet</div>
+</div>
+
+<div id="grid">
+  <div class="tile" id="saya" data-go="face.html">
+    <div class="big">☺</div>
+    <b>Saya</b>
+    <span>her face</span>
+  </div>
+  <div class="tile" data-launch="chat">
+    <div class="big">💬</div>
+    <b>Talk</b>
+    <span>chat with her</span>
+  </div>
+  <div class="tile" data-launch="wiki">
+    <div class="big">📖</div>
+    <b>Wikipedia</b>
+    <span>offline</span>
+  </div>
+  <div class="tile" data-launch="gba">
+    <div class="big">🎮</div>
+    <b>Game Boy</b>
+    <span>newest ROM</span>
+  </div>
+</div>
+
+<div id="bar">
+  <div id="swatches"></div>
+  <div id="note"></div>
+</div>
+
+<script>
+// The same four, and the same storage key her face uses, so recolouring
+// either one recolours both.
+const COLOURS = [
+  ['hot pink',   '#ff2d95'],
+  ['cyan',       '#22e0e8'],
+  ['neon green', '#39ff5e'],
+  ['lavender',   '#b98cff'],
+];
+
+function setColour(hex) {
+  document.documentElement.style.setProperty('--bg', hex);
+  document.querySelectorAll('#swatches i').forEach(i =>
+    i.classList.toggle('on', i.dataset.hex === hex));
+  try { localStorage.setItem('saya-bg', hex); } catch (e) {}
+}
+COLOURS.forEach(([name, hex]) => {
+  const i = document.createElement('i');
+  i.style.background = hex;
+  i.title = name;
+  i.dataset.hex = hex;
+  i.onclick = () => setColour(hex);
+  document.getElementById('swatches').append(i);
+});
+let bg = null;
+try { bg = localStorage.getItem('saya-bg'); } catch (e) {}
+setColour(COLOURS.some(c => c[1] === bg) ? bg : COLOURS[0][1]);
+
+// ---- clock ---------------------------------------------------------
+// 1969 on screen is the board telling you it has not reached NTP yet.
+// Naming that beats a clock that is quietly, confidently wrong.
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toTimeString().slice(0, 5);
+  document.getElementById('date').textContent =
+    now.toDateString();
+  document.getElementById('warn').style.display =
+    now.getFullYear() < 2000 ? 'block' : 'none';
+}
+tick();
+setInterval(tick, 20000);
+
+// ---- launching -----------------------------------------------------
+// A tap that appears to do nothing is the worst outcome on a
+// touchscreen -- it reads as a broken deck. So every tile says what it
+// is doing, and says it for long enough to be read.
+const note = document.getElementById('note');
+function say(text, ms) {
+  note.textContent = text;
+  if (ms) setTimeout(() => { if (note.textContent === text) note.textContent = ''; }, ms);
+}
+
+document.querySelectorAll('.tile').forEach(tile => {
+  tile.onclick = () => {
+    const go = tile.dataset.go;
+    if (go) { location.href = go; return; }
+
+    const what = tile.dataset.launch;
+    if (tile.classList.contains('busy')) return;
+    tile.classList.add('busy');
+    say('Starting ' + tile.querySelector('b').textContent + '...');
+
+    fetch('launch/' + what, { method: 'POST' })
+      .then(r => r.json())
+      .then(r => {
+        tile.classList.remove('busy');
+        if (r.ok) {
+          say(r.said || 'Started. Look at the screen.', 6000);
+          if (r.open) location.href = r.open;
+        } else {
+          say(r.said || 'It would not start.', 9000);
+        }
+      })
+      .catch(() => {
+        tile.classList.remove('busy');
+        say('No answer from the deck. Is ~/YUZU/face running?', 9000);
+      });
+  };
+});
+</script>

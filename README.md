@@ -48,7 +48,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 397 tests, ~18 seconds
+python YUZU_TESTER.py         # 407 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 ```
 
@@ -94,7 +94,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 397 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 407 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -109,12 +109,13 @@ $400.
 | `wiki` | Offline Wikipedia (kiwix-serve), finds the .zim itself |
 | `gba` | VNC desktop + mGBA on the newest ROM |
 | `pad` | Pair the 8BitDo. Try the USB cable first |
-| `deckapps` | Install touch app icons for Saya, Wikipedia, Game Boy |
+| `deckapps` | Install touch app icons. `--autostart` boots into the home screen |
 | `tile` | Auto-tiling windows (Pop Shell). `--off` gives floating back |
 | `drop.py` | Phone → board file drop. Run it in the target folder |
 | `yuzu_face.py` | Sprite system. Finds the art, paints her mouth, serves it |
 | `ui/sprites/` | Her expressions. **One PNG per face — the filename is the name** |
 | `ui/face.html` | The face page. Draws nothing; renders the sprites |
+| `ui/home.html` | The home screen. Tap a tile, it opens |
 | **Read these** | |
 | `PHONE_START.md` | Phone instructions, no terminal needed |
 | `DEPLOY.md` | Moving the brain onto the Jetson |

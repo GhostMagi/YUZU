@@ -3177,12 +3177,17 @@ class TestDeckApps(unittest.TestCase):
                               capture_output=True)
         self.assertEqual(done.returncode, 0, done.stderr.decode())
 
-    def test_it_installs_all_three_when_the_desktop_has_what_it_needs(self):
+    def test_it_installs_every_app_when_the_desktop_has_what_it_needs(self):
+        """Five now: her FACE and the HOME screen joined the original
+        three when Ghost asked for "a desktop with my apps and a saya
+        button visible"."""
         done, names, on_desktop, _ = self._run(have=("chromium", "xterm"))
-        self.assertEqual(names, ["yuzu-gba.desktop", "yuzu-saya.desktop",
+        self.assertEqual(names, ["yuzu-face.desktop", "yuzu-gba.desktop",
+                                 "yuzu-home.desktop", "yuzu-saya.desktop",
                                  "yuzu-wiki.desktop"], done.stdout)
         # and on the Desktop too, which is where a touchscreen user taps
         self.assertIn("yuzu-wiki.desktop", on_desktop)
+        self.assertIn("yuzu-home.desktop", on_desktop)
 
     def test_the_wiki_app_opens_CHROMELESS_not_a_browser_tab(self):
         """The whole request. --app= gives a window with no url bar and
@@ -4815,6 +4820,129 @@ class TestJetsonChecks(unittest.TestCase):
             self.assertTrue(want, f"{name} has no recommended value")
             self.assertGreater(len(why), 40,
                                f"{name} doesn't explain itself")
+
+
+class TestHomeScreen(unittest.TestCase):
+    """`ui/home.html` -- the desktop behind her face.
+
+    Ghost, Sept 10: "id like home button to take me to a desktop with
+    my apps and a saya button visible." It is what the home button goes
+    to and what the deck can boot into."""
+
+    import yuzu_face as face
+
+    PAGE = Path(__file__).parent / "ui" / "home.html"
+    FACE = Path(__file__).parent / "ui" / "face.html"
+
+    def test_it_exists_and_reaches_for_nothing_outside_itself(self):
+        self.assertTrue(self.PAGE.exists())
+        page = self.PAGE.read_text()
+        for reach in ("http://", "https://", "//cdn", "@import",
+                      "fonts.googleapis", "integrity="):
+            # 127.0.0.1 is the deck talking to itself and is not a reach
+            # outside; a CDN is.
+            for hit in [ln for ln in page.splitlines() if reach in ln]:
+                self.assertIn("127.0.0.1", hit,
+                              f"home.html reaches outside itself: {hit}")
+
+    def test_the_home_button_on_her_face_actually_goes_somewhere(self):
+        """It was decoration until now, which is WORSE than absent: a
+        button that does nothing on a touchscreen reads as a broken
+        deck, and he has no keyboard to work around it with."""
+        self.assertIn("home.html", self.FACE.read_text(),
+                      "the home button still goes nowhere")
+
+    def test_her_tile_is_there_and_goes_to_her_face(self):
+        page = self.PAGE.read_text()
+        self.assertIn('id="saya"', page, "there is no Saya button")
+        self.assertIn('data-go="face.html"', page)
+
+    def test_both_pages_share_one_colour_key(self):
+        """Recolouring one must recolour the other -- two screens of the
+        same object disagreeing about its colour reads as a bug."""
+        for f in (self.PAGE, self.FACE):
+            self.assertIn("'saya-bg'", f.read_text(),
+                          f"{f.name} does not share the colour setting")
+
+    # ---- the launcher, which is the only risky thing here ------------
+
+    def test_only_the_allowlist_can_ever_run(self):
+        """THE WHOLE DESIGN. A page cannot start mGBA, so it POSTs a
+        NAME -- and a name is all that crosses. Nothing from the request
+        reaches a shell: no arguments, no path, no interpolation.
+
+        Verified against the real server with raw sockets as well as
+        here: `gba;rm -rf /`, `../../etc/passwd`, a NUL byte and
+        `wiki'&&touch /tmp/pwned` all come back 'not a thing this deck
+        knows how to open', and /tmp/pwned was never created.
+
+        This matters because the server binds 0.0.0.0 -- anything looser
+        is a box on his WiFi that runs what it is told."""
+        for hostile in ("gba;rm -rf /", "../../etc/passwd", "gba\x00",
+                        "wiki'&&touch /tmp/pwned", "", "chat; echo hi",
+                        "/bin/sh", "gba "):
+            ok, said, opens = self.face.launch(hostile)
+            self.assertFalse(ok, f"{hostile!r} was allowed to run")
+        # And every allowed key maps to a real file in the repo.
+        for name, (argv, said, opens) in self.face.launchers().items():
+            self.assertTrue(said, f"{name} runs silently")
+            first = argv[0]
+            self.assertTrue(os.path.exists(first) or shutil.which(first),
+                            f"{name} points at {first}, which is not there")
+
+    def test_a_missing_terminal_says_so_instead_of_doing_nothing(self):
+        """The chat needs a terminal to live in. On a board without one
+        the tile must explain itself -- `deckapps` already learned that
+        an icon which opens nothing reads as a broken deck rather than
+        as a missing package."""
+        with unittest.mock.patch.object(self.face, "_terminal",
+                                        lambda: None):
+            ok, said, opens = self.face.launch("chat")
+        self.assertFalse(ok)
+        self.assertIn("apt install", said, "it does not say how to fix it")
+
+    def test_launching_is_detached(self):
+        """A launcher that holds the server hostage takes her face down
+        with it, and a foreground process on this board has already cost
+        two power cycles."""
+        body = (Path(__file__).parent / "yuzu_face.py").read_text()
+        popen = body.split("subprocess.Popen(")[1].split(")")[0]
+        self.assertIn("start_new_session=True", popen)
+
+
+class TestDeckAutostart(unittest.TestCase):
+    """`deckapps --autostart` -- the deck opens the home screen at login."""
+
+    SCRIPT = Path(__file__).parent / "deckapps"
+
+    def test_autostart_is_opt_in_and_reversible(self):
+        body = self.SCRIPT.read_text()
+        self.assertIn("--autostart", body)
+        auto_dir = body.split("AUTO=")[1].splitlines()[0]
+        self.assertIn("autostart", auto_dir,
+                      "AUTO does not point at the autostart folder")
+        remove_block = body.split('= "--remove" ]')[1].split("fi")[0]
+        self.assertIn("$AUTO", remove_block,
+                      "--remove does not undo the autostart, so a bad "
+                      "page would open at every login with no way back "
+                      "except the serial cable")
+
+    def test_it_is_a_window_he_can_close_not_a_kiosk(self):
+        """CLAUDE.md is blunt about this: a UI that can trap him is
+        strictly WORSE than a terminal, because there is not even a
+        keyboard to type an exit into. Booting into a page is fine;
+        booting into something he cannot leave is not."""
+        body = self.SCRIPT.read_text()
+        self.assertNotIn("--kiosk", body.split("autostart")[0],
+                         "the autostart page is a locked kiosk")
+
+    def test_the_face_launcher_waits_for_the_port(self):
+        """A tap landing on a dead port is the same dead end as typing
+        the address wrong, just prettier."""
+        body = self.SCRIPT.read_text()
+        wrapper = body.split('cat > "$YUZU/.face-app"')[1].split("\nAPP")[0]
+        self.assertIn("8081", wrapper)
+        self.assertIn("sleep", wrapper, "it opens the page immediately")
 
 
 class TestTiling(unittest.TestCase):
