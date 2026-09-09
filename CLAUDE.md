@@ -686,6 +686,45 @@ started the whole trap. Run it AT THE SHELL:
     print(re.findall(r'href=\"[^\"]*\"', g('/search?pattern=ice+cream'))[:12])
     "
 
+## HER FACE ON THE SCREEN — designed, NOT built. See DECK_UI.md
+
+Ghost, Sept 9: *"i totally wouldnt mind booting into seeing 'Sayas
+face' with a passcode screen right before it and a homescreen button on
+bottom right corner... and her face screen could be interactive or talk
+toable."* Plus: *"lmk if ud like design notes on the actual face art."*
+
+**Nothing is written. `DECK_UI.md` holds the shape of it** and the
+seven questions whose answers change the build. Do not start coding
+this before he has answered at least the first one.
+
+**The one big call: it is a WEB PAGE**, served by a stdlib HTTP server
+and opened with `chromium --app=` -- the pattern `deckapps` already
+uses for the wiki and `drop.py` already proves on this board. Touch is
+free, the art is just a PNG, no new dependency, the stdlib-only rule
+survives. **And it renders in the VNC session TODAY at the panel's real
+1024x600**, so the whole UI can be designed weeks before the screen
+arrives. Nothing else on the shortlist can be tried early.
+
+**The passcode is a RITUAL, not security, and he must be told plainly.**
+A lock screen on a kiosk page stops nobody -- close the window, plug in
+a keyboard, pull the NVMe. Real security is the Linux login and disk
+encryption. Build it because waking her on purpose feels right; never
+let it be described as protection.
+
+**`thinking` is the most valuable face state on the screen.** Every
+frustration in these logs is "is it working or is it stuck". A face
+that visibly thinks answers that with no status text, and it is the
+honest version of the loading spinner this deck has never had.
+
+**Whatever gets built, `quit` must always work.** A UI that can trap
+him is strictly WORSE than a terminal, because there is not even a
+keyboard to type an exit into. That is not hypothetical -- see the
+two power cycles above.
+
+**"Prolly gunna get ya monthly"** -- worth knowing that this is
+becoming a long project rather than a burst, which is an argument for
+keeping the record in this file as good as it has been.
+
 ## `deckapps` — real app icons, because a touchscreen is not a terminal
 
 Ghost, Sept 9: *"as far as the https blah blah number number in a
