@@ -1,185 +1,138 @@
-# YUZU — handoff
+# YUZU — paste this into a fresh chat
 
-**Paste this whole file into a fresh AI chat to bring it up to speed.**
-Written Sept 3, 2026. Repo: github.com/GhostMagi/YUZU
-
----
-
-## What this is
-
-Ghost is building a companion robot. A Yahboom Muto S2 hexapod (six
-legs, 18 serial-bus servos, a 2-DOF camera on a swivel) with a local
-LLM brain — no cloud, everything runs on the robot. The persona is
-**Yuzu**, a gyaru character who talks and moves.
-
-The trick that makes it work: Yuzu writes movements in `[square
-brackets]`. Code strips them out of her speech, checks each one against
-a whitelist of things the body can actually do, and runs the real gait.
-Everything else she says goes to text-to-speech.
+Rewritten Sept 10. This is the catch-up for a DESIGN conversation: what
+the thing is, what already exists, and what is actually open. The full
+engineering record is `CLAUDE.md` (very long, do not paste that).
 
 ---
 
-## Catch-up: where things actually stand
+## What I'm building
 
-**Hardware**
-- Jetson Orin Nano Super Dev Kit — **ordered**, $399 direct from NVIDIA
-- 512GB M.2 2280 NVMe (KingSpec, Gen3 x4) — **ordered**
-- Muto S2 chassis — **not yet bought**, deliberately later
-- Acer Aspire VN7-592G on Ubuntu 22.04 — **working**, this is the eval
-  machine. Model runs 100% on its GTX 960M.
-- Testing day-to-day happens in **PocketPal on a Z Flip 6**
+A **handheld cyberdeck** whose whole purpose is one AI character living
+on it, fully offline. Not a robot — it controls nothing.
 
-**Software — all of this works today**
-- Full reply pipeline: listen → think → parse → move → speak
-- Real Ollama client (stdlib only, no pip installs anywhere)
-- Tripod gait library + a `DummyBot` simulator, so gaits run with no
-  hardware attached
-- Swappable personas: character text and body rules are separate files,
-  composed at load time
-- 297 tests, ~18 seconds, all passing
+- **NVIDIA Jetson Orin Nano Super devkit**, 8GB shared CPU/GPU, 512GB NVMe
+- **Llama 3.2 3B** (heretic-abliterated, Q4_K_M) via Ollama, on the board
+- **Saya** — tsundere character. Four others exist and are one line away
+- **Piper** for her voice, offline. Mic/speech-in not built yet
+- **Offline Wikipedia** (Kiwix, Simple English, 982MB) she can read from
+- Also a real Ubuntu ARM64 computer, and plays Game Boy games
 
-**Model:** `Llama-3.2-3B-Instruct-heretic-ablitered-uncensored` Q4_K_M
-(the "ablitered" misspelling is genuinely in the repo name), pulled via
-`ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
+**Everything works today.** She talks, has a face with expressions, reads
+the encyclopedia, plays games. It is not a plan, it is running.
 
-**Measured prompt quality**, scored by machine against the real parser:
-- v1 → 20% of her movements actually ran
-- v2 → 78–91% depending on the round
-- Latest cold-run: `moves_at_all` 80.6%, `has_dialogue` 94.4%
+## The constraints — these decide most design answers
 
----
+1. **Offline is the point.** No cloud model, no CDN, no web fonts, no
+   library fetched at runtime. It must work with WiFi off.
+2. **10.1" 1024x600 touchscreen** in the lid. Not bought yet, ~2 weeks out.
+   Everything is designed for that resolution already.
+3. **Touch-first, often no keyboard.** A Bluetooth keyboard exists but
+   will not always be attached.
+4. **Right now my only interface is a USB serial terminal on my phone**
+   (Samsung Z Flip 6). One session. No SSH, no second window, no easy
+   Ctrl-C. This has caused real problems — see the rules below.
+5. **8GB shared.** She costs ~3GB resident; ~3.4GB stays free. Measured.
+6. **Python stdlib only** for anything that runs on the deck. Piper is the
+   one exception. This is deliberate: it keeps things runnable anywhere.
 
-## Ghost's own progress — worth knowing
+## What already exists (don't re-suggest these)
 
-He had **never written a line of Python** when this started. Facts,
-not flattery:
+**Her face** — a web page served locally, opened in a browser or on the
+phone. Nine hand-drawn expressions as transparent PNGs (idle, blink,
+talking, thinking, mad, cry, smug, wink, woahshock). Black line art on a
+colour I can change; the background shows through her eyes.
 
-- Wrote a working regex bracket-action parser himself, on his phone,
-  in Pydroid, unaided. That parser is still the core of the project.
-- Learned what an LLM was about a week before this repo existed.
-- Got Ubuntu booting on a laptop with **locked NVRAM** — a genuinely
-  nasty problem that needed a firmware-registered trusted file and
-  Secure Boot toggled on, then off. That took a night and it's all
-  written up in `UBUNTU_LAPTOP.md`.
-- Ran the first machine-scored prompt evals himself.
-- **Caught a mistake that would have invalidated a whole round of
-  results:** PocketPal renders `*asterisks*` as italics without showing
-  the markers, so the AI scoring his screenshots was reading asterisk
-  actions as plain text. He flagged it unprompted.
+- She **blinks** on her own, and **breathes**
+- The face **reacts to what she is doing**: idle → thinking while she
+  generates → talking when words start. Driven by the brain, not by me
+- I can **type to her right on that page** and her reply appears under
+  her face
+- Four background colours only: hot pink, cyan, neon green, lavender
 
-His working method — A/B test in PocketPal, screenshot, score it
-against the real parser — is the reason the numbers above exist. It
-works. Don't replace it with theory.
+**A home screen** — 2x2 tiles: Saya, Talk, Wikipedia, Game Boy. A clock
+that says when the board hasn't reached the network. Her face has a ⌂
+that goes there. It can boot straight into it.
 
----
+**One-word commands**, because typing paths on a phone is a dead end:
 
-## What's left, in order
+    ~/YUZU/pull      update, and say plainly whether it worked
+    ~/YUZU/face      serve her face
+    ~/YUZU/deck      get ready for the screen; --check for an inventory
+    ~/YUZU/wiki      offline Wikipedia; --test says why a lookup missed
+    ~/YUZU/gba       play the newest ROM
+    ~/YUZU/tile      auto-tiling windows
+    drop.py          send a file from my phone to the board
 
-**1. Score `yuzu5` against `yuzu4` on the laptop**
-```
-cd YUZU && git pull
-python3 YUZU_AB.py          # yuzu4 vs yuzu5, 12 replies each, one table
-```
-`yuzu4` is `yuzu2` plus one bare-command example, and it is what boots
-today (`LIVE_PERSONA` in `yuzu_personas.py`). It fixed a reproducible
-bug — told "Walk forward." she used to *narrate* walking instead of
-doing it, because every example in the prompt was a question or a
-polite request and none was a flat order. It held live, 4/4 replies
-moved.
+**Art pipeline** — I draw/crop a face, drop the file in `ui/raw/`, run
+one command, and it becomes a sprite: white background removed, squared,
+mouth coloured. The filename becomes the expression name.
 
-`yuzu5` is `yuzu4` trimmed 17% for latency, with the three character
-rules cut because the examples already demonstrate them. It has never
-been run against a model. If it wins, move `LIVE_PERSONA` and note it
-in `CLAUDE.md`; if it loses, `yuzu4` stays and yuzu5 is the record of
-what the trim cost.
+**446 tests** covering all of it, run in one command.
 
-Watch `moves_at_all` and ignore a difference of one or two replies —
-at 12 replies each, one reply is 8.3 percentage points, and that is
-what made the yuzu2-vs-yuzu3 round look like a result when it wasn't.
-`YUZU_AB.py` prints that number under the table.
+## Hard-won rules — please respect these in any design idea
 
-**2. When the Jetson arrives** — follow `DEPLOY.md`. It's a `git clone`;
-the whole repo is standard library, nothing to install.
-⚠️ Run `sudo nvpmodel -m 0` — the board ships throttled and forgetting
-it makes everything slow with no visible cause.
+These were each paid for. They are not preferences.
 
-**3. When the chassis arrives** — run `muto_firstcontact.py` BEFORE any
-gait. Six stages, a yes/no after every movement, starting at a 15°
-limit. Every angle in the gait library is an educated guess that has
-never touched hardware.
+1. **Never build something I can get trapped in.** A chat loop with no
+   exit once cost me two power cycles of the board. On a touchscreen with
+   no keyboard, a UI I can't leave is worse than a terminal.
+2. **The verdict goes first.** Any status output must lead with the
+   answer, not the evidence. I have read working things as broken three
+   separate times because an alarming line sat above the good news.
+3. **Never suggest a fix that needs hardware I don't have.** "Open a
+   second terminal", "press Alt+F2", "click Refresh" — all were correct
+   and all were useless to me.
+4. **A tap that appears to do nothing reads as a broken deck.** Anything
+   touched must say what it's doing.
+5. **Render it and look.** Five separate visual bugs passed every
+   automated test and were only caught by looking at a screenshot.
+6. **She is a character, not an assistant.** The biggest risk on this
+   build is her collapsing into ChatGPT-with-a-name — markdown headings,
+   numbered lists, code fences. It has happened once and was measured.
 
-**4. Audio (Whisper + Piper)** — deliberately deferred. The whole
-pipeline runs on typed input, so audio bought now would sit in a drawer.
+## Not built, on purpose
 
-**5. Vision / follow-me** — see the constraints in `CLAUDE.md` first.
-The gait functions block for 2–5 seconds each, so a vision controller
-cannot be layered on top of them without a non-blocking API underneath.
+- **The `ghost` passcode / lock screen.** I want it as flair (the case
+  will have a real key lock; the passcode is not security). Held because
+  a lock screen needs typing, and an on-screen keypad is exactly the kind
+  of thing that traps me if it's buggy. Needs designing around always
+  being escapable.
+- **Speech in (Whisper).** The last real stub. There is memory room for
+  it. Not started.
+- **A nicer voice (Kokoro TTS).** Would sound human instead of robotic.
+  Held because it needs PyTorch, which breaks the installs-nothing rule.
+- **An `asleep` face.** No art for it yet, so no idle/screensaver state.
 
----
+## Where I actually want design help
 
-## Open curiosities Ghost has raised
+1. **What should the deck DO when I'm not talking to her?** Right now it
+   sits on one face. Idle behaviour, an ambient state, something that
+   makes it feel alive on a desk — this is wide open.
+2. **The lock/wake screen**, designed so it can never trap me.
+3. **How she should look while thinking vs talking** beyond swapping a
+   sprite — timing, motion, anything that isn't a spinner.
+4. **What belongs on the home screen** when there are more than four
+   things. And whether the clock earns its space.
+5. **Physical layout.** 17.3" x 12.4" x 4.3" aluminium case, 10" keyboard
+   and 10" panel side by side, board in a metal enclosure. Cable routing,
+   what faces the user, where the speaker goes.
+6. **Anything about her as a character** — how she should behave when
+   idle, what she should notice, what would make her feel like she lives
+   there rather than runs there.
 
-**"Can I run multiple LLMs?"** — Answered. He doesn't need to: a
-persona is just a different system prompt, so every character shares
-one loaded model for free. Two 3B models won't fit in 8GB alongside
-Whisper and Piper anyway. A small 1B specialist alongside the 3B would
-fit, if a real use for one appears.
+## Please don't suggest
 
-**"What's the SSD for then?"** — Ollama unloads the model after ~5
-minutes idle. Reloading 2.7GB off microSD is ~45 seconds; off NVMe it's
-1–3. That's the difference between a robot that answers and one that
-doesn't. Plus swap headroom on 8GB, and microSD cards die from
-sustained writes.
+- Anything needing internet at runtime (CDN, web fonts, cloud API, Rive/
+  Lottie pulled from a host)
+- x86-only software — this is ARM64
+- Anything assuming a mouse, a second monitor, or a spare terminal
+- Rewriting what already works. I'd rather add than replace.
 
-**Saya (quadruped)** — a second robot, kuudere personality, ESP32, 8×
-MG90S, OLED face. `personas/_hardware_saya_quad.txt` is a DRAFT guessed
-from notes. It needs Ghost's real action list before it means anything.
+## How to answer me
 
-**Humanoid body** — long-term want. White with gold trim.
-
----
-
-## Settled. Don't re-litigate these.
-
-- **Chassis paint colours stay out of the repo.** He's changed the
-  scheme repeatedly. `paintstepslol.txt` keeps the prep process, which
-  works for any colours. (Yuzu *herself* still loves hot pink — that's
-  character, it stays.)
-- **The asterisk hypothesis is closed.** Rewording the anti-asterisk
-  rule so it doesn't display an asterisk changed nothing, measured.
-  Keep the rule; deleting it entirely did regress.
-- **`[winks]` and `[laughs]` are accepted.** The whitelist drops them
-  safely. They're a 3B ceiling, not a prompt bug.
-- **Skipping ROS2** on purpose — direct Python serial calls instead.
-- **`personas/yuzu.persona` is frozen.** A test asserts it stays
-  byte-identical to the version Ghost tested. Iterate on `yuzu2`.
-
----
-
-## Notes for whoever picks this up
-
-**He works from a phone most of the time.** File paths and terminal
-commands are often useless to him. Give him text he can paste, or a
-script he can tap Run on.
-
-**Paste the actual prompt text when it changes.** Not a path, not a
-command — the text.
-
-**One step at a time.** He's said plainly that keeping everything
-organised in his head is hard. That's what this file and the repo docs
-are for. Don't hand him a ten-step plan; hand him step one and wait.
-
-**Check things before asserting them.** This project has been bitten
-repeatedly by confident guesses — a stale doc, a parser bug nobody
-tested, a hypothesis that felt obviously right and measured as noise.
-Run the code. Score the output. `python YUZU_TESTER.py` is 18 seconds.
-
-**Where the detail lives**
-| File | What's in it |
-|---|---|
-| `CLAUDE.md` | Every measured finding, in detail |
-| `Yuzu_Full_Technical_Context_Dump.md` | Full technical background |
-| `DEPLOY.md` | Moving the brain to the Jetson |
-| `HEADLESS_SETUP.md` | Jetson setup with no monitor |
-| `UBUNTU_LAPTOP.md` | The laptop's boot saga |
-| `PERSONA_SWITCHING.md` | How characters swap |
+I don't have a strong technical background yet and I'm running this from
+a phone. Give me the decision and one line of reasoning, not a menu of
+options I have no basis to choose between. Plain language. I take in a
+lot when it's written clearly — the gap is vocabulary and spare time,
+not capability.
