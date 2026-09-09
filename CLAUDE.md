@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 334 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 341 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 334 tests pass on it. Getting it
+(that repo path is confirmed working). 341 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -560,6 +560,42 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 512gb SSD"). The deck self-concept holds for what she IS (she got the
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
+
+## `wiki` — offline Wikipedia, one word (Sept 9)
+
+Ghost, after parking the controller: *"lets focus on PC stuff and Ai
+stuff and kiwix."*
+
+    ~/YUZU/wiki            start it, print the address to open
+    ~/YUZU/wiki --off      stop it
+    ~/YUZU/wiki --status   is it up, and where
+
+**This exists because of the power-cycle.** The earlier attempt ran
+`kiwix-serve` in the FOREGROUND. It held the terminal, which on a
+phone serial link is indistinguishable from a frozen board -- `q`, `cd`
+and `sudo poweroff` all went into a process that was not a shell, and
+Ghost pulled power rather than lose the session. Nothing was damaged
+and he was right that it was his only visible option. **`nohup ... &`,
+always**, and a test asserts the launch line is detached.
+
+**It finds the .zim itself**, newest first, under `$HOME`, `/media`
+and `/mnt`. His archive is `wikipedia_en_simple_all_nopic_2026-05.zim`,
+982MB -- a path that long is not something to retype on a phone
+keyboard, and a no-argument script he can tap Run on is the standing
+preference in this file.
+
+**Every lesson from tonight is already in it:** it checks for a
+NON-LOOPBACK listener rather than a live process (the TigerVNC
+finding), prints the routing-table LAN address rather than the first
+line of `hostname -I` (which has now cost time three times), leaves a
+running server alone rather than dropping what he is reading, and
+prints kiwix-serve's OWN output when it fails to come up.
+
+**Next, unbuilt and his call: a `/wiki` lookup inside Saya's chat.**
+`kiwix-serve` answers over HTTP, so `urllib` reaches it and the
+stdlib-only property survives. That is the "AI stuff" half of the same
+sentence -- an offline character with an offline encyclopedia behind
+her -- and it is the obvious next thing. Not started.
 
 ## `gba` — one word to play (Sept 9)
 

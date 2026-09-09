@@ -1,0 +1,103 @@
+#!/bin/bash
+# Offline Wikipedia, one word.
+#
+#   ~/YUZU/wiki           start it, print the address to open
+#   ~/YUZU/wiki --off     stop it
+#   ~/YUZU/wiki --status  is it up, and where
+#
+# The last attempt at this ran kiwix-serve in the FOREGROUND. It held
+# the terminal, which on a phone serial link is indistinguishable from
+# a frozen board -- q, cd and sudo poweroff all went into a process
+# that was not a shell, and the board got power-cycled. So this
+# detaches, always, and never holds the terminal.
+
+set -u
+PORT=8080
+LOG=/tmp/kiwix.log
+
+lan_ip() {
+    local found
+    found=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+    [ -n "$found" ] && echo "$found" || echo "<board is offline>"
+}
+
+# Is something actually serving, from an address a phone can reach?
+# Not "is the process alive" -- see the TigerVNC loopback finding.
+serving() {
+    ss -ltn 2>/dev/null | awk -v port=":$PORT" '
+        $4 ~ port"$" && $4 !~ /^127\./ && $4 !~ /^\[::1\]/ { found = 1 }
+        END { exit !found }'
+}
+
+# Find the ZIM rather than making him type a path on a phone keyboard.
+# Newest wins, so a freshly downloaded archive is picked up with no
+# argument and no editing.
+find_zim() {
+    find "$HOME" /media /mnt -maxdepth 4 -name '*.zim' -size +1M \
+        -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-
+}
+
+case "${1:-}" in
+--off)
+    pkill -f kiwix-serve 2>/dev/null && echo "Wiki stopped." \
+                                     || echo "It was not running."
+    exit 0
+    ;;
+--status)
+    if serving; then
+        echo
+        echo "  UP.  Open this on your phone:  http://$(lan_ip):$PORT"
+        echo
+        exit 0
+    fi
+    echo
+    if pgrep -f kiwix-serve >/dev/null 2>&1; then
+        echo "  Running, but NOT reachable from the network."
+        echo "  Listening on:"
+        ss -ltn | grep "$PORT" || echo "    nothing on port $PORT"
+    else
+        echo "  Not running.  Start it with:  ~/YUZU/wiki"
+    fi
+    echo
+    exit 1
+    ;;
+esac
+
+if serving; then
+    echo
+    echo "  Already up.  Open this on your phone:  http://$(lan_ip):$PORT"
+    echo
+    exit 0
+fi
+
+ZIM="${1:-$(find_zim)}"
+if [ -z "$ZIM" ] || [ ! -f "$ZIM" ]; then
+    echo
+    echo "  No .zim archive found under $HOME, /media or /mnt."
+    echo "  Download one from library.kiwix.org, or pass the path:"
+    echo "    ~/YUZU/wiki /path/to/wikipedia.zim"
+    echo
+    exit 1
+fi
+
+pkill -f kiwix-serve 2>/dev/null          # clear a half-dead instance
+# nohup + & is the whole point. A foreground server on a serial link
+# reads as a hang, and that already cost this board a power-cycle.
+nohup kiwix-serve --port=$PORT "$ZIM" >"$LOG" 2>&1 &
+sleep 3
+
+if ! serving; then
+    echo
+    echo "  kiwix-serve did not come up. Its own output:"
+    tail -5 "$LOG" | sed 's/^/    /'
+    echo
+    exit 1
+fi
+
+echo
+echo "  Wiki is UP:   $(basename "$ZIM")"
+echo "  On your phone, open:  http://$(lan_ip):$PORT"
+echo
+echo "  It keeps running after you close this. Stop it with:"
+echo "    ~/YUZU/wiki --off"
+echo

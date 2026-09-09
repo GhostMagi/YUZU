@@ -3100,6 +3100,107 @@ class TestPadPairing(unittest.TestCase):
         self.assertEqual(done.returncode, 0)
 
 
+class TestWikiServer(unittest.TestCase):
+    """`wiki` -- offline Wikipedia on the deck, one word.
+
+    The previous attempt at this ran kiwix-serve in the FOREGROUND. It
+    held the terminal, which on a phone serial link is indistinguishable
+    from a frozen board: q, cd and `sudo poweroff` all went into a
+    process that was not a shell, and Ghost power-cycled the board
+    rather than lose the session. Nothing was damaged, but that is the
+    failure this script exists to prevent."""
+
+    SCRIPT = Path(__file__).parent / "wiki"
+
+    def _run(self, *args, zims=(), up=False):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            home = tmp / "home"
+            home.mkdir()
+            binv = tmp / "bin"
+            binv.mkdir()
+            calls = tmp / "calls"
+            flag = tmp / "up"
+            if up:
+                flag.touch()
+            for name, body in (
+                    ("kiwix-serve",
+                     f'echo "kiwix $*" >> {calls}\ntouch {flag}\nexit 0\n'),
+                    ("ss",
+                     'echo "State Recv-Q Send-Q Local:Port Peer"\n'
+                     f'[ -f {flag} ] && echo "LISTEN 0 5 0.0.0.0:8080 *"\n'
+                     "exit 0\n"),
+                    ("pkill", "exit 0\n"),
+                    ("pgrep", f'[ -f {flag} ]\n')):
+                target = binv / name
+                target.write_text("#!/bin/bash\n" + body)
+                target.chmod(0o755)
+            for zim in zims:
+                (home / zim).write_bytes(b"z" * (2 * 1024 * 1024))
+            env = dict(os.environ, HOME=str(home),
+                       PATH=f"{binv}:{os.environ['PATH']}")
+            done = subprocess.run(["bash", str(self.SCRIPT), *args],
+                                  capture_output=True, text=True,
+                                  env=env, timeout=90)
+            return done, (calls.read_text() if calls.exists() else "")
+
+    def test_it_is_valid_shell(self):
+        import subprocess
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_the_server_is_launched_DETACHED(self):
+        """The whole reason this file exists. A foreground server on a
+        serial link looks exactly like a frozen board, and that already
+        cost one power-cycle."""
+        body = self.SCRIPT.read_text()
+        launch = [ln for ln in body.splitlines()
+                  if "kiwix-serve --port" in ln and
+                  not ln.strip().startswith("#")]
+        self.assertTrue(launch, "nothing launches kiwix-serve")
+        self.assertTrue(any("nohup" in ln and ln.rstrip().endswith("&")
+                            for ln in launch),
+                        "kiwix-serve runs in the FOREGROUND -- it will hold "
+                        "the terminal and read as a hung board")
+
+    def test_it_finds_the_archive_itself(self):
+        """A 982MB download's path is not something to retype on a
+        phone keyboard. Newest .zim wins, no argument needed."""
+        done, calls = self._run(zims=("wikipedia_en_simple_all_nopic.zim",))
+        self.assertIn("wikipedia_en_simple_all_nopic.zim", calls,
+                      done.stdout + done.stderr)
+        self.assertEqual(done.returncode, 0)
+
+    def test_a_missing_archive_says_where_to_get_one(self):
+        done, calls = self._run(zims=())
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("kiwix.org", done.stdout)
+        self.assertEqual(calls, "", "it launched a server with no archive")
+
+    def test_it_checks_the_PHONE_can_reach_it(self):
+        """Same fault as TigerVNC binding to loopback: a live process
+        proves nothing about whether anything can connect."""
+        body = self.SCRIPT.read_text()
+        self.assertIn("ss -ltn", body)
+        self.assertIn("127", body,
+                      "nothing rejects a loopback-only bind")
+
+    def test_a_running_server_is_left_alone(self):
+        """Restarting it would drop whatever he is reading."""
+        done, calls = self._run(zims=("w.zim",), up=True)
+        self.assertEqual(calls, "", "it relaunched a healthy server")
+        self.assertIn("Already up", done.stdout)
+
+    def test_there_is_an_off_switch(self):
+        """He asked how to macro a Ctrl-C once. He should never need
+        one -- same reasoning as drop.py stopping itself."""
+        self.assertIn("--off", self.SCRIPT.read_text())
+        done, _ = self._run("--off", up=True)
+        self.assertEqual(done.returncode, 0)
+
+
 class TestGbaLauncher(unittest.TestCase):
     """`gba` -- one word to play, because the real command was three
     lines with a DISPLAY prefix, a vncserver invocation and a glob.
