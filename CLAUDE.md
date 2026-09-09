@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 378 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 387 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 378 tests pass on it. Getting it
+(that repo path is confirmed working). 387 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -741,6 +741,90 @@ two power cycles above.
 **"Prolly gunna get ya monthly"** -- worth knowing that this is
 becoming a long project rather than a burst, which is an argument for
 keeping the record in this file as good as it has been.
+
+## THE FACE IS SPRITES NOW — his art, not mine (Sept 9)
+
+Ghost, on the vector face: *"i dislike the color choices though and she
+looks like MS Paint tbh... i want unmistakeable anime eyes."* Then he
+solved it himself: *"i cropped my vector expression art into
+transparent PNGs"* and *"write a Python script that loads and renders
+external .SVG or .PNG image files... a sprite system so i can just swap
+out the image files."*
+
+He was right and the drawing code is gone. `ui/face.html` no longer
+contains a single `<path>` -- a test pins that, because a leftover
+shape would render next to his art and there is no version of that
+which looks intentional.
+
+    ui/sprites/<name>.png     drop a file in, it is an expression
+    python3 yuzu_face.py      see what it found and how it is wired
+    ~/YUZU/face               serve it
+
+**THE FILENAME IS THE EXPRESSION NAME.** No manifest, no list in the
+page, nothing to keep in sync. `sprites()` scans the folder and
+`/sprites.json` is regenerated PER REQUEST, so a new face needs a page
+refresh rather than a server restart -- on a phone over a serial link
+that is a much bigger difference than it sounds. His five are `cry`,
+`mad`, `thinking`, `wink`, `woahshock`.
+
+**`ROLES` keeps two vocabularies apart on purpose.** He names files
+after what the face is DOING (`woahshock`); the brain will ask for what
+she IS (`talking`). `ROLES` maps semantic state to whatever art exists,
+first match wins, and a role with no art is ABSENT rather than pointing
+at the wrong face -- `asleep` currently resolves to nothing and that is
+correct. Collapsing the two is the name-leak bug this file has recorded
+six times.
+
+**HIS ART IS BLACK LINE WORK ON HOLES, and that measurement decided the
+whole design.** 92% of `wink.png` is fully transparent and there is not
+ONE opaque white pixel in it: the eye whites and the inside of her
+mouth are gaps. So the background colour shows straight through her
+eyes. That is why flat black line art looks coloured without anything
+being recoloured, and why the swatches matter more here than they did
+on the vector version.
+
+**THE FOUR COLOURS ARE HIS AND THERE ARE ONLY FOUR.** *"Hot pink, Cyan,
+Neon green, And a Lavender or purple color. Only those colors."* A test
+pins the names AND the count, because quietly adding a fifth is the
+same fault as picking the wrong four.
+
+**THE PINK IRIS RING WAS BUILT AND CUT IN THE SAME MINUTE, and that is
+the lesson worth keeping.** He asked for *"maybe add a ring of pink
+color to her eyes if u want"*. It found both eye blobs correctly, laid
+a ring over the outer band of each, and rendered as a smear -- it
+flooded the pupil on the open eye and painted the CLOSED one, which has
+no iris to ring. He saw it instantly: *"remove the pink iris idea my
+bad entirely. just use the art i gave u."*
+
+**Every geometry assertion would have passed.** What caught it was
+compositing a preview PNG and LOOKING at it before shipping. Same rule
+this repo keeps re-deriving from the other direction: a check that
+cannot observe the actual failure mode is not a check -- and for
+generated ART, the only check that observes it is your eyes.
+
+`test_every_sprite_paints_and_the_line_art_stays_black` is the closest
+a test can get: the paint layer must cover well under half the art's
+own inked pixels. A layer that covers her face is the smear again,
+whatever the geometry says.
+
+**What survived is the mouth.** `paint()` finds the mouth as the ink
+blob with the lowest centroid, fills the enclosed transparent holes
+inside its box, and touches nothing else. Nothing is hand-positioned,
+so a new PNG gets painted too -- which is the whole reason this is a
+sprite system and not five hard-coded faces. `<name>.paint.png` is
+generated, is skipped by `sprites()`, and stacks OVER the line art
+(the mouth interior is a hole, so over and behind are identical there).
+
+**Blink is gone and that is a real loss.** You cannot squash a flat
+sprite without smearing the line work. A `blink.png` would bring it
+back for free, and it is the cheapest thing that makes a face look
+alive. Worth asking him for.
+
+**Still missing art, and this is the answer to "lmk how i can assist":**
+a NEUTRAL/idle face (everything falls back to `wink`, so she winks
+permanently), a TALKING face (currently `woahshock`, which is a
+reaction rather than speech), and `blink`. Three PNGs, same crop
+treatment, and the file names do the wiring.
 
 ## `face` — you look at her on the PHONE until the panel lands (Sept 9)
 

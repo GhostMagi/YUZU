@@ -4817,6 +4817,104 @@ class TestJetsonChecks(unittest.TestCase):
                                f"{name} doesn't explain itself")
 
 
+class TestFaceSprites(unittest.TestCase):
+    """`yuzu_face.py` -- the art is DATA now.
+
+    Ghost's call, Sept 9: the hand-drawn SVG face read as MS Paint, so
+    he cropped real anime expressions into transparent PNGs and asked
+    for "a sprite system so i can just swap out the image files". The
+    filename IS the expression name, and that is the property every
+    test here defends."""
+
+    import yuzu_face as face
+
+    SPRITES = Path(__file__).parent / "ui" / "sprites"
+
+    def test_his_art_is_actually_there(self):
+        found = self.face.sprites()
+        self.assertTrue(found, "no sprites -- her face has no art at all")
+        names = {s["name"] for s in found}
+        self.assertIn("thinking", names,
+                      "thinking is the state that answers 'is it stuck?' "
+                      "-- see DECK_UI.md")
+
+    def test_a_new_file_is_a_new_expression_with_no_code_change(self):
+        """The whole point of the sprite system. Adding art must not
+        require editing a list, this suite, or anything else."""
+        with tempfile.TemporaryDirectory() as tmp:
+            before = self.face.sprites(tmp)
+            (Path(tmp) / "sleepy.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 40)
+            after = self.face.sprites(tmp)
+        self.assertEqual(before, [])
+        self.assertEqual([s["name"] for s in after], ["sleepy"])
+
+    def test_generated_paint_layers_are_not_offered_as_expressions(self):
+        """`wink.paint.png` is the mouth colour for `wink`, not a sixth
+        face. Left unfiltered it would appear as its own chip and show
+        a mouth floating on an empty background."""
+        names = [s["name"] for s in self.face.sprites()]
+        self.assertFalse([n for n in names if n.endswith(".paint")], names)
+
+    def test_a_missing_folder_is_empty_not_an_exception(self):
+        """A face with no art should say so on screen. Raising here
+        takes the whole page down instead."""
+        self.assertEqual(self.face.sprites("/nope/not/here"), [])
+        self.assertEqual(self.face.manifest("/nope/not/here")["roles"], {})
+
+    def test_roles_resolve_only_to_art_that_exists(self):
+        """The brain will ask for `talking`; he named a file
+        `woahshock`. Those two vocabularies stay separate on purpose --
+        collapsing a semantic state onto one artist's filename is the
+        name-leak bug this repo has hit six times."""
+        resolved = self.face.roles_for(self.face.sprites())
+        have = {s["name"] for s in self.face.sprites()}
+        for role, sprite in resolved.items():
+            self.assertIn(sprite, have,
+                          f"role {role} points at art that is not there")
+        self.assertNotIn("asleep", resolved,
+                         "there is no asleep art, so the role must be "
+                         "ABSENT rather than pointing at the wrong face")
+
+    def test_every_sprite_paints_and_the_line_art_stays_black(self):
+        """THE FINDING THIS TEST EXISTS FOR. A pink iris ring was built
+        and cut in the same minute: it found both eyes correctly and
+        rendered as a smear, flooding the pupil and painting the CLOSED
+        eye. What caught it was compositing a preview and LOOKING at
+        it; every geometry assertion passed.
+
+        So this checks the thing that broke: paint must be a small
+        MINORITY of the art's own pixels. A layer that covers the face
+        is the smear, whatever the geometry says."""
+        for sprite in self.face.sprites():
+            src = self.SPRITES / Path(sprite["file"]).name
+            got = self.face.read_rgba(str(src))
+            if not got:
+                continue
+            w, h, px = got
+            inked = sum(1 for i in range(0, len(px), 4) if px[i + 3] > 140)
+            out = self.face.paint(str(src),
+                                  str(Path(tempfile.gettempdir()) / "t.png"))
+            self.assertTrue(out, f"{sprite['name']} would not paint")
+            _, _, painted = self.face.read_rgba(out)
+            covered = sum(1 for i in range(0, len(painted), 4)
+                          if painted[i + 3] > 140)
+            self.assertLess(covered, inked * 0.5,
+                            f"{sprite['name']}: the paint layer covers "
+                            f"{covered} px against {inked} px of art -- "
+                            "that is the iris smear all over again")
+            self.assertGreater(covered, 0,
+                               f"{sprite['name']}: nothing was painted, so "
+                               "her mouth is a hole showing the wallpaper")
+
+    def test_paint_survives_art_it_cannot_read(self):
+        """One odd export must never take her whole face down."""
+        with tempfile.TemporaryDirectory() as tmp:
+            junk = Path(tmp) / "junk.png"
+            junk.write_bytes(b"not a png at all")
+            self.assertIsNone(self.face.paint(str(junk)))
+            self.assertIsNone(self.face.read_rgba(str(junk)))
+
+
 class TestFaceServer(unittest.TestCase):
     """`face` -- her face on a screen, one word.
 
@@ -4852,20 +4950,47 @@ class TestFaceServer(unittest.TestCase):
         thing."""
         page = self.PAGE.read_text()
         for reach in ("http://", "https://", "//cdn", "@import",
-                      "fonts.googleapis", "src=\"/", "integrity="):
+                      "fonts.googleapis", "integrity="):
             self.assertNotIn(reach, page,
                              f"face.html reaches outside itself: {reach!r}")
+
+    def test_it_offers_exactly_the_four_colours_he_asked_for(self):
+        """Ghost, Sept 9: "Please add the homescreen colors as Hot pink,
+        Cyan, Neon green, And a Lavender or purple color. ONLY those
+        colors." The old dark-mauve set is what he meant by "i dislike
+        the color choices" -- so this pins the count as well as the
+        names, because quietly adding a sixth is the same fault."""
+        page = self.PAGE.read_text()
+        for want in ("hot pink", "cyan", "neon green", "lavender"):
+            self.assertIn(want, page, f"{want} is not a swatch")
+        block = page.split("const COLOURS")[1].split("];")[0]
+        self.assertEqual(block.count("#"), 4,
+                         "there are not exactly four swatches")
+
+    def test_the_page_draws_no_art_of_its_own(self):
+        """The vector face is GONE, not disabled. Ghost: "she looks like
+        MS Paint tbh" and then "just use the art i gave u". A leftover
+        <path> would render behind or beside his sprites and there is
+        no version of that which looks intentional."""
+        page = self.PAGE.read_text()
+        for drawn in ("<path", "<circle", "viewBox"):
+            self.assertNotIn(drawn, page,
+                             f"face.html still draws its own art: {drawn}")
 
     def test_the_server_is_launched_detached(self):
         """nohup + & always. A foreground server on a serial link is
         indistinguishable from a frozen board, and reading one as a
         freeze has already cost this project two power cycles."""
-        body = self.SCRIPT.read_text()
-        launch = [ln for ln in body.splitlines()
-                  if "http.server" in ln and not ln.strip().startswith("#")]
-        self.assertTrue(launch, "nothing starts a server")
-        start = [ln for ln in launch if "nohup" in ln]
-        self.assertTrue(start, "the server is started in the FOREGROUND")
+        body = "\n".join(ln for ln in self.SCRIPT.read_text().splitlines()
+                         if not ln.strip().startswith("#"))
+        self.assertIn("--serve", body, "nothing starts a server")
+        # The launch is a continued line, so match the statement rather
+        # than one line of it.
+        started = re.search(r"nohup[^&]*--serve[^&]*&", body, re.S)
+        self.assertTrue(started,
+                        "the server is started in the FOREGROUND -- on a "
+                        "serial link that is indistinguishable from a "
+                        "frozen board, and it has cost two power cycles")
 
     def test_it_binds_every_interface_because_the_phone_is_the_client(self):
         body = self.SCRIPT.read_text()

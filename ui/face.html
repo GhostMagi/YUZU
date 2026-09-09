@@ -3,254 +3,203 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Saya</title>
 <!--
-  Her face. Eyes and a mouth on a colour you can change -- Ghost's spec,
-  Sept 9: "doesnt have to be her face i just like her eyeshape... anime
-  eyes and mouth on a screen with a background color i can change."
+  Her face.
 
-  Everything is SVG and CSS. No image files, no fonts, no network, no
-  build step. Open it in a browser and it works -- which also means it
-  works in the VNC session TODAY, at the panel's real 1024x600, weeks
-  before the screen arrives.
+  THE ART IS NOT IN THIS FILE ANY MORE. Ghost drew/cropped real anime
+  expressions into transparent PNGs, because the hand-drawn SVG version
+  read as MS Paint and he was right. So this page draws nothing: it
+  asks `yuzu_face.py` what art exists and renders it.
 
-  Tweaking it: every colour and size is a --variable at the top of the
-  stylesheet. Change one number, reload, see it.
+      ui/sprites/<name>.png      drop a file in, it is an expression
+      ui/sprites/<name>.paint.png   generated, the mouth colour
+
+  Adding a face is adding a file. No list here to update, nothing to
+  keep in sync, no code to touch -- which is exactly what he asked for:
+  "set it up as a sprite system so i can just swap out the image files".
+
+  Two layers, in this order, and the order is the whole trick:
+      1. the background colour  (his four swatches)
+      2. the paint layer        (inside of her mouth)
+      3. the line art           (black, untouched)
+  Her eye whites and the inside of her mouth are HOLES in the art, so
+  the background shows through them. That is why a flat black line
+  drawing looks coloured without anything being recoloured.
+
+  No network, no fonts, no libraries. Works with the WiFi off, which is
+  the entire point of this deck.
 -->
 <style>
 :root {
-  /* ------- the two you will actually touch ------- */
-  --bg:        #1b1420;      /* background. tap a swatch to change */
-  --iris:      #e8a33d;      /* amber, off her reference */
-
-  /* ------- the rest, tune once ------- */
-  --lash:      #14090f;      /* upper lash line, the heaviest mark */
-  --sclera:    #fdf6ef;
-  --brow:      #b4344f;
-  --mouth:     #d8506a;
-  --glow:      #e8a33d;
-  --eye-w:     190px;
-  --eye-h:     150px;
-  --eye-gap:   150px;
+  --bg:   #ff2d95;      /* hot pink. tap a swatch to change */
+  --chip: rgba(0,0,0,.30);
+  --face: min(76vw, 74vh);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }
-body { position: relative; }
 body {
   background: var(--bg);
-  display: grid;
-  place-items: center;
-  font: 15px system-ui, sans-serif;
-  transition: background .6s ease;
-  -webkit-user-select: none; user-select: none;
-  cursor: default;
-}
-
-/* The face sits in a fixed-ratio box so it scales to any panel and
-   still lands right on the 1024x600 it is actually for. */
-#face {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: var(--eye-gap);
-  place-items: center;
-  margin-bottom: 40px;
-}
-.eye { width: var(--eye-w); height: var(--eye-h); overflow: visible; }
-
-/* ---- blink -------------------------------------------------------
-   The single cheapest thing that makes a face look alive. Runs on
-   idle only; every other expression owns the eyes.               */
-@keyframes blink {
-  0%, 92%, 100% { transform: scaleY(1); }
-  95%           { transform: scaleY(.06); }
-}
-.lid-group { transform-origin: center 55%; }
-body.idle .lid-group,
-body.happy .lid-group { animation: blink 5.2s infinite; }
-body.idle.slow .lid-group { animation-duration: 8s; }
-
-/* ---- breathing ---------------------------------------------------
-   Two pixels of drift. Invisible until it stops, and then the screen
-   looks dead -- which is the point.                              */
-@keyframes breathe {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
-#face { animation: breathe 4.5s ease-in-out infinite; }
-
-/* ---- expressions -------------------------------------------------
-   Every variant is drawn in the SVG and switched on here, so nothing
-   is computed and nothing can get out of sync.                   */
-.v { display: none; }
-body.idle     .v-idle,
-body.happy    .v-happy,
-body.annoyed  .v-annoyed,
-body.talking  .v-talking,
-body.asleep   .v-asleep   { display: block; }
-
-body.asleep { --bg: #0d0910; }
-body.asleep #face { opacity: .55; animation-duration: 9s; }
-
-/* thinking is a MODIFIER, not an expression: she can think while
-   annoyed. It is the most valuable state on the screen -- see
-   DECK_UI.md -- so it reads at a glance without a word of text. */
-@keyframes pulse { 0%,100% { opacity:.25 } 50% { opacity:.9 } }
-#think { opacity: 0; transition: opacity .3s; }
-body.thinking #think { opacity: 1; }
-body.thinking #think circle { animation: pulse 1.1s infinite; }
-body.thinking #think circle:nth-child(2) { animation-delay: .18s; }
-body.thinking #think circle:nth-child(3) { animation-delay: .36s; }
-
-/* ---- mouth ------------------------------------------------------- */
-#mouth { position: absolute; bottom: 26%; }
-@keyframes talk {
-  0%,100% { transform: scaleY(.55) }
-  50%     { transform: scaleY(1.35) }
-}
-body.talking #mouth path { transform-origin: center; animation: talk .28s infinite; }
-
-/* ---- chrome ------------------------------------------------------ */
-#home {
-  position: fixed; right: 22px; bottom: 18px;
-  width: 54px; height: 54px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.28);
-  background: rgba(255,255,255,.07);
   display: grid; place-items: center;
-  color: rgba(255,255,255,.75); font-size: 22px;
+  font: 15px system-ui, -apple-system, sans-serif;
+  transition: background .45s ease;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
-#swatches { position: fixed; left: 18px; bottom: 18px; display: flex; gap: 10px; }
-#swatches i {
-  width: 30px; height: 30px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.3); cursor: pointer;
+
+/* ---- the face ----------------------------------------------------
+   One square box, two stacked images, scaled to the panel. `contain`
+   so a sprite of any size lands right -- his crops are 436-504px and
+   not all the same shape.                                          */
+#face {
+  position: relative;
+  width: var(--face); height: var(--face);
+  animation: breathe 4.6s ease-in-out infinite;
+  cursor: pointer;
 }
-#states {
-  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 8px; opacity: .5;
+#face img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  pointer-events: none;
 }
+/* Blink is gone with the vector eyes: you cannot squash a flat sprite
+   without smearing the line work. A `blink.png` would bring it back
+   for free -- see the note in DECK_UI.md. */
+@keyframes breathe {
+  0%, 100% { transform: translateY(0)     scale(1)     }
+  50%      { transform: translateY(-10px) scale(1.012) }
+}
+
+/* thinking gets a slower, heavier drift -- she is busy, not idle. */
+body.thinking #face { animation-duration: 2.6s; }
+
+/* ---- chrome ------------------------------------------------------
+   Deliberately quiet. It is her face on a screen, not a control
+   panel, and every one of these comes out when the brain drives it. */
+#bar {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  overflow-x: auto; scrollbar-width: none;
+}
+#bar::-webkit-scrollbar { display: none; }
+#states { display: flex; gap: 8px; flex: 1; }
 #states b {
-  font-weight: 500; font-size: 13px; padding: 5px 11px; border-radius: 20px;
-  color: #fff; background: rgba(255,255,255,.1); cursor: pointer;
+  font-weight: 600; font-size: 13px; letter-spacing: .02em;
+  padding: 7px 13px; border-radius: 999px; white-space: nowrap;
+  color: rgba(0,0,0,.55); background: var(--chip); cursor: pointer;
 }
-#states b.on { background: var(--iris); color: #201007; }
+#states b.on { background: #111; color: #fff; }
+#swatches { display: flex; gap: 9px; }
+#swatches i {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(0,0,0,.35);
+}
+#swatches i.on { box-shadow: 0 0 0 3px rgba(0,0,0,.55); }
+#home {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.35); background: var(--chip);
+  display: grid; place-items: center;
+  color: rgba(0,0,0,.6); font-size: 20px; cursor: pointer;
+}
+#empty {
+  padding: 28px; max-width: 30em; line-height: 1.6;
+  color: rgba(0,0,0,.7); text-align: center;
+}
 </style>
 
-<div id="face">
-  <!-- LEFT EYE -->
-  <svg class="eye" viewBox="0 0 190 150">
-    <g class="lid-group">
-      <!-- idle: sharp almond, outer corner lifted -->
-      <g class="v v-idle">
-        <path d="M12 82 Q60 26 150 44 Q176 50 180 66 Q150 118 74 116 Q28 112 12 82Z" fill="var(--sclera)"/>
-        <circle cx="104" cy="79" r="33" fill="var(--iris)"/>
-        <circle cx="104" cy="79" r="15" fill="#1a0d06"/>
-        <circle cx="94"  cy="68" r="9"  fill="#fff" opacity=".92"/>
-        <path d="M10 80 Q58 20 152 40 Q180 47 182 64 Q168 44 140 38 Q60 22 10 80Z" fill="var(--lash)"/>
-        <path d="M12 82 Q60 26 150 44 Q176 50 180 66" fill="none" stroke="var(--lash)" stroke-width="13" stroke-linecap="round"/>
-      </g>
-      <!-- happy: closed upward arc -->
-      <g class="v v-happy">
-        <path d="M18 96 Q95 34 176 92" fill="none" stroke="var(--lash)" stroke-width="15" stroke-linecap="round"/>
-      </g>
-      <!-- annoyed: narrowed, brow driven down -->
-      <g class="v v-annoyed">
-        <path d="M20 88 Q70 56 158 68 Q176 72 178 82 Q150 112 76 110 Q34 106 20 88Z" fill="var(--sclera)"/>
-        <circle cx="106" cy="86" r="29" fill="var(--iris)"/>
-        <circle cx="106" cy="86" r="13" fill="#1a0d06"/>
-        <circle cx="97"  cy="78" r="7"  fill="#fff" opacity=".9"/>
-        <path d="M18 86 Q68 50 160 64 Q178 68 180 80 Q166 62 146 58 Q68 46 18 86Z" fill="var(--lash)"/>
-      </g>
-      <!-- talking: wide, bright -->
-      <g class="v v-talking">
-        <path d="M10 80 Q58 20 152 40 Q180 48 184 66 Q152 122 72 118 Q26 112 10 80Z" fill="var(--sclera)"/>
-        <circle cx="104" cy="77" r="35" fill="var(--iris)"/>
-        <circle cx="104" cy="77" r="15" fill="#1a0d06"/>
-        <circle cx="93"  cy="65" r="10" fill="#fff" opacity=".95"/>
-        <path d="M8 78 Q56 16 154 36 Q182 44 186 62 Q170 40 142 34 Q58 18 8 78Z" fill="var(--lash)"/>
-      </g>
-      <!-- asleep: lash line only -->
-      <g class="v v-asleep">
-        <path d="M22 84 Q95 112 172 82" fill="none" stroke="var(--lash)" stroke-width="13" stroke-linecap="round"/>
-      </g>
-    </g>
-    <!-- brows live OUTSIDE the blink group so they do not squash -->
-    <path class="v v-annoyed" d="M14 34 Q80 14 168 40" fill="none"
-          stroke="var(--brow)" stroke-width="14" stroke-linecap="round"/>
-    <path class="v v-idle" d="M22 22 Q90 6 170 24" fill="none"
-          stroke="var(--brow)" stroke-width="11" stroke-linecap="round" opacity=".85"/>
-  </svg>
+<div id="face" hidden><img id="art" alt=""><img id="paint" alt=""></div>
+<div id="empty" hidden></div>
 
-  <!-- RIGHT EYE: the same drawing, mirrored. One shape to maintain. -->
-  <svg class="eye" id="right" viewBox="0 0 190 150" style="transform:scaleX(-1)"></svg>
+<div id="bar">
+  <div id="states"></div>
+  <div id="swatches"></div>
+  <div id="home">⌂</div>
 </div>
 
-<svg id="mouth" width="150" height="80" viewBox="0 0 150 80">
-  <g class="v v-idle">
-    <path d="M52 24 Q75 40 98 24" fill="none" stroke="var(--mouth)" stroke-width="9" stroke-linecap="round"/>
-  </g>
-  <g class="v v-happy">
-    <path d="M40 18 Q75 62 110 18 Q75 34 40 18Z" fill="var(--mouth)"/>
-  </g>
-  <g class="v v-annoyed">
-    <path d="M46 34 Q75 18 104 34" fill="none" stroke="var(--mouth)" stroke-width="9" stroke-linecap="round"/>
-  </g>
-  <g class="v v-talking">
-    <path d="M50 12 Q75 12 100 12 Q100 56 75 56 Q50 56 50 12Z" fill="var(--mouth)"/>
-  </g>
-  <g class="v v-asleep">
-    <path d="M62 30 Q75 38 88 30" fill="none" stroke="var(--mouth)" stroke-width="7"
-          stroke-linecap="round" opacity=".6"/>
-  </g>
-</svg>
-
-<svg id="think" width="120" height="30" viewBox="0 0 120 30">
-  <circle cx="20" cy="15" r="8" fill="var(--iris)"/>
-  <circle cx="60" cy="15" r="8" fill="var(--iris)"/>
-  <circle cx="100" cy="15" r="8" fill="var(--iris)"/>
-</svg>
-
-<div id="home">⌂</div>
-<div id="swatches"></div>
-<div id="states"></div>
-
 <script>
-// Mirror the left eye into the right one without duplicating the art.
-document.getElementById('right').innerHTML =
-  document.querySelectorAll('.eye')[0].innerHTML;
+// His four, and only his four. "Please add the homescreen colors as Hot
+// pink, Cyan, Neon green, And a Lavender or purple color. Only those
+// colors." Black line art reads on every one of them, which is why the
+// art could stay black.
+const COLOURS = [
+  ['hot pink',   '#ff2d95'],
+  ['cyan',       '#22e0e8'],
+  ['neon green', '#39ff5e'],
+  ['lavender',   '#b98cff'],
+];
 
-const STATES = ['idle', 'happy', 'annoyed', 'talking', 'asleep'];
-const COLOURS = ['#1b1420', '#0e1a1c', '#1d1526', '#221108', '#0b1020', '#000000'];
+let expressions = [];
+let current = 0;
 
-function setState(name) {
-  document.body.className = name;
-  document.querySelectorAll('#states b').forEach(b =>
-    b.classList.toggle('on', b.textContent === name));
-  try { localStorage.setItem('saya-state', name); } catch (e) {}
+function show(i) {
+  if (!expressions.length) return;
+  current = (i + expressions.length) % expressions.length;
+  const e = expressions[current];
+  document.getElementById('art').src = e.file;
+  // The paint layer is optional: a sprite yuzu_face.py could not read
+  // still SHOWS, it just has no mouth colour. Missing art must never
+  // be a blank screen.
+  const paint = document.getElementById('paint');
+  paint.src = e.file.replace(/\.[^.]+$/, '.paint.png');
+  paint.onerror = () => { paint.removeAttribute('src'); };
+  document.body.className = e.name;
+  document.querySelectorAll('#states b').forEach((b, n) =>
+    b.classList.toggle('on', n === current));
+  try { localStorage.setItem('saya-face', e.name); } catch (err) {}
 }
+
 function setColour(hex) {
   document.documentElement.style.setProperty('--bg', hex);
-  try { localStorage.setItem('saya-bg', hex); } catch (e) {}
+  document.querySelectorAll('#swatches i').forEach(i =>
+    i.classList.toggle('on', i.dataset.hex === hex));
+  try { localStorage.setItem('saya-bg', hex); } catch (err) {}
 }
 
-// The demo controls. These come OUT once the brain drives the face --
-// they exist so he can see all five expressions without a server.
-STATES.forEach(s => {
-  const b = document.createElement('b');
-  b.textContent = s;
-  b.onclick = () => setState(s);
-  document.getElementById('states').append(b);
-});
-COLOURS.forEach(c => {
+COLOURS.forEach(([name, hex]) => {
   const i = document.createElement('i');
-  i.style.background = c;
-  i.onclick = () => setColour(c);
+  i.style.background = hex;
+  i.title = name;
+  i.dataset.hex = hex;
+  i.onclick = () => setColour(hex);
   document.getElementById('swatches').append(i);
 });
 
-let saved;
-try { saved = localStorage.getItem('saya-bg'); } catch (e) {}
-if (saved) setColour(saved);
-setState('idle');
+fetch('sprites.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(m => {
+    expressions = m.expressions || [];
+    if (!expressions.length) {
+      const box = document.getElementById('empty');
+      box.hidden = false;
+      box.textContent = 'No art in ui/sprites/ yet. Drop transparent '
+        + 'PNGs in there — the filename becomes the expression name.';
+      return;
+    }
+    expressions.forEach((e, n) => {
+      const b = document.createElement('b');
+      b.textContent = e.name;
+      b.onclick = () => show(n);
+      document.getElementById('states').append(b);
+    });
+    document.getElementById('face').hidden = false;
+    let saved = null;
+    try { saved = localStorage.getItem('saya-face'); } catch (err) {}
+    const at = expressions.findIndex(e => e.name === saved);
+    show(at < 0 ? 0 : at);
+  })
+  .catch(() => {
+    const box = document.getElementById('empty');
+    box.hidden = false;
+    box.textContent = 'Could not read sprites.json. Start her with '
+      + '~/YUZU/face rather than opening this file directly.';
+  });
 
-// A tap on her face cycles expressions, so the whole thing is usable
-// on a touchscreen with no keyboard at all.
-document.getElementById('face').onclick = () =>
-  setState(STATES[(STATES.indexOf(document.body.className.split(' ')[0]) + 1) % STATES.length]);
+// A tap on her face cycles expressions, so the whole thing works on a
+// touchscreen with no keyboard anywhere near it.
+document.getElementById('face').onclick = () => show(current + 1);
+
+let bg = null;
+try { bg = localStorage.getItem('saya-bg'); } catch (err) {}
+setColour(COLOURS.some(c => c[1] === bg) ? bg : COLOURS[0][1]);
 </script>

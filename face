@@ -100,6 +100,7 @@ report() {
     echo "      http://$ip:$PORT/face.html"
     echo
     echo "  Tap her face to change expression. Tap a circle to recolour."
+    echo "  New face: drop a transparent PNG in ~/YUZU/ui/sprites/ and reload."
     echo "  Stop it with:  ~/YUZU/face --off"
     echo
     return 0
@@ -107,7 +108,7 @@ report() {
 
 case "${1:-}" in
 --off)
-    pkill -f "http.server $PORT" 2>/dev/null && echo "Face stopped." \
+    pkill -f "yuzu_face.py --serve --port $PORT" 2>/dev/null && echo "Face stopped." \
                                              || echo "It was not running."
     exit 0 ;;
 --status)
@@ -116,12 +117,22 @@ esac
 
 [ -f "$DIR/face.html" ] || { echo "No $DIR/face.html -- run: git pull origin main"; exit 1; }
 
+# Paint any sprite that has no mouth colour yet. Idempotent and fast,
+# so it just runs -- a face he dropped in five seconds ago should work
+# without him knowing a build step exists.
+python3 "$(dirname "$DIR")/yuzu_face.py" --paint >/dev/null 2>&1
+
 if ! up; then
     # nohup + & always. A foreground server on a serial link reads as a
     # frozen board, and that has already cost this project two power
     # cycles. --bind 0.0.0.0 because the phone is the client.
-    nohup python3 -m http.server "$PORT" --bind 0.0.0.0 \
-        --directory "$DIR" >"$LOG" 2>&1 &
+    # yuzu_face.py rather than `python3 -m http.server`: it serves ui/
+    # AND generates /sprites.json per request, so dropping a new PNG in
+    # ui/sprites/ needs a page refresh instead of a server restart. On
+    # a phone over a serial link that is a much bigger difference than
+    # it sounds.
+    nohup python3 "$(dirname "$DIR")/yuzu_face.py" --serve --port "$PORT" \
+        >"$LOG" 2>&1 &
     sleep 2
     if ! up; then
         echo; echo "  It did not come up. Its own output:"
