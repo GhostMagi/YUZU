@@ -4822,6 +4822,141 @@ class TestJetsonChecks(unittest.TestCase):
                                f"{name} doesn't explain itself")
 
 
+class TestArtConversion(unittest.TestCase):
+    """`yuzu_art.py` -- white background out, line art in.
+
+    Ghost, Sept 10: "Write a Python function using PIL/Pygame that
+    converts white pixels to transparent alpha when loading the images
+    into memory, so we don't have to edit the backgrounds manually."
+    Then, on the grey shading: "color not needed." """
+
+    import yuzu_art as art
+
+    RAW = Path(__file__).parent / "ui" / "raw"
+    SPRITES = Path(__file__).parent / "ui" / "sprites"
+
+    def _paper(self, w=40, h=40, mark=(10, 10)):
+        """A white page with one black mark on it."""
+        px = bytearray([255, 255, 255, 255] * (w * h))
+        i = (mark[1] * w + mark[0]) * 4
+        px[i:i + 4] = bytes((0, 0, 0, 255))
+        return w, h, px
+
+    def test_white_becomes_transparent_and_ink_becomes_black(self):
+        w, h, px = self._paper()
+        _, _, out = self.art.to_transparent(w, h, px)
+        self.assertEqual(out[3], 0, "the paper is still opaque")
+        i = (10 * w + 10) * 4
+        self.assertEqual(out[i + 3], 255, "the drawing was erased")
+        self.assertEqual(tuple(out[i:i + 3]), (0, 0, 0), "ink is not black")
+
+    def test_alpha_RAMPS_so_curves_do_not_go_jagged(self):
+        """A hard cutoff turns every anti-aliased edge into a staircase,
+        and her line work is nothing but curves. The grey between paper
+        and ink has to survive as partial alpha."""
+        w, h, px = self._paper()
+        mid = self.art.WHITE_AT - (self.art.WHITE_AT - self.art.INK_AT) // 2
+        px[0:4] = bytes((mid, mid, mid, 255))
+        _, _, out = self.art.to_transparent(w, h, px)
+        self.assertGreater(out[3], 40, "mid-grey vanished; edges will be hard")
+        self.assertLess(out[3], 215, "mid-grey went solid; edges will be fat")
+
+    def test_a_transparent_border_is_NOT_a_screenshot_bar(self):
+        """THIS BUG ATE blink.png AND LEFT ONE PIXEL.
+
+        `strip_bars` removes the black and grey letterboxing his phone
+        gallery puts around a picture. The first version asked only about
+        BRIGHTNESS -- and the RGB underneath a transparent pixel is
+        usually black, so on art that was already a sprite every
+        transparent border row read as a solid black bar and the crop ate
+        the whole image. 485x460 in, 1x1 out.
+
+        A transparent edge is nothing being there. It is not furniture."""
+        w = h = 30
+        px = bytearray(w * h * 4)               # fully transparent
+        i = (15 * w + 15) * 4
+        px[i:i + 4] = bytes((0, 0, 0, 255))     # one real mark
+        nw, nh, out = self.art.strip_bars(w, h, px)
+        self.assertEqual((nw, nh), (w, h),
+                         "a transparent border was cropped as a bar")
+
+    def test_a_real_bar_IS_removed(self):
+        """The second version of this test's subject: uniformity was the
+        wrong question, because JPEG noise beat it -- a grey chrome strip
+        survived, defined the bounding box, and her face rendered small
+        and off-centre with a stray line beside it. That is exactly how
+        it looked on the page.
+
+        Every row of real line art crosses white paper somewhere. A
+        letterbox never does, however noisy it is."""
+        w = h = 40
+        px = bytearray([255, 255, 255, 255] * (w * h))
+        for y in range(h):                      # noisy grey bar, 3 wide
+            for x in range(3):
+                g = 120 + ((x * 7 + y * 13) % 40)
+                i = (y * w + x) * 4
+                px[i:i + 4] = bytes((g, g, g, 255))
+        px[(20 * w + 20) * 4:(20 * w + 20) * 4 + 4] = bytes((0, 0, 0, 255))
+        nw, _, _ = self.art.strip_bars(w, h, px)
+        self.assertEqual(nw, w - 3, "the noisy bar survived the crop")
+
+    def test_every_sprite_is_SQUARE(self):
+        """What makes it look smooth. The page scales each sprite into
+        one square box with object-fit: contain, so a wide sprite renders
+        SMALLER -- her face visibly jumps size when the expression
+        changes, or every few seconds when she blinks. Cropped tight, his
+        four came out between 1.09 and 1.51 wide."""
+        for f in sorted(self.SPRITES.glob("*.png")):
+            if ".paint" in f.name:
+                continue
+            got = self.art.load_rgba(str(f))
+            self.assertTrue(got, f"{f.name} will not load")
+            w, h, _ = got
+            self.assertEqual(w, h, f"{f.name} is {w}x{h}, not square")
+
+    def test_no_sprite_was_reduced_to_nothing(self):
+        """The blink disaster, guarded from the other end: whatever the
+        conversion does, real art has to come out the far side."""
+        for f in sorted(self.SPRITES.glob("*.png")):
+            if ".paint" in f.name:
+                continue
+            w, h, px = self.art.load_rgba(str(f))
+            inked = sum(1 for i in range(3, len(px), 4) if px[i] > 12)
+            self.assertGreater(w, 200, f"{f.name} was cropped to {w}x{h}")
+            self.assertGreater(inked, 2000, f"{f.name} has almost no art")
+
+    def test_no_sprite_still_has_a_white_background(self):
+        """The whole point. A sprite that kept its paper shows as a white
+        card on the neon background instead of as her face."""
+        for f in sorted(self.SPRITES.glob("*.png")):
+            if ".paint" in f.name:
+                continue
+            w, h, px = self.art.load_rgba(str(f))
+            self.assertFalse(self.art.looks_like_paper(w, h, px),
+                             f"{f.name} still has a white background")
+
+    def test_PIL_is_optional_and_the_import_is_guarded(self):
+        """He asked for PIL and PIL is right -- the stdlib cannot read
+        the JPEGs his phone gallery makes. But "installs nothing" is what
+        lets the brain run in Pydroid on that phone, so this is a
+        workbench tool whose OUTPUT is a plain PNG. The deck never needs
+        PIL to show her face."""
+        body = (Path(__file__).parent / "yuzu_art.py").read_text()
+        self.assertIn("try:", body.split("from PIL")[0][-120:],
+                      "the PIL import is not guarded")
+        face = (Path(__file__).parent / "yuzu_face.py").read_text()
+        self.assertNotIn("PIL", face,
+                         "the runtime now depends on PIL, which ends the "
+                         "phone property")
+
+    def test_the_raw_art_is_kept_so_it_can_be_redone(self):
+        """His originals live in ui/raw/ and the conversion is one
+        command with no arguments. A lossy step whose input was thrown
+        away can never be improved on."""
+        self.assertTrue(list(self.RAW.glob("*")),
+                        "the raw drawings were not kept")
+
+
 class TestHomeScreen(unittest.TestCase):
     """`ui/home.html` -- the desktop behind her face.
 

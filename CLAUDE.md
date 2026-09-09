@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 407 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 416 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 407 tests pass on it. Getting it
+(that repo path is confirmed working). 416 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -940,6 +940,76 @@ there with her eyes shut on `blink`.
 others carry a soft grey halo from the crop. It shows against the neon
 backgrounds. Harmless, and a tighter crop or a threshold pass would fix
 it -- not worth touching unless it bothers him.
+
+## `yuzu_art.py` — raw drawing in, sprite out (Sept 10)
+
+Ghost, morning: *"Write a Python function using PIL/Pygame that converts
+white pixels to transparent alpha when loading the images into memory,
+so we don't have to edit the backgrounds manually."* Then, on the grey
+shading in the new art: *"color not needed."*
+
+    ui/raw/<name>.jpg      his drawing, straight off the phone
+    python3 yuzu_art.py    convert everything in ui/raw/
+    ui/sprites/<name>.png  the sprite
+
+**PIL IS OPTIONAL AND THE IMPORT IS GUARDED, exactly like Piper's.** He
+asked for PIL and PIL is right -- the stdlib cannot read the JPEGs his
+gallery produces. But "installs nothing" is what lets the brain run in
+Pydroid on that phone, so this is a WORKBENCH tool whose output is a
+plain PNG committed to the repo. The deck never needs PIL to show her
+face, and a test asserts `yuzu_face.py` never mentions it.
+
+**ALPHA IS A RAMP, NOT A THRESHOLD.** A cutoff turns every anti-aliased
+edge into a staircase and her line work is nothing but curves. Alpha
+comes from darkness across the last few shades before white; colour is
+discarded, so the grey iris shading becomes faint black and the
+background shows through it. That is what "smooth" meant.
+
+**THE ALPHA-BLIND CROP ATE `blink.png` AND LEFT ONE PIXEL.** 485x460 in,
+1x1 out. `strip_bars` removes the letterboxing his gallery app puts
+round a screenshot, and the first version asked only about BRIGHTNESS --
+but the RGB underneath a transparent pixel is usually black, so on art
+that was already a sprite every transparent border row read as a solid
+black bar and the crop ate the whole image.
+
+**Restored from git in one command, which is the only reason it was
+cheap.** Committing his art the moment it arrived is what made a
+destructive bug a two-minute problem. The originals now live in
+`ui/raw/` as well, so the conversion can be redone with a better rule
+without asking him for the drawings again.
+
+**THEN THE SECOND VERSION OF THE SAME CHECK WAS ALSO WRONG, and the
+PAGE is what showed it.** Asking whether an edge row is a UNIFORM colour
+loses to JPEG noise: the grey chrome strip down the side of one
+screenshot varied by more than the tolerance, survived the crop, and
+then DEFINED THE BOUNDING BOX -- so her face rendered small and
+off-centre with a stray vertical line beside it. Every test passed.
+
+The rule that works has nothing to tune: **a bar is an edge line with NO
+PAPER IN IT.** Every row of real line art crosses white somewhere; a
+letterbox never does, however noisy it is. idle went from 992px wide to
+863 and the line was gone.
+
+**EVERY SPRITE IS SQUARE NOW, and that is what actually makes it look
+smooth.** The page scales each one into a square box with `object-fit:
+contain`, so a WIDE sprite renders SMALLER -- her face jumps size when
+the expression changes, and every few seconds when she blinks. Cropped
+tight, his four came out between 1.09 and 1.51 wide. `square()` centres
+the drawing on a square canvas with a 6% margin, the padding is
+transparent and free, and the existing eight were normalised the same
+way so nothing renders at two different scales.
+
+**FIFTH TIME IN TWO DAYS THAT LOOKING IS WHAT FOUND IT** -- the iris
+ring, the painted eye, the mouth tones, the orphaned Game Boy tile, and
+now a stray grey line. Three of those passed every assertion in the
+suite. **Render it and look. There is no substitute for image work.**
+
+**`smug` IS A NEW EXPRESSION, not a replacement.** He sent four faces
+and asked for three (angry, crying, idle). The fourth -- sharp brows
+over a wide smirk -- is too good to throw away and costs nothing in a
+system where a file IS an expression. `mad` got the pouty frown with the
+blush hatching, which is the tsundere annoyed face; if he wants them the
+other way round it is one `mv`.
 
 ## THE HOME SCREEN — the deck is an object now (Sept 10)
 
