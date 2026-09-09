@@ -3740,6 +3740,75 @@ class TestDropBox(unittest.TestCase):
         self.assertRegex(ip, r"^\d+\.\d+\.\d+\.\d+$")
 
 
+class TestGettingOutOfTheChat(unittest.TestCase):
+    """THIS COST GHOST TWO POWER CYCLES IN ONE EVENING.
+
+    He has ONE serial terminal. No SSH, no second session, no working
+    Ctrl-C -- *"theres no option for a second session brudda. i had no
+    choice."* When the chat loop would not let go, the only thing left
+    was the plug.
+
+    That is not a user error. It is a loop with no exit, and every
+    piece of advice that assumed a second terminal was wrong.
+
+    These drive the REAL functions against a real pipe, because select()
+    is what decides all of it."""
+
+    HARNESS = ("import sys, yuzu_brain\n"
+               "text, out = yuzu_brain.read_turn(prompt='')\n"
+               "print('OUT' if out else 'MSG=' + repr(text))\n")
+
+    def _turn(self, typed):
+        import subprocess
+        done = subprocess.run([sys.executable, "-c", self.HARNESS],
+                              input=typed, capture_output=True, text=True,
+                              cwd=str(Path(__file__).parent), timeout=30)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stdout.strip()
+
+    def test_quit_typed_while_she_is_talking_wins_IMMEDIATELY(self):
+        """The exact trap. `quit` used to queue up BEHIND everything
+        already buffered, so it looked ignored while she worked through
+        a backlog. An exit anywhere in the buffer now ends it."""
+        self.assertEqual(self._turn("hey saya whats up\nquit\n"), "OUT")
+
+    def test_a_paste_with_quit_behind_it_still_gets_out(self):
+        """He pasted a 12-line command by mistake; every line became a
+        message costing a full generation, and the quit he typed next
+        sat behind all twelve."""
+        self.assertEqual(
+            self._turn("import urllib.request as u\ndef g(p):\n"
+                       "    return 1\nprint(g)\nquit\n"), "OUT")
+
+    def test_hammering_exit_four_times_gets_out(self):
+        self.assertEqual(self._turn("Exit\nExit!\nquit\nquit\n"), "OUT")
+
+    def test_pkill_typed_in_desperation_gets_out(self):
+        """He typed `pkill -f yuzu_brain` AT HER PROMPT while trapped,
+        and she answered it. Someone reaching for pkill wants out."""
+        self.assertEqual(self._turn("blah\npkill -f yuzu_brain\n"), "OUT")
+
+    def test_a_paste_is_ONE_turn_not_one_message_per_line(self):
+        out = self._turn("hey saya\nhows the deck\n")
+        self.assertEqual(out, "MSG='hey saya\\nhows the deck'")
+
+    def test_talking_ABOUT_quitting_is_not_quitting(self):
+        """The dangerous half. These must reach her as conversation --
+        an exit that fires on ordinary sentences is its own trap."""
+        for typed in ("what does quit mean anyway\n",
+                      "i quit my job today lol\n",
+                      "stop it lol\n",
+                      "does pkill work on ubuntu\n"):
+            with self.subTest(typed=typed):
+                self.assertTrue(self._turn(typed).startswith("MSG="), typed)
+
+    def test_pending_lines_never_blocks_on_an_empty_stream(self):
+        """A zero timeout is the whole contract: it must ask "is there
+        input RIGHT NOW", never wait for something not yet typed."""
+        import io
+        self.assertEqual(yuzu_brain.pending_lines(io.StringIO("")), [])
+
+
 class TestExitCommand(unittest.TestCase):
     """Getting OUT of the chat loop. Reported by Ghost, Sept 9: he typed
     quit twice into a live Shiro session and she REPLIED to it, in
@@ -3803,12 +3872,23 @@ class TestExitCommand(unittest.TestCase):
                     f"the two copies disagree about {typed!r}")
 
     def test_both_loops_actually_call_it(self):
-        """A helper nothing calls fixes nothing."""
+        """A helper nothing calls fixes nothing.
+
+        The chat loop reaches it through read_turn() now, which also
+        makes an exit ANYWHERE in the buffer win -- see
+        TestGettingOutOfTheChat. The robot loop still calls it
+        directly."""
         import inspect
-        for func in (yuzu_brain._cli, yuzu.run_yuzu_forever):
-            self.assertIn("is_exit_command(", inspect.getsource(func),
-                          f"{func.__name__} still compares the word by "
-                          f"hand, so a phone's full stop gets sent to her")
+        self.assertIn("is_exit_command(",
+                      inspect.getsource(yuzu_brain.read_turn),
+                      "read_turn does not use the exit check, so a "
+                      "phone's full stop gets sent to her")
+        self.assertIn("read_turn(", inspect.getsource(yuzu_brain._cli),
+                      "the chat loop bypasses read_turn, so a queued "
+                      "quit waits behind the backlog again")
+        self.assertIn("is_exit_command(",
+                      inspect.getsource(yuzu.run_yuzu_forever),
+                      "run_yuzu_forever still compares the word by hand")
 
 
 class TestPersonaSwitching(BrainTestCase):

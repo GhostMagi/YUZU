@@ -21,6 +21,7 @@ rules composed in from a shared hardware file. See yuzu_personas.py.
 
 import json
 import os
+import select
 import re
 import sys
 import urllib.error
@@ -516,6 +517,67 @@ def is_exit_command(text):
     return word in _EXIT_WORDS
 
 
+def pending_lines(stream=None, limit=200):
+    """Every line ALREADY waiting on stdin. Never blocks.
+
+    select() with a zero timeout asks "is there input right now",
+    which is the only question that matters here -- it must never wait
+    for something not yet typed.
+    """
+    stream = stream or sys.stdin
+    lines = []
+    try:
+        while len(lines) < limit and select.select([stream], [], [], 0)[0]:
+            more = stream.readline()
+            if not more:
+                break
+            lines.append(more.rstrip("\n"))
+    except (OSError, ValueError):
+        pass                       # not a real tty/pipe; nothing waiting
+    return lines
+
+
+def read_turn(prompt="You: ", stream=None):
+    """One conversational turn -> (text, wants_out).
+
+    THIS EXISTS BECAUSE IT COST GHOST A SECOND POWER CYCLE.
+
+    He has ONE serial terminal. No SSH, no second session, no working
+    Ctrl-C. So when the chat loop would not let go, the only thing left
+    was the plug -- twice in one evening. That is not a user error, it
+    is a loop with no exit.
+
+    Two rules, and the second is the one that matters:
+
+    1. A PASTE IS ONE TURN. A twelve-line paste became twelve messages,
+       each costing a full generation.
+    2. AN EXIT ANYWHERE IN THE BUFFER WINS IMMEDIATELY. `quit` typed
+       while she is mid-reply used to queue up BEHIND everything
+       already waiting, so it looked ignored. Someone typing quit --
+       especially four times, and then `pkill` -- wants out now, not
+       after the backlog is answered.
+    """
+    first = input(prompt)
+    lines = [first] + pending_lines(stream)
+    for line in lines:
+        if is_exit_command(line) or _is_kill_attempt(line):
+            return None, True
+    return "\n".join(lines).strip(), False
+
+
+def _is_kill_attempt(line):
+    """Someone typing `pkill -f yuzu_brain` at this prompt wants OUT.
+
+    He typed exactly that, into the chat, while trapped -- it went to
+    her as a message and she answered it. Treating it as an exit costs
+    nothing: the only way to lose is to be discussing pkill with her,
+    which is a fine trade against being stuck.
+    """
+    lowered = line.strip().lower()
+    return lowered.startswith(("pkill", "killall", "kill ")) and \
+        ("yuzu" in lowered or "brain" in lowered or lowered.endswith("kill"))
+
+
 def _cli(argv):
     model = DEFAULT_MODEL
     persona = None
@@ -602,11 +664,12 @@ def _cli(argv):
           + "\n")
     while True:
         try:
-            text = input("You: ").strip()
+            text, wants_out = read_turn()
         except (EOFError, KeyboardInterrupt):
             print()
             return 0
-        if is_exit_command(text):
+        if wants_out:
+            print("(bye)")
             return 0
         if text.lower() == "reset":
             brain.reset()

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 359 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 366 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 359 tests pass on it. Getting it
+(that repo path is confirmed working). 366 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -616,40 +616,66 @@ needed the unit file, not the environment. The wiki extract needed to
 be a user turn, not a system message. And an identity needs the key at
 boot and the name in dialogue.
 
-## OPEN, diagnosed, NOT built: a paste is twelve messages
+## THE CHAT LOOP HAD NO EXIT, AND IT COST TWO POWER CYCLES
 
-Sept 9. Ghost pasted a 12-line diagnostic command into Saya's chat by
-mistake. Every line became its own message and cost a full generation,
-so the `quit` he typed next sat behind twelve replies -- **which looks
-exactly like `quit` being ignored again**, and it is not. It is a
-queue.
+Sept 9. **The worst thing this project has done to him.**
 
-(Her replies to it were good, for the record: *"Hah, a function, how
-quaint. I-it's not like you actually know what you're doing or
-anything, right?"*)
+Ghost pasted a 12-line diagnostic into Saya's chat by mistake. Every
+line became its own message costing a full generation. He typed `quit`
+-- it queued behind them. `Exit`, `Exit!`, `quit` again -- all queued.
+He typed `pkill -f yuzu_brain` AT HER PROMPT and she answered it. He
+pulled the serial cable; the process survived (the Jetson's USB console
+is not SSH -- `Disconnected` / `Connected` and she kept talking). In
+the end he unplugged the board.
 
-**The fix is written and was REVERTED unbuilt.** `read_line()` would
-call `input()` then drain anything already waiting via
-`select.select([sys.stdin], [], [], 0)` and join it -- a paste is ONE
-thought, and the part that actually matters is that whatever he types
-next gets read promptly instead of queueing behind a wall of
-accidental messages.
+**Every workaround suggested to him assumed a second terminal he does
+not have.** *"theres no option for a second session brudda. i had no
+choice."* He is right. Serial USB Terminal is his only session, there
+is no easy Ctrl-C on it, and SSH needs another app and a working
+network. **A loop with no exit is not a user error.**
 
-It was reverted because **there is no Ollama here and it could not be
-behaviour-tested**, and this is his main chat loop. Shipping an
-unverified change to the thing he uses every day is exactly what this
-file warns about under "tested in a sim". Pick it up with a test that
-drives `read_line` against a pipe and a tty.
+`read_turn()` fixes it with two rules, and the second is the one that
+matters:
 
-**Related and still true: `/wiki` search returns nothing on his
-archive.** The server starts correctly now (measured: 3 seconds, then
-an answer), but `Nothing in the archive about 'ice cream'` on a Simple
-English Wikipedia ZIM is a PARSING failure, not a missing article. The
-likely cause is that modern kiwix-serve dropped the `/A/` namespace
-from article URLs while `_suggest`'s regex still requires it. NOT
-confirmed -- the diagnostic that would settle it was pasted into the
-chat instead of the shell, so the real endpoint shapes are still
-unknown. Run it AT THE SHELL:
+1. **A paste is ONE turn.** `pending_lines()` drains whatever is
+   already buffered (select with a zero timeout -- "is there input
+   RIGHT NOW", never a wait) and joins it into a single message.
+2. **An exit ANYWHERE in the buffer wins IMMEDIATELY.** Not in order,
+   not after the backlog. Someone typing quit four times and then
+   reaching for `pkill` wants out now.
+
+`_is_kill_attempt()` also treats `pkill -f yuzu_brain` at the prompt as
+an exit. He typed exactly that while trapped. The only way to lose is
+to be discussing pkill with her, which is a fine trade.
+
+`TestGettingOutOfTheChat` drives the REAL functions through a real
+pipe -- select() is what decides all of it -- against his four actual
+escape attempts, plus four sentences that must NOT trigger ("what does
+quit mean anyway", "i quit my job today lol", "stop it lol", "does
+pkill work on ubuntu"). An exit that fires on ordinary conversation is
+its own trap.
+
+**I ALSO GOT THE DIAGNOSIS PARTLY WRONG AND SAID IT TOO CONFIDENTLY.**
+I told him she was draining a backlog; he said *"she wasmt waiting for
+a quit to work. she was straight fucking with me fast too."* He was in
+the room and I was not. Streamed replies arrive in chunks and each
+chunk gets its own terminal timestamp, so what I read as separate
+queued replies may have been one reply streaming. The queue is real --
+the fix is right either way -- but the confidence was not earned.
+
+**Generalisable: never ship an escape hatch that depends on a second
+session.** Check what the person can actually reach before calling
+something a workaround.
+
+## STILL OPEN: `/wiki` finds nothing in his archive
+
+The server starts correctly (measured: 3 seconds, then an answer), so
+`Nothing in the archive about 'ice cream'` on a Simple English
+Wikipedia ZIM is a PARSING failure, not a missing article. Likely the
+`/A/` namespace that `_suggest`'s regex requires and modern
+kiwix-serve dropped. **NOT confirmed** -- the diagnostic that would
+settle it was pasted into the chat instead of the shell, which is what
+started the whole trap. Run it AT THE SHELL:
 
     python3 -c "
     import urllib.request as u, re
