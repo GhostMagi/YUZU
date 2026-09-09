@@ -323,6 +323,17 @@ class YuzuBrain:
         messages.append({"role": "user", "content": user_text})
         return messages
 
+    # Telling her face what she is doing. GUARDED, like Piper and the
+    # wiki: the face is a nicety and the reply is the product, so a
+    # missing or broken face module must never be able to stop her
+    # talking. `_face_state` swallows everything on purpose.
+    def _face(self, state, said=""):
+        try:
+            import yuzu_face
+            yuzu_face.set_state(state, said)
+        except Exception:
+            pass
+
     def ask(self, user_text, remember=True):
         """One turn in, Yuzu's raw reply out -- brackets and all. Feed
         the result straight to handle_yuzu_reply()."""
@@ -333,6 +344,7 @@ class YuzuBrain:
             "options": self.options,
             "keep_alive": self.keep_alive,
         }
+        self._face("thinking")
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as r:
                 data = json.load(r)
@@ -359,6 +371,7 @@ class YuzuBrain:
             ) from exc
 
         reply = (data.get("message") or {}).get("content", "").strip()
+        self._face("talking", reply)
         if remember:
             self._remember(user_text, reply)
         self._check_drift(reply)
@@ -380,6 +393,7 @@ class YuzuBrain:
             "keep_alive": self.keep_alive,
         }
         collected = []
+        self._face("thinking")
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as response:
                 for line in response:
@@ -391,6 +405,11 @@ class YuzuBrain:
                         raise BrainError(f"Ollama error: {chunk['error']}")
                     piece = (chunk.get("message") or {}).get("content", "")
                     if piece:
+                        # The FIRST chunk is the moment she stops
+                        # thinking and starts talking -- which is the
+                        # whole reason streaming is used here.
+                        if not collected:
+                            self._face("talking")
                         collected.append(piece)
                         yield piece
                     if chunk.get("done"):
@@ -406,6 +425,7 @@ class YuzuBrain:
                 f"Try: export YUZU_TIMEOUT=600"
             ) from exc
         full_reply = "".join(collected).strip()
+        self._face("talking", full_reply)
         if remember:
             self._remember(user_text, full_reply)
         # ask() scored drift and ask_stream() didn't, so streaming

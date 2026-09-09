@@ -5291,6 +5291,155 @@ class TestArtConversion(unittest.TestCase):
                         "the raw drawings were not kept")
 
 
+class TestSheReacts(unittest.TestCase):
+    """Her face knows what she is doing.
+
+    It was a picture until now -- it did not know she existed. The brain
+    writes what it is doing to a file, the server serves it, the page
+    asks. `thinking` is the whole point: every frustration in this
+    project's log is "is it working or is it stuck", and a face that
+    visibly thinks answers that with no status text."""
+
+    import yuzu_face as face
+
+    PAGE = Path(__file__).parent / "ui" / "face.html"
+
+    def setUp(self):
+        self.face.set_state("idle")
+
+    def test_state_crosses_between_processes(self):
+        """The brain and the server are separate processes -- he starts
+        the chat in his terminal and the page is served here -- so a
+        file is the right size for the boundary. No socket to fail, no
+        order to get right."""
+        self.face.set_state("thinking")
+        self.assertEqual(self.face.get_state()["state"], "thinking")
+        self.face.set_state("talking", "Hmph.")
+        got = self.face.get_state()
+        self.assertEqual(got["state"], "talking")
+        self.assertEqual(got["said"], "Hmph.")
+
+    def test_a_stale_state_reads_as_idle(self):
+        """A chat that died mid-reply must not leave her frozen mid-
+        thought forever."""
+        import json, time
+        with open(self.face.STATE_FILE, "w") as fh:
+            json.dump({"state": "thinking", "said": "",
+                       "at": time.time() - 9999}, fh)
+        self.assertEqual(self.face.get_state()["state"], "idle")
+
+    def test_setting_state_NEVER_raises(self):
+        """It is called from the reply path. A face that cannot be
+        updated must never be able to stop her talking -- the same rule
+        Piper and the wiki import already follow."""
+        old = self.face.STATE_FILE
+        try:
+            self.face.STATE_FILE = "/nope/not/a/place/state"
+            self.face.set_state("thinking")      # must not raise
+        finally:
+            self.face.STATE_FILE = old
+        self.face.set_state("not-a-real-state")  # must not raise
+
+    def test_the_brain_telling_the_face_is_GUARDED(self):
+        """Same shape as Piper's import. The face is a nicety; the reply
+        is the product."""
+        import yuzu_brain
+        brain = yuzu_brain.YuzuBrain.__new__(yuzu_brain.YuzuBrain)
+        with unittest.mock.patch.dict("sys.modules", {"yuzu_face": None}):
+            brain._face("thinking")              # must not raise
+        body = (Path(__file__).parent / "yuzu_brain.py").read_text()
+        self.assertIn("except Exception:", body.split("def _face")[1][:400],
+                      "the face call is not swallowed")
+
+    def test_both_reply_paths_report_thinking_then_talking(self):
+        body = (Path(__file__).parent / "yuzu_brain.py").read_text()
+        for path in ("def ask(", "def ask_stream("):
+            chunk = body.split(path)[1].split("\n    def ")[0]
+            self.assertIn('_face("thinking")', chunk,
+                          f"{path} never says she is thinking")
+            self.assertIn('_face("talking"', chunk,
+                          f"{path} never says she is talking")
+
+    def test_the_server_is_THREADED(self):
+        """Not optional. One reply takes tens of seconds on that board,
+        and a single-threaded server would stop answering /state for the
+        whole time -- so her face would freeze exactly when it most
+        needs to say `thinking`. Verified live as well: /state answered
+        `thinking` mid-generation."""
+        body = (Path(__file__).parent / "yuzu_face.py").read_text()
+        self.assertIn("ThreadingHTTPServer", body)
+
+    def test_an_empty_message_never_reaches_the_model(self):
+        reply, error = self.face.answer("")
+        self.assertIsNone(reply)
+
+    # ---- the UI he asked to be quieter -------------------------------
+
+    def test_there_are_no_expression_buttons(self):
+        """Ghost: "remove the visual clues i can change her expression i
+        want that automatic." The brain drives her face now, so a row of
+        buttons offering to do it by hand advertised the wrong thing --
+        and it also overlapped the speech bubble and cut her chin off,
+        which a screenshot caught."""
+        page = self.PAGE.read_text()
+        self.assertNotIn('id="states"', page, "the expression chips are back")
+
+    def test_the_colours_are_ONE_dot_not_four(self):
+        """"put those color options into 1 small bubble instead of
+        polluting screen" -- four swatches is a settings panel parked on
+        her face."""
+        page = self.PAGE.read_text()
+        self.assertNotIn('id="swatches"', page)
+        self.assertIn('id="tint"', page)
+        # still exactly his four, just not all on screen at once
+        block = page.split("const COLOURS")[1].split("];")[0]
+        self.assertEqual(block.count("#"), 4)
+
+    def test_she_can_be_talked_to_from_the_page(self):
+        page = self.PAGE.read_text()
+        self.assertIn("'say'", page, "there is no way to talk to her")
+        self.assertIn('id="says"', page, "there is nowhere for her reply")
+
+
+class TestWikiBrevity(unittest.TestCase):
+    """The Munchkin reply ran three paragraphs and truncated."""
+
+    import yuzu_wiki as wiki
+
+    def test_the_lookup_turn_asks_for_a_short_answer(self):
+        """Measured Sept 10: asked about Munchkin cats she gave three
+        paragraphs and was cut mid-sentence by num_predict. The turn
+        asked for "your own words" and said nothing about how MANY,
+        while her brevity rule is about ordinary conversation.
+
+        A reply that long also does not fit a 1024x600 face screen,
+        which is why the UI work and the brevity work are one problem.
+
+        One variable, no code, no persona edit -- so no A/B was
+        invalidated and nothing needs re-composing."""
+        # PATCHED, not assigned. The first version replaced look_up on
+        # the module and never put it back, which broke five unrelated
+        # wiki tests further down the run -- test pollution, and it
+        # looked like the wiki itself had regressed.
+        with unittest.mock.patch.object(
+                self.wiki, "look_up",
+                lambda *a, **k: ("Cat", "A small animal.")):
+            turn, error = self.wiki.as_context("cat")
+        self.assertIsNone(error)
+        self.assertIn("sentence or two", turn)
+        # and it is still a USER turn, which is the load-bearing part
+        self.assertIn("I looked up", turn)
+
+    def test_num_predict_was_NOT_raised(self):
+        """Already recorded: the truncation is a symptom of rambling and
+        a bigger ceiling just buys longer rambles."""
+        import re as _re
+        for f in sorted((Path(__file__).parent / "personas").glob("*.persona")):
+            for found in _re.findall(r"num_predict:\s*(\d+)", f.read_text()):
+                self.assertLessEqual(int(found), 200,
+                                     f"{f.name} raised num_predict to {found}")
+
+
 class TestHomeScreen(unittest.TestCase):
     """`ui/home.html` -- the desktop behind her face.
 

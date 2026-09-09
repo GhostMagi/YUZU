@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 434 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 446 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 434 tests pass on it. Getting it
+(that repo path is confirmed working). 446 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1065,6 +1065,75 @@ there with her eyes shut on `blink`.
 others carry a soft grey halo from the crop. It shows against the neon
 backgrounds. Harmless, and a tighter crop or a threshold pass would fix
 it -- not worth touching unless it bothers him.
+
+## HER FACE REACTS, AND YOU CAN TALK TO IT (Sept 10)
+
+Ghost picked three: the face reacting, chat on the screen, and the
+rambling. All three landed in one pass.
+
+**1. THE FACE KNOWS WHAT SHE IS DOING.** It was a picture until now --
+it did not know she existed. The brain writes its state to a FILE, the
+server serves it at `/state`, the page asks every 900ms:
+
+    idle -> thinking (generating) -> talking (first chunk) -> idle
+
+A file rather than a socket because the brain and the server are
+SEPARATE PROCESSES -- he starts the chat in his terminal and the page
+is served here -- and a file has no connection to fail and no order to
+get right. **The brain works exactly as before when the face server is
+not running at all**: `_face()` swallows everything, same guard Piper
+and the wiki import already have. The face is a nicety; the reply is
+the product.
+
+**`thinking` is the whole point and it is the honest loading spinner
+this deck never had.** Every frustration in this log is "is it working
+or is it stuck".
+
+**The server had to become THREADED, and that is not cosmetic.** One
+reply takes tens of seconds on that board, and a single-threaded server
+stops answering `/state` for the whole time -- her face would freeze
+exactly when it most needs to say `thinking`. Verified live: `/state`
+answered `thinking` mid-generation.
+
+**2. HE CAN TALK TO HER ON THE SCREEN.** `POST /say` runs a turn
+through the same brain and the reply lands in a bubble under her face.
+The chat lived in a terminal, which on a 10" touchscreen with no
+keyboard was the weakest part of the whole deck.
+
+**Known and accepted: the page keeps its own conversation**, separate
+from a terminal chat running at the same time. Two mouths, one model.
+Not worth solving until it actually annoys him.
+
+**Stage directions are stripped from the BUBBLE**, the same call
+`yuzu_voice` already makes for the speaker: `[eye roll]` is for reading
+but it is not what she SAID, and on a small screen it crowds out the
+words that are.
+
+**3. THE WIKI TURN ASKS FOR A SHORT ANSWER.** One clause -- "in a
+sentence or two" -- and no persona edit, so no A/B was invalidated and
+nothing needs re-composing. If it is not enough the next step is ONE
+EXAMPLE of answering from a lookup, the lever that has worked three
+times, and that one does change the composed prompt.
+
+**THE UI GOT QUIETER, twice, and both were his calls.** The first
+layout put a row of expression chips across the bottom; a screenshot
+showed it overlapping the speech bubble and cutting her chin off.
+Then:
+
+- *"remove the visual clues i can change her expression i want that
+  automatic"* -- the chips are GONE. The brain drives her face, so
+  buttons offering to do it by hand advertised the wrong thing.
+  Tapping her face still cycles, because that costs no pixels and is
+  how you check new art.
+- *"any way to put those color options into 1 small bubble instead of
+  polluting screen"* -- four swatches was a settings panel parked on
+  her face. One dot now, and it shows the NEXT colour rather than the
+  current one, because the current one is the whole screen behind it.
+
+**A test of mine broke five others.** `TestWikiBrevity` assigned over
+`yuzu_wiki.look_up` and never put it back, so every later wiki test saw
+a stub -- and it read as the wiki having regressed. `mock.patch.object`
+now. **Test pollution looks exactly like a real bug in something else.**
 
 ## `deck` — plug and play, and the bug that made it necessary (Sept 10)
 

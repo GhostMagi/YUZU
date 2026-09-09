@@ -44,13 +44,27 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ---- the face ----------------------------------------------------
-   One square box, two stacked images, scaled to the panel. `contain`
-   so a sprite of any size lands right -- his crops are 436-504px and
-   not all the same shape.                                          */
+/* ---- the layout --------------------------------------------------
+   A column, not four fixed things fighting over the bottom edge. The
+   first version overlapped the speech bubble with a row of expression
+   chips and cut her chin off -- caught by screenshotting it, like
+   everything else visual in this project.
+
+   The chips are GONE. Ghost: "remove the visual clues i can change her
+   expression i want that automatic." The brain drives her face now, so
+   a row of buttons offering to do it by hand was advertising the wrong
+   thing. Tapping her face still cycles, because that costs no pixels
+   and is how you check new art.                                     */
+/* stretch, explicitly: the old layout set place-items:center and it
+   survived the switch to a column, squeezing the ask bar to the width
+   of its own text. */
+body { display: flex; flex-direction: column;
+       align-items: stretch; justify-content: flex-end; }
+
 #face {
+  flex: 1; min-height: 0;
   position: relative;
-  width: var(--face); height: var(--face);
+  align-self: center; width: min(78vw, 100%);
   animation: breathe 4.6s ease-in-out infinite;
   cursor: pointer;
 }
@@ -58,7 +72,6 @@ body {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: contain;
-  image-rendering: auto;
   pointer-events: none;
 }
 /* Blink is a FRAME, not an animation. You cannot squash a flat sprite
@@ -68,41 +81,51 @@ body {
   0%, 100% { transform: translateY(0)     scale(1)     }
   50%      { transform: translateY(-10px) scale(1.012) }
 }
-
 /* thinking gets a slower, heavier drift -- she is busy, not idle. */
 body.thinking #face { animation-duration: 2.6s; }
 
-/* ---- chrome ------------------------------------------------------
-   Deliberately quiet. It is her face on a screen, not a control
-   panel, and every one of these comes out when the brain drives it. */
-#bar {
-  position: fixed; left: 0; right: 0; bottom: 0;
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  overflow-x: auto; scrollbar-width: none;
+/* ---- what she said ------------------------------------------------ */
+#says {
+  margin: 0 auto 10px; max-width: min(92vw, 46em);
+  background: rgba(255,255,255,.9); color: #14090f;
+  border: 2px solid rgba(0,0,0,.28); border-radius: 16px;
+  padding: 12px 16px; font-size: 16px; line-height: 1.45;
+  max-height: 30vh; overflow-y: auto;
+  display: none;
 }
-#bar::-webkit-scrollbar { display: none; }
-#states { display: flex; gap: 8px; flex: 1; }
-#states b {
-  font-weight: 600; font-size: 13px; letter-spacing: .02em;
-  padding: 7px 13px; border-radius: 999px; white-space: nowrap;
-  color: rgba(0,0,0,.55); background: var(--chip); cursor: pointer;
+#says.on { display: block; }
+
+/* ---- saying something back ---------------------------------------- */
+#ask {
+  display: flex; gap: 8px; align-items: center;
+  padding: 0 14px calc(12px + env(safe-area-inset-bottom));
 }
-#states b.on { background: #111; color: #fff; }
-#swatches { display: flex; gap: 9px; }
-#swatches i {
-  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
-  border: 2px solid rgba(0,0,0,.35);
+#ask input {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px;
+  padding: 11px 15px; border-radius: 999px;
+  border: 2px solid rgba(0,0,0,.28); background: rgba(255,255,255,.92);
+  color: #14090f;
 }
-#swatches i.on { box-shadow: 0 0 0 3px rgba(0,0,0,.55); }
-#home {
-  width: 46px; height: 46px; border-radius: 50%;
-  border: 2px solid rgba(0,0,0,.35); background: var(--chip);
+#ask button {
+  font: inherit; font-weight: 700; font-size: 16px;
+  padding: 11px 20px; border-radius: 999px; cursor: pointer;
+  border: 2px solid rgba(0,0,0,.28); background: #111; color: #fff;
+  white-space: nowrap;
+}
+#ask button:disabled { opacity: .45; }
+
+/* ONE dot, not four. "put those color options into 1 small bubble
+   instead of polluting screen" -- and he is right: four swatches is a
+   settings panel parked on her face. Tap it and it moves to the next. */
+#tint, #home {
+  width: 42px; height: 42px; flex: none; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.28); cursor: pointer;
   display: grid; place-items: center;
-  color: rgba(0,0,0,.6); font-size: 20px; cursor: pointer;
 }
+#home { background: rgba(0,0,0,.16); color: rgba(0,0,0,.6); font-size: 19px; }
+
 #empty {
-  padding: 28px; max-width: 30em; line-height: 1.6;
+  padding: 28px; max-width: 30em; line-height: 1.6; margin: auto;
   color: rgba(0,0,0,.7); text-align: center;
 }
 </style>
@@ -110,11 +133,14 @@ body.thinking #face { animation-duration: 2.6s; }
 <div id="face" hidden><img id="art" alt=""><img id="paint" alt=""></div>
 <div id="empty" hidden></div>
 
-<div id="bar">
-  <div id="states"></div>
-  <div id="swatches"></div>
-  <div id="home">⌂</div>
-</div>
+<div id="says"></div>
+
+<form id="ask" autocomplete="off">
+  <input id="text" placeholder="Say something to her..." maxlength="2000">
+  <button id="send" type="submit">Send</button>
+  <div id="tint" title="background colour"></div>
+  <div id="home" title="home">⌂</div>
+</form>
 
 <script>
 // His four, and only his four. "Please add the homescreen colors as Hot
@@ -129,6 +155,7 @@ const COLOURS = [
 ];
 
 let expressions = [];
+let roles = null;
 let current = 0;
 
 function show(i) {
@@ -143,31 +170,33 @@ function show(i) {
   paint.src = e.file.replace(/\.[^.]+$/, '.paint.png');
   paint.onerror = () => { paint.removeAttribute('src'); };
   document.body.className = e.name;
-  document.querySelectorAll('#states b').forEach((b, n) =>
-    b.classList.toggle('on', n === current));
   try { localStorage.setItem('saya-face', e.name); } catch (err) {}
 }
 
+let current_bg = COLOURS[0][1];
 function setColour(hex) {
+  current_bg = hex;
   document.documentElement.style.setProperty('--bg', hex);
-  document.querySelectorAll('#swatches i').forEach(i =>
-    i.classList.toggle('on', i.dataset.hex === hex));
+  // The dot shows the NEXT colour, not the current one -- the current
+  // one is the whole screen behind it, so showing it again says
+  // nothing. This way the button is a preview of what a tap does.
+  const at = COLOURS.findIndex(c => c[1] === hex);
+  document.getElementById('tint').style.background =
+    COLOURS[(at + 1) % COLOURS.length][1];
   try { localStorage.setItem('saya-bg', hex); } catch (err) {}
 }
 
-COLOURS.forEach(([name, hex]) => {
-  const i = document.createElement('i');
-  i.style.background = hex;
-  i.title = name;
-  i.dataset.hex = hex;
-  i.onclick = () => setColour(hex);
-  document.getElementById('swatches').append(i);
-});
+const tint = document.getElementById('tint');
+tint.onclick = () => {
+  const at = COLOURS.findIndex(c => c[1] === current_bg);
+  setColour(COLOURS[(at + 1) % COLOURS.length][1]);
+};
 
 fetch('sprites.json', { cache: 'no-store' })
   .then(r => r.json())
   .then(m => {
     expressions = m.expressions || [];
+    roles = m.roles || {};
     if (!expressions.length) {
       const box = document.getElementById('empty');
       box.hidden = false;
@@ -175,12 +204,6 @@ fetch('sprites.json', { cache: 'no-store' })
         + 'PNGs in there — the filename becomes the expression name.';
       return;
     }
-    expressions.forEach((e, n) => {
-      const b = document.createElement('b');
-      b.textContent = e.name;
-      b.onclick = () => show(n);
-      document.getElementById('states').append(b);
-    });
     document.getElementById('face').hidden = false;
     // Default to the IDLE role, not to expressions[0] -- that is
     // alphabetical, so she would boot with her eyes shut on `blink`.
@@ -189,6 +212,7 @@ fetch('sprites.json', { cache: 'no-store' })
     const wanted = saved || (m.roles && m.roles.idle);
     const at = expressions.findIndex(e => e.name === wanted);
     show(at < 0 ? 0 : at);
+    watch();
   })
   .catch(() => {
     const box = document.getElementById('empty');
@@ -199,12 +223,104 @@ fetch('sprites.json', { cache: 'no-store' })
 
 // A tap on her face cycles expressions, so the whole thing works on a
 // touchscreen with no keyboard anywhere near it.
-document.getElementById('face').onclick = () => show(current + 1);
+document.getElementById('face').onclick = () => {
+  driven = null;            // he chose; let him keep it
+  show(current + 1);
+};
 
 // ⌂ goes to the home screen. It was decoration until now, which is
 // worse than not being there: a button that does nothing on a
 // touchscreen reads as a broken deck.
 document.getElementById('home').onclick = () => { location.href = 'home.html'; };
+
+// ---- she reacts -----------------------------------------------------
+// The face was a picture until now: it did not know she existed. The
+// brain writes what it is doing to a file, the server serves it, and
+// this asks. `thinking` is the whole point -- every frustration in this
+// project's log is "is it working or is it stuck", and a face that
+// visibly thinks answers that with no status text at all.
+//
+// The BRAIN wins over a tap: an expression she was put into by hand is
+// overridden the moment she actually starts thinking, because what she
+// is really doing beats what someone poked.
+let driven = null;      // the expression the brain asked for, if any
+let lastSaid = '';
+
+function faceFor(role) {
+  if (!roles) return null;
+  const want = roles[role];
+  if (!want) return null;
+  const at = expressions.findIndex(e => e.name === want);
+  return at < 0 ? null : at;
+}
+
+function watch() {
+  fetch('state', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(s => {
+      const want = faceFor(s.state);
+      if (want !== null && want !== driven) {
+        driven = want;
+        show(want);
+      }
+      // `thinking` also drives the CSS, so the breathe speeds up even
+      // when there is no separate thinking sprite to switch to.
+      document.body.classList.toggle('thinking', s.state === 'thinking');
+      if (s.said && s.said !== lastSaid) {
+        lastSaid = s.said;
+        speech(s.said);
+      }
+    })
+    .catch(() => {})
+    .then(() => setTimeout(watch, 900));
+}
+
+function speech(text) {
+  const box = document.getElementById('says');
+  // Bracketed stage directions are for reading, but they are not what
+  // she SAID -- and on a small screen they crowd out the words that
+  // are. Same call yuzu_voice already makes for the speaker.
+  box.textContent = text.replace(/\[[^\]]*\]/g, '')
+                        .replace(/\*[^*]+\*/g, '')
+                        .replace(/\s{2,}/g, ' ').trim() || text;
+  box.classList.add('on');
+  box.scrollTop = 0;
+}
+
+// ---- talking to her -------------------------------------------------
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const said = input.value.trim();
+  if (!said) return;
+  input.value = '';
+  send.disabled = true;
+  send.textContent = '...';
+  // Show HER state immediately rather than waiting for the poll: on
+  // that board a reply takes tens of seconds, and a screen that does
+  // nothing for the first second reads as a tap that missed.
+  const at = faceFor('thinking');
+  if (at !== null) { driven = at; show(at); }
+  document.body.classList.add('thinking');
+
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: said }),
+  })
+    .then(r => r.json())
+    .then(r => { speech(r.said || 'She said nothing.'); })
+    .catch(() => speech('No answer from the deck. Is ~/YUZU/face running?'))
+    .then(() => {
+      send.disabled = false;
+      send.textContent = 'Send';
+      document.body.classList.remove('thinking');
+      input.focus();
+    });
+};
 
 // ---- blink --------------------------------------------------------
 // The cheapest thing that makes a face look alive, and the difference

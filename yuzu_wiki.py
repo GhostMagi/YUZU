@@ -350,8 +350,22 @@ def as_context(term):
     title, body = look_up(term)
     if title is None:
         return None, body
+    # THE LENGTH CLAUSE. Measured Sept 10: asked about Munchkin cats she
+    # gave three paragraphs and truncated mid-sentence on num_predict.
+    # This turn asked for "your own words" and said nothing about how
+    # MANY, while her brevity rule is about ordinary conversation -- so
+    # handed an encyclopedia she summarised at encyclopedia length.
+    #
+    # A reply that long also does not fit a 1024x600 face screen, which
+    # is why the UI work and the brevity work are the same problem.
+    #
+    # One variable, no code, no persona edit. If it is not enough the
+    # next step is ONE EXAMPLE of answering from a lookup -- the lever
+    # that has worked three times here -- and that one does change the
+    # composed prompt.
     return (f"I looked up {title} and it says: {body}\n\n"
-            f"Tell me about it in your own words."), None
+            f"Tell me about it in your own words, in a sentence or "
+            f"two."), None
 
 
 def _cli(argv):

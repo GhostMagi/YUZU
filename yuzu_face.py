@@ -27,13 +27,15 @@ the colouring for free.
 
 import json
 import os
+import tempfile
+import time
 import shutil
 import subprocess
 import zlib
 import struct
 import sys
 from collections import deque
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_DIR = os.path.join(HERE, "ui")
@@ -433,6 +435,84 @@ def launch(name):
     return (True, said, opens)
 
 
+# ---------------------------------------------------------------------
+# WHAT SHE IS DOING, shared between processes by a FILE.
+#
+# The brain and the face server are separate processes -- he starts the
+# chat in his terminal and the page is served here -- so the state has to
+# cross a boundary. A file is the right size for that: no socket to
+# fail, no order to get right, and the brain works exactly as before
+# when the face server is not running at all.
+#
+# `thinking` is the whole point. Every frustration in this project's log
+# is "is it working or is it stuck", and a face that visibly thinks
+# answers that with no status text. It is the honest version of the
+# loading spinner this deck has never had.
+# ---------------------------------------------------------------------
+
+STATE_FILE = os.path.join(tempfile.gettempdir(), "yuzu-face-state")
+STATES = ("idle", "thinking", "talking")
+
+
+def set_state(state, said=""):
+    """Say what she is doing. NEVER raises -- this is called from the
+    reply path, and a face that cannot be updated must not be able to
+    stop her talking."""
+    if state not in STATES:
+        return
+    try:
+        with open(STATE_FILE, "w") as fh:
+            json.dump({"state": state, "said": said[:600],
+                       "at": time.time()}, fh)
+    except Exception:
+        pass
+
+
+def get_state():
+    """What she is doing, and what she last said.
+
+    A stale file means a chat that died mid-reply, so anything older
+    than a couple of minutes reads as idle rather than leaving her
+    frozen mid-thought forever."""
+    try:
+        with open(STATE_FILE) as fh:
+            got = json.load(fh)
+        if time.time() - got.get("at", 0) > 150:
+            got["state"] = "idle"
+        return got
+    except Exception:
+        return {"state": "idle", "said": "", "at": 0}
+
+
+def answer(text):
+    """One turn with her, for the page. (reply, error).
+
+    The chat lives in a terminal today, which on a 10" touchscreen with
+    no keyboard is the weakest part of the whole deck. This is the same
+    brain, reached from the same box.
+
+    NOTE: this keeps its own conversation, separate from a terminal
+    chat running at the same time. Two mouths, one model."""
+    global _BRAIN
+    try:
+        import yuzu_brain
+    except Exception as exc:
+        return None, "The brain is not importable here (%s)." % exc
+    try:
+        if _BRAIN is None:
+            _BRAIN = yuzu_brain.YuzuBrain()
+        set_state("thinking")
+        reply = _BRAIN.ask(text)
+        set_state("talking", reply)
+        return reply, None
+    except Exception as exc:
+        set_state("idle")
+        return None, str(exc)
+
+
+_BRAIN = None
+
+
 class _Handler(SimpleHTTPRequestHandler):
     """Static files out of ui/, plus one generated endpoint.
 
@@ -445,6 +525,9 @@ class _Handler(SimpleHTTPRequestHandler):
         super().__init__(*a, directory=UI_DIR, **kw)
 
     def do_GET(self):
+        if self.path.split("?")[0].rstrip("/") == "/state":
+            self._json(get_state())
+            return
         if self.path.split("?")[0].rstrip("/") in ("/sprites.json", "/sprites"):
             body = json.dumps(manifest(), indent=1).encode()
             self.send_response(200)
@@ -456,8 +539,30 @@ class _Handler(SimpleHTTPRequestHandler):
             return
         return super().do_GET()
 
+    def _json(self, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_POST(self):
         path = self.path.split("?")[0].rstrip("/")
+        if path == "/say":
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+                said = json.loads(self.rfile.read(size) or b"{}").get("text", "")
+            except Exception:
+                said = ""
+            said = said.strip()[:2000]
+            if not said:
+                self._json({"ok": False, "said": "Say something first."})
+                return
+            reply, error = answer(said)
+            self._json({"ok": error is None, "said": reply or error})
+            return
         if not path.startswith("/launch/"):
             self.send_error(404)
             return
@@ -476,7 +581,11 @@ class _Handler(SimpleHTTPRequestHandler):
 def serve(port=8081, bind="0.0.0.0"):
     """Blocks. `face` backgrounds this with nohup -- never foreground on
     his serial link, which reads as a frozen board."""
-    HTTPServer((bind, port), _Handler).serve_forever()
+    # THREADING, and it is not optional: one reply takes tens of seconds
+    # on that board, and a single-threaded server would stop answering
+    # /state for the whole time -- so her face would freeze exactly when
+    # it most needs to say `thinking`.
+    ThreadingHTTPServer((bind, port), _Handler).serve_forever()
 
 
 def _report():
