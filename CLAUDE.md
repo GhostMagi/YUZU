@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 350 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 356 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 350 tests pass on it. Getting it
+(that repo path is confirmed working). 356 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -560,6 +560,74 @@ her ("youre 'pcb' is already a nvidia nano orin super devkit with a
 512gb SSD"). The deck self-concept holds for what she IS (she got the
 "handheld computer with no legs" joke right, unprompted) but not yet
 for what she is MADE OF. Nothing in her prompt names a single part.
+
+## `deckapps` — real app icons, because a touchscreen is not a terminal
+
+Ghost, Sept 9: *"as far as the https blah blah number number in a
+browser can we please go an 'app' route for when i have the monitor
+touch screen... like a ui that opens when i click an app."*
+
+Right call, and it is the first request that is about the deck being a
+FINISHED OBJECT rather than a project. Typing `192.168.4.136:8080` is
+fine over a serial link and absurd on a 7" panel you are holding.
+
+    ~/YUZU/deckapps            install the launchers
+    ~/YUZU/deckapps --remove   take them off
+
+Three icons, in the app menu and on the Desktop: **Saya**, **Wikipedia**,
+**Game Boy**. A `.desktop` file IS what an app is on Linux, so this
+needs nothing installed and no new dependency.
+
+**The wiki opens CHROMELESS** -- `chromium --app=` gives a window with
+no url bar and no tabs, so it reads as an application rather than as a
+web page. That is the actual request; a normal browser window would be
+the same problem in a nicer costume.
+
+**It uses `127.0.0.1`, not the LAN address.** Every other tool here
+prints the routing-table IP because the PHONE is the client. On the
+deck's own screen the client is the deck, and loopback never changes
+with the network.
+
+**The launcher STARTS the server before opening it**, and waits for
+the port. A tap that lands on a dead port is the same dead end,
+prettier. A test pins the ordering.
+
+**A missing browser SKIPS rather than installing a dead icon**, and
+names the package to install. An icon that opens nothing when tapped
+reads as a broken deck rather than a missing package -- and Game Boy
+still installs, because a partial install is not a failure.
+
+**Neither browser nor terminal is known to be on that board.** The
+script detects what is actually there rather than assuming, and says
+which one it wants. UNVERIFIED until it runs on the deck.
+
+## Is this a unicorn? Roughly yes, and the reasons are useful
+
+Ghost: *"i havent seen a single cyberdeck with a nano orin super btw."*
+
+Cyberdecks are overwhelmingly Raspberry Pi. Jetson decks exist but are
+rare and usually old Nanos in robotics rigs, not handhelds. **A deck
+built on an Orin Nano Super whose purpose is a local LLM character is
+genuinely unusual**, and the reasons it is rare are all things this
+project has already hit:
+
+- **DisplayPort only.** Every Pi build says "plug in HDMI"; this needs
+  an adapter, which is why one is in the parts list.
+- **8GB shared** between CPU and GPU. That is the whole `keep_alive`
+  argument.
+- **ARM64.** No x86 binaries -- ES-DE needed the AArch64 AppImage
+  specifically.
+- **Power.** A Pi sips ~5W; this wants ~25W at MAXN, which is why the
+  runtime figure is still arithmetic rather than measurement.
+
+**The payoff is the part a Pi cannot do at all**: no Pi runs a 3B model
+at conversational speed, because it has no real GPU. The compute is the
+entire justification for the awkwardness -- and it is what makes
+on-device Whisper realistic later.
+
+Do not oversell this to him as "nobody has ever done it" -- that is not
+checkable. The defensible claim is the one above: unusual combination,
+for a reason, with a payoff that matches what he actually wants.
 
 ## `wiki` — offline Wikipedia, one word (Sept 9)
 

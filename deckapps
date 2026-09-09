@@ -1,0 +1,127 @@
+#!/bin/bash
+# Put real APP ICONS on the deck. Run once.
+#
+#   ~/YUZU/deckapps            install the launchers
+#   ~/YUZU/deckapps --remove   take them back off
+#
+# Ghost, Sept 9: "as far as the https blah blah number number in a
+# browser can we please go an 'app' route for when i have the monitor
+# touch screen. like a ui that opens when i click an app."
+#
+# Right call. Typing 192.168.4.136:8080 is fine over a serial link and
+# absurd on a 7" touchscreen you are holding. A .desktop file IS what
+# an app is on Linux -- an icon in the menu, on the desktop, tappable.
+#
+# Kiwix opens in a browser window with NO url bar and no tabs (--app
+# mode), so it reads as an application rather than as a web page.
+
+set -u
+APPS="$HOME/.local/share/applications"
+DESKTOP="$HOME/Desktop"
+YUZU="$HOME/YUZU"
+
+if [ "${1:-}" = "--remove" ]; then
+    rm -f "$APPS"/yuzu-*.desktop "$DESKTOP"/yuzu-*.desktop
+    echo "Launchers removed."
+    exit 0
+fi
+
+# Pick what is actually installed rather than assuming. Chromium's
+# --app= gives a chromeless window, which is the whole point; firefox
+# --kiosk is the closest equivalent.
+browser_cmd() {
+    for b in chromium chromium-browser google-chrome brave-browser; do
+        command -v "$b" >/dev/null 2>&1 && { echo "$b --app=URL"; return; }
+    done
+    command -v firefox >/dev/null 2>&1 && { echo "firefox --kiosk URL"; return; }
+    command -v epiphany >/dev/null 2>&1 && { echo "epiphany -a URL"; return; }
+    echo ""
+}
+
+term_cmd() {
+    for t in xfce4-terminal lxterminal mate-terminal gnome-terminal xterm; do
+        command -v "$t" >/dev/null 2>&1 && { echo "$t"; return; }
+    done
+    echo ""
+}
+
+BROWSER=$(browser_cmd)
+TERM_APP=$(term_cmd)
+
+mkdir -p "$APPS" "$DESKTOP"
+
+write_app() {                    # name, comment, exec, icon, filename
+    local file="$APPS/$5.desktop"
+    cat > "$file" <<DESK
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=$1
+Comment=$2
+Exec=$3
+Icon=$4
+Terminal=false
+Categories=Utility;
+DESK
+    chmod +x "$file"
+    cp "$file" "$DESKTOP/$5.desktop"
+    chmod +x "$DESKTOP/$5.desktop"
+    echo "  installed: $1"
+}
+
+echo
+echo "Installing deck apps..."
+
+# --- Saya -------------------------------------------------------------
+# The chat is a terminal program, so it needs a terminal to live in.
+# Without one there is nothing to install and saying so beats a
+# launcher that opens nothing when tapped.
+if [ -n "$TERM_APP" ]; then
+    write_app "Saya" "Talk to her" \
+        "$TERM_APP -e bash -c 'cd $YUZU && python3 yuzu_brain.py --chat; exec bash'" \
+        "utilities-terminal" "yuzu-saya"
+else
+    echo "  SKIPPED Saya: no terminal emulator found."
+    echo "    sudo apt install -y xterm"
+fi
+
+# --- Wikipedia --------------------------------------------------------
+# One wrapper script rather than a long Exec line: the launcher has to
+# START the server if it is not up, then open it. A .desktop Exec
+# cannot do that cleanly, and a tap that lands on a dead port is
+# exactly the "blah blah number number" problem in a nicer costume.
+if [ -n "$BROWSER" ]; then
+    cat > "$YUZU/.wiki-app" <<APP
+#!/bin/bash
+"$YUZU/wiki" >/dev/null 2>&1
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    ss -ltn 2>/dev/null | grep -q ":8080" && break
+    sleep 1
+done
+exec ${BROWSER/URL/http://127.0.0.1:8080}
+APP
+    chmod +x "$YUZU/.wiki-app"
+    write_app "Wikipedia" "Offline encyclopedia" \
+        "$YUZU/.wiki-app" "accessories-dictionary" "yuzu-wiki"
+else
+    echo "  SKIPPED Wikipedia: no browser found."
+    echo "    sudo apt install -y chromium-browser"
+fi
+
+# --- Game Boy ---------------------------------------------------------
+write_app "Game Boy" "mGBA" "$YUZU/gba" "applications-games" "yuzu-gba"
+
+# Some desktops refuse to run a .desktop file until it is marked
+# trusted; this is the GNOME/Nautilus flavour of that and failing is
+# harmless everywhere else.
+for f in "$DESKTOP"/yuzu-*.desktop; do
+    gio set "$f" metadata::trusted true 2>/dev/null || true
+done
+
+echo
+echo "Done. The icons are in your app menu and on the Desktop."
+echo "On the touchscreen, tap them. No addresses to type."
+echo
+[ -z "$BROWSER" ] && echo "NOTE: install a browser and rerun this for the wiki app."
+[ -z "$TERM_APP" ] && echo "NOTE: install xterm and rerun this for the Saya app."
+exit 0

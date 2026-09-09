@@ -3101,6 +3101,110 @@ class TestPadPairing(unittest.TestCase):
         self.assertEqual(done.returncode, 0)
 
 
+class TestDeckApps(unittest.TestCase):
+    """`deckapps` -- real app icons, because a touchscreen is not a
+    terminal.
+
+    Ghost, Sept 9: "as far as the https blah blah number number in a
+    browser can we please go an 'app' route for when i have the monitor
+    touch screen... like a ui that opens when i click an app."
+
+    Typing 192.168.4.136:8080 is fine over a serial link and absurd on
+    a 7" panel you are holding. A .desktop file IS what an app is on
+    Linux."""
+
+    SCRIPT = Path(__file__).parent / "deckapps"
+
+    def _run(self, *args, have=()):
+        """Install into a fake HOME with only `have` on PATH, so both
+        'everything present' and 'nothing installed' are driven from
+        fixtures rather than from whatever this machine has."""
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            home, binv = tmp / "home", tmp / "bin"
+            (home / "YUZU").mkdir(parents=True)
+            binv.mkdir()
+            for tool in ("bash", "mkdir", "cat", "chmod", "cp", "rm",
+                         "ls", "grep", "sleep"):
+                found = shutil.which(tool)
+                if found:
+                    (binv / tool).symlink_to(found)
+            for fake in have:
+                stub = binv / fake
+                stub.write_text("#!/bin/bash\nexit 0\n")
+                stub.chmod(0o755)
+            done = subprocess.run(
+                [str(binv / "bash"), str(self.SCRIPT), *args],
+                capture_output=True, text=True, timeout=60,
+                env={"HOME": str(home), "PATH": str(binv)})
+            # Read INSIDE the with-block: the tempdir is gone the
+            # moment it exits, and an earlier version of this test
+            # checked paths that no longer existed.
+            apps = home / ".local/share/applications"
+            names = sorted(p.name for p in apps.glob("*.desktop")) \
+                if apps.exists() else []
+            on_desktop = sorted(p.name for p in (home / "Desktop")
+                                .glob("*.desktop")) \
+                if (home / "Desktop").exists() else []
+            wrapper_path = home / "YUZU" / ".wiki-app"
+            wrapper = wrapper_path.read_text() if wrapper_path.exists() else None
+            return done, names, on_desktop, wrapper
+
+    def test_it_is_valid_shell(self):
+        import subprocess
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_it_installs_all_three_when_the_desktop_has_what_it_needs(self):
+        done, names, on_desktop, _ = self._run(have=("chromium", "xterm"))
+        self.assertEqual(names, ["yuzu-gba.desktop", "yuzu-saya.desktop",
+                                 "yuzu-wiki.desktop"], done.stdout)
+        # and on the Desktop too, which is where a touchscreen user taps
+        self.assertIn("yuzu-wiki.desktop", on_desktop)
+
+    def test_the_wiki_app_opens_CHROMELESS_not_a_browser_tab(self):
+        """The whole request. --app= gives a window with no url bar and
+        no tabs, so it reads as an application. A normal browser window
+        is the "blah blah number number" problem in a nicer costume."""
+        done, _, _, wrapper = self._run(have=("chromium", "xterm"))
+        self.assertIsNotNone(wrapper, done.stdout)
+        self.assertIn("--app=", wrapper)
+        self.assertIn("127.0.0.1:8080", wrapper,
+                      "it hardcodes a LAN address that changes with the "
+                      "network -- on the deck itself, loopback is right")
+
+    def test_the_wiki_app_STARTS_the_server_before_opening_it(self):
+        """A tap that lands on a dead port is the same dead end he
+        already has, just prettier. It launches ~/YUZU/wiki first and
+        waits for the port."""
+        done, _, _, wrapper = self._run(have=("chromium", "xterm"))
+        self.assertIsNotNone(wrapper, done.stdout)
+        self.assertIn("YUZU/wiki", wrapper)
+        self.assertLess(wrapper.index("YUZU/wiki"), wrapper.index("exec "),
+                        "it opens the browser before starting the server")
+
+    def test_a_missing_browser_SKIPS_rather_than_installing_a_dead_icon(self):
+        """An icon that opens nothing when tapped is worse than no
+        icon: it reads as a broken deck rather than a missing package.
+        It says which package instead."""
+        done, names, _, wrapper = self._run(have=())
+        self.assertEqual(names, ["yuzu-gba.desktop"], done.stdout)
+        self.assertIn("SKIPPED Wikipedia", done.stdout)
+        self.assertIn("chromium", done.stdout, "it does not name the fix")
+        self.assertIsNone(wrapper,
+                          "it wrote a launcher wrapper with no browser to run")
+        self.assertEqual(done.returncode, 0,
+                         "a partial install is not a failure -- Game Boy "
+                         "still works and he should keep that")
+
+    def test_it_can_be_undone(self):
+        done, names, _, _ = self._run("--remove", have=("chromium", "xterm"))
+        self.assertEqual(names, [])
+        self.assertEqual(done.returncode, 0)
+
+
 class TestWikiLookup(unittest.TestCase):
     """`/wiki` -- grounding her in a real encyclopedia, still offline.
 
