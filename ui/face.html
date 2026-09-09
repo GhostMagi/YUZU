@@ -395,7 +395,13 @@ function watch() {
   fetch('state', { cache: 'no-store' })
     .then(r => r.json())
     .then(s => {
-      const want = faceFor(s.state);
+      // HER MOOD WINS OVER HER STATUS while she is talking, and only
+      // then. Ghost: "saya never uses the cute blushing faces even
+      // when shes blushing" -- she never could, because `talking`
+      // resolves to one sprite and nothing else was ever asked for.
+      // The mood comes from HER OWN stage directions, so a wrong face
+      // needs her to have written the wrong thing.
+      const want = faceFor(s.state === 'talking' && s.mood ? s.mood : s.state);
       if (want !== null && want !== driven) {
         driven = want;
         show(want);

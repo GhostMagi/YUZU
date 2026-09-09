@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 474 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 480 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 474 tests pass on it. Getting it
+(that repo path is confirmed working). 480 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -447,6 +447,72 @@ it was RP and wanted); she has never been scored by the eval; and the
 eval still reports 0% on the movement rows for any deck persona, so it
 cannot give her honest numbers yet. That harness gap is now the single
 biggest thing between her and a real measurement.
+
+## ☆Misc☆, a d20, and the blushing faces that could never appear
+
+Three asks and one real bug, Sept 11.
+
+**THE FRONT PAGE IS FOUR TILES AGAIN.** Ghost: *"lets hide the gameboy
+tab for now its not as important. or put it and the wikipedia tabs
+under a tab called ☆Misc☆ we can pile up our fancy future apps in that
+tab. (yes include the stars if possible)"* Saya, Talk, Pet, ☆Misc☆ on
+the front; Wikipedia, Game Boy, d20 and Back in the drawer.
+
+**It is the SAME PAGE with the tiles swapped, not a second file.** A
+new page needs its own way out, and every screen on this deck having
+one is the rule two power cycles paid for -- so the cheapest way to
+keep that true is to not add a screen. `data-show` is its own verb
+next to `data-go` and `data-launch`, which keeps `data-launch` exactly
+the allowlisted-name-crosses-the-wire thing it has always been.
+
+**Both views are FOUR EQUAL TILES and nothing spans.** That is the grid
+back where it was before a fifth tile forced a wide row -- and the test
+now pins the count per view rather than pinning where the wide one
+sits, because there is no longer a wide one to get wrong.
+
+**THE d20 IS FAIR, and that is not a flourish.** `random() % 20` is
+biased: 256 does not divide by 20, so four faces come up more often
+than the rest. `crypto.getRandomValues` with the top of the byte range
+rejected costs nothing and a loaded die is a bad joke to leave in a
+thing somebody rolls for fun. It tumbles for half a second before it
+settles, because a number that simply appears has not been ROLLED, and
+only 20 and 1 get the CRT glow -- a flourish on every result is just a
+bright tile.
+
+**THE MONSTER IS BIGGER.** 38% of the room to 52%. Nothing structural,
+he just asked.
+
+**AND THE REAL FIND: "saya never uses the cute blushing faces even when
+shes 'blushing'".** He is right and it was WIRING, not taste. The brain
+only ever reported `idle` / `thinking` / `talking`, and `talking`
+resolves to exactly one sprite -- so **five of his eight faces could
+never appear on screen no matter what she said.** `mad` (the pouty
+blush), `cry`, `smug` and `woahshock` were art he drew for nothing.
+
+**The fix does not guess her feelings. She already writes them down.**
+`[blushes]`, `[eye roll]`, `*giggles*`, `[gasps]` -- her own stage
+directions, in her own reply, which this project spent two days
+deciding to KEEP rather than suppress. `mood_from()` reads what is
+inside the brackets and asterisks; a sentiment score would have been a
+guess, and a wrong guess puts the wrong face on a real reply. Here a
+wrong face needs her to have written the wrong thing.
+
+**`mood` is a SECOND FIELD, never a replacement for `state`.** What she
+is DOING is the honest loading spinner; how she IS is a different
+question. Merging them would mean a thinking face could never also be
+a blushing one, and this file already records paying for one variable
+doing two jobs more than once. The mood only wins while she is
+`talking`.
+
+**ORDER IN `MOODS` IS THE DESIGN, not alphabetical.** A tsundere who
+blushes AND giggles is blushing -- that is the whole character, which
+is why `happy` is last. And `blush` mapping to the `annoyed` role is
+correct rather than a bodge: `mad.png` IS the pouty blush face, which
+for a tsundere is the same feeling.
+
+`test_every_sprite_he_drew_can_actually_be_reached` is the guard worth
+keeping: art in the repo that no state resolves to is art made for
+nothing, and it went unnoticed for two days.
 
 ## THE V-PET, and the colour swap traded for it (Sept 11)
 

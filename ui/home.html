@@ -90,20 +90,58 @@ body {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: 1fr 1fr .62fr;
+  grid-auto-rows: 1fr;
   gap: 12px;
   padding: 8px 20px 14px;
   min-height: 0;
 }
-/* FIVE tiles into a two-column grid: the fifth spans the width along
-   the BOTTOM. Both halves of that matter and a screenshot proved it --
-   the first attempt put the wide tile in source order, mid-grid, which
-   orphaned Wikipedia AND Game Boy on rows of their own. Worse than the
-   `auto-fit` bug it was avoiding. An odd number of tiles needs a
-   decision about WHERE, not just about width. */
-#pet { grid-column: span 2; flex-direction: row; gap: 14px; }
-#pet .big svg { width: 34px; height: 34px; }
-#pet .words { display: flex; flex-direction: column; align-items: flex-start; }
+/* ---- two views, one grid -----------------------------------------
+   Ghost, Sept 11: "lets hide the gameboy tab for now its not as
+   important. or put it and the wikipedia tabs under a tab called
+   ☆Misc☆ we can pile up our fancy future apps in that tab."
+
+   So the front page is the four things he actually opens and ☆Misc☆ is
+   the drawer. It is the SAME PAGE with the tiles swapped rather than a
+   second file: a new page would need its own way out, and every screen
+   on this deck having an exit is the rule two power cycles paid for.
+   Here the ⌂ tile IS that exit and it goes back to the front page.
+
+   It also puts the grid back to four equal thumb targets, which is
+   what it was before the fifth tile forced a spanning row. */
+[data-view] { display: none !important; }
+#grid.main [data-view="main"], #grid.misc [data-view="misc"] {
+  display: flex !important;
+}
+#back .big { font-size: 30px; line-height: 1; }
+.stars { letter-spacing: .06em; }
+
+/* ---- the d20 ------------------------------------------------------
+   Ghost: "add a D20 dice button somewhere with that black and neon
+   green crt effects that rolls it randomly."
+
+   It rolls IN PLACE. A dice roller that needs a page of its own is a
+   dice roller nobody taps, and this deck already has enough screens
+   with exits to get right. */
+#d20 .roll {
+  font-size: 46px; font-weight: 800; line-height: 1;
+  letter-spacing: .02em; font-variant-numeric: tabular-nums;
+}
+#d20.rolling .roll { opacity: .55; }
+/* The CRT flourish, and it is only ever on the two numbers that
+   deserve one. A glow on every result is just a bright tile. */
+#d20.nat20 { border-color: var(--ink); }
+#d20.nat20 .roll { text-shadow: 0 0 10px var(--ink), 0 0 26px var(--ink); }
+#d20.nat1 { border-color: #ff4d6a; }
+#d20.nat1 .roll { color: #ff4d6a;
+                  text-shadow: 0 0 10px #ff4d6a, 0 0 26px #ff4d6a; }
+@keyframes crt {
+  0%   { transform: scaleY(1);    filter: brightness(1) }
+  18%  { transform: scaleY(1.06); filter: brightness(2.2) }
+  34%  { transform: scaleY(.97);  filter: brightness(.7) }
+  60%  { transform: scaleY(1.02); filter: brightness(1.5) }
+  100% { transform: scaleY(1);    filter: brightness(1) }
+}
+#d20.settled .roll { animation: crt .42s ease-out; }
 @media (max-width: 560px) { #grid { grid-template-columns: 1fr; } }
 .tile {
   background: var(--tile);
@@ -154,30 +192,47 @@ body {
   <div id="batt"></div>
 </div>
 
-<div id="grid">
-  <div class="tile" id="saya" data-go="face.html">
+<div id="grid" class="main">
+  <div class="tile" id="saya" data-view="main" data-go="face.html">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="3"/><path d="M9 2v4M15 2v4"/><path d="M9 12h.01M15 12h.01"/><path d="M9.5 15.5h5"/></svg></div>
     <b>Saya</b>
     <span>her face</span>
   </div>
-  <div class="tile" data-launch="chat">
+  <div class="tile" data-view="main" data-launch="chat">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 9l3 2.5L7 14"/><path d="M12.5 14.5H17"/></svg></div>
     <b>Talk</b>
     <span>chat with her</span>
   </div>
-  <div class="tile" data-launch="wiki">
+  <div class="tile" id="pet" data-view="main" data-go="vpet.html">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
+    <b>Pet</b>
+    <span>he lives here</span>
+  </div>
+  <div class="tile" id="misc" data-view="main" data-show="misc">
+    <div class="big"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 13.8v6.4M13.8 17h6.4"/></svg></div>
+    <b class="stars">☆Misc☆</b>
+    <span>everything else</span>
+  </div>
+
+  <div class="tile" data-view="misc" data-launch="wiki">
     <div class="big"><svg viewBox="0 0 24 24"><path d="M12 6.5C10.5 5 8.5 4.5 4 4.5v13c4.5 0 6.5.5 8 2 1.5-1.5 3.5-2 8-2v-13c-4.5 0-6.5.5-8 2z"/><path d="M12 6.5v13"/></svg></div>
     <b>Wikipedia</b>
     <span>offline</span>
   </div>
-  <div class="tile" data-launch="gba">
+  <div class="tile" data-view="misc" data-launch="gba">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 10.5v4M5 12.5h4"/><path d="M16 11.5h.01M18.5 14h.01"/></svg></div>
     <b>Game Boy</b>
     <span>newest ROM</span>
   </div>
-  <div class="tile" id="pet" data-go="vpet.html">
-    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
-    <div class="words"><b>Pet</b><span>he lives here</span></div>
+  <div class="tile" id="d20" data-view="misc" data-roll="20">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z"/><path d="m12 2.2 5 7.3-5 8-5-8z"/><path d="M7 9.5 3.5 7M17 9.5 20.5 7M12 17.5V21.8"/></svg></div>
+    <b>d20</b>
+    <span class="roll"></span>
+  </div>
+  <div class="tile" id="back" data-view="misc" data-show="main">
+    <div class="big">⌂</div>
+    <b>Back</b>
+    <span>to the front page</span>
   </div>
 </div>
 
@@ -257,8 +312,55 @@ function say(text, ms) {
   if (ms) setTimeout(() => { if (note.textContent === text) note.textContent = ''; }, ms);
 }
 
+const grid = document.getElementById('grid');
+
+// ---- the d20 --------------------------------------------------------
+// FAIR, not just random-looking. crypto.getRandomValues with the top of
+// the range thrown away removes the modulo bias you get from
+// `random() % 20` -- it costs nothing and a loaded die is a bad joke to
+// leave in a thing somebody rolls for fun.
+function d(sides) {
+  const limit = 256 - (256 % sides);
+  const byte = new Uint8Array(1);
+  do { crypto.getRandomValues(byte); } while (byte[0] >= limit);
+  return (byte[0] % sides) + 1;
+}
+
+function roll(tile, sides) {
+  if (tile.classList.contains('rolling')) return;
+  const out = tile.querySelector('.roll');
+  tile.className = tile.className.replace(/ (nat20|nat1|settled|rolling)/g, '');
+  tile.classList.add('rolling');
+  // Tumble first. A number that simply appears has not been ROLLED,
+  // and the whole point of a dice button is the half-second of not
+  // knowing yet.
+  let left = 9;
+  const tumble = setInterval(() => {
+    out.textContent = d(sides);
+    if (--left) return;
+    clearInterval(tumble);
+    const got = d(sides);
+    out.textContent = got;
+    tile.classList.remove('rolling');
+    tile.classList.add('settled');
+    if (got === sides) tile.classList.add('nat20');
+    if (got === 1) tile.classList.add('nat1');
+    say(got === sides ? 'NAT ' + sides + '.'
+        : got === 1 ? 'Critical fail.' : '', 4000);
+  }, 55);
+}
+
 document.querySelectorAll('.tile').forEach(tile => {
   tile.onclick = () => {
+    // A view swap is not a launch and not a link -- it is the drawer
+    // opening. Kept as its own verb so `data-launch` stays exactly the
+    // allowlisted-name-crosses-the-wire thing it has always been.
+    const sides = tile.dataset.roll;
+    if (sides) { roll(tile, parseInt(sides, 10)); return; }
+
+    const view = tile.dataset.show;
+    if (view) { grid.className = view; say(''); return; }
+
     const go = tile.dataset.go;
     if (go) { location.href = go; return; }
 

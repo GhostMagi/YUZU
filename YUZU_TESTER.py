@@ -5868,6 +5868,68 @@ class TestTelemetry(unittest.TestCase):
                 self.assertNotIn(emoji, body,
                                  f"{page.name} uses an emoji battery")
 
+    def test_her_face_reads_HER_OWN_stage_directions(self):
+        """Ghost, Sept 11: "saya never uses the cute blushing faces even
+        when shes 'blushing'". He was right, and it was WIRING rather
+        than taste -- the brain only reported idle/thinking/talking, and
+        `talking` resolves to one sprite, so five of his eight faces
+        could never appear.
+
+        The fix does not guess her feelings. She already writes them
+        down in her own stage directions, which this project spent two
+        days deciding to keep rather than suppress. No direction, no
+        mood -- and then `talking`, exactly as before."""
+        for said, want in (
+                ("[blushes] I-It's not like I missed you.", "annoyed"),
+                ("*giggles* fine, you win.", "happy"),
+                ("[eye roll] whatever.", "annoyed"),
+                ("[smirks] obviously.", "smug"),
+                ("[gasps] you did WHAT?", "shock"),
+                ("[sniffs] ...it's nothing.", "sad"),
+                ("Just a plain reply with no directions.", None),
+                ("", None)):
+            self.assertEqual(self.face.mood_from(said), want, said)
+
+    def test_a_blush_beats_a_giggle_in_the_same_line(self):
+        """ORDER IS THE DESIGN, not alphabetical. A tsundere who blushes
+        AND giggles is blushing -- that is the whole character, and it
+        is why `happy` is last in the list."""
+        self.assertEqual(
+            self.face.mood_from("[blushes and giggles] shut up"), "annoyed")
+
+    def test_the_mood_never_replaces_what_she_is_DOING(self):
+        """Two questions, two fields. `state` is the honest loading
+        spinner; `mood` is how she is. Collapsing them means a thinking
+        face can never also be a blushing one -- and this repo has paid
+        for merging two questions into one variable more than once."""
+        real = self.face.STATE_FILE
+        with tempfile.TemporaryDirectory() as tmp:
+            self.face.STATE_FILE = os.path.join(tmp, "state")
+            try:
+                self.face.set_state("talking", "[blushes] hmph.")
+                got = self.face.get_state()
+                self.assertEqual(got["state"], "talking")
+                self.assertEqual(got["mood"], "annoyed")
+                self.face.set_state("thinking")
+                self.assertNotIn("mood", self.face.get_state(),
+                                 "a stale mood outlived the reply")
+            finally:
+                self.face.STATE_FILE = real
+        page = (Path(__file__).parent / "ui" / "face.html").read_text()
+        self.assertIn("s.state === 'talking' && s.mood", page,
+                      "the mood is used outside of talking, so a blush "
+                      "could override the thinking face")
+
+    def test_every_sprite_he_drew_can_actually_be_reached(self):
+        """THE POINT OF THE WHOLE FIX. Eight faces were in the repo and
+        three could be shown. A file that no state resolves to is art
+        he made for nothing."""
+        resolved = set(self.face.roles_for(self.face.sprites()).values())
+        have = {s["name"] for s in self.face.sprites()}
+        unreachable = have - resolved - {"blink"}   # blink is a frame
+        self.assertFalse(unreachable,
+                         f"nothing can ever show: {sorted(unreachable)}")
+
     def test_the_rate_is_MEASURED_by_the_brain_not_guessed_here(self):
         """Only the brain sees Ollama's own eval_count / eval_duration.
         A rate this deck estimated would be worse than no rate, so the
@@ -5933,26 +5995,57 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn('id="saya"', page, "there is no Saya button")
         self.assertIn('data-go="face.html"', page)
 
-    def test_the_pet_tile_is_there_and_does_not_orphan_the_others(self):
-        """FIVE tiles into a two-column grid. The fifth spans the width
-        along the BOTTOM, and both halves of that matter -- the first
-        attempt put the wide tile in source order, mid-grid, which
-        orphaned Wikipedia AND Game Boy onto rows of their own. Worse
-        than the auto-fit bug it was avoiding, and only a screenshot at
-        1024x600 caught it.
+    def test_the_front_page_is_four_tiles_and_misc_is_the_drawer(self):
+        """Ghost, Sept 11: "lets hide the gameboy tab for now its not as
+        important. or put it and the wikipedia tabs under a tab called
+        ☆Misc☆ we can pile up our fancy future apps in that tab."
 
-        So this pins the ORDER as well as the span: nothing may follow
-        the tile that spans two columns."""
+        So the front page is the four things he actually opens, and
+        every view is FOUR EQUAL TILES with nothing spanning -- which is
+        what the grid was before a fifth tile forced a wide row and a
+        screenshot caught it orphaning two others."""
         page = self.PAGE.read_text()
-        self.assertIn('id="pet" data-go="vpet.html"', page,
-                      "there is no Pet tile")
-        self.assertIn("grid-column: span 2", page,
-                      "the fifth tile does not span the row")
-        tiles = re.findall(r'<div class="tile"[^>]*>', page)
-        self.assertEqual(len(tiles), 5, "there are not five tiles")
-        self.assertIn('id="pet"', tiles[-1],
-                      "the spanning tile is not last, so it orphans the "
-                      "tiles after it")
+        views = {}
+        for tile in re.findall(r'<div class="tile"[^>]*>', page):
+            views.setdefault(
+                re.search(r'data-view="(\w+)"', tile).group(1), []).append(tile)
+        self.assertEqual(sorted(views), ["main", "misc"])
+        self.assertEqual(len(views["main"]), 4, "the front page is not four")
+        self.assertEqual(len(views["misc"]), 4, "the drawer is not four")
+        self.assertNotIn("grid-column: span", page,
+                         "a spanning tile is back, and an odd row with it")
+        for wanted in ('data-go="face.html"', 'data-go="vpet.html"',
+                       'data-launch="chat"'):
+            self.assertIn(wanted, "".join(views["main"]) + page,
+                          f"{wanted} left the front page")
+        self.assertIn("☆Misc☆", page, "the stars are gone")
+
+    def test_the_drawer_has_a_way_back_and_needs_no_second_page(self):
+        """It is the SAME PAGE with the tiles swapped. A second file
+        would need its own exit, and every screen on this deck having
+        one is the rule two power cycles paid for -- so the cheapest
+        way to keep that true is to not add a screen."""
+        page = self.PAGE.read_text()
+        self.assertIn('data-show="main"', page, "there is no way back")
+        self.assertIn('data-show="misc"', page, "nothing opens the drawer")
+        self.assertNotIn("misc.html", page, "the drawer became a page")
+
+    def test_the_d20_is_FAIR_and_rolls_in_place(self):
+        """Ghost: "add a D20 dice button somewhere with that black and
+        neon green crt effects that rolls it randomly."
+
+        `random() % 20` is biased -- 256 does not divide by 20, so some
+        faces come up more often. A loaded die is a bad joke to leave
+        in a thing somebody rolls for fun, and rejection sampling costs
+        nothing."""
+        page = self.PAGE.read_text()
+        self.assertIn('data-roll="20"', page, "there is no d20")
+        self.assertIn("getRandomValues", page, "the roll is not fair")
+        self.assertIn("256 % sides", page, "no rejection sampling")
+        self.assertNotIn("d20.html", page, "the dice grew a page")
+        # the flourish belongs to the two results that earn one
+        self.assertIn("nat20", page)
+        self.assertIn("nat1", page)
 
     def test_the_icons_are_line_art_and_not_emoji(self):
         """Ghost wanted "clean single-color line icons... rather than
@@ -5964,7 +6057,7 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 5, "not five line icons")
+        self.assertEqual(page.count("<svg"), 7, "not seven line icons")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):

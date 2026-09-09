@@ -27,6 +27,7 @@ each sprite as a mask, which is what makes the black theme legible.
 
 import json
 import os
+import re
 import tempfile
 import time
 import shutil
@@ -61,8 +62,66 @@ ROLES = {
     "happy":    ("happy", "wink"),
     "annoyed":  ("mad", "annoyed"),
     "sad":      ("cry", "sad"),
+    "smug":     ("smug",),
+    "shock":    ("woahshock", "shock"),
     "asleep":   ("asleep", "sleepy"),
 }
+
+# ---------------------------------------------------------------------
+# HER MOOD, TAKEN FROM HER OWN WORDS.
+#
+# Ghost, Sept 11: *"saya never uses the cute blushing faces even when
+# shes 'blushing'"*. He is right and it was not a taste problem -- it
+# was a WIRING problem. The brain only ever reported idle / thinking /
+# talking, and `talking` resolves to one sprite, so five of his eight
+# faces could not appear no matter what she said. `mad` (the pouty
+# blush) and `cry` and `smug` were dead files.
+#
+# The fix does NOT guess her feelings. She already writes them down:
+# `[blushes]`, `[eye roll]`, `*giggles*`, `[pouts]` -- her own stage
+# directions, in her own reply, which this project has spent two days
+# deciding to keep rather than suppress. So the face reads what SHE
+# said rather than a sentiment score somebody invented.
+#
+# That distinction is the whole reason this is safe to ship: a wrong
+# guess would put the wrong face on a real reply, and there is no guess
+# here. No stage direction, no mood, and `talking` as before.
+# ---------------------------------------------------------------------
+
+MOODS = (
+    # (role, words she actually writes inside brackets or asterisks)
+    ("annoyed", ("blush", "flustered", "embarrass", "pout", "huff",
+                 "hmph", "annoy", "glare", "scowl", "grumbl", "mutter",
+                 "eye roll", "rolls her eyes", "sulk", "tsk")),
+    ("smug",    ("smug", "smirk", "grin", "chuckl", "preen", "gloat")),
+    ("sad",     ("cries", "cry", "sob", "sniff", "tear", "whimper",
+                 "sigh", "trails off", "quiet", "sad")),
+    ("shock",   ("gasp", "startl", "shock", "jumps", "wide eye",
+                 "wide-eyed", "surprise", "squeal", "yelp")),
+    ("happy",   ("giggl", "laugh", "beam", "smile", "hums", "bounce",
+                 "delight", "cheer", "wink")),
+)
+
+
+def mood_from(text):
+    """The role her own stage directions ask for, or None.
+
+    ORDER MATTERS and it is not alphabetical: a line can carry two
+    directions, and the one that should win is the one that is most
+    specific about how she FEELS. A tsundere who blushes AND giggles is
+    blushing -- that is the whole character, and `happy` is last for
+    exactly that reason."""
+    if not text:
+        return None
+    found = [a or b for a, b in
+             re.findall(r"\[([^\]]{1,80})\]|\*([^*]{1,80})\*", text.lower())]
+    if not found:
+        return None
+    inside = " ".join(found)
+    for role, words in MOODS:
+        if any(word in inside for word in words):
+            return role
+    return None
 
 
 def _png_size(path):
@@ -331,6 +390,14 @@ def set_state(state, said="", rate=None):
     body = {"state": state, "said": said[:600], "at": time.time()}
     if rate:
         body["rate"] = round(float(rate), 1)
+    # TWO QUESTIONS, TWO FIELDS. `state` is what she is DOING (the
+    # honest loading spinner); `mood` is how she IS. Collapsing them
+    # would mean a thinking face could never also be a blushing one,
+    # and this repo has already paid for merging two questions into one
+    # variable more than once.
+    mood = mood_from(said)
+    if mood:
+        body["mood"] = mood
     try:
         with open(STATE_FILE, "w") as fh:
             json.dump(body, fh)
