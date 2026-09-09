@@ -616,6 +616,50 @@ needed the unit file, not the environment. The wiki extract needed to
 be a user turn, not a system message. And an identity needs the key at
 boot and the name in dialogue.
 
+## OPEN, diagnosed, NOT built: a paste is twelve messages
+
+Sept 9. Ghost pasted a 12-line diagnostic command into Saya's chat by
+mistake. Every line became its own message and cost a full generation,
+so the `quit` he typed next sat behind twelve replies -- **which looks
+exactly like `quit` being ignored again**, and it is not. It is a
+queue.
+
+(Her replies to it were good, for the record: *"Hah, a function, how
+quaint. I-it's not like you actually know what you're doing or
+anything, right?"*)
+
+**The fix is written and was REVERTED unbuilt.** `read_line()` would
+call `input()` then drain anything already waiting via
+`select.select([sys.stdin], [], [], 0)` and join it -- a paste is ONE
+thought, and the part that actually matters is that whatever he types
+next gets read promptly instead of queueing behind a wall of
+accidental messages.
+
+It was reverted because **there is no Ollama here and it could not be
+behaviour-tested**, and this is his main chat loop. Shipping an
+unverified change to the thing he uses every day is exactly what this
+file warns about under "tested in a sim". Pick it up with a test that
+drives `read_line` against a pipe and a tty.
+
+**Related and still true: `/wiki` search returns nothing on his
+archive.** The server starts correctly now (measured: 3 seconds, then
+an answer), but `Nothing in the archive about 'ice cream'` on a Simple
+English Wikipedia ZIM is a PARSING failure, not a missing article. The
+likely cause is that modern kiwix-serve dropped the `/A/` namespace
+from article URLs while `_suggest`'s regex still requires it. NOT
+confirmed -- the diagnostic that would settle it was pasted into the
+chat instead of the shell, so the real endpoint shapes are still
+unknown. Run it AT THE SHELL:
+
+    python3 -c "
+    import urllib.request as u, re
+    def g(p):
+        try: return u.urlopen('http://127.0.0.1:8080'+p, timeout=6).read().decode('utf-8','replace')
+        except Exception as e: return 'ERR %s' % e
+    print(g('/suggest?term=ice+cream')[:400])
+    print(re.findall(r'href=\"[^\"]*\"', g('/search?pattern=ice+cream'))[:12])
+    "
+
 ## `deckapps` — real app icons, because a touchscreen is not a terminal
 
 Ghost, Sept 9: *"as far as the https blah blah number number in a
