@@ -32,6 +32,7 @@ import drop
 import gguf_inspect
 import yuzu_brain
 import yuzu_personas
+import yuzu_wiki
 import yuzu_prompt_eval as prompt_eval
 import yuzu_brain as yuzu_brain_module
 from yuzu_brain import BrainError, YuzuBrain, load_system_prompt
@@ -3098,6 +3099,154 @@ class TestPadPairing(unittest.TestCase):
         self.assertIn("--forget", self.SCRIPT.read_text())
         done = self._run("--forget")
         self.assertEqual(done.returncode, 0)
+
+
+class TestWikiLookup(unittest.TestCase):
+    """`/wiki` -- grounding her in a real encyclopedia, still offline.
+
+    She is a character on a deck with no internet, and everything she
+    "knows" is whatever a 3B memorised: thin, and confidently wrong at
+    the edges. A ZIM archive on the NVMe is real checkable text sitting
+    right next to her.
+
+    Every test here drives a REAL HTTP server serving canned Kiwix
+    responses, because the thing that decides whether this works is
+    parsing what kiwix-serve actually returns."""
+
+    PAGE = (b"<html><head><title>Black hole</title></head><body>"
+            b"<script>var x = 1;</script>"
+            b"<h1>Black hole</h1>"
+            b"<p>A black hole is a region of spacetime where gravity is "
+            b"so strong that nothing, not even light, can escape.[12] "
+            b"It forms when a massive star collapses.</p>"
+            b"<table><tr><td>infobox junk</td></tr></table>"
+            b"</body></html>")
+
+    def _serve(self, routes, test):
+        """Run a stub kiwix-serve on the port yuzu_wiki talks to."""
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                for prefix, (code, body) in routes.items():
+                    if self.path.startswith(prefix):
+                        self.send_response(code)
+                        self.send_header("Content-Type", "text/html")
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                self.send_response(404)
+                self.end_headers()
+                self.wfile.write(b"no")
+
+            def log_message(self, *a):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        port = server.server_port
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        original = yuzu_wiki.BASE
+        yuzu_wiki.BASE = f"http://127.0.0.1:{port}"
+        try:
+            return test()
+        finally:
+            yuzu_wiki.BASE = original
+            server.shutdown()
+            server.server_close()
+
+    def test_it_reads_an_article_through_the_json_suggest_endpoint(self):
+        routes = {"/suggest": (200, b'[{"path": "/c/A/Black_hole"}]'),
+                  "/c/A/": (200, self.PAGE),
+                  "/": (200, b"<html>kiwix</html>")}
+        title, body = self._serve(routes, lambda: yuzu_wiki.look_up("black hole"))
+        self.assertEqual(title, "Black hole")
+        self.assertIn("nothing, not even light", body)
+
+    def test_script_and_table_junk_never_reaches_her(self):
+        """An infobox and a <script> body would be read out loud by
+        Piper and would eat the context window for nothing."""
+        routes = {"/suggest": (200, b'[{"path": "/c/A/Black_hole"}]'),
+                  "/c/A/": (200, self.PAGE),
+                  "/": (200, b"ok")}
+        _, body = self._serve(routes, lambda: yuzu_wiki.look_up("black hole"))
+        self.assertNotIn("var x", body)
+        self.assertNotIn("infobox junk", body)
+        self.assertNotIn("[12]", body, "citation markers survived")
+
+    def test_it_falls_back_to_scraping_search_when_suggest_is_missing(self):
+        """kiwix-serve has changed shape across versions and the one on
+        his board is not pinned. Older builds have no /suggest at all."""
+        routes = {"/suggest": (404, b"nope"),
+                  "/search": (200, b'<a href="/c/A/Black_hole">Black hole</a>'),
+                  "/c/A/": (200, self.PAGE),
+                  "/": (200, b"ok")}
+        title, _ = self._serve(routes, lambda: yuzu_wiki.look_up("black hole"))
+        self.assertEqual(title, "Black hole")
+
+    def test_a_dead_wiki_returns_a_SENTENCE_not_a_traceback(self):
+        """The failure that matters. A lookup mid-conversation must
+        degrade to something he can read, not end the chat."""
+        original = yuzu_wiki.BASE
+        yuzu_wiki.BASE = "http://127.0.0.1:9"      # discard port
+        try:
+            title, why = yuzu_wiki.look_up("anything")
+            self.assertIsNone(title)
+            self.assertIn("~/YUZU/wiki", why, "it does not say how to fix it")
+        finally:
+            yuzu_wiki.BASE = original
+
+    def test_a_miss_says_so_plainly(self):
+        routes = {"/suggest": (200, b"[]"), "/search": (200, b"<html></html>"),
+                  "/": (200, b"ok")}
+        title, why = self._serve(routes,
+                                 lambda: yuzu_wiki.look_up("zzzznotathing"))
+        self.assertIsNone(title)
+        self.assertIn("zzzznotathing", why)
+
+    def test_the_extract_is_capped_and_cut_on_a_SENTENCE(self):
+        """4096 context on the Orin, shared with her whole prompt and
+        eight turns of history. And half a clause is worse than none --
+        she would answer from a sentence that stops mid-thought."""
+        long_body = (b"<html><h1>T</h1><p>" + b"Fact number one here. " * 200
+                     + b"</p></html>")
+        routes = {"/suggest": (200, b'[{"path": "/c/A/T"}]'),
+                  "/c/A/": (200, long_body), "/": (200, b"ok")}
+        _, body = self._serve(routes, lambda: yuzu_wiki.look_up("t"))
+        self.assertLessEqual(len(body), yuzu_wiki.MAX_CHARS + 3)
+        self.assertTrue(body.rstrip().endswith((".", "...")), repr(body[-40:]))
+
+    def test_it_arrives_as_a_USER_turn_not_a_system_instruction(self):
+        """ASSISTANT COLLAPSE is this deck's signature failure and it
+        is already measured once: asked a technical question she
+        produced markdown headings and fenced code blocks.
+
+        A wall of encyclopedia text delivered as a system message is
+        the shortest path back to that. Phrased as something HE says,
+        with an explicit ask for her own words, it stays conversation."""
+        routes = {"/suggest": (200, b'[{"path": "/c/A/Black_hole"}]'),
+                  "/c/A/": (200, self.PAGE), "/": (200, b"ok")}
+        grounded, why = self._serve(
+            routes, lambda: yuzu_wiki.as_context("black hole"))
+        self.assertIsNone(why)
+        self.assertTrue(grounded.startswith("I looked up"),
+                        "it does not read as the user speaking")
+        self.assertIn("in your own words", grounded)
+
+    def test_the_brain_guards_the_import_like_the_voice_does(self):
+        """yuzu_brain must still run with this file absent -- the
+        encyclopedia is a nice-to-have and a missing sibling must never
+        stop her talking. Same rule the Piper import already follows."""
+        import inspect
+        head = inspect.getsource(yuzu_brain)[:2000]
+        self.assertIn("import yuzu_wiki", head)
+        self.assertIn("except ImportError", head)
+
+    def test_the_chat_loop_actually_wires_it_up(self):
+        import inspect
+        body = inspect.getsource(yuzu_brain._cli)
+        self.assertIn("/wiki", body)
+        self.assertIn("as_context", body,
+                      "it does not use the user-turn phrasing, so a raw "
+                      "extract reaches her and invites assistant collapse")
 
 
 class TestWikiServer(unittest.TestCase):

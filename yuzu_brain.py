@@ -29,6 +29,13 @@ from pathlib import Path
 
 import yuzu_personas
 
+# Optional, exactly like yuzu_voice: the encyclopedia is a nice-to-have
+# and a missing sibling must never stop her talking.
+try:
+    import yuzu_wiki
+except ImportError:
+    yuzu_wiki = None
+
 # Same guard as yuzu_all_in_one: Piper is a real binary and a real model
 # file, and neither exists on a phone. Absent, --chat just prints, which
 # is exactly what it did before there was a voice.
@@ -580,7 +587,9 @@ def _cli(argv):
         print(f"voice: piper, {voice.model.name}" if voice.ready
               else f"voice: printing only ({voice.why_not()})")
 
-    print("Interactive. 'quit' to exit, 'reset' to clear history.\n")
+    print("Interactive. 'quit' to exit, 'reset' to clear history."
+          + ("  '/wiki <thing>' looks it up offline." if yuzu_wiki else "")
+          + "\n")
     while True:
         try:
             text = input("You: ").strip()
@@ -593,6 +602,18 @@ def _cli(argv):
             brain.reset()
             print("(history cleared)\n")
             continue
+        if text.lower().startswith("/wiki"):
+            # Hand her real facts to answer FROM, still fully offline.
+            # The lookup is substituted for what he typed, so the rest
+            # of the turn -- history, streaming, voice -- is unchanged.
+            if yuzu_wiki is None:
+                print("(yuzu_wiki.py isn't here)\n")
+                continue
+            grounded, why = yuzu_wiki.as_context(text[5:].strip())
+            if grounded is None:
+                print(f"({why})\n")
+                continue
+            text = grounded
         if not text:
             continue
         print(f"{who}: ", end="", flush=True)

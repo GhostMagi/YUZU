@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 341 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 350 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 341 tests pass on it. Getting it
+(that repo path is confirmed working). 350 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -591,11 +591,52 @@ line of `hostname -I` (which has now cost time three times), leaves a
 running server alone rather than dropping what he is reading, and
 prints kiwix-serve's OWN output when it fails to come up.
 
-**Next, unbuilt and his call: a `/wiki` lookup inside Saya's chat.**
-`kiwix-serve` answers over HTTP, so `urllib` reaches it and the
-stdlib-only property survives. That is the "AI stuff" half of the same
-sentence -- an offline character with an offline encyclopedia behind
-her -- and it is the obvious next thing. Not started.
+## `/wiki` — she answers from a real encyclopedia now (Sept 9)
+
+Ghost: *"build it bro. Saya gunna be so smart!"* Built.
+
+    You: /wiki black holes
+    Saya: [answers from the actual article, in her own voice]
+
+`yuzu_wiki.py`, stdlib only, so the phone property survives. The chat
+loop substitutes the lookup for what he typed and everything
+downstream -- history, streaming, voice -- is unchanged.
+
+**The extract arrives as a USER turn, not a system instruction, and
+that is the most important line in the file.** Assistant collapse is
+this deck's signature failure and it is already MEASURED once: asked
+how to centre a div she produced markdown headings and fenced code
+blocks. A wall of encyclopedia text delivered as a system message is
+the shortest path back to that. So it reads as something HE said --
+*"I looked up X and it says: ... Tell me about it in your own words"* --
+which keeps it conversation and asks for her register explicitly. A
+test pins the phrasing.
+
+**Capped at 700 chars and cut on a SENTENCE.** `num_ctx` is 4096 on
+the Orin, shared with her whole prompt and eight turns of history, and
+half a clause is worse than none -- she would answer from a thought
+that stops mid-way.
+
+**Two endpoints, because kiwix-serve is not pinned.** Newer builds
+answer `/suggest` with JSON; older ones only have `/search` returning
+HTML. It tries the clean one and falls back to scraping article links.
+Both paths are tested against a REAL HTTP server serving canned
+responses, because what decides this is parsing what kiwix-serve
+actually returns.
+
+**A dead wiki returns a SENTENCE, never a traceback** -- including the
+command to start it. A lookup that ends the conversation is worse than
+no lookup, and `yuzu_brain` guards the import exactly like Piper's, so
+the file being absent never stops her talking.
+
+**Script tags, infoboxes and `[12]` citation markers are stripped.**
+Piper would read every one of them out loud.
+
+**NOT VERIFIED: a real ZIM through a real kiwix-serve.** Everything
+here is exercised against a stub. The parsing is the risky half and
+his archive is the only thing that can confirm it -- same standing
+limit as every "tested in a sim" claim in this file. `python3
+yuzu_wiki.py black holes` on the board answers it in ten seconds.
 
 ## `gba` — one word to play (Sept 9)
 
