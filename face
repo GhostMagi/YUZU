@@ -1,0 +1,132 @@
+#!/bin/bash
+# Show her face. One word.
+#
+#   ~/YUZU/face           serve it, print the address for the phone
+#   ~/YUZU/face --off     stop
+#   ~/YUZU/face --status  is it up, and can the phone reach it
+#
+# The PHONE is the screen here, not the deck. It is a touchscreen
+# already, the face is built for touch, and it needs no VNC, no X
+# session and no browser installed on the board. When the real 7" panel
+# lands the same page opens locally instead -- nothing changes but the
+# client.
+
+set -u
+# Overridable so the suite can drive the REAL script on a free port.
+# 8080 is kiwix, 8000 is drop.py.
+PORT=${YUZU_FACE_PORT:-8081}
+DIR="$(cd "$(dirname "$0")" && pwd)/ui"
+LOG=/tmp/face.log
+
+# The LAN address, or empty. NEVER a placeholder string: a caller has to
+# be able to tell "no network" from "here is the address", and a
+# sentence dressed up as an IP defeats that. `ip route get` is the one
+# that picks the address the phone will actually arrive on -- reading
+# the first line of `hostname -I` has cost this project time three
+# times (docker0 and the USB-gadget link both sort ahead of the real
+# one), so that is the FALLBACK and it is filtered.
+lan_ip() {
+    local found
+    found=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+    if [ -z "$found" ]; then
+        found=$(hostname -I 2>/dev/null | tr ' ' '\n' \
+                | grep -v '^127\.' | grep -v '^172\.1[6-9]\.' \
+                | grep -v '^172\.2[0-9]\.' | grep -v '^172\.3[01]\.' \
+                | grep -v '^192\.168\.55\.' | head -1)
+    fi
+    echo "$found"
+}
+
+# TWO QUESTIONS, ASKED SEPARATELY, because they have different answers
+# and different fixes:
+#
+#   up()         is the server running at all?      (loopback)
+#   reachable()  can the PHONE get to it?           (LAN address)
+#
+# The first version asked only the second, so on a board with no network
+# it reported "it did not come up" about a server that was serving
+# perfectly. That is this project's most-repeated bug -- a check that
+# cannot observe the actual failure mode -- and merging the two
+# questions is how you build one.
+#
+# Both CONNECT rather than reading a listener table. `ss` is not
+# guaranteed (it was missing on a machine this was developed against),
+# and connecting is exactly what the phone does. python3 is guaranteed:
+# it is the whole project's one rule.
+_connect() {
+    [ -n "$1" ] || return 1
+    python3 -c "
+import socket, sys
+s = socket.socket(); s.settimeout(1.5)
+try:
+    s.connect((sys.argv[1], int(sys.argv[2])))
+except Exception:
+    sys.exit(1)
+finally:
+    s.close()
+" "$1" "$PORT" 2>/dev/null
+}
+
+up()        { _connect 127.0.0.1; }
+reachable() { _connect "$(lan_ip)"; }
+
+# The verdict goes FIRST. `pad --status` printed two alarming lines
+# about a transport that was not in use and the answer last, and a
+# working controller read as broken.
+report() {
+    local ip; ip=$(lan_ip)
+    echo
+    if ! up; then
+        echo "  NOT RUNNING.  Start it with:  ~/YUZU/face"
+        echo
+        return 1
+    fi
+    if [ -z "$ip" ]; then
+        echo "  RUNNING -- but this board is not on the network,"
+        echo "  so the phone cannot reach it. Connect WiFi, then re-run."
+        echo
+        echo "  On the deck's own screen it works now:"
+        echo "      http://127.0.0.1:$PORT/face.html"
+        echo
+        return 0
+    fi
+    if ! reachable; then
+        echo "  RUNNING -- but not answering on $ip, so the phone"
+        echo "  cannot reach it. Something is filtering the port."
+        echo
+        return 1
+    fi
+    echo "  UP.  Open this on your phone:"
+    echo "      http://$ip:$PORT/face.html"
+    echo
+    echo "  Tap her face to change expression. Tap a circle to recolour."
+    echo "  Stop it with:  ~/YUZU/face --off"
+    echo
+    return 0
+}
+
+case "${1:-}" in
+--off)
+    pkill -f "http.server $PORT" 2>/dev/null && echo "Face stopped." \
+                                             || echo "It was not running."
+    exit 0 ;;
+--status)
+    report; exit $? ;;
+esac
+
+[ -f "$DIR/face.html" ] || { echo "No $DIR/face.html -- run: git pull origin main"; exit 1; }
+
+if ! up; then
+    # nohup + & always. A foreground server on a serial link reads as a
+    # frozen board, and that has already cost this project two power
+    # cycles. --bind 0.0.0.0 because the phone is the client.
+    nohup python3 -m http.server "$PORT" --bind 0.0.0.0 \
+        --directory "$DIR" >"$LOG" 2>&1 &
+    sleep 2
+    if ! up; then
+        echo; echo "  It did not come up. Its own output:"
+        tail -5 "$LOG" | sed 's/^/    /'; echo; exit 1
+    fi
+fi
+
+report

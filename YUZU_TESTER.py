@@ -3590,7 +3590,20 @@ class TestGbaLauncher(unittest.TestCase):
                        PATH=f"{binv}:{os.environ['PATH']}")
             done = subprocess.run(["bash", str(self.SCRIPT), *args],
                                   capture_output=True, text=True, env=env)
-            log = calls.read_text() if calls.exists() else ""
+            # The emulator is launched with `nohup ... &` ON PURPOSE, so
+            # the script returns BEFORE the stub has written its line.
+            # Reading the log immediately made this class fail about one
+            # run in eight -- an intermittent red that reads as a broken
+            # launcher and is really a test racing a correct detach.
+            deadline = time.time() + 5
+            log = ""
+            while done.returncode == 0 and time.time() < deadline:
+                log = calls.read_text() if calls.exists() else ""
+                if "rom=" in log:
+                    break
+                time.sleep(0.02)
+            else:
+                log = calls.read_text() if calls.exists() else ""
             return done, log
 
     def test_a_rom_name_with_spaces_and_parens_reaches_the_emulator(self):
@@ -4802,6 +4815,211 @@ class TestJetsonChecks(unittest.TestCase):
             self.assertTrue(want, f"{name} has no recommended value")
             self.assertGreater(len(why), 40,
                                f"{name} doesn't explain itself")
+
+
+class TestFaceServer(unittest.TestCase):
+    """`face` -- her face on a screen, one word.
+
+    The PHONE is the screen until the 7" panel lands: it is already a
+    touchscreen, the page is built for touch, and this needs no VNC, no
+    X session and no browser on the board."""
+
+    SCRIPT = Path(__file__).parent / "face"
+    PAGE = Path(__file__).parent / "ui" / "face.html"
+
+    def test_it_exists_and_is_executable(self):
+        self.assertTrue(self.SCRIPT.exists())
+        self.assertTrue(os.access(self.SCRIPT, os.X_OK),
+                        "face is not executable, so `~/YUZU/face` fails")
+        self.assertTrue(self.PAGE.exists(), "there is no face to serve")
+
+    def test_it_is_valid_shell(self):
+        """A syntax error here surfaces on a phone at the board."""
+        import subprocess
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_the_face_reaches_for_nothing_outside_itself(self):
+        """THE PROPERTY THAT MATTERS MOST ABOUT THIS PAGE. The deck is
+        offline by design: no cloud model, no CDN, no web font. One
+        `<script src>` or one `@import` and the face renders wrong on
+        the machine it was built for -- and it would look FINE on any
+        development box with a network, which is the worst way for a
+        thing to break.
+
+        The art is SVG, the animation is CSS, and there is no third
+        thing."""
+        page = self.PAGE.read_text()
+        for reach in ("http://", "https://", "//cdn", "@import",
+                      "fonts.googleapis", "src=\"/", "integrity="):
+            self.assertNotIn(reach, page,
+                             f"face.html reaches outside itself: {reach!r}")
+
+    def test_the_server_is_launched_detached(self):
+        """nohup + & always. A foreground server on a serial link is
+        indistinguishable from a frozen board, and reading one as a
+        freeze has already cost this project two power cycles."""
+        body = self.SCRIPT.read_text()
+        launch = [ln for ln in body.splitlines()
+                  if "http.server" in ln and not ln.strip().startswith("#")]
+        self.assertTrue(launch, "nothing starts a server")
+        start = [ln for ln in launch if "nohup" in ln]
+        self.assertTrue(start, "the server is started in the FOREGROUND")
+
+    def test_it_binds_every_interface_because_the_phone_is_the_client(self):
+        body = self.SCRIPT.read_text()
+        self.assertIn("--bind 0.0.0.0", body,
+                      "a loopback-only bind is unreachable from the phone "
+                      "-- the exact TigerVNC failure, one port along")
+
+    @staticmethod
+    def _free_port():
+        import socket
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        return port
+
+    def _run(self, *args, lan="10.1.2.3", port=None):
+        """Drive the REAL script against a stub `ip`/`hostname`, so the
+        no-network path can be exercised on a machine that has one.
+
+        `lan=None` fakes a board that is not on the network at all --
+        the case that produced the bug this class exists for."""
+        import subprocess
+        port = port or self._free_port()
+        with tempfile.TemporaryDirectory() as tmp:
+            binv = Path(tmp) / "bin"
+            binv.mkdir()
+            if lan:
+                ip_out = f'echo "8.8.8.8 via 10.1.2.1 dev wlan0 src {lan}"\n'
+                host_out = f'echo "172.17.0.1 192.168.55.1 {lan}"\n'
+            else:
+                ip_out = "exit 1\n"          # no route: board is offline
+                host_out = 'echo "172.17.0.1 192.168.55.1"\n'
+            (binv / "ip").write_text("#!/bin/bash\n" + ip_out)
+            (binv / "hostname").write_text("#!/bin/bash\n" + host_out)
+            for name in ("ip", "hostname"):
+                (binv / name).chmod(0o755)
+            env = dict(os.environ, YUZU_FACE_PORT=str(port),
+                       PATH=f"{binv}:{os.environ['PATH']}")
+            try:
+                done = subprocess.run(["bash", str(self.SCRIPT), *args],
+                                      capture_output=True, text=True,
+                                      env=env, timeout=30)
+            finally:
+                if not args:
+                    subprocess.run(["bash", str(self.SCRIPT), "--off"],
+                                   capture_output=True, env=env)
+            return done, port
+
+    def test_it_serves_the_real_page(self):
+        """Everything else here is about what it SAYS. This is the one
+        that checks it actually works."""
+        import subprocess, urllib.request
+        port = self._free_port()
+        env = dict(os.environ, YUZU_FACE_PORT=str(port))
+        try:
+            subprocess.run(["bash", str(self.SCRIPT)], capture_output=True,
+                           text=True, env=env, timeout=30)
+            got = urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/face.html", timeout=5).read()
+        finally:
+            subprocess.run(["bash", str(self.SCRIPT), "--off"],
+                           capture_output=True, env=env)
+        self.assertEqual(got, self.PAGE.read_bytes(),
+                         "what it served is not the face in the repo")
+
+    def test_a_board_with_no_network_is_told_it_is_RUNNING(self):
+        """THE BUG THIS CLASS EXISTS FOR, and it is the evening's
+        pattern one more time: the first version asked only "can the
+        LAN address reach it", so on a board with no LAN address it
+        printed `It did not come up` about a server that was serving
+        perfectly. A check that cannot observe the actual failure mode
+        is not a check -- and merging two questions with two different
+        fixes into one is how you build one.
+
+        Running-but-unreachable and not-running are DIFFERENT problems.
+        The first needs WiFi; the second needs a restart."""
+        done, port = self._run(lan=None)
+        self.assertIn("RUNNING", done.stdout, done.stdout + done.stderr)
+        self.assertNotIn("did not come up", done.stdout)
+        self.assertIn("not on the network", done.stdout,
+                      "it must say WHY the phone cannot reach it")
+
+    def test_the_verdict_comes_first(self):
+        """`pad --status` printed two alarming lines about a transport
+        that was not in use and put the answer last, and Ghost read a
+        working controller as broken. The answer goes on the first line
+        with content on it."""
+        done, port = self._run()
+        first = [ln.strip() for ln in done.stdout.splitlines() if ln.strip()]
+        self.assertTrue(first, "it printed nothing at all")
+        self.assertTrue(first[0].startswith(("UP", "RUNNING", "NOT RUNNING")),
+                        f"the verdict is buried: {first[0]!r}")
+
+    @staticmethod
+    def _this_machines_lan_ip():
+        """This box's own routable address, or None. Same UDP-socket
+        trick drop.py uses -- no packet is sent, the routing table just
+        says which local address it WOULD leave from."""
+        import socket
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect(("8.8.8.8", 53))
+            found = probe.getsockname()[0]
+        except Exception:
+            return None
+        finally:
+            probe.close()
+        return None if found.startswith("127.") else found
+
+    def test_it_prints_the_lan_address_never_docker_or_the_usb_link(self):
+        """Third time this exact confusion has cost time: `hostname -I`
+        lists 172.17.0.1 (docker) and 192.168.55.1 (the USB gadget link
+        to the phone's serial console) alongside the real address, and
+        only the last is reachable over WiFi.
+
+        The decoys are put AHEAD of the real one, because taking the
+        first line is exactly the mistake being guarded against."""
+        real = self._this_machines_lan_ip()
+        if not real:
+            self.skipTest("this machine has no routable address to serve on")
+        done, port = self._run(lan=real)
+        self.assertIn(f"http://{real}:{port}/face.html", done.stdout,
+                      done.stdout + done.stderr)
+        for wrong in ("172.17.0.1", "192.168.55.1", "127.0.0.1"):
+            if wrong == real:
+                continue
+            self.assertNotIn(f"http://{wrong}", done.stdout,
+                             f"it told him to open {wrong}, which is not "
+                             "reachable from the phone")
+
+    def test_an_unreachable_address_is_not_reported_as_UP(self):
+        """The other half of the split, and the reason it is a split:
+        a server that is running but cannot be reached from the LAN is
+        a REAL failure and must not be dressed up as success. 10.1.2.3
+        is not this machine, so nothing can answer on it."""
+        done, port = self._run(lan="10.1.2.3")
+        self.assertIn("RUNNING", done.stdout)
+        self.assertIn("cannot reach it", done.stdout)
+        self.assertNotIn(f"http://10.1.2.3:{port}/face.html", done.stdout,
+                         "it printed an address that does not work")
+        self.assertEqual(done.returncode, 1)
+
+    def test_status_says_not_running_when_it_is_not(self):
+        done, port = self._run("--status")
+        self.assertIn("NOT RUNNING", done.stdout)
+        self.assertEqual(done.returncode, 1,
+                         "--status must exit non-zero when it is down")
+
+    def test_off_is_safe_to_run_twice(self):
+        """He will run it twice. It must not read as an error."""
+        done, port = self._run("--off")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
 
 
 if __name__ == "__main__":

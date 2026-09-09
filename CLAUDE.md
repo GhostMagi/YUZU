@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 366 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 378 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 366 tests pass on it. Getting it
+(that repo path is confirmed working). 378 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -741,6 +741,79 @@ two power cycles above.
 **"Prolly gunna get ya monthly"** -- worth knowing that this is
 becoming a long project rather than a burst, which is an argument for
 keeping the record in this file as good as it has been.
+
+## `face` — you look at her on the PHONE until the panel lands (Sept 9)
+
+Ghost: *"leme plug her in and run that. then how do i look at her
+again? recall current setup. (flip 6 and the nano xD"*
+
+    ~/YUZU/face            serve it, print the address to open
+    ~/YUZU/face --off      stop
+    ~/YUZU/face --status   is it up, and can the phone reach it
+
+**The phone IS the screen, and that was the whole answer.** The 7"
+panel is ~20 days out, the board may not have a browser, and a VNC
+session is a lot of moving parts to look at a static page. His Flip 6
+is already a touchscreen with a browser on it, the face is built for
+touch, and `ui/face.html` has zero external references -- so a plain
+`python3 -m http.server` on port 8081 is the entire delivery
+mechanism. When the panel arrives the same page opens locally and
+nothing changes but the client.
+
+**MY OWN CHECK REPORTED "IT DID NOT COME UP" ABOUT A SERVER THAT WAS
+SERVING PERFECTLY.** Fifth instance of the evening's pattern, and the
+second one that was mine end to end. `serving()` connected to the LAN
+address -- correct reasoning, it is exactly what the phone does -- and
+on a box with no routable address that returns nothing to connect to.
+So a server that was up, bound and answering was reported as failed to
+start, with its own happy log printed underneath as evidence.
+
+**The fix is that it was TWO QUESTIONS wearing one function's name:**
+
+    up()         is the server running at all?     -> 127.0.0.1
+    reachable()  can the PHONE get to it?          -> the LAN address
+
+They have different answers and, more to the point, **different
+fixes**: not-running needs a restart, running-but-unreachable needs
+WiFi. Collapsing them meant one of the two could never be reported.
+That is the same shape as `pad` saying "not paired" about a controller
+plugged in and working, and the same shape as `xdpyinfo` answering
+happily through a loopback-only VNC bind.
+
+**`lan_ip` returns EMPTY, never a placeholder.** The first version
+echoed `<board is offline>` and the caller then tried to connect to
+it. A sentence dressed as an address means no caller can tell "no
+network" from "here is the address" -- which is precisely the
+distinction the split exists to make.
+
+**It falls back to `hostname -I` when `ip route` says nothing, and
+FILTERS it.** Docker's `172.17.0.1` and the USB-gadget link
+`192.168.55.1` both sort ahead of the real address, and picking the
+first line has now cost this project time three times. A test puts the
+decoys ahead of the real one on purpose.
+
+**`YUZU_FACE_PORT` exists so the SUITE can drive the real script.** The
+tests start it on a free port, stub `ip`/`hostname` to fake both a
+networked board and an offline one, fetch the page and byte-compare it
+against `ui/face.html`. The no-network case is the one that would have
+caught the bug, and it is the test this class exists for.
+
+**An intermittent red in `TestGbaLauncher` turned out to be the test
+racing a CORRECT detach.** It failed about one run in eight with
+`'Pokemon - Emerald...' not found in ''` -- which reads as a launcher
+that never started the game. It is not: `gba` runs the emulator with
+`nohup ... &` on purpose, so the script returns before the stub binary
+has written its line, and the test read the file immediately. It now
+polls for the line with a deadline. **A flaky test about backgrounded
+work is almost always the test, and an intermittent red is worse than
+a solid one** -- it teaches you to re-run instead of to look.
+
+**Same `ss` dependency is still in `gba` and `wiki`.** Both parse
+`ss -ltn`, and `ss` is not guaranteed -- it was missing on the machine
+this was developed against. On the Orin it is present so nothing is
+broken today, but if either ever reports a working server as down,
+this is the first place to look. Not changed now: they are working on
+the board and one variable at a time.
 
 ## `deckapps` — real app icons, because a touchscreen is not a terminal
 

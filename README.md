@@ -48,7 +48,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 366 tests, ~18 seconds
+python YUZU_TESTER.py         # 378 tests, ~18 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 ```
 
@@ -94,7 +94,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 366 tests, ~18s |
+| `YUZU_TESTER.py` | Test suite. 378 tests, ~18s |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -104,6 +104,14 @@ $400.
 | `muto_firstcontact.py` | **Run this before any gait.** Guided bring-up, one joint at a time |
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_voice.py` | Piper TTS. The project's one dependency boundary |
+| **The deck** | One word each, no arguments to remember |
+| `face` | Serve her face; open the address on the phone |
+| `wiki` | Offline Wikipedia (kiwix-serve), finds the .zim itself |
+| `gba` | VNC desktop + mGBA on the newest ROM |
+| `pad` | Pair the 8BitDo. Try the USB cable first |
+| `deckapps` | Install touch app icons for Saya, Wikipedia, Game Boy |
+| `drop.py` | Phone → board file drop. Run it in the target folder |
+| `ui/face.html` | The face itself. One file, no external references |
 | **Read these** | |
 | `PHONE_START.md` | Phone instructions, no terminal needed |
 | `DEPLOY.md` | Moving the brain onto the Jetson |
@@ -112,6 +120,7 @@ $400.
 | `HEADLESS_SETUP.md` | Jetson setup from a Steam Deck, no monitor |
 | `UBUNTU_LAPTOP.md` | Putting Ubuntu on the laptop, phone-readable |
 | `PERSONA_SWITCHING.md` | Two characters on one robot, and the tradeoffs |
+| `DECK_UI.md` | The face UI: what it is, and the questions still open |
 | `HANDOFF.md` | Pasteable catch-up for a fresh AI chat |
 | `CLAUDE.md` | Working notes: every measured result, and what's settled |
 | `Yuzu_Full_Technical_Context_Dump.md` | Full project context and reasoning |
