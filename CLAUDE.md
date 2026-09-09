@@ -1066,6 +1066,51 @@ others carry a soft grey halo from the crop. It shows against the neon
 backgrounds. Harmless, and a tighter crop or a threshold pass would fix
 it -- not worth touching unless it bothers him.
 
+## TEST POLLUTION: audited, and now DETECTABLE (Sept 10)
+
+Ghost: *"worth remembering means worth fixing ;p i dont wana break my
+hardware or have pollution going on."* He is right about the first half
+and can relax about the second: **test pollution cannot touch the
+hardware.** It only makes the suite lie, which is bad enough.
+
+**The audit found the existing suite was careful and the sloppy tests
+were mine.** Every older place that stubs a global -- `yuzu.speak`,
+`PAUSE_SCALE`, `g_bot`, `PERSONA_DIR`, `legs.settle` -- restores it in a
+`finally` or a `tearDown`. A first grep flagged four `PAUSE_SCALE`
+leaks and all four were false: they restore with a TUPLE assignment
+(`yuzu.speak, yuzu.PAUSE_SCALE = real, 1.0`) that the pattern missed.
+**Grepping source text is a proxy; this repo already knew that.**
+
+Three real leaks, all written in the last hour:
+
+- `TestWikiBrevity` assigned over `yuzu_wiki.look_up` and never put it
+  back, so five later wiki tests saw a stub. It read as the WIKI having
+  regressed.
+- `TestWikiNamespace` left `_BOOK` set to a stub server's book name.
+- `TestSheReacts` could end with the state file saying `thinking`,
+  which makes the next thing that reads it wrong.
+
+**THE REAL FIX IS NOT REMEMBERING, IT IS `--shuffle`.**
+
+    python3 YUZU_TESTER.py --shuffle       random order
+    python3 YUZU_TESTER.py --shuffle 7     that exact order again
+
+**Pollution is invisible in a fixed order** -- that is the entire
+reason it survives. Randomising the order is what makes a leak fail,
+and printing the seed is what makes it reproducible instead of a ghost.
+A failure under `--shuffle` that passes normally means one test is
+leaving something behind, and the thing to read is **what ran BEFORE
+the failure, not the failure.**
+
+Clean across several seeds after the fixes. It takes ~70s rather than
+~50s because the shuffle scatters the slow subprocess tests, which is
+the correct price.
+
+**Generalisable, and it is the same shape as everything else this week:
+a check that cannot observe the failure is not a check.** A suite that
+only ever runs in one order cannot see order-dependence, however many
+tests it has.
+
 ## HER FACE REACTS, AND YOU CAN TALK TO IT (Sept 10)
 
 Ghost picked three: the face reacting, chat on the screen, and the

@@ -4909,14 +4909,15 @@ class TestWikiNamespace(unittest.TestCase):
 
         srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
-        old_base, self.wiki.BASE = self.wiki.BASE, \
-            "http://127.0.0.1:%d" % srv.server_port
+        old_base, old_book = self.wiki.BASE, self.wiki._BOOK
+        self.wiki.BASE = "http://127.0.0.1:%d" % srv.server_port
+        self.wiki._BOOK = None
         try:
-            importlib.reload  # noqa - kept explicit for the reader
-            self.wiki._BOOK = None
             lines = self.wiki.diagnose()
         finally:
-            self.wiki.BASE = old_base
+            # BOTH of them. The first version put BASE back and left
+            # _BOOK pointing at a stub server's book name.
+            self.wiki.BASE, self.wiki._BOOK = old_base, old_book
             srv.shutdown()
         self.assertIn("WORKING", lines[0],
                       f"the verdict is not first: {lines[0]!r}")
@@ -4932,10 +4933,10 @@ class TestWikiNamespace(unittest.TestCase):
         close enough to look right, wrong enough that every scoped query
         would miss. A path that exists is ground truth; a catalogue
         entry is a claim."""
-        self.wiki._BOOK = "wrong_name"
-        links = self.wiki._article_links(
-            '<a href="/content/the_real_book_2026/Cat">Cat</a>')
-        self.assertTrue(links)
+        with unittest.mock.patch.object(self.wiki, "_BOOK", "wrong_name"):
+            links = self.wiki._article_links(
+                '<a href="/content/the_real_book_2026/Cat">Cat</a>')
+            self.assertTrue(links)
         body = (Path(__file__).parent / "yuzu_wiki.py").read_text()
         self.assertIn("LEARN THE BOOK FROM THE ANSWER", body,
                       "the book name is still only ever the catalog's")
@@ -5305,6 +5306,12 @@ class TestSheReacts(unittest.TestCase):
     PAGE = Path(__file__).parent / "ui" / "face.html"
 
     def setUp(self):
+        self.face.set_state("idle")
+
+    def tearDown(self):
+        # Leave her idle. A test that ends with the state file saying
+        # `thinking` makes the NEXT thing that reads it wrong, and this
+        # class is the one that would have caused it.
         self.face.set_state("idle")
 
     def test_state_crosses_between_processes(self):
@@ -6083,5 +6090,45 @@ class TestFaceServer(unittest.TestCase):
 
 
 
+def _shuffled(seed=None):
+    """Run every test in a RANDOM order.
+
+    TEST POLLUTION IS INVISIBLE IN A FIXED ORDER. One test assigned over
+    `yuzu_wiki.look_up` and never put it back, and five unrelated wiki
+    tests failed further down the run -- which read as the wiki having
+    regressed, not as the test that caused it. It only shows when the
+    order changes, so:
+
+        python3 YUZU_TESTER.py --shuffle          random seed
+        python3 YUZU_TESTER.py --shuffle 7        that exact order again
+
+    A failure here and a pass in the normal run means one test is
+    leaving something behind. The seed is printed so it can be
+    reproduced rather than chased."""
+    import random
+    seed = random.randrange(10000) if seed is None else int(seed)
+    flat = []
+
+    def walk(suite):
+        for item in suite:
+            walk(item) if isinstance(item, unittest.TestSuite) \
+                else flat.append(item)
+
+    walk(unittest.TestLoader().loadTestsFromModule(sys.modules[__name__]))
+    random.Random(seed).shuffle(flat)
+    print(f"shuffled with seed {seed} -- rerun this exact order with:")
+    print(f"    python3 YUZU_TESTER.py --shuffle {seed}\n")
+    result = unittest.TextTestRunner(verbosity=1).run(unittest.TestSuite(flat))
+    if not result.wasSuccessful():
+        print("\nFAILED IN THIS ORDER BUT NOT THE NORMAL ONE?")
+        print("Then a test is leaving something behind. Look at what ran")
+        print("BEFORE the failure, not at the failure.")
+    return 0 if result.wasSuccessful() else 1
+
+
 if __name__ == "__main__":
+    if "--shuffle" in sys.argv:
+        at = sys.argv.index("--shuffle")
+        seed = sys.argv[at + 1] if len(sys.argv) > at + 1 else None
+        sys.exit(_shuffled(seed))
     unittest.main(verbosity=2)
