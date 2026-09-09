@@ -3306,17 +3306,40 @@ class TestWikiLookup(unittest.TestCase):
         title, _ = self._serve(routes, lambda: yuzu_wiki.look_up("black hole"))
         self.assertEqual(title, "Black hole")
 
-    def test_a_dead_wiki_returns_a_SENTENCE_not_a_traceback(self):
+    def test_a_missing_server_is_STARTED_not_reported(self):
+        """MEASURED, Sept 9. `/wiki ice cream` correctly said "The wiki
+        isn't running" -- accurate, and still a dead end, because he has
+        ONE serial terminal. Fixing it meant quitting the chat, starting
+        a server, and starting the chat again, mid-sentence.
+
+        Same rule the app launcher already follows: a request that lands
+        on a dead port should START the thing, not report on it."""
+        import inspect
+        body = inspect.getsource(yuzu_wiki.look_up)
+        self.assertIn("start_server", body,
+                      "a missing wiki is still only reported, so a lookup "
+                      "mid-conversation is a dead end")
+        starter = inspect.getsource(yuzu_wiki.start_server)
+        self.assertIn("wiki", starter)
+        # it must WAIT: kiwix-serve binds a second or two after forking,
+        # and returning immediately would report failure on a server
+        # that was seconds from being ready
+        self.assertIn("time.sleep", starter)
+
+    def test_a_wiki_that_will_not_start_returns_a_SENTENCE(self):
         """The failure that matters. A lookup mid-conversation must
         degrade to something he can read, not end the chat."""
         original = yuzu_wiki.BASE
+        started = yuzu_wiki.start_server
         yuzu_wiki.BASE = "http://127.0.0.1:9"      # discard port
+        yuzu_wiki.start_server = lambda *a, **k: False   # and it won't come up
         try:
             title, why = yuzu_wiki.look_up("anything")
             self.assertIsNone(title)
             self.assertIn("~/YUZU/wiki", why, "it does not say how to fix it")
         finally:
             yuzu_wiki.BASE = original
+            yuzu_wiki.start_server = started
 
     def test_a_miss_says_so_plainly(self):
         routes = {"/suggest": (200, b"[]"), "/search": (200, b"<html></html>"),

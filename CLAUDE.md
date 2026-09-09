@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 358 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 359 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 358 tests pass on it. Getting it
+(that repo path is confirmed working). 359 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -747,10 +747,22 @@ Both paths are tested against a REAL HTTP server serving canned
 responses, because what decides this is parsing what kiwix-serve
 actually returns.
 
-**A dead wiki returns a SENTENCE, never a traceback** -- including the
-command to start it. A lookup that ends the conversation is worse than
-no lookup, and `yuzu_brain` guards the import exactly like Piper's, so
-the file being absent never stops her talking.
+**A missing server is STARTED, not reported.** First live use said
+*"The wiki isn't running. Start it in another terminal with:
+~/YUZU/wiki"* -- accurate, and still a dead end, because he has ONE
+serial terminal. Acting on it meant quitting the chat, starting a
+server and restarting the chat, mid-sentence. `look_up` now calls
+`start_server()`, which runs `~/YUZU/wiki` (idempotent, backgrounds
+itself) and WAITS for the port, because kiwix-serve binds a second or
+two after forking and returning immediately would report failure on a
+server that was nearly ready.
+
+Same rule the app launcher already follows: **a request that lands on
+a dead port should start the thing, not report on it.** Only a wiki
+that will not come up returns a sentence -- and it still names the
+command, and still never raises. `yuzu_brain` guards the import
+exactly like Piper's, so the file being absent never stops her
+talking.
 
 **Script tags, infoboxes and `[12]` citation markers are stripped.**
 Piper would read every one of them out loud.

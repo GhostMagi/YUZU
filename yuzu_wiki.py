@@ -19,8 +19,11 @@ offline.
 """
 import html
 import json
+import os
 import re
+import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -125,6 +128,33 @@ def _suggest(term):
     return paths
 
 
+def start_server(wait=12):
+    """Start ~/YUZU/wiki and wait for it, returning True if it came up.
+
+    MEASURED, Sept 9. `/wiki ice cream` correctly reported "The wiki
+    isn't running" -- accurate, and still a dead end, because he has
+    ONE serial terminal. Fixing it meant quitting the chat, starting a
+    server, and starting the chat again, mid-sentence.
+
+    Same rule the app launcher already follows: a request that lands on
+    a dead port should START the thing, not report on it. `wiki` is
+    idempotent and backgrounds itself, so calling it costs nothing when
+    it is already up.
+    """
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wiki")
+    if not os.path.exists(script):
+        return False
+    try:
+        subprocess.run([script], capture_output=True, timeout=wait + 5)
+    except Exception:
+        return False
+    for _ in range(wait):
+        if available():
+            return True
+        time.sleep(1)
+    return False
+
+
 def look_up(term, max_chars=MAX_CHARS):
     """(title, extract) for a term, or (None, reason) if it can't.
 
@@ -135,8 +165,9 @@ def look_up(term, max_chars=MAX_CHARS):
     if not term:
         return None, "Say what to look up: /wiki black holes"
     if not available():
-        return None, ("The wiki isn't running. Start it in another "
-                      "terminal with:  ~/YUZU/wiki")
+        if not start_server():
+            return None, ("The wiki won't start. Try it by hand to see "
+                          "why:  ~/YUZU/wiki")
 
     try:
         paths = _suggest(term)
