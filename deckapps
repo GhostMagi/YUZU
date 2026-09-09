@@ -19,7 +19,11 @@
 set -u
 APPS="$HOME/.local/share/applications"
 DESKTOP="$HOME/Desktop"
-YUZU="$HOME/YUZU"
+# Find itself. `$HOME/YUZU` was hardcoded and it is the one path in
+# this script that CANNOT be assumed -- when it is wrong the wrapper
+# scripts are never written, every icon points at a file that is not
+# there, and tapping one does nothing. Which reads as a broken deck.
+YUZU="$(cd "$(dirname "$0")" && pwd)"
 
 AUTO="$HOME/.config/autostart"
 
@@ -76,6 +80,7 @@ BROWSER=$(browser_cmd)
 TERM_APP=$(term_cmd)
 
 mkdir -p "$APPS" "$DESKTOP"
+BROKEN=0
 
 write_app() {                    # name, comment, exec, icon, filename
     local file="$APPS/$5.desktop"
@@ -93,7 +98,19 @@ DESK
     chmod +x "$file"
     cp "$file" "$DESKTOP/$5.desktop"
     chmod +x "$DESKTOP/$5.desktop"
-    echo "  installed: $1"
+
+    # An icon whose target is not there is the worst thing this script
+    # can produce: it looks installed, taps do nothing, and the output
+    # still says "Done." Check the program before claiming the icon.
+    local target; target=${3%% *}
+    if [ -e "$target" ] || command -v "$target" >/dev/null 2>&1; then
+        echo "  installed: $1"
+    else
+        echo "  BROKEN: $1 points at $target, which is not there."
+        echo "          Removing it rather than leaving a dead icon."
+        rm -f "$file" "$DESKTOP/$5.desktop"
+        BROKEN=1
+    fi
 }
 
 echo
@@ -181,6 +198,11 @@ for f in "$DESKTOP"/yuzu-*.desktop; do
 done
 
 echo
+if [ "$BROKEN" = 1 ]; then
+    echo "SOME ICONS WERE NOT INSTALLED -- see the lines above."
+    echo "Nothing here is half-installed: a dead icon is removed."
+    exit 1
+fi
 echo "Done. The icons are in your app menu and on the Desktop."
 echo "On the touchscreen, tap them. No addresses to type."
 echo

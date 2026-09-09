@@ -3167,8 +3167,16 @@ class TestDeckApps(unittest.TestCase):
             on_desktop = sorted(p.name for p in (home / "Desktop")
                                 .glob("*.desktop")) \
                 if (home / "Desktop").exists() else []
-            wrapper_path = home / "YUZU" / ".wiki-app"
+            # Beside the SCRIPT, not under $HOME/YUZU. deckapps used to
+            # hardcode that path, which is exactly the bug that made it
+            # install icons pointing at wrappers it never wrote.
+            wrapper_path = self.SCRIPT.parent / ".wiki-app"
             wrapper = wrapper_path.read_text() if wrapper_path.exists() else None
+            # deckapps writes its wrappers beside itself, which is the
+            # repo when the suite runs it. Leaving them behind is test
+            # pollution and it made one run go red on its own droppings.
+            for junk in (".wiki-app", ".face-app"):
+                (self.SCRIPT.parent / junk).unlink(missing_ok=True)
             return done, names, on_desktop, wrapper
 
     def test_it_is_valid_shell(self):
@@ -4820,6 +4828,119 @@ class TestJetsonChecks(unittest.TestCase):
             self.assertTrue(want, f"{name} has no recommended value")
             self.assertGreater(len(why), 40,
                                f"{name} doesn't explain itself")
+
+
+class TestDeckSetup(unittest.TestCase):
+    """`deck` -- one word, get ready for the screen.
+
+    Ghost, Sept 10: *"i really want soooome plug and play in case i make
+    enough for an adapter before the next expected time."* He is about
+    to be a week without anyone to ask, so every failure here has to
+    name its own fix."""
+
+    SCRIPT = Path(__file__).parent / "deck"
+    APPS = Path(__file__).parent / "deckapps"
+
+    def _stub_run(self, script, have=(), extra=None):
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        binv, home = Path(tmp) / "bin", Path(tmp) / "home"
+        binv.mkdir(); home.mkdir()
+        for name in have:
+            (binv / name).write_text("#!/bin/bash\nexit 0\n")
+            (binv / name).chmod(0o755)
+        env = {"PATH": f"{binv}:/usr/bin:/bin", "HOME": str(home)}
+        done = subprocess.run(["bash", str(script)] + list(extra or []),
+                              capture_output=True, text=True, env=env,
+                              timeout=60)
+        return done, home, tmp
+
+    def test_it_is_valid_shell_and_executable(self):
+        import subprocess
+        self.assertTrue(os.access(self.SCRIPT, os.X_OK))
+        done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
+                              capture_output=True)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_check_never_changes_anything(self):
+        """He has to be able to look without committing to anything."""
+        done, home, tmp = self._stub_run(self.SCRIPT, extra=["--check"])
+        try:
+            self.assertEqual(list(home.rglob("*.desktop")), [],
+                             "--check installed something")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_every_missing_piece_names_its_own_fix(self):
+        """A week with nobody to ask. 'MISSING' on its own is a dead end;
+        the apt line beside it is the whole difference."""
+        done, home, tmp = self._stub_run(self.SCRIPT, extra=["--check"])
+        try:
+            for line in done.stdout.splitlines():
+                if "MISSING" in line:
+                    self.assertTrue("apt install" in line or "git pull" in line,
+                                    f"no fix given: {line.strip()}")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_it_refuses_to_install_icons_with_no_browser(self):
+        """An icon that opens nothing reads as a broken deck rather than
+        as a missing package -- so stop, and say which package."""
+        done, home, tmp = self._stub_run(self.SCRIPT)
+        try:
+            self.assertEqual(done.returncode, 1)
+            self.assertIn("chromium", done.stdout)
+            self.assertEqual(list(home.rglob("*.desktop")), [],
+                             "it installed icons that cannot open")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class TestDeckAppsPaths(unittest.TestCase):
+    """The bug that made `deck` worth writing.
+
+    `deckapps` had NEVER BEEN RUN on that board. Running it for the
+    first time, it hardcoded `$HOME/YUZU`, failed to write its wrapper
+    scripts, installed every icon pointing at a file that did not
+    exist -- and still printed "Done." Tapping them would have done
+    nothing, a week from any help."""
+
+    SCRIPT = Path(__file__).parent / "deckapps"
+
+    def test_it_finds_itself_rather_than_assuming_a_path(self):
+        body = self.SCRIPT.read_text()
+        self.assertNotIn('YUZU="$HOME/YUZU"', body,
+                         "the one path that cannot be assumed is assumed")
+        self.assertIn('dirname "$0"', body)
+
+    def test_a_dead_icon_is_REMOVED_not_installed(self):
+        """The failure was not that something was missing -- it is that
+        the output said Done. An icon whose target is not there looks
+        installed, does nothing when tapped, and gives him no clue."""
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        try:
+            fake, binv, home = (Path(tmp) / "y", Path(tmp) / "bin",
+                                Path(tmp) / "home")
+            fake.mkdir(); binv.mkdir(); home.mkdir()
+            shutil.copy(self.SCRIPT, fake / "deckapps")
+            (fake / "ui").mkdir()
+            # `gba` deliberately absent -- that icon must not survive.
+            for name in ("chromium", "xterm"):
+                (binv / name).write_text("#!/bin/bash\nexit 0\n")
+                (binv / name).chmod(0o755)
+            done = subprocess.run(["bash", str(fake / "deckapps")],
+                                  capture_output=True, text=True, timeout=60,
+                                  env={"PATH": f"{binv}:/usr/bin:/bin",
+                                       "HOME": str(home)})
+            installed = {p.name for p in home.rglob("*.desktop")}
+            self.assertNotIn("yuzu-gba.desktop", installed,
+                             "a dead icon was left for him to tap")
+            self.assertIn("BROKEN", done.stdout, "it did not say which")
+            self.assertNotIn("Done. The icons", done.stdout,
+                             "it claimed success with an icon missing")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class TestArtConversion(unittest.TestCase):

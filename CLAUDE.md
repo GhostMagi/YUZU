@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 416 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 422 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 416 tests pass on it. Getting it
+(that repo path is confirmed working). 422 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -940,6 +940,53 @@ there with her eyes shut on `blink`.
 others carry a soft grey halo from the crop. It shows against the neon
 backgrounds. Harmless, and a tighter crop or a threshold pass would fix
 it -- not worth touching unless it bothers him.
+
+## `deck` — plug and play, and the bug that made it necessary (Sept 10)
+
+Ghost: *"i really want soooome plug and play in case i make enough for
+an adapter before the next expected time."* A week without anyone to
+ask, so every failure has to name its own fix.
+
+    ~/YUZU/deck            set everything up, now, before the screen
+    ~/YUZU/deck --check    what is ready and what is missing
+
+**EVERYTHING FOR "PLUG IT IN AND IT WORKS" WAS BUILT AND NONE OF IT HAD
+EVER BEEN RUN.** `deckapps` installs the app icons and had never been
+executed on that board. Plugging a screen in would have given him a
+bare Ubuntu desktop and no way to reach her that does not involve
+typing an address.
+
+**AND THE FIRST RUN FOUND A DRASTIC ONE.** `deckapps` hardcoded
+`YUZU="$HOME/YUZU"` -- the one path in it that cannot be assumed. Run
+anywhere else it fails to write its wrapper scripts, installs EVERY
+icon pointing at a file that does not exist, and **still prints
+"Done."** Tapping them would do nothing, with nobody to ask for a week.
+
+Two fixes, and the second is the one that generalises:
+
+- It finds itself (`dirname "$0"`), like every other script here.
+- **`write_app` checks the target exists before claiming the icon, and
+  DELETES a dead one rather than leaving it.** The failure was never
+  that something was missing -- it is that the output said Done. A dead
+  icon looks installed, does nothing when tapped, and gives him no clue
+  which of five it was.
+
+**`deck --check` is read-only and prints an inventory** -- browser,
+terminal, mgba, kiwix, how many expressions, whether the home screen is
+there -- with the apt line beside anything missing and ONE line that
+installs the lot. Then it says, in plain words, what will actually
+happen when he plugs the screen in.
+
+**It refuses to install icons when there is no browser**, and says
+which package. Same rule `deckapps` already had, promoted to the front
+where he will see it: an icon that opens nothing reads as a broken deck
+rather than as a missing package.
+
+**Verified by running it, not by reading it** -- against stub binaries,
+both paths: with a browser (five icons, wrappers written, autostart
+armed, face serving) and without (stops, names chromium, installs
+nothing). The dead-icon guard was verified by deleting `gba` and
+watching that icon get removed instead of installed.
 
 ## `yuzu_art.py` — raw drawing in, sprite out (Sept 10)
 

@@ -5,3 +5,7 @@ __pycache__/
 # you how to get one (JETSON_SETUP.md section 6) rather than shipping it.
 # ACTIVE is which one you picked -- also yours, not the project's.
 voices/
+
+# deckapps writes these beside itself when it runs
+.wiki-app
+.face-app

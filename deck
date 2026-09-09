@@ -1,0 +1,135 @@
+#!/bin/bash
+# Get the deck ready for the screen. One word, run it now.
+#
+#   ~/YUZU/deck            set everything up
+#   ~/YUZU/deck --check    what is ready and what is missing
+#
+# WHY THIS EXISTS. Everything needed for "plug the panel in and it just
+# works" was built and NONE OF IT HAD EVER BEEN RUN. `deckapps` installs
+# the app icons and had never been executed on that board; without it,
+# plugging a screen in gets you a bare Ubuntu desktop and no way to
+# reach her that does not involve typing an address.
+#
+# Worse, `deckapps` SKIPS quietly when a browser or a terminal is
+# missing -- correct behaviour, an icon that opens nothing is worse than
+# no icon -- but the skip is one line in the middle of its output, and
+# Ghost is about to be a week without anyone to ask.
+#
+# So this does the setup AND takes an inventory, and every missing piece
+# names the exact command that fixes it. It is safe to run repeatedly
+# and safe to run BEFORE the screen arrives -- installing icons needs no
+# display at all.
+
+set -u
+# Find itself rather than assuming ~/YUZU. Every other script here
+# does, and a hardcoded path is untestable and breaks the day the repo
+# sits anywhere else.
+YUZU="$(cd "$(dirname "$0")" && pwd)"
+CHECK_ONLY=0
+[ "${1:-}" = "--check" ] && CHECK_ONLY=1
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# What a browser is called varies; deckapps already picks whichever is
+# there, so ask the same question the same way.
+a_browser() {
+    for b in chromium chromium-browser google-chrome brave-browser firefox; do
+        have "$b" && { echo "$b"; return; }
+    done
+}
+a_terminal() {
+    for t in xfce4-terminal lxterminal mate-terminal gnome-terminal xterm; do
+        have "$t" && { echo "$t"; return; }
+    done
+}
+
+BROWSER=$(a_browser); TERMINAL=$(a_terminal)
+MISSING=""
+
+echo
+echo "  WHAT THE DECK HAS"
+echo
+
+row() {  # label, value-or-empty, what-to-install
+    if [ -n "$2" ]; then
+        printf "    %-12s %s\n" "$1" "$2"
+    else
+        printf "    %-12s MISSING -- sudo apt install -y %s\n" "$1" "$3"
+        MISSING="$MISSING $3"
+    fi
+}
+
+row "browser"  "$BROWSER"  "chromium-browser"
+row "terminal" "$TERMINAL" "xterm"
+row "emulator" "$(have mgba-qt && echo mgba-qt)" "mgba-qt"
+row "kiwix"    "$(have kiwix-serve && echo kiwix-serve)" "kiwix-tools"
+
+# The art and the pages are the only things that CANNOT be apt-installed,
+# so they get checked separately and loudly.
+SPRITES=$(ls "$YUZU"/ui/sprites/*.png 2>/dev/null | grep -v '\.paint\.' | wc -l)
+printf "    %-12s %s expressions\n" "her face" "$SPRITES"
+printf "    %-12s %s\n" "home screen" \
+    "$([ -f "$YUZU/ui/home.html" ] && echo present || echo 'MISSING -- git pull')"
+
+if [ -n "$MISSING" ]; then
+    echo
+    echo "  One line installs everything missing:"
+    echo "      sudo apt install -y$MISSING"
+fi
+
+# --- what happens when he plugs the screen in -------------------------
+echo
+echo "  WHEN YOU PLUG THE SCREEN IN"
+echo
+if [ -f "$HOME/.config/autostart/yuzu-home.desktop" ]; then
+    echo "    The home screen opens by itself at login."
+elif [ -f "$HOME/.local/share/applications/yuzu-home.desktop" ]; then
+    echo "    Icons are installed; the home screen does NOT open by"
+    echo "    itself yet. Run:  ~/YUZU/deck"
+else
+    echo "    Nothing is set up yet. Run:  ~/YUZU/deck"
+fi
+echo
+
+[ "$CHECK_ONLY" = 1 ] && exit 0
+
+# --- do the setup ------------------------------------------------------
+if [ -z "$BROWSER" ]; then
+    echo "  STOPPING: without a browser there is no way to show her face,"
+    echo "  and installing icons that open nothing would look like a"
+    echo "  broken deck rather than a missing package."
+    echo
+    echo "      sudo apt install -y chromium-browser"
+    echo
+    echo "  Then run  ~/YUZU/deck  again."
+    echo
+    exit 1
+fi
+
+echo "  SETTING UP"
+echo
+"$YUZU/deckapps" || exit 1
+"$YUZU/deckapps" --autostart || exit 1
+
+# Prove the face actually serves, rather than assuming. A tap landing on
+# a dead port is the dead end this whole thing exists to avoid.
+"$YUZU/face" >/dev/null 2>&1
+if python3 -c "
+import socket,sys
+s=socket.socket(); s.settimeout(2)
+try: s.connect(('127.0.0.1', 8081))
+except Exception: sys.exit(1)
+finally: s.close()
+" 2>/dev/null; then
+    echo "    her face:    serving on 127.0.0.1:8081"
+else
+    echo "    her face:    NOT SERVING -- run ~/YUZU/face and read its output"
+fi
+
+echo
+echo "  READY. Plug the screen in, log in, and the home screen opens."
+echo "  Tap Saya for her face. Tap the house on her face to come back."
+echo
+echo "  If the home screen ever gets in your way:"
+echo "      ~/YUZU/deckapps --remove"
+echo
