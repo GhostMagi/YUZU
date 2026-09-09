@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 396 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 397 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 396 tests pass on it. Getting it
+(that repo path is confirmed working). 397 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -934,6 +934,25 @@ says the true thing: nothing to do, it turns itself on the first time
 he logs into the desktop with the panel attached. Alt+F2 stays, as an
 aside for when he has a keyboard, and a test pins that it appears
 AFTER the sentence saying waiting is enough.
+
+**THIRD INSTANCE IN ONE EVENING, and it printed both halves in a row:**
+
+    Forge downloaded and installed.
+    Nothing installed itself. Its output is above.
+
+`have()` asked `gnome-extensions list`, which reports what the RUNNING
+SHELL HAS LOADED -- and a shell loads new extensions at startup. So it
+is guaranteed to say no in exactly the moment the script needs a yes.
+The extension is a directory; the fix is to look at the directory
+(`~/.local/share/gnome-shell/extensions/<uuid>`).
+
+**Same evening, same question, three times: TigerVNC's happy
+`xdpyinfo`, `gnome-extensions enable` needing a shell restart, and now
+`gnome-extensions list` on a fresh install.** All three are the GNOME/X
+layer answering about its own cached view rather than about the world.
+*What would this check say if the thing were broken in the way it
+actually is?* -- and here, worse: what would it say if the thing were
+WORKING?
 
 **Forge's keyboard shortcuts are NOT printed**, deliberately. They were
 never verified on this board, and unverified keystrokes stated as steps

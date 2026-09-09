@@ -4882,6 +4882,25 @@ class TestTiling(unittest.TestCase):
         self.assertNotIn("apt install", done.stdout,
                          "it tried to install on a box with no GNOME")
 
+    def test_installed_means_ON_DISK_not_listed_by_the_running_shell(self):
+        """MEASURED LIVE, and it is the third instance in one evening.
+
+            Forge downloaded and installed.
+            Nothing installed itself. Its output is above.
+
+        Both lines, one after the other, about a Forge that had just
+        installed perfectly. `gnome-extensions list` reports what the
+        running shell has LOADED, and a shell loads new extensions at
+        startup -- so it is guaranteed to say no in exactly the moment
+        this script needs it to say yes.
+
+        The extension is a DIRECTORY. Look at the directory."""
+        check = self.SCRIPT.read_text().split("have()")[1].split("\n}")[0]
+        self.assertIn("gnome-shell/extensions/", check,
+                      "it asks the running shell whether an extension it "
+                      "has not scanned yet exists")
+        self.assertIn("-d ", check, "it does not look on disk at all")
+
     def test_it_can_be_switched_on_without_a_keyboard(self):
         """Ghost, Sept 9: "i cant hit alt-f2-r-enter until i get the
         keyboard and screen goin". The standard advice for a freshly

@@ -40,8 +40,18 @@ FORGE="forge@jmmaranan.com"
 on_gnome()        { pgrep -x gnome-shell >/dev/null 2>&1; }
 gnome_installed() { command -v gnome-shell >/dev/null 2>&1; }
 
-have() { command -v gnome-extensions >/dev/null 2>&1 \
-         && gnome-extensions list 2>/dev/null | grep -q "$1"; }
+# ON DISK, not "listed by the running shell". THIRD TIME TODAY.
+# `gnome-extensions list` only reports extensions the shell has LOADED,
+# and it loads new ones at startup -- so straight after a successful
+# install it says the extension is not there. Measured live: "Forge
+# downloaded and installed." followed immediately by "Nothing installed
+# itself." A check that cannot see the state it exists to check.
+have() {
+    [ -d "$HOME/.local/share/gnome-shell/extensions/$1" ] && return 0
+    [ -d "/usr/share/gnome-shell/extensions/$1" ] && return 0
+    command -v gnome-extensions >/dev/null 2>&1 \
+        && gnome-extensions list 2>/dev/null | grep -q "$1"
+}
 live() { command -v gnome-extensions >/dev/null 2>&1 \
          && gnome-extensions list --enabled 2>/dev/null | grep -q "$1"; }
 
