@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 480 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 489 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 480 tests pass on it. Getting it
+(that repo path is confirmed working). 489 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -513,6 +513,115 @@ for a tsundere is the same feeling.
 `test_every_sprite_he_drew_can_actually_be_reached` is the guard worth
 keeping: art in the repo that no state resolves to is art made for
 nothing, and it went unnoticed for two days.
+
+## ☆Misc☆ IS A DRAWER, and the calculator in it (Sept 11)
+
+Ghost: *"lets hide the gameboy tab for now its not as important. or put
+it and the wikipedia tabs under a tab called ☆Misc☆ we can pile up our
+fancy future apps in that tab."* Then, later the same evening: *"add a
+D20 dice button somewhere with that black and neon green crt effects"*
+and *"wana toss a working calculator in the same style into the misc
+drawer? (i suck at math)"*.
+
+**THE DRAWER IS THE SAME PAGE WITH THE TILES SWAPPED.** Not a second
+file. A new page would need its own way out, and every screen on this
+deck having an exit is the rule two power cycles paid for -- so the
+cheapest way to keep that true is to not add a screen. `data-show`
+swaps a class on `#grid`; `[data-view]` hides everything else.
+
+**BACK LIVES IN THE BOTTOM BAR, NOT IN THE GRID.** The first version
+spent a tile on it. But he means to *"pile up our fancy future apps"*
+in there, so a Back TILE burns an app slot forever and MOVES every time
+the drawer grows. In the bar it is in the same place whatever is on
+screen, which is what an exit has to be on a deck with no keyboard. It
+walks DOWN one level (calc -> misc -> main) rather than keeping a
+history: a stack is a thing that can strand you.
+
+**Both views are FOUR EQUAL TILES and nothing spans.** That is the
+`auto-fit` orphan bug from the first home screen, and the fifth tile
+had already brought it back once.
+
+**The d20 is FAIR, not just random-looking.** `random() % 20` is
+biased -- 256 does not divide by 20 -- so it is
+`crypto.getRandomValues` with the top of the range thrown away.
+Rejection sampling costs nothing and a loaded die is a bad joke to
+leave in a thing somebody rolls for fun. It rolls IN PLACE, tumbling
+for half a second first, because a number that simply appears has not
+been ROLLED. The CRT flash is only on the two results that earn one.
+
+### The calculator
+
+**"i suck at math" IS THE SPEC.** If he could check the answer he would
+not need the tool, so it has to be checkable another way: **the whole
+sum stays on screen above the result, and stays there after `=`.** A
+normal calculator shows one number and hides what you typed, which is
+what makes a slipped digit invisible until the answer is already wrong.
+
+**THERE IS NO `eval()`.** Not paranoia about a page the deck serves to
+itself -- eval turns a typo into a JavaScript error instead of an
+answer, and `SyntaxError` on a screen with no keyboard is the same dead
+end as a tap that does nothing. A two-pass reduction is shorter and can
+only ever produce a number or a sentence.
+
+**Real precedence.** `2 + 3 × 4` is 14, because it is 14 on paper. A
+calculator that answers 20 is one you cannot trust with the sum you
+could not do yourself, and he told us he cannot.
+
+**Divide by zero is a SENTENCE, never `Infinity`.** Infinity is a
+number that looks like an answer -- the same family as a made-up
+battery percentage.
+
+**Ten significant digits**, so `0.1 + 0.2` is `0.3` and not
+`0.30000000000000004`. It touches nothing a person would ever type.
+
+**`%` is percent OF THE NUMBER IN FRONT OF YOU.** Every calculator on
+earth disagrees about what `%` means next to `+` and `−`, and a rule
+you cannot guess is worse than no button.
+
+**AND `direction: rtl` DREW THE SUM BACKWARDS.** It was there to keep
+the END of a long sum on screen. It rendered `12 × 3.5 + 7 =` as
+`= 7 + 3.5 × 12`, because rtl reverses the ORDER OF RUNS in mixed text,
+not just the overflow -- and it would have flipped the minus off the
+front of a negative answer, which is a wrong number rather than a
+scrambled one. Setting `scrollLeft` in `draw()` is what actually keeps
+the tail visible.
+
+**NINTH TIME LOOKING IS WHAT FOUND IT.** Every assertion passed. It was
+rendered headless at the panel's real 1024x600 and read. There is still
+no substitute.
+
+**THE GREP-MATCHES-PROSE TRAP FIRED FOUR TIMES IN A ROW HERE**, in one
+test class, and that is worth more than the calculator is:
+
+    "eval("           matched  evaluate()  -- the function that exists
+                               SO THAT there is no eval
+    "eval("           matched  the COMMENT saying there is no eval
+    "Infinity"        matched  the comment saying never print Infinity
+    "direction: rtl"  matched  the comment saying NOT direction: rtl
+    "grid-column"     matched  the calculator's own display, which is
+                               not a tile and not what the rule is about
+
+Four of the five were a test tripping over the note explaining why the
+thing is absent. `TestCalculator.code()` strips comments before
+asserting anything about behaviour, and the span rule pins WHICH
+selector may span rather than banning the string. **A comment
+explaining an absence must never read as that thing being present** --
+this repo had already recorded the false positives on `remaining`,
+`hunger`, "no hype" and Coco's brevity rule, and it happened again
+anyway. Assert on code, or assert on the model; never on prose.
+
+**What is verified where.** The arithmetic is JavaScript and the suite
+is stdlib Python, so the sums were driven in a real browser --
+precedence, divide-by-zero, `0.1 + 0.2`, backspace, negation, chaining
+off an answer, an operator swapped mid-sum, and a twelve-digit product
+-- and the screen was rendered and looked at. What is pinned in the
+suite is every structural property whose loss brings a fault back. Same
+standing limit as every "tested in a sim" claim in this file.
+
+**Keyboard input is gated on the calculator being on screen.** The
+Bluetooth keyboard exists and may end up on the deck, so typing a sum
+is free to support -- but the tiles POST to the `/launch/` allowlist,
+and a keypress that reaches one of those is a tap he never made.
 
 ## THE V-PET, and the colour swap traded for it (Sept 11)
 

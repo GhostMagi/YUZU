@@ -112,8 +112,19 @@ body {
 #grid.main [data-view="main"], #grid.misc [data-view="misc"] {
   display: flex !important;
 }
-#back .big { font-size: 30px; line-height: 1; }
 .stars { letter-spacing: .06em; }
+
+/* THE WAY OUT LIVES IN THE BAR, not in the grid. Ghost means to "pile
+   up our fancy future apps" in the drawer, so a Back TILE would spend
+   an app slot forever and move every time the drawer grew. In the bar
+   it is in the same place whatever is on screen -- which is what an
+   exit has to be on a deck with no keyboard. */
+#back {
+  display: none; font: inherit; font-weight: 700; font-size: 15px;
+  color: var(--ink); background: var(--tile); cursor: pointer;
+  border: 2px solid var(--edge); border-radius: 4px; padding: 8px 16px;
+}
+#grid:not(.main) ~ #bar #back { display: block; }
 
 /* ---- the d20 ------------------------------------------------------
    Ghost: "add a D20 dice button somewhere with that black and neon
@@ -143,6 +154,54 @@ body {
 }
 #d20.settled .roll { animation: crt .42s ease-out; }
 @media (max-width: 560px) { #grid { grid-template-columns: 1fr; } }
+
+/* ---- the calculator -----------------------------------------------
+   Ghost: "wana toss a working calculator in the same style into the
+   misc drawer? (i suck at math)".
+
+   That parenthesis is the spec. A normal calculator shows one number
+   and hides what you typed, so a slip is invisible until the answer is
+   wrong. This one keeps the WHOLE SUM on screen above the result, so
+   the thing you check is the thing you typed. */
+#grid.calc { display: none; }
+#pad { display: none; }
+#grid.calc ~ #pad {
+  display: grid; flex: 1; min-height: 0;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto repeat(5, 1fr);
+  gap: 10px; padding: 4px 20px 12px;
+}
+#screen {
+  grid-column: span 4; text-align: right;
+  background: var(--tile); border: 2px solid var(--edge);
+  border-radius: 4px; padding: 10px 16px; overflow: hidden;
+}
+/* NOT direction: rtl. That was the first thing tried, to keep the END
+   of a long sum on screen -- and it rendered "12 x 3.5 + 7 =" as
+   "= 7 + 3.5 x 12", because rtl reverses the ORDER OF RUNS in mixed
+   text, not just the overflow. It would have flipped a minus sign off
+   the front of a negative answer too. Caught by rendering the page and
+   looking at it, which is the only check that sees this class of bug.
+   Scrolling the box in draw() is what actually keeps the tail visible. */
+#sum {
+  font-size: 15px; opacity: .7; min-height: 1.3em;
+  white-space: nowrap; overflow-x: auto;
+}
+#out {
+  font-size: 40px; font-weight: 800; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow-x: auto;
+}
+#out.bad { font-size: 20px; color: #ff4d6a; }
+#pad button {
+  font: inherit; font-size: 24px; font-weight: 700;
+  color: var(--ink); background: var(--tile); cursor: pointer;
+  border: 2px solid var(--edge); border-radius: 4px;
+}
+#pad button:active { transform: scale(.97); }
+#pad .op   { color: var(--ink); border-color: var(--ink); opacity: .85; }
+#pad .warm { color: #ffcf5c; border-color: rgba(255,207,92,.45); }
+#pad .go   { background: var(--ink); color: #06080a; border-color: var(--ink); }
 .tile {
   background: var(--tile);
   border: 2px solid var(--edge);
@@ -174,7 +233,7 @@ body {
 
 /* ---- bottom: what a tap is doing ---------------------------------- */
 #bar {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 14px;
   padding: 0 20px calc(16px + env(safe-area-inset-bottom));
 }
 #note { font-size: 13px; opacity: .75; min-height: 1.2em; }
@@ -227,16 +286,33 @@ body {
   <div class="tile" id="d20" data-view="misc" data-roll="20">
     <div class="big"><svg viewBox="0 0 24 24"><path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z"/><path d="m12 2.2 5 7.3-5 8-5-8z"/><path d="M7 9.5 3.5 7M17 9.5 20.5 7M12 17.5V21.8"/></svg></div>
     <b>d20</b>
-    <span class="roll"></span>
+    <span class="roll">tap to roll</span>
   </div>
-  <div class="tile" id="back" data-view="misc" data-show="main">
-    <div class="big">⌂</div>
-    <b>Back</b>
-    <span>to the front page</span>
+  <div class="tile" id="calc" data-view="misc" data-show="calc">
+    <div class="big"><svg viewBox="0 0 24 24"><rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><path d="M7.5 6.5h9"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h.01M16 18h.01"/></svg></div>
+    <b>Calculator</b>
+    <span>sums, out loud</span>
   </div>
 </div>
 
+<div id="pad">
+  <div id="screen"><div id="sum"></div><div id="out">0</div></div>
+  <button class="warm" data-k="C">C</button>
+  <button class="warm" data-k="back">⌫</button>
+  <button class="warm" data-k="%">%</button>
+  <button class="op" data-k="÷">÷</button>
+  <button data-k="7">7</button><button data-k="8">8</button>
+  <button data-k="9">9</button><button class="op" data-k="×">×</button>
+  <button data-k="4">4</button><button data-k="5">5</button>
+  <button data-k="6">6</button><button class="op" data-k="−">−</button>
+  <button data-k="1">1</button><button data-k="2">2</button>
+  <button data-k="3">3</button><button class="op" data-k="+">+</button>
+  <button data-k="neg">±</button><button data-k="0">0</button>
+  <button data-k=".">.</button><button class="go" data-k="=">=</button>
+</div>
+
 <div id="bar">
+  <button id="back" type="button">⌂ Back</button>
   <div id="note"></div>
 </div>
 
@@ -386,4 +462,175 @@ document.querySelectorAll('.tile').forEach(tile => {
       });
   };
 });
+
+// ---- the calculator -------------------------------------------------
+// Ghost: "i suck at math". So this one does NOT hide what you typed.
+// The whole sum sits above the answer and stays there, because the
+// failure mode of a pocket calculator is a slip you cannot see -- one
+// wrong digit looks exactly like a right one once the display has
+// moved on.
+//
+// THERE IS NO eval() IN HERE, and that is not paranoia about a page
+// this deck serves to itself: eval turns a typo into a javascript
+// error instead of an answer, and "SyntaxError" on screen is the same
+// dead end as a tap that does nothing. A four-line shunting pass costs
+// less and can only ever produce a number or a sentence. A test pins
+// the absence.
+const sumBox = document.getElementById('sum');
+const outBox = document.getElementById('out');
+
+let expr = [];      // committed tokens: numbers, and operator strings
+let cur = '';       // the number being typed right now
+let answer = null;  // what = last produced, so it can be built on
+let bad = '';       // a sentence instead of a number
+let last = '';      // the sum that produced `answer`, kept ON SCREEN
+
+// TEN SIGNIFICANT DIGITS, because binary floating point cannot hold
+// 0.1 + 0.2 and shows 0.30000000000000004 if you let it. Rounding at
+// 10 digits removes that entirely and touches nothing a person would
+// ever actually type into a deck.
+function fmt(n) {
+  if (!isFinite(n)) return '-';
+  return Number(n.toPrecision(10)).toString();
+}
+
+function draw() {
+  const parts = expr.map(t => typeof t === 'number' ? fmt(t) : t);
+  if (cur !== '') parts.push(cur);
+  sumBox.textContent = parts.length ? parts.join(' ') : last;
+
+  let big = '0';
+  if (cur !== '') big = cur;
+  else {
+    for (let i = expr.length - 1; i >= 0; i--) {
+      if (typeof expr[i] === 'number') { big = fmt(expr[i]); break; }
+    }
+    if (big === '0' && answer !== null && !expr.length) big = fmt(answer);
+  }
+  outBox.classList.toggle('bad', bad !== '');
+  outBox.textContent = bad !== '' ? bad : big;
+
+  // Show the END of a long sum -- that is where you are typing, and it
+  // is the digit you just pressed that you want to check.
+  sumBox.scrollLeft = sumBox.scrollWidth;
+  outBox.scrollLeft = outBox.scrollWidth;
+}
+
+// Real precedence, in two passes: × and ÷ collapse first, then + and −
+// left to right. "2 + 3 × 4" is 14 here, which is what it is on paper.
+// A calculator that answers 20 is a calculator you cannot trust with
+// the sum you could not do yourself.
+function evaluate(tokens) {
+  const t = tokens.slice();
+  if (typeof t[t.length - 1] === 'string') t.pop();   // "5 +" means 5
+  if (!t.length) return null;
+
+  const rest = [t[0]];
+  for (let i = 1; i < t.length; i += 2) {
+    const op = t[i], n = t[i + 1];
+    if (op === '\u00d7') rest[rest.length - 1] *= n;
+    else if (op === '\u00f7') {
+      // Not Infinity. Infinity is a number that looks like an answer.
+      if (n === 0) return { err: 'cannot divide by zero' };
+      rest[rest.length - 1] /= n;
+    } else rest.push(op, n);
+  }
+
+  let r = rest[0];
+  for (let i = 1; i < rest.length; i += 2) {
+    r = rest[i] === '+' ? r + rest[i + 1] : r - rest[i + 1];
+  }
+  return r;
+}
+
+function clear() { expr = []; cur = ''; answer = null; bad = ''; last = ''; }
+
+function key(k) {
+  if (k === 'C') { clear(); draw(); return; }
+  if (bad !== '') clear();   // any key after an error starts clean
+
+  if (k >= '0' && k <= '9') {
+    if (answer !== null && !expr.length && cur === '') { answer = null; last = ''; }
+    cur = cur === '0' ? k : cur + k;
+    draw(); return;
+  }
+
+  if (k === '.') {
+    if (answer !== null && !expr.length && cur === '') { answer = null; last = ''; }
+    if (cur.indexOf('.') < 0) cur = (cur === '' ? '0' : cur) + '.';
+    draw(); return;
+  }
+
+  if (k === 'neg') {
+    if (cur !== '') cur = cur.charAt(0) === '-' ? cur.slice(1) : '-' + cur;
+    else if (answer !== null && !expr.length) { cur = fmt(-answer); answer = null; }
+    draw(); return;
+  }
+
+  if (k === '%') {
+    // Percent of the number in front of you. Predictable beats clever:
+    // every calculator disagrees about what % means next to + and −,
+    // and a rule you cannot guess is worse than no button.
+    if (cur !== '') cur = fmt(Number(cur) / 100);
+    draw(); return;
+  }
+
+  if (k === 'back') {
+    if (cur !== '') cur = cur.slice(0, -1);
+    else if (expr.length) expr.pop();
+    else answer = null;
+    draw(); return;
+  }
+
+  if (k === '+' || k === '\u2212' || k === '\u00d7' || k === '\u00f7') {
+    if (cur !== '') { expr.push(Number(cur)); cur = ''; }
+    else if (!expr.length) {
+      if (answer === null) return;            // nothing to operate on
+      expr.push(answer); answer = null; last = '';   // build on the answer
+    }
+    if (typeof expr[expr.length - 1] === 'string') expr.pop();  // swap it
+    expr.push(k);
+    draw(); return;
+  }
+
+  if (k === '=') {
+    if (cur !== '') { expr.push(Number(cur)); cur = ''; }
+    const shown = expr.map(t => typeof t === 'number' ? fmt(t) : t).join(' ');
+    const got = evaluate(expr);
+    if (got === null) { draw(); return; }
+    if (got && got.err) { expr = []; last = shown; bad = got.err; draw(); return; }
+    expr = []; answer = got; last = shown + ' =';
+    draw(); return;
+  }
+}
+
+document.querySelectorAll('#pad button').forEach(b => {
+  b.onclick = () => key(b.dataset.k);
+});
+
+// The Bluetooth keyboard exists on the laptop and may end up on the
+// deck. Free to support, and only while the calculator is on screen --
+// a stray keypress must never reach the launcher tiles.
+document.addEventListener('keydown', e => {
+  if (grid.className !== 'calc') return;
+  const map = { '*': '\u00d7', 'x': '\u00d7', '/': '\u00f7',
+                '-': '\u2212', 'Enter': '=', '=': '=',
+                'Backspace': 'back', 'Escape': 'C', 'c': 'C' };
+  const k = map[e.key] || e.key;
+  const keys = ['0','1','2','3','4','5','6','7','8','9','.','+','%',
+                'C', 'back', '=', '\u00d7', '\u00f7', '\u2212'];
+  if (keys.indexOf(k) >= 0) { e.preventDefault(); key(k); }
+});
+
+draw();
+
+// ---- getting out ----------------------------------------------------
+// One Back, in the bottom bar, in the same place whatever is on screen.
+// It walks DOWN one level rather than remembering a history, because a
+// stack can strand you and this deck has no keyboard to escape with.
+document.getElementById('back').onclick = () => {
+  grid.className = grid.className === 'main' ? 'main'
+    : grid.className === 'calc' ? 'misc' : 'main';
+  say('');
+};
 </script>

@@ -6012,7 +6012,12 @@ class TestHomeScreen(unittest.TestCase):
         self.assertEqual(sorted(views), ["main", "misc"])
         self.assertEqual(len(views["main"]), 4, "the front page is not four")
         self.assertEqual(len(views["misc"]), 4, "the drawer is not four")
-        self.assertNotIn("grid-column: span", page,
+        # The rule is about the TILE grid: a wide tile forced an odd row
+        # and orphaned two others. The calculator's display spanning its
+        # own keypad is not that, so pin WHICH selector may span rather
+        # than banning the string and catching the wrong one.
+        spans = re.findall(r"([#.][\w-]+)[^{}]*\{[^}]*grid-column:\s*span", page)
+        self.assertEqual(spans, ["#screen"],
                          "a spanning tile is back, and an odd row with it")
         for wanted in ('data-go="face.html"', 'data-go="vpet.html"',
                        'data-launch="chat"'):
@@ -6024,11 +6029,23 @@ class TestHomeScreen(unittest.TestCase):
         """It is the SAME PAGE with the tiles swapped. A second file
         would need its own exit, and every screen on this deck having
         one is the rule two power cycles paid for -- so the cheapest
-        way to keep that true is to not add a screen."""
+        way to keep that true is to not add a screen.
+
+        BACK IS IN THE BOTTOM BAR, NOT A TILE. Ghost means to "pile up
+        our fancy future apps" in the drawer, so a Back tile would spend
+        an app slot forever and MOVE every time the drawer grew. In the
+        bar it is in the same place whatever is on screen, which is what
+        an exit has to be on a deck with no keyboard."""
         page = self.PAGE.read_text()
-        self.assertIn('data-show="main"', page, "there is no way back")
+        self.assertIn('id="back"', page, "there is no way back")
         self.assertIn('data-show="misc"', page, "nothing opens the drawer")
         self.assertNotIn("misc.html", page, "the drawer became a page")
+        # it walks DOWN one level rather than keeping a history -- a
+        # stack is a thing that can strand you
+        self.assertIn("'calc' ? 'misc'", page,
+                      "Back out of the calculator does not reach the drawer")
+        self.assertNotIn('data-view="calc"', page,
+                         "the calculator became a tile that needs a view")
 
     def test_the_d20_is_FAIR_and_rolls_in_place(self):
         """Ghost: "add a D20 dice button somewhere with that black and
@@ -6057,7 +6074,7 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 7, "not seven line icons")
+        self.assertEqual(page.count("<svg"), 8, "not eight line icons")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):
@@ -6107,6 +6124,139 @@ class TestHomeScreen(unittest.TestCase):
         body = (Path(__file__).parent / "yuzu_face.py").read_text()
         popen = body.split("subprocess.Popen(")[1].split(")")[0]
         self.assertIn("start_new_session=True", popen)
+
+
+class TestCalculator(unittest.TestCase):
+    """The calculator in the drawer. Ghost, Sept 11: "wana toss a
+    working calculator in the same style into the misc drawer? (i suck
+    at math)".
+
+    THAT PARENTHESIS IS THE SPEC. If he could check the answer he would
+    not need the tool, so the tool has to be checkable a different way:
+    the whole sum stays on screen above the result. A normal calculator
+    shows one number and hides what you typed, which makes a slipped
+    digit invisible until the answer is already wrong.
+
+    WHAT IS VERIFIED WHERE. The arithmetic is JavaScript and this suite
+    is stdlib Python, so the sums themselves were driven in a real
+    browser -- precedence, division by zero, 0.1 + 0.2, backspace,
+    negation, chaining off an answer, and a twelve-digit product -- and
+    the screen was rendered at the panel's real 1024x600 and LOOKED at,
+    which is what caught the one bug this round had. What is pinned HERE
+    is every structural property whose loss would bring a fault back."""
+
+    PAGE = Path(__file__).parent / "ui" / "home.html"
+
+    def code(self):
+        """The page with its comments removed. Every rule worth pinning
+        here is about what the page DOES, and a comment explaining why
+        something is absent must never read as that thing being
+        present."""
+        body = self.PAGE.read_text()
+        body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
+        return "\n".join(ln.split("//")[0] for ln in body.splitlines())
+
+    def test_it_lives_in_the_drawer_and_is_not_another_page(self):
+        page = self.PAGE.read_text()
+        self.assertIn('id="calc"', page, "there is no calculator")
+        self.assertIn('data-show="calc"', page, "nothing opens it")
+        self.assertNotIn("calc.html", page, "the calculator grew a page")
+
+    def test_there_is_no_eval_anywhere_near_it(self):
+        """Not paranoia about a page the deck serves to itself. eval
+        turns a typo into a JavaScript error instead of an answer, and
+        "SyntaxError" on screen is the same dead end as a tap that does
+        nothing -- on a deck with no keyboard to debug it with."""
+        # CODE, not prose. Two false positives on the way to this line:
+        # a bare "eval(" matches evaluate() -- the function that exists
+        # SO THAT there is no eval -- and it also matches the COMMENT
+        # saying there is no eval. Grepping source text is a proxy, and
+        # this repo has now been bitten by that exact shape four times.
+        code = self.code()
+        self.assertIsNone(re.search(r"\beval\s*\(", code),
+                          "eval() is in the calculator page")
+        # NOT innerHTML: the battery cell writes a fixed string through
+        # it and has since before there was a calculator. Banning it
+        # here would fail a line this page is REQUIRED to keep byte for
+        # byte identical to face.html.
+        for hole in ("new Function", "setTimeout('"):
+            self.assertNotIn(hole, code, f"{hole} is in the calculator page")
+
+    def test_it_does_real_precedence_rather_than_left_to_right(self):
+        """"2 + 3 x 4" is 14, which is what it is on paper. A calculator
+        that answers 20 is a calculator you cannot trust with the sum
+        you could not do yourself -- and he told us he cannot.
+
+        Two passes: x and \u00f7 collapse first, then + and \u2212 left to
+        right. Verified in a browser; pinned here so a rewrite cannot
+        quietly flatten it."""
+        body = self.code().split("function evaluate(")[1].split("\nfunction ")[0]
+        # the multiply/divide pass has to come BEFORE the add/subtract one
+        self.assertLess(body.index("\\u00d7"), body.index("'+' ?"),
+                        "the precedence passes are the wrong way round")
+
+    def test_dividing_by_zero_is_a_sentence_and_never_Infinity(self):
+        """Infinity is a number that LOOKS like an answer. This project
+        keeps refusing to print things it made up, and a wrong answer
+        wearing a right answer's clothes is the worst version of it."""
+        code = self.code()
+        self.assertIn("cannot divide by zero", code)
+        self.assertIn("n === 0", code, "nothing checks the divisor")
+        # ...and again on the comment that explains why it is absent.
+        self.assertNotIn("Infinity", code)
+
+    def test_the_answer_is_rounded_so_binary_float_never_shows(self):
+        """0.1 + 0.2 is 0.30000000000000004 if you let it. Ten
+        significant digits removes that entirely and touches nothing a
+        person would ever type into a deck."""
+        self.assertIn("toPrecision(10)", self.code(),
+                      "the answers are not rounded")
+
+    def test_the_sum_is_NOT_laid_out_right_to_left(self):
+        """THE BUG THIS ROUND HAD, and only rendering the page found it.
+        `direction: rtl` was there to keep the END of a long sum on
+        screen -- and it drew "12 x 3.5 + 7 =" as "= 7 + 3.5 x 12",
+        because rtl reverses the ORDER OF RUNS in mixed text, not just
+        the overflow. It would have flipped the minus off the front of a
+        negative answer too, which is a wrong number rather than a
+        scrambled one.
+
+        Scrolling the box in draw() is what actually keeps the tail
+        visible, and it cannot reorder anything."""
+        code = self.code()
+        self.assertNotIn("direction: rtl", code,
+                         "the sum reads backwards again")
+        self.assertIn("scrollLeft = ", code,
+                      "nothing keeps the end of a long sum on screen")
+
+    def test_the_whole_sum_stays_on_screen_next_to_the_answer(self):
+        """The one thing he asked for, stated as structure: two boxes,
+        the sum above the result, and the sum still there AFTER '='."""
+        code = self.code()
+        self.assertIn('id="sum"', code)
+        self.assertIn('id="out"', code)
+        self.assertLess(code.index('id="sum"'), code.index('id="out"'),
+                        "the answer is above the sum")
+        self.assertIn("last = shown + ' ='", code,
+                      "the sum is thrown away the moment it is answered")
+
+    def test_every_key_a_calculator_needs_is_on_the_pad(self):
+        page = self.PAGE.read_text()
+        keys = set(re.findall(r'data-k="([^"]+)"', page))
+        wanted = set("0123456789") | {".", "+", "=", "%", "C", "back",
+                                      "neg", "\u00d7", "\u00f7", "\u2212"}
+        self.assertEqual(wanted - keys, set(), "keys missing from the pad")
+        self.assertEqual(len(keys), 20, "the pad is not twenty keys")
+
+    def test_a_stray_keypress_can_never_reach_the_launcher(self):
+        """The Bluetooth keyboard exists and may end up on the deck, so
+        typing a sum is free to support. But the tiles POST to the
+        allowlist, and a keypress that reaches one of those is a tap he
+        never made."""
+        guard = self.code().split("addEventListener('keydown'")[1][:400]
+        self.assertIn("grid.className !== 'calc'", guard,
+                      "keys are handled outside the calculator")
+        self.assertIn("return", guard)
 
 
 class TestDeckAutostart(unittest.TestCase):
