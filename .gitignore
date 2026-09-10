@@ -9,3 +9,11 @@ voices/
 # deckapps writes these beside itself when it runs
 .wiki-app
 .face-app
+
+# yuzu_cutout.py's output. DERIVED -- the originals are in ui/art_in/
+# and the tool is in the repo, so `python3 yuzu_cutout.py` rebuilds all
+# of it. 4.8MB of regenerable PNG is 4.8MB Ghost pulls over WiFi onto a
+# board whose clock breaks TLS on a cold boot; the cuts that are
+# actually USED get copied into a character's folder and committed
+# there. Same call as the V-Pet background being downscaled.
+ui/art_out/

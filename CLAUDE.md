@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 541 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 556 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 541 tests pass on it. Getting it
+(that repo path is confirmed working). 556 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -831,6 +831,133 @@ small — but a warm "cute right?" after a switch gets an answer that
 cannot see what he is looking at. The honest fix is the `/wiki` shape
 (ground it into the turn), and it is deliberately NOT built in the same
 pass as everything above: one variable at a time.
+
+## MIMI, AND `yuzu_cutout.py` — the ghosts survive the cut (Sept 12)
+
+Ghost, with six pictures of a new character: *"i went to remove the
+background to make it a png online but it removed the cool parts too
+like the ghosts behind her. can you pull this off with regular images
+whilst keeping the cool art?"*
+
+**WHY THE ONLINE TOOL ATE THEM, and it decides the whole design.**
+Those services run a SUBJECT DETECTOR: they find the person and throw
+away what is not her. Ghosts, wisps, skulls and floating flames are not
+the person, so they are background BY DEFINITION. The tool was working
+correctly and doing the wrong thing.
+
+`yuzu_cutout.py` removes the **backdrop colour** instead -- a flood
+inward from the edges of the picture, taking only what matches the
+flat backdrop. Anything that is not the backdrop survives, and it
+never has an opinion about what the character is. Four of his six came
+out clean on the first run with every wisp and skull intact.
+
+    ui/art_in/<name>.jpg     drop art here
+    python3 yuzu_cutout.py   cut everything
+    ui/art_out/<name>.png    transparent, plus a contact sheet
+
+**THE ONE REAL LIMIT IS HER COSTUME BEING THE BACKDROP COLOUR** -- a
+white cape on white, black gloves on black. That information is not in
+the picture, so no tolerance fixes it; what fixes it is a tighter `hi`
+per file, which is what `RECIPES` is. Both of his hard ones are in
+there with the reason written beside them.
+
+**Three faults worth keeping, each one already paid for elsewhere:**
+
+- **ALPHA IS A RAMP, NOT A CUTOFF** -- `yuzu_art.py`'s lesson, and this
+  art is nothing but soft edges.
+- **THE DISTANCE TEST READS A BLURRED COPY, the output keeps the sharp
+  one.** JPEG blocks a flat dark backdrop into patches that vary more
+  than any usable tolerance, so the black picture came out speckled
+  until the test stopped reading the noise.
+- **THE HALO.** An edge pixel is a MIX of her and the page:
+  `C = a*Her + (1-a)*Backdrop`. Setting the alpha and stopping leaves
+  the page sitting in her edge colour, which on a dark screen is a
+  bright rim tracing her whole silhouette. `unfringe()` solves it back
+  out. This is what Ghost called *"jagged pixels from removing
+  outline"*.
+
+**PEELING IS A TRAP, tried and rejected.** Re-deriving the backdrop
+from whatever is still opaque on the border looks like the general fix
+for a two-tone background -- until the character touches the border, at
+which point the leftover border pixels ARE HER and the second pass
+floods her from the feet up. Measured: it ate the cape it was meant to
+save. An explicit `seed` is duller and cannot do that.
+
+**AND A SEED HAS TO BRING ITS OWN TONE.** The first version gated seeds
+against the BORDER's colour, so a seed dropped into a grey panel on a
+white page was refused by the very tolerance it existed to get around
+-- it could only ever succeed where it was not needed.
+
+### The guard I could not write, and said so
+
+**TWO ATTEMPTS AT "did it eat her", both wrong in opposite
+directions.** "Is the middle of the picture full" failed a PERFECT cut
+of Yuzu's two-outfit sheet, where the middle is the gap between the two
+girls. "Is the fullest band full" then passed a cut that had visibly
+destroyed her, because the backdrop it left behind filled the band.
+
+So the verdict is **`look`**, the run writes
+`ui/art_out/_CONTACT_SHEET.png`, and the docstring says plainly what
+the numbers cannot see. **A check that fires on a right answer and
+stays quiet on a wrong one is worse than no check** -- and for image
+work the only check this repo has ever found that holds is rendering
+it and looking, now about fifteen times over.
+
+What a number CAN see is kept: a corner that is still the backdrop
+COLOUR means no cut happened. That test also got written wrong first --
+"a corner is always backdrop" failed three perfect cuts, because in
+this art the corners are ghosts, blue flame and graveyard rock.
+
+### Yuzu's art was NOT replaced, and that is the answer to his question
+
+He sent the original Yuzu two-outfit art at 736x1039 against the
+420x594 the sprites came from, and asked straight out: *"will it look
+better or should we stick with yuzus current setup"*.
+
+**Stick with the current setup.** Measured, by rendering both at the
+size she actually appears on the panel, on her real page colour:
+
+- **The new art carries a white keyline drawn around her** that the old
+  source did not. The cut keeps it, so she gets a bright rim on a dark
+  page. The old sprites have no rim.
+- **The resolution buys nothing.** She renders about 440px tall; the
+  old sprite is already 551. The new one is 959 -- more pixels than the
+  screen can show.
+
+A downgrade with extra steps. `ui/yuzu/` is untouched. The
+`split_figures()` helper written for it is kept in the tool, because
+it is the two-figure-sheet logic and the next costume sheet will want
+it.
+
+### Mimi
+
+Named by Ghost in the same conversation. Six pictures in `ui/mimi/`,
+sized to 720 tall (2.3MB rather than 3.5MB -- he pulls this repo over
+WiFi onto a board whose clock breaks TLS on a cold boot), with
+`ART.txt` recording where they came from and how they were cut.
+
+**`personas/_hardware_wisp.txt` IS HER WORLD AND HER BODY, AND NOT ONE
+WORD OF HER TEMPERAMENT.** Ghost: *"Dont design the characters persona
+yet im still trying to brainstrorm her personality"*, and then *"make a
+body file for her too"*. Those are compatible, and the split between
+them is the entire reason body files exist here. A small spirit with a
+real but not living body, and the soul-lights that follow her.
+
+**A fourth world rather than reusing the faerie one**, and the
+difference is worth naming: Cait ATTENDS a death and leaves; the lights
+here STAY, and there are more of them than anyone counts. One is a
+visitor, the other is a keeper.
+
+**`{LOOK}` is a token from the start** -- the avatar-world lesson
+applied BEFORE it could go wrong rather than after. A specific
+character's colouring in a shared file is the sounds rule shipping a
+gyaru's `Ehehe~` to a kuudere all over again.
+
+**One call is left open on purpose and the file says so:** whether she
+has ever heard of a computer. Cait has not; nothing here decides it, so
+her persona can go whichever way her personality turns out to want.
+`test_it_carries_no_persona_and_names_the_call_left_to_ghost` fails if
+anybody writes her persona before he does.
 
 ## THE SWITCHER IS A ROSTER, AND COCO AND SHIRO ARE RETIRED (Sept 11)
 

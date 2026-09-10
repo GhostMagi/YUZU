@@ -1,0 +1,63 @@
+MIMI — where her pictures came from
+===================================
+
+Six images, sent by Ghost on Sept 12 2026, named by him in the same
+conversation ("move on to mimi"). All six are the SAME character in
+different poses, not a costume sheet -- so unlike Yuzu's folder these
+are not interchangeable states of one thing and nothing here is
+registered to a shared canvas.
+
+  bunny_ghosts      standing, small blue ghosts around her
+  crawling          on all fours, blue soul-flames, black backdrop
+  ghost_crowd       standing over a crowd of little ghosts
+  graveyard         sitting among crosses
+  hooded_portrait   bust, hands raised, hood up
+  standing_tan      standing, black smoke and two skulls
+
+PROVENANCE IS NOT RECORDED, the same as Cait's picture and for the same
+reason: they arrived as finished images and nobody wrote down where
+they came from. Saya's faces are Ghost's OWN drawings (ui/raw/ has the
+originals off his phone); these are not known to be.
+
+Being straight about it once, in the place it matters: this is a
+personal build on his own hardware, which is fine. If the deck is ever
+shown off publicly, credit these or swap them.
+
+HOW THEY WERE CUT
+-----------------
+`python3 yuzu_cutout.py` -- the originals are in ui/art_in/ and the
+cuts land in ui/art_out/; these are copies, resized to 720 tall.
+
+He tried an online background remover first and it ate the ghosts:
+"i went to remove the background to make it a png online but it removed
+the cool parts too like the ghosts behind her." Those services run a
+SUBJECT DETECTOR -- they keep the person and drop the rest, so floating
+ghosts are background by definition. yuzu_cutout removes the BACKDROP
+COLOUR instead and keeps everything that is not it. Every wisp, skull,
+flame and cloud survived.
+
+Two of the six needed a recipe, both for the same reason -- her costume
+being the backdrop colour -- and both recipes live in
+`yuzu_cutout.RECIPES` beside the reason:
+
+  hooded_portrait   white cape and a near-white face on a white page,
+                    plus an inset grey panel behind her that a flood
+                    from the edge can never reach. Tight tolerance,
+                    seven seeds along the panel's margins, trimmed.
+  crawling          black gloves and black legs on a black page, with
+                    JPEG blocking in the darks.
+
+WHY THEY ARE 720 TALL
+---------------------
+The panel is 1024x600 and a character renders around 440px tall on it,
+so 720 is comfortably above what any screen here shows while keeping
+the folder at 2.3MB instead of 3.5MB. Ghost pulls this repo over WiFi
+onto a board whose clock breaks TLS on a cold boot; megabytes are not
+free. The full-size cuts are in ui/art_out/ if a bigger one is ever
+wanted, and the untouched originals are in ui/art_in/.
+
+HER PERSONALITY IS NOT WRITTEN YET, deliberately. Ghost, Sept 12:
+"Dont design the characters persona yet im still trying to brainstrorm
+her personality." What exists is `personas/_hardware_wisp.txt` -- the
+world and the body, no temperament -- and that file says which call is
+still his to make.

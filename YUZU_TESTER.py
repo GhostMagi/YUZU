@@ -3804,6 +3804,209 @@ class TestYuzuAvatar(unittest.TestCase):
             yuzu_face.set_state("idle")
 
 
+class TestCutout(unittest.TestCase):
+    """`yuzu_cutout.py` -- backdrop out, ghosts kept.
+
+    Ghost, Sept 12: "i went to remove the background to make it a png
+    online but it removed the cool parts too like the ghosts behind
+    her. can you pull this off with regular images whilst keeping the
+    cool art?"
+
+    Everything here is DRIVEN against a synthetic picture rather than
+    against his art, because what decides all of it is what the
+    function does to pixels -- and because a test that needs a
+    particular JPEG is a test that rots the day the art changes.
+    """
+
+    def setUp(self):
+        self.cut = __import__("yuzu_cutout")
+        if self.cut.Image is None:
+            self.skipTest("Pillow is a workbench dependency and is absent")
+
+    def picture(self, backdrop=(250, 250, 250)):
+        """A dark ring (her), a same-colour hole inside it (her cape),
+        and a detached blob away from her (a ghost)."""
+        im = self.cut.Image.new("RGB", (80, 80), backdrop)
+        d = __import__("PIL.ImageDraw", fromlist=["ImageDraw"]).Draw(im)
+        d.ellipse([20, 20, 60, 60], outline=(20, 20, 30), width=3,
+                  fill=backdrop)            # her: outline, backdrop inside
+        d.ellipse([4, 4, 12, 12], fill=(90, 140, 200))   # a floating ghost
+        return im
+
+    def test_a_detached_ghost_survives_the_cut(self):
+        """THE WHOLE POINT. A subject detector drops anything that is
+        not the person; this keeps everything that is not the backdrop,
+        so a ghost floating in the corner with nothing joining it to
+        her comes through untouched."""
+        out = self.cut.lift(self.picture(), lo=10, hi=40)
+        a = out.getchannel("A").load()
+        self.assertGreater(a[8, 8], 200, "the floating ghost was eaten")
+        self.assertEqual(a[0, 0], 0, "the backdrop survived")
+
+    def test_it_floods_rather_than_matching_colour(self):
+        """Her cape is the same white as the page. A colour match would
+        erase it; a flood cannot get through her outline."""
+        out = self.cut.lift(self.picture(), lo=10, hi=40)
+        a = out.getchannel("A").load()
+        self.assertGreater(a[40, 40], 200,
+                           "the fill walked through her outline and "
+                           "erased the inside of her")
+
+    def test_alpha_is_a_ramp_not_a_cutoff(self):
+        """Same lesson as yuzu_art.py: a hard threshold turns every
+        anti-aliased edge into a staircase, and this art is nothing but
+        soft edges. Some pixel on the boundary has to land between."""
+        out = self.cut.lift(self.picture(), lo=6, hi=60)
+        seen = set(out.getchannel("A").tobytes())
+        self.assertTrue(any(0 < v < 255 for v in seen),
+                        "every pixel is fully on or fully off")
+
+    def test_the_backdrop_is_taken_back_out_of_the_soft_edge(self):
+        """THE HALO. An edge pixel is a MIX of her and the page, so
+        cutting the backdrop out without un-mixing the colour leaves a
+        bright rim tracing her whole silhouette on any dark page.
+        Ghost saw it as "jagged pixels from removing outline"."""
+        white = (255, 255, 255)
+        edge = (250, 250, 250)          # nearly all page, a little her
+        rgba = self.cut.Image.new("RGBA", (1, 1), edge + (128,))
+        fixed = self.cut.unfringe(rgba, white).getpixel((0, 0))
+        self.assertLess(fixed[0], edge[0],
+                        "the page is still sitting in the edge colour")
+        self.assertEqual(fixed[3], 128, "it moved the alpha")
+
+    def test_a_seed_brings_its_own_tone(self):
+        """An inset panel is unreachable from the edge, and the first
+        version gated seeds against the BORDER's colour -- so a seed
+        dropped into a grey panel on a white page was refused by the
+        very tolerance it existed to get around. It could only succeed
+        where it was not needed."""
+        im = self.picture()
+        d = __import__("PIL.ImageDraw", fromlist=["ImageDraw"]).Draw(im)
+        d.rectangle([62, 62, 78, 78], fill=(180, 180, 190))   # a panel
+        plain = self.cut.lift(im, lo=6, hi=20)
+        seeded = self.cut.lift(im, lo=6, hi=20, seeds=[(70, 70)])
+        self.assertGreater(plain.getchannel("A").load()[70, 70], 200,
+                           "the panel went without being asked")
+        self.assertLess(seeded.getchannel("A").load()[70, 70], 40,
+                        "the seed did not reach the panel")
+
+    def test_pockets_are_opt_in_because_they_ate_a_cape(self):
+        """Backdrop her own body encloses is only safe to take when she
+        wears nothing like it. On the tan pictures it cleared the gap
+        between her legs; on a white page it took her face."""
+        out = self.cut.lift(self.picture(), lo=10, hi=40, pockets=True)
+        self.assertLess(out.getchannel("A").load()[40, 40], 40,
+                        "pockets did not reach the enclosed backdrop")
+        self.assertFalse(self.cut.DEFAULTS["pockets"],
+                         "pockets are on by default, which eats capes")
+
+    def test_the_corner_check_asks_about_COLOUR_not_just_opacity(self):
+        """It read "a corner is always backdrop" first and failed three
+        cuts that were perfect, because in this art the corners are
+        ghosts, blue flame and graveyard rock."""
+        im = self.cut.Image.new("RGBA", (40, 40), (12, 200, 90, 255))
+        pct, solid, note = self.cut.sanity(im, (250, 250, 250), 10)
+        self.assertEqual(note, "look", "opaque art in a corner read as a miss")
+        page = self.cut.Image.new("RGBA", (40, 40), (250, 250, 250, 255))
+        self.assertIn("BACKDROP LEFT BEHIND",
+                      self.cut.sanity(page, (250, 250, 250), 10)[2])
+
+    def test_the_deck_never_needs_pillow(self):
+        """Workbench only. "Installs nothing" is what lets the brain run
+        in Pydroid on his phone, and what ships is a plain PNG."""
+        import yuzu_face
+        source = Path(__file__).parent / "yuzu_face.py"
+        self.assertNotIn("PIL", source.read_text())
+        self.assertNotIn("yuzu_cutout", source.read_text())
+
+    def test_it_says_to_look_because_the_numbers_cannot_tell(self):
+        """Two guards were tried and both were wrong in opposite
+        directions -- one failed a perfect two-figure sheet, the other
+        passed a cut that had destroyed her. For image work the only
+        check this repo has ever found that holds is looking, so the
+        run writes a contact sheet and says so."""
+        source = (Path(__file__).parent / "yuzu_cutout.py").read_text()
+        self.assertIn("_CONTACT_SHEET.png", source)
+        self.assertIn("contact_sheet", source)
+
+
+class TestMimiBody(unittest.TestCase):
+    """`personas/_hardware_wisp.txt` -- her world and her body, and
+    deliberately not one word of her temperament.
+
+    Ghost, Sept 12: "Dont design the characters persona yet im still
+    trying to brainstrorm her personality", and then "make a body file
+    for her too". Those are compatible, and the split between them is
+    the whole reason body files exist in this repo.
+    """
+
+    FILE = Path(__file__).parent / "personas" / "_hardware_wisp.txt"
+
+    def test_the_world_exists_and_declares_a_body_that_cannot_move(self):
+        text = self.FILE.read_text()
+        self.assertIn("[MOVES]", text)
+        self.assertRegex(text, r"\[MOVES\]\s*\n\s*no")
+        for block in ("[WISP_SELF]", "[SOUND_EXAMPLES]", "[LOOK]"):
+            self.assertIn(block, text, "%s is missing" % block)
+
+    def test_she_is_not_a_cyberdeck(self):
+        """{DECK_SELF} was a MEASURED win on the deck and is damage on
+        anyone else. Third time this has had to be said in a body
+        file."""
+        text = self.FILE.read_text().lower()
+        for machine in ("cyberdeck", "handheld computer", "battery",
+                        "language model", "no legs, no arms"):
+            self.assertNotIn(machine, text.split("referenced from")[-1],
+                             "the wisp world says '%s'" % machine)
+
+    def test_her_look_is_a_token_so_the_next_character_cannot_inherit_it(self):
+        """The lesson from the avatar world, applied before it could go
+        wrong rather than after: a specific character's colouring in a
+        SHARED file is the sounds rule shipping a gyaru's "Ehehe~" to a
+        kuudere all over again."""
+        text = self.FILE.read_text()
+        body = text.split("[WISP_SELF]")[1].split("[NO_STAGE")[0]
+        self.assertIn("{LOOK}", body,
+                      "her appearance is written into the shared world")
+
+    def test_every_sound_it_teaches_survives_the_voice(self):
+        """A sound with no vowel is spelled out letter by letter by
+        espeak -- the mechanism that made PFFT come out "Pee Eff Eff
+        Tee". Checked BEFORE they went in, not after."""
+        import yuzu_voice
+        text = self.FILE.read_text()
+        sounds = text.split("[SOUND_EXAMPLES]")[1].split("[")[0].strip()
+        for sound in (s.strip() for s in sounds.split(",")):
+            self.assertTrue(yuzu_voice.for_speech(sound).strip(),
+                            "the voice drops '%s'" % sound)
+            self.assertTrue(set(sound.lower()) & set("aeiou"),
+                            "'%s' has no vowel -- espeak will spell it "
+                            "out one letter at a time" % sound)
+
+    def test_it_carries_no_persona_and_names_the_call_left_to_ghost(self):
+        """The file must not quietly become a character. It also has to
+        say which decision is still his, because a body file that
+        silently settles a personality question is the shared-file bleed
+        wearing a different hat."""
+        text = self.FILE.read_text()
+        self.assertNotIn("---", text, "a body file has no composed prompt")
+        self.assertIn("ONE CALL LEFT FOR GHOST", text)
+        import yuzu_personas
+        on_this_body = [k for k in yuzu_personas.available()
+                        if yuzu_personas.load(k).hardware == "wisp"]
+        self.assertEqual(on_this_body, [],
+                         "somebody wrote her persona; her personality was "
+                         "Ghost's to decide")
+
+    def test_her_art_is_in_the_repo_with_its_provenance(self):
+        art = Path(__file__).parent / "ui" / "mimi"
+        self.assertTrue(art.is_dir(), "her art never landed")
+        pngs = sorted(p.name for p in art.glob("*.png"))
+        self.assertGreaterEqual(len(pngs), 5)
+        self.assertTrue((art / "ART.txt").exists(),
+                        "nobody wrote down where her pictures came from")
+
+
 class TestDeckApps(unittest.TestCase):
     """`deckapps` -- real app icons, because a touchscreen is not a
     terminal.
