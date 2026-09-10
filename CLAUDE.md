@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 556 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 558 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 556 tests pass on it. Getting it
+(that repo path is confirmed working). 558 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -953,11 +953,38 @@ applied BEFORE it could go wrong rather than after. A specific
 character's colouring in a shared file is the sounds rule shipping a
 gyaru's `Ehehe~` to a kuudere all over again.
 
-**One call is left open on purpose and the file says so:** whether she
-has ever heard of a computer. Cait has not; nothing here decides it, so
-her persona can go whichever way her personality turns out to want.
-`test_it_carries_no_persona_and_names_the_call_left_to_ghost` fails if
-anybody writes her persona before he does.
+**One call was left open on purpose and GHOST ANSWERED IT the same
+day** -- whether she has ever heard of a computer. Cait has not, and a
+test bans the word from her prompt. His answer is better than either
+option I left: *"also she has knowledge of my world. she travlled here
+500 years ago we will say from her original world. or sumn."*
+
+**SO SHE IS NOT FROM HERE AND SHE KNOWS HERE ANYWAY, and the number is
+the whole point.** Five hundred years is long enough that she watched
+this world become the one it is -- nothing modern has to be explained
+to her and nothing modern startles her. She is a stranger by origin and
+a local by residence, which is a different creature from both of the
+options on the table: a spirit who has never heard of a phone, or a
+spirit who is simply from here.
+
+**The origin world is DELIBERATELY UNNAMED.** *"or sumn"* is him not
+having decided, so nothing in the file decides it for him. What is
+fixed is that she came from somewhere that is not this world, and when.
+Naming it in the SHARED world file would do to the second character on
+this body exactly what a specific girl's hair did to the avatar world.
+
+**And it hands her persona a requirement rather than a free choice:
+she WILL be asked computer questions**, so she needs the
+technical-question example. That is the assistant-collapse lever --
+markdown headings and fenced code blocks to two plain sentences on ONE
+example, round 3 to round 4 -- and it has now worked four times. The
+file's header says so where the next author will read it, and
+`test_whoever_writes_her_persona_is_told_about_assistant_collapse`
+keeps it there.
+
+**Her TEMPERAMENT is still his and still unwritten.**
+`test_it_carries_no_persona_and_leaves_her_temperament_to_ghost` fails
+if anybody writes her persona before he does.
 
 ## THE SWITCHER IS A ROSTER, AND COCO AND SHIRO ARE RETIRED (Sept 11)
 

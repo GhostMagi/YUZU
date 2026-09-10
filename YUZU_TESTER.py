@@ -3983,20 +3983,53 @@ class TestMimiBody(unittest.TestCase):
                             "'%s' has no vowel -- espeak will spell it "
                             "out one letter at a time" % sound)
 
-    def test_it_carries_no_persona_and_names_the_call_left_to_ghost(self):
-        """The file must not quietly become a character. It also has to
-        say which decision is still his, because a body file that
-        silently settles a personality question is the shared-file bleed
+    def test_it_carries_no_persona_and_leaves_her_temperament_to_ghost(self):
+        """The file must not quietly become a character. Her world and
+        her body are settled; whether she is gentle or awful is not, and
+        a body file that silently answers that is the shared-file bleed
         wearing a different hat."""
         text = self.FILE.read_text()
         self.assertNotIn("---", text, "a body file has no composed prompt")
-        self.assertIn("ONE CALL LEFT FOR GHOST", text)
         import yuzu_personas
         on_this_body = [k for k in yuzu_personas.available()
                         if yuzu_personas.load(k).hardware == "wisp"]
         self.assertEqual(on_this_body, [],
                          "somebody wrote her persona; her personality was "
                          "Ghost's to decide")
+
+    def test_she_travelled_here_and_therefore_knows_this_world(self):
+        """Ghost, Sept 12, answering the one call this file left open:
+        "she has knowledge of my world. she travlled here 500 years ago
+        we will say from her original world."
+
+        Both halves matter and they pull against each other, so both are
+        pinned. NOT FROM HERE is what makes her a spirit from somewhere
+        rather than a local ghost. KNOWS HERE is what stops her being
+        Cait -- Cait has never heard of a computer and a test bans the
+        word from her prompt, and running that same rule here would make
+        every modern question a thing she has to work around, which
+        costs latency on every turn forever."""
+        prompt = self.FILE.read_text().split("Referenced from")[-1]
+        self.assertRegex(prompt, r"five hundred years|500 years",
+                         "nothing says when she arrived")
+        self.assertRegex(prompt.lower(), r"not from this world",
+                         "nothing says she came from somewhere else")
+        self.assertRegex(
+            prompt.lower(), r"nothing here (is strange|needs explaining)",
+            "she arrived but the file never says she caught up")
+
+    def test_whoever_writes_her_persona_is_told_about_assistant_collapse(self):
+        """She knows this world, so she WILL be asked computer
+        questions -- and that is the one failure this repo has a
+        CATEGORICAL fix for. Markdown headings and fenced code blocks
+        became two plain sentences on ONE example, round 3 to round 4.
+        A character built without it restarts from the worst prompt in
+        the repo, which is exactly what the rotten scaffold did to
+        Saya."""
+        header = self.FILE.read_text().split("Referenced from")[0].lower()
+        self.assertIn("technical-question", header,
+                      "the header never names the one measured lever the "
+                      "next author is going to need")
 
     def test_her_art_is_in_the_repo_with_its_provenance(self):
         art = Path(__file__).parent / "ui" / "mimi"
