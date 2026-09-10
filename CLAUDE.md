@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 578 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 580 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 578 tests pass on it. Getting it
+(that repo path is confirmed working). 580 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1132,6 +1132,68 @@ UNMEASURED in the strongest sense -- and a first round is what decides
 whether the imouto register survives a 3B. Her `sulking` pose is also
 the only one gated on mood, so it may simply never appear if she does
 not write sulk words; worth watching for on the first real conversation.
+
+## HER CAPE HAD BLACK HOLES TORN IN IT (Sept 12)
+
+Ghost, on the sulking pose live: *"only note. shes wonderful. but this
+exact image looks off to me on her robe its part black. the white gab
+between her legs is slightly bothersome too."*
+
+**TWO FAULTS, ONE CAUSE: `ghost_crowd` had no recipe.** It was cut on
+the defaults, `lo=14 hi=58 pockets=False`, and both halves follow from
+that:
+
+    the black gashes   hi=58 is wide enough to walk THROUGH her own
+                       near-white outline into the cape, so the flood
+                       ate the middle of her and the dark page showed
+                       through
+    the white gap      the pocket between her legs is enclosed, so no
+                       flood from the edge can ever reach it
+
+**AND THE MEASUREMENT IS WHAT DECIDED IT.** Her cape's median distance
+from the backdrop is **8**, and its **minimum is 0** -- parts of her
+cape are literally the page colour. By the rule already in ART.txt that
+should be unfixable: *"That information is not in the picture, so no
+tolerance fixes it."*
+
+**IT IS FIXABLE, AND THE REASON IS THE THING WORTH KEEPING: A FLOOD IS
+ABOUT CONNECTIVITY, NOT COLOUR.** Narrow the tolerance far enough and
+her own outline closes the bridge, so the cape survives even where its
+colour matches the page exactly. That is a real correction to the note
+above -- "her costume is the backdrop colour" is not automatically
+fatal; it is fatal only where the outline does not hold.
+
+**`hi=6` IS THE FLOOR AND IT WAS FOUND BY WALKING INTO IT.** At `hi=5`
+the backdrop stops clearing at all and the whole picture comes back
+grey. The working window here is six levels wide.
+
+**`pockets` IS ONLY SAFE AT A TIGHT TOLERANCE, which is the other half
+of the finding.** Turned on at the default it counted the cape's own
+interior as a pocket and mottled it -- the same damage in a different
+costume. At `hi=6` the cape no longer COUNTS as backdrop, so pockets
+can only take the leg gap, which is what it is for.
+
+**Explicit seeds worked too and were dropped.** Two seeds in the gap
+cleared it perfectly at `hi=8` -- but at `hi=6` they left a hard blocky
+edge that `pockets` does not, so the blunt tool won on this one picture.
+Written down because the reflex here has been "seeds are precise,
+pockets is blunt", and that was the wrong way round at this tolerance.
+
+**Six renders and looks to get there** -- twentieth time. Every step was
+a picture: the cape holes, the mottling, the blocky seed, the grey
+no-cut floor. No number in the tool could see any of it, which is what
+its own `look` verdict says.
+
+**AND THERE IS NOW A NUMBER THAT CAN SEE THE ONE THING THAT MATTERS.**
+The tool cannot tell a good cut from a bad one -- two attempts at that
+are already recorded as abandoned -- but it CAN tell whether the art
+she ships was cut **with its recipe**.
+`test_the_art_she_SHIPS_was_cut_with_its_recipe` drives the real tool
+over the real source and compares opaque-pixel counts within 2%.
+Verified by regenerating on the defaults on purpose: **18.8% off**, so
+the guard has enormous headroom. The failure it exists for is somebody
+re-cutting her art and losing the recipe, which is exactly how this
+shipped broken.
 
 ## THE BARE ADDRESS IS THE DECK NOW (Sept 12)
 

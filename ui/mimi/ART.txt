@@ -46,6 +46,16 @@ being the backdrop colour -- and both recipes live in
                     seven seeds along the panel's margins, trimmed.
   crawling          black gloves and black legs on a black page, with
                     JPEG blocking in the darks.
+  ghost_crowd       ADDED Sept 12, after Ghost saw it live: "this exact
+                    image looks off to me on her robe its part black"
+                    and "the white gab between her legs is slightly
+                    bothersome too". Both from one cause -- it had no
+                    recipe. Measured: her cape's median distance from
+                    the backdrop is 8 and its MINIMUM IS 0, so the
+                    default hi=58 walked in through her own near-white
+                    outline and tore the cape open, while the enclosed
+                    gap between her legs was left behind as a white
+                    blob. lo=2, hi=6, denoise=3, pockets=True.
 
 WHY THEY ARE 720 TALL
 ---------------------

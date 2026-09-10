@@ -90,6 +90,27 @@ RECIPES = {
     # enclose are safe to take.
     "standing_tan":    dict(pockets=True),
     "bunny_ghosts":    dict(pockets=True),
+    # HER WHITE CAPE IS THE PAGE, MEASURED: the cape's median distance
+    # from the backdrop is 8 and its MINIMUM IS 0 -- parts of it are
+    # literally the backdrop colour. The default hi=58 walked in through
+    # the near-white outline and tore black gashes down the middle of
+    # her, which is what Ghost saw: "this exact image looks off to me on
+    # her robe its part black."
+    #
+    # A tight tolerance rescues it anyway, and the reason is worth
+    # keeping: A FLOOD IS ABOUT CONNECTIVITY, NOT COLOUR. Narrow enough
+    # and her own outline closes the bridge, so the cape survives even
+    # though its colour matches. hi=6 is the floor -- at hi=5 the
+    # backdrop stops clearing at all and the whole picture comes back
+    # grey.
+    #
+    # And `pockets` is what takes the white gap between her legs, which
+    # no edge flood can reach ("the white gab between her legs is
+    # slightly bothersome too"). It is only SAFE at this tolerance: at
+    # the default it counted her cape's interior as a pocket and ate
+    # that instead. Explicit seeds worked too and were dropped -- at
+    # hi=6 they left a hard blocky edge that pockets does not.
+    "ghost_crowd":     dict(lo=2, hi=6, denoise=3, pockets=True),
     # Yuzu's cream poncho sits a few levels off the white page, so the
     # tolerance has to stay under that gap or the fill walks into her.
     "yuzu_outfits":    dict(lo=3, hi=9),

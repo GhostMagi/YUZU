@@ -3834,6 +3834,56 @@ class TestCutout(unittest.TestCase):
         if self.cut.Image is None:
             self.skipTest("Pillow is a workbench dependency and is absent")
 
+    def test_every_recipe_names_a_picture_that_is_actually_there(self):
+        """A recipe for a file nobody has is a note, not a setting, and
+        it goes stale silently. `yuzu_outfits` is exempt: Ghost's Yuzu
+        art was deliberately NOT adopted (the new source carries a white
+        keyline and the resolution buys nothing), and the recipe stays
+        as the record of that round."""
+        art = Path(__file__).parent / "ui" / "art_in"
+        for name in self.cut.RECIPES:
+            self.assertTrue((art / (name + ".jpg")).exists(),
+                            "RECIPES has %r and ui/art_in does not" % name)
+
+    def test_the_art_she_SHIPS_was_cut_with_its_recipe(self):
+        """Ghost, Sept 12, on the sulking pose: "this exact image looks
+        off to me on her robe its part black" and "the white gab between
+        her legs is slightly bothersome too."
+
+        Both were one cause: `ghost_crowd` had no recipe, so the default
+        hi=58 walked through her near-white outline and tore the cape
+        open, while the enclosed gap between her legs was left behind.
+
+        THE FAILURE THIS GUARDS IS RE-CUTTING WITHOUT THE RECIPE. The
+        committed PNG is what the deck actually shows; the recipe only
+        matters if it was the thing that made it. So this drives the
+        real tool over the real source and compares the ALPHA to the
+        file in ui/mimi/ -- and it is deliberately not a byte compare of
+        the colours, because a Pillow version can shift a resample by a
+        level without anything being wrong."""
+        import io
+        root = Path(__file__).parent
+        src = root / "ui" / "art_in" / "ghost_crowd.jpg"
+        shipped = root / "ui" / "mimi" / "ghost_crowd.png"
+        if not (src.exists() and shipped.exists()):
+            self.skipTest("her art is not in this checkout")
+        Image = self.cut.Image
+        opts = dict(self.cut.DEFAULTS)
+        opts.update(self.cut.RECIPES["ghost_crowd"])
+        fresh = self.cut.lift(Image.open(src).convert("RGB"), **opts)
+        have = Image.open(shipped).convert("RGBA")
+        fresh = fresh.resize(have.size, Image.LANCZOS)
+
+        def solid(im):
+            a = im.split()[3]
+            return sum(1 for v in a.getdata() if v > 200)
+
+        want, got = solid(fresh), solid(have)
+        self.assertLess(abs(want - got) / float(want), 0.02,
+                        "ui/mimi/ghost_crowd.png is not what the recipe "
+                        "produces -- it was re-cut on the defaults, which "
+                        "is what tore her cape open")
+
     def picture(self, backdrop=(250, 250, 250)):
         """A dark ring (her), a same-colour hole inside it (her cape),
         and a detached blob away from her (a ghost)."""
