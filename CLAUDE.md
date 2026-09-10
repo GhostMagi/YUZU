@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 493 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 500 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 493 tests pass on it. Getting it
+(that repo path is confirmed working). 500 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -513,6 +513,103 @@ for a tsundere is the same feeling.
 `test_every_sprite_he_drew_can_actually_be_reached` is the guard worth
 keeping: art in the repo that no state resolves to is art made for
 nothing, and it went unnoticed for two days.
+
+## `/wiki` WORKS — AND WAS FETCHING THE WRONG ARTICLE (Sept 11)
+
+Ghost ran `/wiki video games` then `/wiki fish` on the face page and
+asked what to make of it: *"its hard to determine with 'humanbrain'"*.
+
+**IT WORKED. The proof is in the names.** Asked about video games she
+said she was *"only here because of those guys, Arnie Katz, Bill
+Kunkel, and Joyce Worley"* -- the three real founders of **Electronic
+Games**, the first US video game magazine. A 3B does not invent that
+trio. **So the server answered, the parser read it, the extract
+reached her, and she was handed the wrong article.**
+
+**KIWIX RANKS BY FULL-TEXT SCORE, and the first hit was taken on
+trust.** A page that MENTIONS a term often can outrank the page that IS
+the term. `video games` got the magazine; `fish` got fish FARMING,
+which is why the second reply was *"I don't think I'd make a very good
+fish farm"*. Both replies were her doing her job on bad input.
+
+`yuzu_wiki.rank()` asks the question a person means -- **does the TITLE
+match what he typed** -- and is deliberately crude: strip the
+qualifier, collapse punctuation, chop a trailing `s` so "video games"
+reaches "Video game". Exact title beats prefix beats
+all-words-present beats body-only, and **the sort is stable, so when
+nothing matches, kiwix's own relevance is left exactly as it was.** It
+re-orders the obvious cases and stays out of the way otherwise.
+
+**A DISAMBIGUATION PAGE IS NEVER THE ANSWER, and stripping the
+qualifier is what made it a threat.** Removing `(disambiguation)`
+before matching is right -- it lets "Fish (animal)" match "fish" -- and
+it also made `Black hole (disambiguation)` an EXACT match for "black
+holes", which would have handed her a list of links. Demoted, not
+dropped: if it is genuinely all there is, it still gets tried.
+
+**AND SHE ABSORBED THE SUBJECT INTO HERSELF.** *"I used to be featured
+in this magazine back when I was still just a concept."* The wiki turn
+ended *"Tell me about it in your own words"* -- and **"it" is free to
+mean her.** It names the title again now. One clause, no persona edit,
+no A/B invalidated; same shape as the brevity clause that went in the
+same way.
+
+**The Munchkin cat round is why this was findable.** That one worked
+perfectly -- every fact correct, every one through her register --
+because the search happened to land on the right article. Two working
+rounds and two broken ones look identical from the outside unless you
+check WHICH article came back.
+
+## A SIGH IS NOT CRYING (Sept 11)
+
+Ghost: *"i noticed she 'cry faces' when she should blush with the
+actual blush image (the one with no tears) or the pouty blush at
+least."* Then, on being shown the art: *"mad works for blushing looks
+like it. thats what i meant by pouty."*
+
+**The blush mapping was already right. `sad` was the bug.** It caught
+`sigh`, `trails off` and `quiet` -- and **a tsundere sighs in almost
+every reply.** Her very first live line was `*sigh* Fine, I'll talk
+about these... annoyingly cute cats`, and `*trails off* Mochi ice
+cream... I guess that sounds okay` is her GIVING GROUND, which is the
+archetype at its best. Both rendered `cry.png`: tears down her face,
+over ice cream.
+
+So `sad` now means crying and nothing softer -- cries, sobs, sniffs,
+tears, weeps. `sigh`, `trails off`, `ahem` and `clears her throat` move
+to **annoyed**, which is exasperation and resolves to `mad.png`: blush
+plus pout, the face he confirmed he wants.
+
+**The test that would have caught it names the FILE, not the role.**
+`test_the_blush_words_resolve_to_art_that_has_no_tears` runs a blushing
+line through `mood_from` AND `roles_for`, and fails if the sprite that
+answers has "cry" in its name. Asserting `mood_from("[blushes]") ==
+"annoyed"` passed the whole time -- it is a check that cannot observe
+the actual failure, which is the oldest lesson in this file.
+
+**CONTACT-SHEET FIRST, and that is the generalisable bit.** All nine
+sprites were rendered in a grid at the ink colour and LOOKED at before
+anything was changed. That is what showed four faces carry blush
+hatching (`idle`, `mad`, `smug`, `cry`) and that the only difference
+between the blush and the cry is the TEARS. Reading `MOODS` alone
+would have kept the argument theoretical. Tenth time.
+
+## FACE AND TALK WERE THE SAME BUTTON (Sept 11)
+
+Ghost: *"i noticed Face button and Talk button are the same thing now?
+is that accurate? lol."* Accurate, and a tile wasted -- both opened
+`face.html`, one with the chat box focused. That was mine, from an hour
+earlier, and he spotted it immediately.
+
+**Saya owns both jobs.** Her chat bar has always been on that page, so
+one tile is the honest count. The front page is **three** now -- Saya,
+Pet, ☆Misc☆ -- and sits in ONE ROW rather than a 2x2 with a hole in the
+corner.
+
+**The two views differ on purpose and the grid says so.** The front
+page is a curated set that rarely changes; the drawer is where he means
+to *"pile up our fancy future apps"*, so it stays 2x2 and grows. A
+single shared grid would have forced one of them to look wrong.
 
 ## `/wiki` DID NOTHING ON HER FACE PAGE, and it looked like character
 

@@ -3439,6 +3439,59 @@ class TestWikiLookup(unittest.TestCase):
             self.assertIn("I looked up cats", got,
                           "no lookup happened for %r" % typed)
 
+    def test_the_ARTICLE_ITSELF_beats_one_that_merely_mentions_it(self):
+        """MEASURED, Sept 11, and the lookup was working perfectly.
+
+        `/wiki video games` came back about **Electronic Games
+        magazine** -- she named Arnie Katz, Bill Kunkel and Joyce
+        Worley, its three real founders, which a 3B does not invent. So
+        the server answered, the parser read it, and she was simply
+        handed the wrong article. `/wiki fish` got fish FARMING.
+
+        Kiwix ranks by full-text score, so a page that MENTIONS a term
+        often can outrank the page that IS the term, and the first hit
+        was taken on trust. Type fish, get Fish."""
+        for term, hits, want in [
+            ("video games",
+             ["/c/b/Electronic_Games", "/c/b/Video_game",
+              "/c/b/List_of_video_games"], "/c/b/Video_game"),
+            ("fish",
+             ["/c/b/Fish_farming", "/c/b/Fishing", "/c/b/Fish"],
+             "/c/b/Fish"),
+            ("cats", ["/c/b/Munchkin_cat", "/c/b/Cat"], "/c/b/Cat"),
+        ]:
+            self.assertEqual(yuzu_wiki.rank(term, hits)[0], want, term)
+
+    def test_a_disambiguation_page_is_never_the_answer(self):
+        """The qualifier is stripped before matching -- which is right,
+        so "Fish (animal)" can match "fish" -- and that made "Black hole
+        (disambiguation)" an EXACT match for "black holes". A list of
+        links where she expected an article. Demoted, not dropped."""
+        hits = ["/c/b/Black_hole_(disambiguation)", "/c/b/Black_hole"]
+        self.assertEqual(yuzu_wiki.rank("black holes", hits)[0],
+                         "/c/b/Black_hole")
+
+    def test_ranking_leaves_kiwix_alone_when_no_title_matches(self):
+        """It re-orders the obvious cases and stays out of the way
+        otherwise -- kiwix's own relevance is better than nothing."""
+        hits = ["/c/b/Fish_farming", "/c/b/Fishing"]
+        self.assertEqual(yuzu_wiki.rank("zzzz", hits), hits)
+
+    def test_the_turn_NAMES_the_subject_rather_than_saying_it(self):
+        """She absorbed the subject into herself: handed an article
+        about a magazine, "I used to be featured in this magazine back
+        when I was still just a concept"; handed fish farming, "I don't
+        think I'd make a very good fish farm".
+
+        "Tell me about it" leaves "it" free to mean HER. Naming the
+        title again costs a few characters and cannot be misread."""
+        with mock.patch.object(yuzu_wiki, "look_up",
+                               lambda t, **k: ("Video game", "Body text.")):
+            said, _ = yuzu_wiki.as_context("video games")
+        self.assertIn("Tell me about Video game", said)
+        self.assertNotIn("Tell me about it", said)
+        self.assertIn("sentence or two", said, "the brevity clause is gone")
+
     def test_whatever_he_said_around_the_lookup_is_KEPT(self):
         """Dropping his own words answers a question he never asked on
         its own."""
@@ -5964,6 +6017,52 @@ class TestTelemetry(unittest.TestCase):
                 ("", None)):
             self.assertEqual(self.face.mood_from(said), want, said)
 
+    def test_a_SIGH_is_not_crying_and_never_puts_TEARS_on_her_face(self):
+        """Ghost, Sept 11: "she 'cry faces' when she should blush with
+        the actual blush image (the one with no tears) or the pouty
+        blush at least."
+
+        `sad` used to catch "sigh", "trails off" and "quiet" -- and a
+        tsundere sighs in almost every reply. Her very first live line
+        was `*sigh* Fine, I'll talk about these... annoyingly cute
+        cats`, and `*trails off* Mochi ice cream... I guess that sounds
+        okay` is her GIVING GROUND, which is the archetype at its best.
+        Both rendered `cry.png`: tears down her face, over ice cream.
+
+        A sigh is exasperation, so it goes with annoyed -- and `mad.png`
+        is blush plus pout, which he confirmed is what he wants: "mad
+        works for blushing looks like it. thats what i meant by pouty."
+        """
+        for said in ("*sigh* Fine, I'll talk about these cats.",
+                     "*trails off* Mochi ice cream... I guess that's okay.",
+                     "O-oh, shut up... *ahem* I'm not built for that.",
+                     "[clears her throat] Anyway."):
+            self.assertEqual(self.face.mood_from(said), "annoyed", said)
+
+    def test_real_crying_still_gets_the_crying_face(self):
+        """Narrowing `sad` must not empty it -- `cry.png` is his art and
+        it has a job. The words that keep it are the ones that only ever
+        mean crying."""
+        for said in ("[starts crying] I hate you.",
+                     "[sniffles] ...whatever.",
+                     "[sobs quietly]",
+                     "[a tear runs down] don't look at me."):
+            self.assertEqual(self.face.mood_from(said), "sad", said)
+
+    def test_the_blush_words_resolve_to_art_that_has_no_tears(self):
+        """The end-to-end version: a blushing line must not land on the
+        sprite with tears drawn on it. This is the assertion that would
+        have caught the bug, because it names the FILE rather than the
+        role."""
+        art = self.face.roles_for(self.face.sprites())
+        for said in ("[blushes] I-It's not like I missed you.",
+                     "*sigh* whatever.",
+                     "[pouts] hmph."):
+            role = self.face.mood_from(said)
+            self.assertNotEqual(role, "sad", said)
+            self.assertNotIn("cry", art.get(role, ""),
+                             f"{said!r} puts tears on her face")
+
     def test_a_blush_beats_a_giggle_in_the_same_line(self):
         """ORDER IS THE DESIGN, not alphabetical. A tsundere who blushes
         AND giggles is blushing -- that is the whole character, and it
@@ -6069,7 +6168,7 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn('id="saya"', page, "there is no Saya button")
         self.assertIn('data-go="face.html"', page)
 
-    def test_the_front_page_is_four_tiles_and_misc_is_the_drawer(self):
+    def test_the_front_page_is_three_tiles_and_misc_is_the_drawer(self):
         """Ghost, Sept 11: "lets hide the gameboy tab for now its not as
         important. or put it and the wikipedia tabs under a tab called
         ☆Misc☆ we can pile up our fancy future apps in that tab."
@@ -6084,8 +6183,16 @@ class TestHomeScreen(unittest.TestCase):
             views.setdefault(
                 re.search(r'data-view="(\w+)"', tile).group(1), []).append(tile)
         self.assertEqual(sorted(views), ["main", "misc"])
-        self.assertEqual(len(views["main"]), 4, "the front page is not four")
+        # THREE ON THE FRONT, FOUR IN THE DRAWER, and each view gets the
+        # row that fits it rather than a shared 2x2 with a hole in the
+        # corner. Ghost, Sept 11: "i noticed Face button and Talk button
+        # are the same thing now? is that accurate?" -- it was. Both
+        # opened face.html, so one of them was a wasted tile. Saya owns
+        # both jobs now; her chat bar has always been on that page.
+        self.assertEqual(len(views["main"]), 3, "the front page is not three")
         self.assertEqual(len(views["misc"]), 4, "the drawer is not four")
+        self.assertIn("#grid.main { grid-template-columns: repeat(3, 1fr); }",
+                      page, "three tiles in a two-column grid orphans one")
         # The rule is about the TILE grid: a wide tile forced an odd row
         # and orphaned two others. The calculator's display spanning its
         # own keypad is not that, so pin WHICH selector may span rather
@@ -6093,8 +6200,7 @@ class TestHomeScreen(unittest.TestCase):
         spans = re.findall(r"([#.][\w-]+)[^{}]*\{[^}]*grid-column:\s*span", page)
         self.assertEqual(spans, ["#screen"],
                          "a spanning tile is back, and an odd row with it")
-        for wanted in ('data-go="face.html"', 'data-go="vpet.html"',
-                       'data-go="face.html#say"'):
+        for wanted in ('data-go="face.html"', 'data-go="vpet.html"'):
             self.assertIn(wanted, "".join(views["main"]) + page,
                           f"{wanted} left the front page")
         # TALK IS NOT A TERMINAL. It used to POST /launch/chat, which
@@ -6159,7 +6265,7 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 8, "not eight line icons")
+        self.assertEqual(page.count("<svg"), 7, "not seven line icons")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):

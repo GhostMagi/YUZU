@@ -92,10 +92,25 @@ MOODS = (
     # (role, words she actually writes inside brackets or asterisks)
     ("annoyed", ("blush", "flustered", "embarrass", "pout", "huff",
                  "hmph", "annoy", "glare", "scowl", "grumbl", "mutter",
-                 "eye roll", "rolls her eyes", "sulk", "tsk")),
+                 "eye roll", "rolls her eyes", "sulk", "tsk",
+                 # exasperation, not sorrow -- see the note on `sad`
+                 "sigh", "trails off", "ahem", "clears her throat")),
     ("smug",    ("smug", "smirk", "grin", "chuckl", "preen", "gloat")),
-    ("sad",     ("cries", "cry", "sob", "sniff", "tear", "whimper",
-                 "sigh", "trails off", "quiet", "sad")),
+    # `sad` MEANS CRYING, and nothing softer. It used to catch "sigh",
+    # "trails off" and "quiet" -- and a tsundere sighs in almost every
+    # reply. Her very first live line was `*sigh* Fine, I'll talk about
+    # these... annoyingly cute cats`, and `*trails off* Mochi ice
+    # cream... I guess that sounds okay` is her GIVING GROUND, which is
+    # the archetype at its best. Both put `cry.png` on screen -- tears
+    # down her face over ice cream.
+    #
+    # Ghost, Sept 11: *"she 'cry faces' when she should blush"*. This
+    # is that bug. A sigh is exasperation, so it belongs with annoyed,
+    # and `mad.png` -- blush plus pout -- is what he confirmed he
+    # wants: *"mad works for blushing looks like it. thats what i meant
+    # by pouty."* Real tears need real crying words.
+    ("sad",     ("cries", "crying", "sob", "sniff", "tear", "whimper",
+                 "weep", "sad")),
     ("shock",   ("gasp", "startl", "shock", "jumps", "wide eye",
                  "wide-eyed", "surprise", "squeal", "yelp")),
     ("happy",   ("giggl", "laugh", "beam", "smile", "hums", "bounce",

@@ -293,6 +293,64 @@ def start_server(wait=12):
     return False
 
 
+def _title_of(path):
+    """The article title a path implies, normalised for comparing."""
+    slug = urllib.parse.unquote(path.rstrip("/").rsplit("/", 1)[-1])
+    slug = re.sub(r"\(.*?\)", " ", slug)          # "Fish (disambiguation)"
+    slug = re.sub(r"[^a-z0-9]+", " ", slug.lower()).strip()
+    return slug
+
+
+def _singular(words):
+    """Crude, and crude is right: "video games" has to match "Video
+    game". Nothing here needs real morphology."""
+    return " ".join(w[:-1] if len(w) > 3 and w.endswith("s") else w
+                    for w in words.split())
+
+
+def rank(term, paths):
+    """Search hits, best TITLE MATCH first.
+
+    MEASURED, Sept 11. `/wiki video games` came back about **Electronic
+    Games magazine** -- she named Arnie Katz, Bill Kunkel and Joyce
+    Worley, its three real founders, so the lookup and the parser were
+    both working perfectly and simply handed her the wrong article.
+    `/wiki fish` got fish FARMING the same way.
+
+    Kiwix ranks by its own full-text score, and an article that merely
+    mentions a term a lot can outrank the article that IS the term. The
+    first hit was being taken on trust. Asking "does the TITLE match
+    what he typed" costs nothing and is the thing a person means: type
+    fish, get Fish.
+
+    Stable, so a tie keeps kiwix's own ordering -- this re-orders the
+    obvious cases and stays out of the way otherwise."""
+    want = _singular(re.sub(r"[^a-z0-9]+", " ", (term or "").lower()).strip())
+    if not want:
+        return list(paths)
+
+    def score(path):
+        got = _singular(_title_of(path))
+        if got == want:
+            return 3                      # "fish" -> Fish
+        if got.startswith(want) or want.startswith(got):
+            return 2                      # "fish" -> Fish farming
+        if all(w in got.split() for w in want.split()):
+            return 1                      # every word is in the title
+        return 0                          # only the BODY matched
+
+    def key(pair):
+        i, path = pair
+        # A DISAMBIGUATION PAGE IS NEVER THE ANSWER. The qualifier is
+        # stripped before matching, so "Black hole (disambiguation)"
+        # scores an exact match on "black holes" and would have won --
+        # a list of links where she expected an article. Demoted, not
+        # dropped: if it is genuinely all there is, it still gets tried.
+        return (-score(path), "disambig" in path.lower(), i)
+
+    return [p for _, p in sorted(enumerate(paths), key=key)]
+
+
 def look_up(term, max_chars=MAX_CHARS):
     """(title, extract) for a term, or (None, reason) if it can't.
 
@@ -314,7 +372,7 @@ def look_up(term, max_chars=MAX_CHARS):
     if not paths:
         return None, f"Nothing in the archive about '{term}'."
 
-    for path in paths[:3]:
+    for path in rank(term, paths)[:3]:
         if not path.startswith("/"):
             path = "/" + path
         try:
@@ -363,8 +421,15 @@ def as_context(term):
     # next step is ONE EXAMPLE of answering from a lookup -- the lever
     # that has worked three times here -- and that one does change the
     # composed prompt.
+    # NAME THE SUBJECT AGAIN, rather than "it". Measured the same day:
+    # handed an article about a magazine she answered "I used to be
+    # featured in this magazine back when I was still just a concept",
+    # and handed one about fish farming, "I don't think I'd make a very
+    # good fish farm". **She absorbed the subject into herself.** "Tell
+    # me about it" leaves "it" free to mean her; naming the title again
+    # costs a few characters and cannot be misread.
     return (f"I looked up {title} and it says: {body}\n\n"
-            f"Tell me about it in your own words, in a sentence or "
+            f"Tell me about {title} in your own words, in a sentence or "
             f"two."), None
 
 
