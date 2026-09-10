@@ -808,6 +808,23 @@ falls back to the first outfit when the markup's `src` is not in the
 list. Cait wants the folder treatment when a second pose of her turns
 up; one variable at a time, and nothing is broken today.
 
+**THE PANEL IS THE ONLY VIEW THAT GETS DESIGNED. Ghost's call, when
+asked whether the phone view had been checked:** *"dont need it to be
+different per screen thats alot of extra work. long as she plug and
+plays on a touch screen when i buy it."*
+
+**So 1024x600 is the target and the only one worth rendering.** That
+is what every character page has been rendered and looked at in, and
+it is the panel he is actually buying. The `@media (max-width: 760px)`
+block in `cait.html` and `yuzu.html` stays -- it is inherited, it costs
+nothing, and it keeps the phone usable as the stand-in screen it has
+always been -- but **it is NOT a supported layout and nobody should
+spend a round polishing it.** Do not build per-screen variants.
+
+Worth being straight about what that means: the phone view of those
+two pages has never been rendered and looked at, so it is unverified
+rather than broken. That is a deliberate scope call, not an oversight.
+
 **Still open:** she does not know which outfit is currently on her. He
 switches it with a button and the picture is on screen, so the gap is
 small — but a warm "cute right?" after a switch gets an answer that
