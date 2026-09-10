@@ -86,7 +86,7 @@ report() {
         echo "  so the phone cannot reach it. Connect WiFi, then re-run."
         echo
         echo "  On the deck's own screen it works now:"
-        echo "      http://127.0.0.1:$PORT/face.html"
+        echo "      http://127.0.0.1:$PORT/"
         echo
         return 0
     fi
@@ -97,10 +97,15 @@ report() {
         return 1
     fi
     echo "  UP.  Open this on your phone:"
-    echo "      http://$ip:$PORT/face.html"
+    echo "      http://$ip:$PORT/"
     echo
-    echo "  Tap her face to change expression. Tap a circle to recolour."
-    echo "  New face: drop a transparent PNG in ~/YUZU/ui/sprites/ and reload."
+    echo "  That is the HOME SCREEN, not her face. Ghost, Sept 12:"
+    echo "  \"id like to choose what i wana do before sayas face pops"
+    echo "  up 1st\" -- so the address with nothing after it lands on"
+    echo "  the deck, and A.I. is where the characters live."
+    echo
+    echo "  New face for Saya: drop a transparent PNG in"
+    echo "  ~/YUZU/ui/sprites/ and reload."
     echo "  Stop it with:  ~/YUZU/face --off"
     echo
     return 0
@@ -115,7 +120,14 @@ case "${1:-}" in
     report; exit $? ;;
 esac
 
-[ -f "$DIR/face.html" ] || { echo "No $DIR/face.html -- run: git pull origin main"; exit 1; }
+# THE LANDING PAGE IS home.html, so that is what has to exist for the
+# address he types to work. face.html is checked too because Saya is
+# still one tap away and an icon that opens nothing reads as a broken
+# deck rather than a missing file.
+for page in home.html face.html; do
+    [ -f "$DIR/$page" ] || {
+        echo "No $DIR/$page -- run: ~/YUZU/pull"; exit 1; }
+done
 
 # THERE IS NO BUILD STEP. A sprite dropped in ui/sprites/ five seconds
 # ago is live on the next page refresh -- the manifest is generated per

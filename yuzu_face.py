@@ -1020,7 +1020,21 @@ class _Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=UI_DIR, **kw)
 
+    # THE FRONT DOOR IS THE HOME SCREEN. Ghost, Sept 12: "id like to
+    # choose what i wana do before sayas face pops up 1st".
+    #
+    # It also closes something worse than a landing page. Bare `/` was
+    # answered by SimpleHTTPRequestHandler's DIRECTORY LISTING, so the
+    # address he actually types on his phone -- 192.168.4.138:8081 with
+    # no path -- gave him an index of ui/ with art_in/, raw/ and every
+    # sprite folder in it, on a server bound to 0.0.0.0. Nothing there
+    # is secret, and a file index is still not a thing to serve to his
+    # whole WiFi.
+    LANDING = "home.html"
+
     def do_GET(self):
+        if self.path.split("?")[0] in ("/", "/index.html"):
+            self.path = "/" + self.LANDING
         if self.path.split("?")[0].rstrip("/") == "/state":
             self._json(get_state())
             return
@@ -1059,6 +1073,17 @@ class _Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
         return super().do_GET()
+
+    def list_directory(self, path):
+        """No directory listings, anywhere.
+
+        `/` is the home screen above; every other folder under ui/ is
+        art this deck reads by name and nobody browses. A listing is
+        not a security hole here so much as a thing that has no reason
+        to exist on a box sitting on his WiFi -- the same reasoning as
+        `/launch/` being an allowlist of NAMES."""
+        self.send_error(404, "File not found")
+        return None
 
     def _json(self, obj):
         body = json.dumps(obj).encode()

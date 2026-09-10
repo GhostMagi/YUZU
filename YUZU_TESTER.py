@@ -15,6 +15,7 @@ import unittest.mock
 from unittest import mock
 from pathlib import Path
 
+import contextlib
 import itertools
 import os
 import re
@@ -25,6 +26,8 @@ import tempfile
 import textwrap
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -8322,6 +8325,61 @@ class TestFaceServer(unittest.TestCase):
             probe.close()
         return None if found.startswith("127.") else found
 
+    @contextlib.contextmanager
+    def _serving(self):
+        """The REAL handler on a free port, in this process.
+
+        Not the `face` script: what is being pinned here is what the
+        SERVER answers, and driving the shell wrapper as well would
+        only add a way for the test to fail for an unrelated reason."""
+        import yuzu_face
+        from http.server import ThreadingHTTPServer
+        server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield "http://127.0.0.1:%d" % server.server_address[1]
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
+
+    def test_the_bare_address_is_the_HOME_SCREEN(self):
+        """Ghost, Sept 12: "make this page the screen that opens when i
+        do ~/YUZU/face... id like to choose what i wana do before sayas
+        face pops up 1st".
+
+        It also closes a worse thing. Bare `/` was answered by
+        SimpleHTTPRequestHandler's DIRECTORY LISTING, so the address he
+        types on his phone gave him an index of ui/ -- art_in/, raw/,
+        every sprite folder -- on a server bound to 0.0.0.0."""
+        with self._serving() as base:
+            landed = urllib.request.urlopen(base + "/", timeout=5).read()
+            home = (Path(__file__).parent / "ui" / "home.html").read_bytes()
+            self.assertEqual(landed, home, "`/` is not the home screen")
+
+    def test_no_folder_under_ui_can_be_BROWSED(self):
+        """A listing is not much of a hole -- it is her art -- but it
+        has no reason to exist on a box sitting on his WiFi, and the
+        files it lists are still served by NAME, which is all any page
+        here needs. Same reasoning as `/launch/` being an allowlist."""
+        # NOT `/sprites/`: that one is already an API route --
+        # `/sprites.json` matches after rstrip("/"), so it answers with
+        # the manifest rather than a listing and always has. Picking it
+        # would have been a test that passes for the wrong reason.
+        with self._serving() as base:
+            for folder in ("/mimi/", "/raw/", "/cait/"):
+                with self.assertRaises(urllib.error.HTTPError,
+                                       msg=folder) as caught:
+                    urllib.request.urlopen(base + folder, timeout=5)
+                self.assertEqual(caught.exception.code, 404, folder)
+            # ...and the art itself still arrives, which is the half
+            # that would break the pages if this were done clumsily.
+            got = urllib.request.urlopen(base + "/mimi/crawling.png",
+                                         timeout=5)
+            self.assertEqual(got.status, 200)
+            self.assertTrue(got.read(8).startswith(b"\x89PNG"))
+
     def test_it_prints_the_lan_address_never_docker_or_the_usb_link(self):
         """Third time this exact confusion has cost time: `hostname -I`
         lists 172.17.0.1 (docker) and 192.168.55.1 (the USB gadget link
@@ -8334,8 +8392,15 @@ class TestFaceServer(unittest.TestCase):
         if not real:
             self.skipTest("this machine has no routable address to serve on")
         done, port = self._run(lan=real)
-        self.assertIn(f"http://{real}:{port}/face.html", done.stdout,
+        # THE BARE ADDRESS, which lands on the home screen. Ghost, Sept
+        # 12: "id like to choose what i wana do before sayas face pops
+        # up 1st". It is also the address he actually types on a phone
+        # keyboard, so anything after the port is a path he has to get
+        # right by hand.
+        self.assertIn(f"http://{real}:{port}/", done.stdout,
                       done.stdout + done.stderr)
+        self.assertNotIn("/face.html", done.stdout,
+                         "it still sends him straight to her face")
         for wrong in ("172.17.0.1", "192.168.55.1", "127.0.0.1"):
             if wrong == real:
                 continue

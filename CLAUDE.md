@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 576 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 578 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 576 tests pass on it. Getting it
+(that repo path is confirmed working). 578 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1132,6 +1132,42 @@ UNMEASURED in the strongest sense -- and a first round is what decides
 whether the imouto register survives a 3B. Her `sulking` pose is also
 the only one gated on mood, so it may simply never appear if she does
 not write sulk words; worth watching for on the first real conversation.
+
+## THE BARE ADDRESS IS THE DECK NOW (Sept 12)
+
+Ghost: *"make this page the screen that opens when i do ~/YUZU/face...
+id like to choose what i wana do before sayas face pops up 1st (i know
+its my own design just hook it up homie)"*.
+
+`http://<board>:8081/` serves `home.html`. `face` prints the bare
+address rather than `/face.html`, and says in the same breath that it
+is the home screen, so the change is legible in the one place he reads.
+
+**AND IT CLOSED SOMETHING WORSE THAN A LANDING PAGE.** Bare `/` was
+answered by `SimpleHTTPRequestHandler`'s **DIRECTORY LISTING** -- so
+the address he actually types on a phone keyboard, with nothing after
+the port, handed him an index of `ui/`: `art_in/`, `raw/`, every sprite
+and character folder, on a server bound to **0.0.0.0**. Nothing in
+there is secret and it is his own WiFi, but a file index has no reason
+to exist on this box. `list_directory` refuses everything now; files
+are still served BY NAME, which is all any page here has ever needed.
+Same reasoning as `/launch/` being an allowlist.
+
+**The bare address is also the one he can actually type.** Every
+character on a phone keyboard is a chance to get a path wrong, and
+`face.html` was four taps he had to remember.
+
+**A TEST THAT WOULD HAVE PASSED FOR THE WRONG REASON, caught while
+writing it.** The first version of the no-listings test asked for
+`/sprites/` -- which has never been a listing, because `/sprites.json`
+matches it after `rstrip("/")` and answers with the manifest. It would
+have gone green against a server with listings fully enabled. It uses
+`/mimi/`, `/raw/` and `/cait/` now, and `/vpet/` was rejected for the
+same collision.
+
+**deckapps needed no change**: `--autostart` already opened
+`home.html`, and Saya keeps her own icon, which is correct -- an icon
+named for her should open her.
 
 ## SHE THOUGHT GHOST WAS A GIRL, AND HER RULES SAID OTHERWISE THIRTEEN TIMES (Sept 12)
 
