@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 540 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 541 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 540 tests pass on it. Getting it
+(that repo path is confirmed working). 541 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -771,6 +771,42 @@ for no reason — and it would have passed a page with ten icons and nine
 tiles just as happily. It compares the two counts now. Same family as
 every other grep-as-proxy fault here: **the assertion was about the
 file's spelling rather than about the page.**
+
+**HER LOOK MOVED OUT OF THE WORLD FILE, and it was the shared-body
+bleed forming again.** Ghost, closing the round: *"thats fine its just
+a visual for me anyway. and tbh 'avatars' may change down the road."*
+
+That second sentence is what made it worth checking, and the first
+draft had it wrong. `_hardware_faerie.txt` gets this split right --
+its world says *"fur, a tail, paws"*, true of ANY fae cat, while
+Cait's own file carries *"large, dark, with one patch of white at your
+breast"*. The avatar world file was written with **Yuzu's blonde hair,
+brown eyes and tail inside it**, which is a specific girl sitting in
+the file about having a drawn body at all. The second character on
+this body would have inherited another character's hair -- the exact
+shape of the sounds rule shipping `Ehehe~` to a kuudere and a
+netrunner from a file about legs.
+
+**Fixed with the mechanism this repo already proved: token it out,
+default it to what the lineage says, override per persona.** `{LOOK}`
+lives in her persona now and the block defaults to hers, so **her
+composed prompt is byte-identical -- verified, 3542 chars before and
+after -- and nothing needed re-testing.** Same as SOUND_EXAMPLES,
+where all eight prompts came out unchanged.
+
+**And the default is exactly the thing that would go wrong quietly**,
+so `test_every_character_on_this_body_declares_her_OWN_look` forces the
+decision instead of trusting someone to remember it -- the same job
+`test_every_all_caps_word_she_has_ever_said_is_classified` does. It
+also asserts the world file never names one character's colouring.
+
+**NOT changed, and worth knowing before avatars do change:**
+`ui/cait.html` hardcodes `src="cait/cait.png"` with no fallback, so
+renaming or replacing her file leaves a permanently broken image.
+Yuzu's page survives the same swap -- it reads `/outfits.json` and
+falls back to the first outfit when the markup's `src` is not in the
+list. Cait wants the folder treatment when a second pose of her turns
+up; one variable at a time, and nothing is broken today.
 
 **Still open:** she does not know which outfit is currently on her. He
 switches it with a button and the picture is on screen, so the gap is

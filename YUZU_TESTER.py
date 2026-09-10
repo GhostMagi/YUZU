@@ -3492,6 +3492,42 @@ class TestYuzuAvatar(unittest.TestCase):
         self.assertIn("not one that walks anywhere", prompt,
                       "nothing stops her offering to fetch the milk")
 
+    def test_every_character_on_this_body_declares_her_OWN_look(self):
+        """WHAT SHE LOOKS LIKE IS HERS, NOT THE WORLD'S.
+
+        The faerie file gets this split right: its world says "fur, a
+        tail, paws" -- true of any fae cat -- while Cait's own file
+        carries "large, dark, with one patch of white at your breast".
+        The first draft of the avatar world put Yuzu's blonde hair and
+        her tail in the SHARED file, which is the character bleed this
+        repo already paid for once: the sounds rule shipped "Ehehe~" to
+        a kuudere and a netrunner from a file about legs.
+
+        Ghost, Sept 11: "avatars may change down the road." That is
+        exactly when a shared default dresses the next character as
+        Yuzu, silently. {LOOK} is defaulted to hers so no composed
+        prompt shifted by a byte, and this makes the decision forced
+        rather than remembered."""
+        import yuzu_face
+        body = yuzu_personas.load("yuzu_avatar").hardware
+        wearing_it = [k for k in yuzu_personas.available()
+                      if yuzu_personas.load(k).hardware == body]
+        self.assertIn("yuzu_avatar", wearing_it)
+        for key in wearing_it:
+            persona = yuzu_personas.load(key)
+            self.assertIn("LOOK", persona.settings,
+                          f"{key} inherits another character's body "
+                          f"from the shared world file")
+            self.assertTrue(persona.settings["LOOK"].strip(),
+                            f"{key} declares an empty LOOK")
+        # and the world file must not describe any ONE character
+        world = (Path(__file__).parent / "personas"
+                 / "_hardware_avatar.txt").read_text()
+        body_text = world.split("[AVATAR_SELF]")[1].split("[")[0]
+        for hers in ("blonde", "brown eyes"):
+            self.assertNotIn(hers, body_text,
+                             f"the shared world file still says '{hers}'")
+
     def test_no_outfit_is_named_in_her_prompt(self):
         """THE WARDROBE IS DATA. ui/yuzu/ is the list, /outfits.json is
         generated from it per request, and the filename is the button.
