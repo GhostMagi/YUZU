@@ -115,6 +115,29 @@ class Persona:
             "no", "false", "0")
 
     @property
+    def retired(self):
+        """Is this character out of the cast?
+
+        Ghost, Sept 11: "we no longer need coco shes retired. or the
+        shiro." So they leave the roster -- the character rail, and the
+        tests that hold a LIVE character to the measured wins.
+
+        RETIRED, NOT DELETED, which is this repo's standing habit and
+        not sentiment: muto_s2, saya_quad and yuzu2/3/5/6 are all still
+        here as the record of what was tried, and that record is what
+        stopped yuzu5 being re-attempted from scratch. A persona file
+        costs nothing while nobody names it. Un-retiring is deleting
+        one line.
+
+        The LED call went the other way -- deleted outright -- and the
+        difference is worth keeping straight: that was live CODE on a
+        path you had to read around every time. This is data nobody
+        loads unless they ask for it by name.
+        """
+        return str(self.settings.get("retired", "")).strip().lower() in (
+            "yes", "true", "1")
+
+    @property
     def built(self):
         """Does a real controller exist for this body yet?
 

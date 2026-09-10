@@ -468,20 +468,98 @@ def get_state():
         return {"state": "idle", "said": "", "at": 0}
 
 
-def answer(text):
-    """One turn with her, for the page. (reply, error).
+# ---------------------------------------------------------------------
+# WHO IS TALKING.
+#
+# Ghost, Sept 11: "id like to have this. its own tab... seperate thing
+# from saya", and separately "saya needs no changes, shes kinda the
+# main live in ai."
+#
+# A NAME CROSSES, AND A NAME IS ALL THAT CROSSES. Same discipline as
+# /launch/ and /vpet/: the page POSTs "cait", this dict turns it into a
+# persona KEY, and nothing a caller sends can name a file. An unknown
+# name is REFUSED rather than quietly answered by whoever is live --
+# putting the wrong character on screen is the confusing kind of wrong,
+# and this repo has paid for name-versus-key confusion six times.
+#
+# Saya's entry follows LIVE_PERSONA rather than naming her file, which
+# is the same rule: decide whether a fact belongs to THIS CHARACTER or
+# to WHOEVER IS LIVE, and pin it accordingly. Move LIVE_PERSONA and
+# this follows; Cait does not, because Cait is Cait.
+# ADDING A CHARACTER IS A DICT ENTRY AND A PAGE. No list in the HTML,
+# no menu to keep in sync -- /characters.json is generated from this,
+# so the rail on every character page is the same roster by
+# construction. Same idea as "a folder is a character" in the V-Pet and
+# "the filename is the expression" in her sprites: the thing you add
+# should be data, not code.
+#
+# WHO IS IN HERE IS THE SWITCHER'S ROSTER, and it is deliberately NOT
+# "every persona file". Ghost, Sept 11: "we no longer need coco shes
+# retired. or the shiro." Coco, Shiro, Byte and the whole yuzu lineage
+# are still on disk -- they are records -- and none of them belong on a
+# button, because a character with no art has no page to send you to.
+# That is the ROLES rule one level up: a role with no art is ABSENT
+# rather than pointing at the wrong face.
+#
+# Yuzu is coming back as a portrait like Cait's ("Yuzu has future plans
+# very similar to cait... will provide pngs"). When her PNG lands she
+# is one entry here plus a copy of cait.html.
+CHARACTERS = {
+    # name      persona key            page          what she is
+    "saya": (None,                     "face.html",  "the deck"),
+    "cait": ("cait",                   "cait.html",  "king of the cats"),
+}
+
+_BRAINS = {}
+
+
+def persona_for(who):
+    """The persona key behind a character NAME, or None if it is not a
+    name this deck knows."""
+    who = (who or "saya").strip().lower()
+    if who not in CHARACTERS:
+        return None
+    import yuzu_personas
+    return CHARACTERS[who][0] or yuzu_personas.LIVE_PERSONA
+
+
+def roster():
+    """Every character with a page, for the rail. Never raises: a
+    character whose persona file has gone missing is DROPPED rather
+    than taking the page down, same guard as sprites()."""
+    import yuzu_personas
+    out = []
+    for who, (key, page, blurb) in CHARACTERS.items():
+        try:
+            persona = yuzu_personas.load(key or yuzu_personas.LIVE_PERSONA)
+        except Exception:
+            continue
+        if persona.retired:
+            continue
+        out.append({"who": who, "name": persona.name,
+                    "page": page, "blurb": blurb})
+    return out
+
+
+def answer(text, who="saya"):
+    """One turn with a character, for the page. (reply, error).
 
     The chat lives in a terminal today, which on a 10" touchscreen with
     no keyboard is the weakest part of the whole deck. This is the same
     brain, reached from the same box.
 
-    NOTE: this keeps its own conversation, separate from a terminal
-    chat running at the same time. Two mouths, one model."""
-    global _BRAIN
+    NOTE: each character keeps its OWN conversation, and all of them
+    are separate from a terminal chat running at the same time. Several
+    mouths, one model -- and the model is loaded once, so a second
+    character costs history, not RAM."""
     try:
         import yuzu_brain
     except Exception as exc:
         return None, "The brain is not importable here (%s)." % exc
+
+    key = persona_for(who)
+    if key is None:
+        return None, "This deck has no character by that name."
     # `/wiki cats` HAS TO WORK HERE TOO. It was written into the
     # terminal loop and this page was built afterwards, so for two days
     # the chat bar under her face took the literal string and handed it
@@ -492,24 +570,45 @@ def answer(text):
     #
     # yuzu_brain.ground() is the ONE copy. Calling it rather than
     # repeating it is what stops there being a third place to forget.
-    text, problem = yuzu_brain.ground(text)
+    # ONLY THE FACE CHARACTER DRIVES THE FACE. Saya's page polls /state
+    # to pick her expression, and that file is hers -- if Cait wrote to
+    # it, talking to Cait would make Saya's face light up in another
+    # window. Cait's page needs no state at all: its own fetch is in
+    # flight while she thinks, so it already knows.
+    drives_face = (key == persona_for("saya"))
+
+    def face(*args, **kw):
+        if drives_face:
+            set_state(*args, **kw)
+
+    # /wiki IS A DECK FEATURE AND STAYS ON THE DECK. Ghost, of Cait:
+    # "Doesnt need access to wiki this is more of a personal RP one."
+    # It is also the right call for her register -- the lookup arrives
+    # as a user turn saying "I looked up X and it says: <700 chars of
+    # encyclopedia>", which is the shortest path to assistant collapse
+    # on a character who has never heard of an encyclopedia.
+    problem = None
+    if drives_face:
+        text, problem = yuzu_brain.ground(text)
     if problem:
         # The VERDICT, in the bubble, where he is already looking --
         # not silence, and not a sentence she never said.
-        set_state("idle")
+        face("idle")
         return "(%s)" % problem, None
     try:
-        if _BRAIN is None:
-            _BRAIN = yuzu_brain.YuzuBrain()
-        set_state("thinking")
-        reply = _BRAIN.ask(text)
+        if key not in _BRAINS:
+            import yuzu_personas
+            _BRAINS[key] = yuzu_brain.YuzuBrain(
+                persona=yuzu_personas.load(key))
+        face("thinking")
+        reply = _BRAINS[key].ask(text)
         # The brain already wrote `talking` WITH the token rate it just
         # measured. Re-stating it here without one would blank the
         # badge on every reply that came through this page.
-        set_state("talking", reply, get_state().get("rate"))
+        face("talking", reply, get_state().get("rate"))
         return reply, None
     except Exception as exc:
-        set_state("idle")
+        face("idle")
         return None, str(exc)
 
 
@@ -792,7 +891,6 @@ def _pet_do(action):
         return {"frames": {}, "says": "The pet module is not here (%s)." % exc}
 
 
-_BRAIN = None
 
 
 class _Handler(SimpleHTTPRequestHandler):
@@ -812,6 +910,10 @@ class _Handler(SimpleHTTPRequestHandler):
             return
         if self.path.split("?")[0].rstrip("/") == "/stats":
             self._json(stats())
+            return
+        if self.path.split("?")[0].rstrip("/") in ("/characters.json",
+                                                   "/characters"):
+            self._json(roster())
             return
         if self.path.split("?")[0].rstrip("/") in ("/vpet.json", "/vpet"):
             self._json(_pet_look())
@@ -847,14 +949,18 @@ class _Handler(SimpleHTTPRequestHandler):
         if path == "/say":
             try:
                 size = int(self.headers.get("Content-Length") or 0)
-                said = json.loads(self.rfile.read(size) or b"{}").get("text", "")
+                body = json.loads(self.rfile.read(size) or b"{}")
+                said = body.get("text", "")
+                who = body.get("who", "saya")
             except Exception:
-                said = ""
+                said = who = ""
             said = said.strip()[:2000]
             if not said:
                 self._json({"ok": False, "said": "Say something first."})
                 return
-            reply, error = answer(said)
+            # `who` is a NAME and gets looked up in CHARACTERS. Nothing
+            # from the request reaches a path or a command.
+            reply, error = answer(said, who)
             self._json({"ok": error is None, "said": reply or error})
             return
         if not path.startswith("/launch/"):

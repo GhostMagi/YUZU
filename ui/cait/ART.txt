@@ -1,0 +1,19 @@
+CAIT — where her picture came from
+==================================
+
+  cait.png    600x1090 RGBA, transparent background.
+              Sent by Ghost, Sept 11 2026, for the Cait tab.
+
+PROVENANCE IS NOT RECORDED because nobody wrote it down at the time.
+Saya's faces are Ghost's OWN drawings (ui/raw/ has the originals off
+his phone). This one arrived as a finished image and its source is
+unknown to this repo -- commissioned, bought, or found.
+
+That matters for exactly one reason and it is worth being straight
+about: this is a personal build on his own hardware, which is fine, and
+it is the one asset here that could not be published as his own work.
+If the deck is ever shown off publicly, credit it or swap it.
+
+Same discipline as assets/README.txt, which records the itch.io packs
+the V-Pet sprites came from. Write the source down WHEN THE FILE
+ARRIVES; a month later nobody remembers.

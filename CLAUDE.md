@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 502 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 519 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 502 tests pass on it. Getting it
+(that repo path is confirmed working). 519 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -513,6 +513,170 @@ for a tsundere is the same feeling.
 `test_every_sprite_he_drew_can_actually_be_reached` is the guard worth
 keeping: art in the repo that no state resolves to is art made for
 nothing, and it went unnoticed for two days.
+
+## CAIT — a second character, a second WORLD (Sept 11)
+
+Ghost: *"i would like to have this. its own tab. and for it to act like
+a cait sith (whatever that means, may require u to study them a bit)
+seperate thing from saya"*, plus *"Doesnt need access to wiki this is
+more of a personal RP one"*, *"dont let it think its a cyberdeck per se
+its its own thing"*, *"id like her to not be green and black xD the
+image colors are fine"*, and *"(we may make more if this goes well)"*.
+
+**THE FOLKLORE IS THE CHARACTER, and he asked for it to be studied.**
+A cait sith (Cat Sìth) is the fairy cat of Scottish and Irish belief: a
+large dark cat with one white patch at the breast — which is exactly
+what his picture is. Four beats are in her prompt and a test pins each:
+
+    the crown     The King of the Cats. A man sees a procession of cats
+                  carrying a small coffin with a crown on it; he tells
+                  his wife, and their own cat leaps up crying "then I'm
+                  the King o' the Cats" and is gone up the chimney.
+                  That cat is her, and the crown in the art is that.
+    the milk      Left out, she blesses the house for a year. Withheld,
+                  the cows dry up. She trades, and she keeps score.
+    the wake      She sits with the newly dead the night before burial.
+                  Stated as her WORK, not as horror -- which is more
+                  unsettling and much better company.
+    the contest   Her kind cannot refuse a riddle or a wager. That is
+                  why the old wake-games existed: to keep her busy.
+
+**`personas/_hardware_faerie.txt` IS A SECOND WORLD, not a second body,
+and that is why it is a file rather than prose inside her persona.**
+"We may make more if this goes well" is the whole argument: the five
+deck personas share one body file so a fix lands on all of them at
+once. Cait is the first character in the faerie world; the next one
+inherits it.
+
+**SHE HAS NEVER HEARD OF A COMPUTER, and that is the point of the
+split.** `{DECK_SELF}` was a MEASURED win on the deck — "my battery's
+always running low" arriving unprompted — and it is an active fault
+here. **A win is measured against a specific failure. When the
+character is different it is not budget, it is damage.** A test bans
+`cyberdeck`, `battery`, `screen` and the rest from her prompt.
+
+**AND "never a generic AI assistant" CAME OUT OF HER PROMPT.** Every
+other persona has that line; Cait's first draft did too, and the test
+caught it. It is the pink-elephant pattern this repo has measured three
+times — naming the thing she must not be — and on a character who is
+supposed to have never heard the word it is self-defeating. What
+actually fixed assistant collapse was never the rule: it was the ONE
+EXAMPLE of a technical question, round 3 to round 4, a categorical
+change. She has that example, and hers answers the CSS question
+correctly while saying she has no idea what a div is.
+
+**She carries the three measured example SHAPES**: the bare command
+(yuzu4, 4/4), the warm statement with nothing to answer (Shiro round
+2), and the technical question. A new character built without them
+restarts the lineage from the worst prompt in the repo.
+
+**`Mrrp` and `Mm` were her first sounds and both were cut.** No vowel
+means espeak spells them out letter by letter — the exact mechanism
+that made PFFT come out "Pee Eff Eff Tee". Checked through
+`for_speech` BEFORE they went in. `Mrow, Purr, Hah, Ohh`.
+
+### Her page
+
+**`ui/cait.html` is a PORTRAIT CARD, not a face rig.** Ghost: *"Id have
+to design a new face (anime faces look p much the same throughout
+sounds annoying)"*. He is right, and this art is one detailed pose —
+slicing it into expressions is work he does not want for a result that
+would look worse. Everything that makes her feel alive happens AROUND
+the picture: a 2% breath, and a warm light behind her that rises while
+she is thinking. No sprite folder, no blink frame, no ROLES.
+
+**Her palette is SAMPLED off her own PNG, not guessed** — slate-blue
+fur (`#303048`, the single most common colour in her), crimson cape,
+cream, gold. The deck's green-on-black is locked to the deck on
+purpose; this is a different thing that happens to run on the same
+board, the same call already made for the V-Pet.
+
+**TWO LAYOUT BUGS, BOTH FOUND BY RENDERING IT.** Thirteenth and
+fourteenth time:
+
+- **A grid row is `auto` by default, so it GREW to fit her** and
+  `max-height: 99%` had nothing bounded to resolve against. Measured: a
+  779px image inside a 460px stage, painting straight over the ask bar
+  and her own Speak button. `grid-template-rows: minmax(0, 1fr)` is
+  what makes a percentage height mean anything.
+- **The speech box sat on top of her.** `left: 4%; width: 46%` ends at
+  exactly the middle of the screen, which is exactly where a centred
+  character is. She stands right, her words go left.
+
+**And she is deliberately cropped at the shins.** A 600x1090 portrait
+shown whole in a 1024x600 panel is 253px wide — correct, tiny, and a
+waste of the art. Letting her run past the bottom edge with the ask bar
+painted over her reads as depth, which is how every visual novel has
+ever framed a standing character.
+
+**`/wiki` STAYS ON THE DECK.** His call, and right for her register: a
+lookup arrives as *"I looked up X and it says: <700 chars of
+encyclopedia>"*, which is the shortest path to assistant collapse on a
+character who has never heard of an encyclopedia.
+
+### Who is talking
+
+**`answer(text, who)` and one brain PER CHARACTER.** The page POSTs a
+NAME, `CHARACTERS` turns it into a persona KEY, and an unknown name is
+REFUSED rather than quietly answered by whoever is live — putting the
+wrong character on screen is the confusing kind of wrong. Same
+allowlist discipline as `/launch/` and `/vpet/`. The model is loaded
+once, so a second character costs history, not RAM.
+
+**THE CROSS-TALK TRAP, and it is the one that would have looked
+haunted.** Saya's page polls `/state` to pick her expression, and that
+file is hers. Without a guard, talking to Cait in one window would have
+lit Saya's face up in another. Only the live deck character drives the
+face; Cait's page needs no state at all, because its own fetch is in
+flight while she thinks.
+
+**Saya's entry follows `LIVE_PERSONA`; Cait's names her file.** Seventh
+instance of the name-leak rule: decide whether a fact belongs to THIS
+CHARACTER or to WHOEVER IS LIVE, and pin it accordingly.
+
+## THE SWITCHER IS A ROSTER, AND COCO AND SHIRO ARE RETIRED (Sept 11)
+
+Ghost: *"persona switcher button seems Boss Status"*, and — decisively
+— *"saya needs no changes, shes kinda the main live in ai."* Then:
+*"we no longer need coco shes retired. or the shiro. Yuzu has future
+plans very similar to cait."*
+
+**THAT OVERRULES THE DESIGN CHAT'S SPEC, which put the switcher ON
+Saya's face screen.** She is the default and she is untouched. The rail
+lives on the character pages that came after her.
+
+**ALWAYS VISIBLE, NOT A MENU.** The proposed version was a button that
+opens a row and closes on a tap outside — which is a mode, and a mode
+needs a way out, and this deck has a rule about that written in two
+power cycles. A row of names costs the same pixels and cannot trap
+anybody.
+
+**IT IS BUILT FROM ONE ROSTER.** `/characters.json` is generated from
+`CHARACTERS` in `yuzu_face.py`, so no page holds a list of the cast and
+none can drift. Adding Yuzu when her PNG lands is one dict entry plus a
+copy of `cait.html`. Same idea as "a folder is a character" and "the
+filename is the expression": **the thing you add should be data, not
+code.**
+
+**A CHARACTER WITH NO PAGE IS ABSENT FROM THE RAIL**, which is the
+ROLES rule one level up. Byte and the whole yuzu lineage are real
+personas with no art — putting them on a button would send him to a
+face that is not theirs. The design chat predicted exactly this
+("switching persona would leave Saya's face on screen, which will look
+like a bug") and it was a good catch; the answer is that art decides
+who gets a button, not the persona folder.
+
+**RETIRED, NOT DELETED.** `retired: yes` in the settings block, so no
+composed prompt shifted by a byte and the files stay as the record —
+same as muto_s2, saya_quad and yuzu2/3/5/6, and that record is what
+stopped yuzu5 being re-attempted from scratch. Un-retiring is deleting
+one line. **The LEDs went the other way and the difference is worth
+keeping straight:** that was live CODE you had to read around every
+time. This is data nobody loads unless they ask for it by name.
+
+`test_every_character_carries_the_measured_wins` now skips retired
+personas, so a record can never force a choice between editing the
+evidence and a red suite.
 
 ## IT IS HER UI, NOT A BROWSER TAB — and the browser stays reachable
 

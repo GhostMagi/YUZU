@@ -2708,8 +2708,14 @@ class TestMovementRule(unittest.TestCase):
         # A win is measured ON a body. Personas on a retired chassis are
         # records, exactly like the yuzu lineage; what has to keep up is
         # every character standing on the body that actually boots.
+        # AND RETIRED CHARACTERS ARE EXEMPT TOO, for the same reason
+        # the archives are. Ghost, Sept 11: "we no longer need coco
+        # shes retired. or the shiro." They are kept as the record;
+        # holding a record to today's wins would eventually force a
+        # choice between editing the evidence and a red suite.
         characters = [k for k in yuzu_personas.available()
                       if k != yuzu_personas.LIVE_PERSONA
+                      and not yuzu_personas.load(k).retired
                       and yuzu_personas.load(k).hardware
                       == live_persona.hardware]
         self.assertTrue(characters, "no peer characters on the live body")
@@ -3121,6 +3127,306 @@ class TestPadPairing(unittest.TestCase):
         self.assertIn("--forget", self.SCRIPT.read_text())
         done = self._run("--forget")
         self.assertEqual(done.returncode, 0)
+
+
+class TestCait(unittest.TestCase):
+    """Cait -- the cait sith, on her own tab, in her own world.
+
+    Ghost, Sept 11: "id like to have this. its own tab. and for it to
+    act like a cait sith (whatever that means, may require u to study
+    them a bit) seperate thing from saya", plus "Doesnt need access to
+    wiki this is more of a personal RP one", "dont let it think its a
+    cyberdeck per se its its own thing", and "id like her to not be
+    green and black xD the image colors are fine."
+
+    Every test here pins one of those sentences."""
+
+    PAGE = Path(__file__).parent / "ui" / "cait.html"
+    ART = Path(__file__).parent / "ui" / "cait" / "cait.png"
+
+    def test_she_loads_and_is_her_own_character(self):
+        cait = yuzu_personas.load("cait")
+        self.assertEqual(cait.name, "Cait")
+        self.assertEqual(cait.hardware, "faerie")
+        self.assertNotEqual(cait.name, yuzu_personas.load(
+            yuzu_personas.LIVE_PERSONA).name, "she is Saya with a hat on")
+
+    def test_she_has_never_heard_of_a_computer(self):
+        """THE POINT OF THE SEPARATE BODY FILE. The deck self-concept
+        was a measured win ON THE DECK -- "my battery's always running
+        low" arriving unprompted -- and it is an active fault here. A
+        win is measured against a specific failure; a different
+        character in a different world does not inherit it."""
+        prompt = yuzu_personas.load("cait").prompt.lower()
+        for word in ("cyberdeck", "handheld computer", "battery",
+                     "screen", "ai assistant", "language model"):
+            self.assertNotIn(word, prompt,
+                             f"Cait's prompt tells her about '{word}'")
+        self.assertIn("otherworld", prompt)
+        # "never a generic AI assistant" is in every OTHER persona and
+        # was in the first draft of this one. It came out, and this
+        # pins that: it is the pink-elephant pattern -- naming the
+        # thing she must not be -- which this repo has measured three
+        # times, and it is self-defeating on a character who is
+        # supposed to have never heard the word. What actually fixed
+        # assistant collapse was the ONE EXAMPLE of a technical
+        # question (round 3 -> round 4, categorical), and she has it.
+        self.assertNotIn("assistant", prompt)
+
+    def test_the_folklore_is_actually_in_her(self):
+        """He asked me to study them, so this pins the four beats that
+        make her a cait sith rather than a generic cat:
+
+          the crown      the King of the Cats tale -- a procession, a
+                         small coffin, a crown, and a cat who leaps up
+                         crying that the king is dead
+          the milk       leave it out and the house is blessed; withhold
+                         it and the cows dry up. She trades, and she
+                         keeps score.
+          the wake       she sits with the newly dead the night before
+                         burial. Stated as work, not as horror.
+          the contest    her kind cannot refuse a riddle or a wager --
+                         which is why the old wake-games existed."""
+        prompt = yuzu_personas.load("cait").prompt.lower()
+        for beat in ("crown", "coffin", "milk", "bless", "buried",
+                     "riddle", "wager"):
+            self.assertIn(beat, prompt, f"the folklore lost '{beat}'")
+
+    def test_she_carries_the_levers_this_repo_actually_measured(self):
+        """She starts where the lineage ended, not where it began.
+
+        Each of these example SHAPES fixed a measured failure: the bare
+        command (yuzu4, 4/4), the warm statement with no question
+        (Shiro round 2), and the technical question (Shiro round 3 ->
+        4, where assistant collapse went from a markdown manual with
+        fenced code blocks to two sentences in her own register).
+
+        A new character built without them restarts the lineage from
+        the worst prompt in the repo, which is exactly what the rotten
+        `--new` scaffold used to do."""
+        prompt = yuzu_personas.load("cait").prompt
+        self.assertIn("User: Stand up.", prompt, "no bare command")
+        self.assertIn("actually gave me chills", prompt,
+                      "no warm statement with nothing to answer")
+        self.assertIn("center a div", prompt, "no technical question")
+        # and the technical one has to be ANSWERED, not deflected
+        tech = prompt.split("center a div in CSS?")[1].split("User:")[0]
+        self.assertIn("flex", tech.lower(),
+                      "she dodges the technical question, which teaches "
+                      "her to dodge every question")
+
+    def test_every_sound_she_is_taught_survives_the_voice(self):
+        """`Mrrp` and `Mm` were the first draft and both were cut: no
+        vowel means espeak spells them out letter by letter, the exact
+        mechanism that made PFFT come out "Pee Eff Eff Tee"."""
+        import yuzu_voice
+        sounds = yuzu_personas.load("cait").settings["SOUND_EXAMPLES"]
+        for sound in (x.strip() for x in sounds.split(",")):
+            self.assertTrue(yuzu_voice.for_speech(sound).strip(),
+                            f"the voice drops '{sound}'")
+            self.assertTrue(set(sound.lower()) & set("aeiou"),
+                            f"'{sound}' has no vowel -- espeak will "
+                            f"spell it out one letter at a time")
+
+    # ---- her page ----------------------------------------------------
+
+    def test_her_page_exists_offline_with_her_picture(self):
+        self.assertTrue(self.PAGE.exists())
+        self.assertTrue(self.ART.exists(), "her art is not in the repo")
+        page = self.PAGE.read_text()
+        for reach in ("http://", "https://", "//cdn", "@import",
+                      "fonts.googleapis"):
+            self.assertNotIn(reach, page,
+                             f"cait.html reaches outside itself: {reach}")
+        self.assertIn('src="cait/cait.png"', page)
+
+    def test_she_is_NOT_green_on_black(self):
+        """Ghost: "id like her to not be green and black xD the image
+        colors are fine." Her palette is sampled off her own picture --
+        slate-blue fur, crimson cape, cream, gold."""
+        page = self.PAGE.read_text()
+        self.assertNotIn("#39ff5e", page, "she got the deck's neon green")
+        for hers in ("--gold", "--wine", "--slate"):
+            self.assertIn(hers, page, f"{hers} is missing from her palette")
+
+    def test_she_is_a_STILL_IMAGE_and_needs_no_sprite_set(self):
+        """Ghost: "Id have to design a new face (anime faces look p much
+        the same throughout sounds annoying)". Correct, and this art is
+        one detailed pose -- slicing it into expressions is work he does
+        not want for a result that would look worse. What makes her feel
+        alive happens AROUND the picture."""
+        page = self.PAGE.read_text()
+        self.assertNotIn("sprites.json", page, "she grew a sprite set")
+        self.assertIn("breathe", page, "she is a dead sticker")
+        self.assertIn("body.thinking", page,
+                      "nothing shows that she is answering")
+
+    def test_the_grid_row_is_BOUNDED_so_she_cannot_overflow(self):
+        """THE BUG RENDERING FOUND. A grid row is `auto` by default, so
+        it grew to fit her and `max-height` had nothing bounded to
+        resolve against: measured, a 779px image inside a 460px stage,
+        painting straight over the ask bar and her own Speak button."""
+        page = self.PAGE.read_text()
+        self.assertIn("grid-template-rows: minmax(0, 1fr)", page)
+        self.assertIn("z-index: 2", page,
+                      "the ask bar can fall behind her again")
+
+    # ---- who is talking ----------------------------------------------
+
+    def test_a_name_crosses_and_nothing_else_does(self):
+        """Same discipline as /launch/ and /vpet/: the page POSTs a
+        NAME, CHARACTERS turns it into a persona key, and an unknown
+        name is refused rather than quietly answered by whoever is
+        live. Putting the wrong character on screen is the confusing
+        kind of wrong."""
+        import yuzu_face
+        self.assertEqual(yuzu_face.persona_for("cait"), "cait")
+        self.assertEqual(yuzu_face.persona_for("  CAIT "), "cait")
+        for hostile in ("../../etc/passwd", "cait;rm -rf /", "", "nope",
+                        "saya_deck"):
+            self.assertIsNone(yuzu_face.persona_for(hostile) if hostile
+                              else None,
+                              f"{hostile!r} resolved to a persona")
+
+    def test_SAYA_follows_the_live_arm_but_CAIT_never_does(self):
+        """The name-leak rule, seventh instance: decide whether a fact
+        belongs to THIS CHARACTER or to WHOEVER IS LIVE. Move
+        LIVE_PERSONA and Saya's tab follows it; Cait is Cait."""
+        import yuzu_face
+        self.assertEqual(yuzu_face.persona_for("saya"),
+                         yuzu_personas.LIVE_PERSONA)
+        self.assertIsNone(yuzu_face.CHARACTERS["saya"][0],
+                          "Saya's tab hardcodes a persona file")
+        self.assertEqual(yuzu_face.CHARACTERS["cait"][0], "cait")
+
+    def test_talking_to_CAIT_never_moves_SAYAS_face(self):
+        """THE CROSS-TALK TRAP. Saya's page polls /state to pick her
+        expression, and that file is hers. If Cait wrote to it, talking
+        to Cait would light Saya's face up in another window -- which
+        would read as a haunted deck rather than as a bug."""
+        import yuzu_face
+
+        class Fake:
+            def __init__(self, **kw): pass
+            def ask(self, text): return "Mrow."
+
+        yuzu_face.set_state("idle")
+        was = dict(yuzu_face._BRAINS)
+        try:
+            with mock.patch.object(yuzu_face, "_BRAINS", {}):
+                with mock.patch("yuzu_brain.YuzuBrain", Fake):
+                    yuzu_face.answer("hello", "cait")
+                    self.assertEqual(yuzu_face.get_state().get("state"),
+                                     "idle", "Cait drove Saya's face")
+                    yuzu_face.answer("hello", "saya")
+                    self.assertEqual(yuzu_face.get_state().get("state"),
+                                     "talking", "Saya stopped driving it")
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+            yuzu_face.set_state("idle")
+
+    def test_the_rail_is_ONE_roster_and_the_page_holds_no_list(self):
+        """Ghost: "persona switcher button seems Boss Status."
+
+        Built from /characters.json, which comes from CHARACTERS in
+        yuzu_face.py. If the page carried its own copy of the cast it
+        would drift the first time somebody was added, which is the
+        same fault as a sprite manifest -- and the reason `sprites()`
+        scans a folder instead."""
+        import yuzu_face
+        page = self.PAGE.read_text()
+        self.assertIn("characters.json", page)
+        for name in ("Saya", "Byte", "Coco", "Shiro"):
+            self.assertNotIn(">%s<" % name, page,
+                             f"{name} is hardcoded into the rail")
+        cast = {c["who"] for c in yuzu_face.roster()}
+        self.assertEqual(cast, {"saya", "cait"})
+
+    def test_retired_characters_are_off_the_roster_but_still_on_disk(self):
+        """Ghost, Sept 11: "we no longer need coco shes retired. or the
+        shiro."
+
+        RETIRED, NOT DELETED. Every superseded thing in this repo is
+        kept -- muto_s2, saya_quad, yuzu2/3/5/6 -- and that record is
+        what stopped yuzu5 being re-attempted from scratch. A persona
+        file costs nothing while nobody names it, and un-retiring is
+        deleting one line.
+
+        (The LEDs went the other way, deleted outright, and the
+        difference is worth keeping straight: that was live code you
+        had to read around. This is data nobody loads unless asked.)"""
+        import yuzu_face
+        for key in ("coco", "coco_deck", "shiro", "shiro_deck"):
+            self.assertTrue(
+                (Path(__file__).parent / "personas" / f"{key}.persona").exists(),
+                f"{key} was deleted rather than retired")
+            self.assertTrue(yuzu_personas.load(key).retired,
+                            f"{key} is not marked retired")
+        names = {c["name"] for c in yuzu_face.roster()}
+        self.assertNotIn("Coco", names)
+        self.assertNotIn("Shiro", names)
+
+    def test_a_character_with_no_page_is_ABSENT_from_the_rail(self):
+        """The ROLES rule, one level up. Byte and the whole yuzu
+        lineage are real personas with no art and no page -- putting
+        them on a button would send him to a face that is not theirs,
+        which is the "switching persona leaves Saya's face on screen"
+        bug the design chat correctly predicted.
+
+        A role with no art is absent rather than pointing at the wrong
+        face. So is a character."""
+        import yuzu_face
+        self.assertIn("byte", yuzu_personas.available())
+        self.assertNotIn("byte", yuzu_face.CHARACTERS,
+                         "a character with no page got a button")
+        for who, (key, page, blurb) in yuzu_face.CHARACTERS.items():
+            self.assertTrue(
+                (Path(__file__).parent / "ui" / page).exists(),
+                f"the rail offers {who}, whose page {page} is missing")
+
+    def test_a_broken_rail_never_takes_her_page_down(self):
+        """`.catch(() => {})`. If the roster cannot be fetched the rail
+        is simply absent and she still talks -- the same call the brain
+        makes about the face server, and Piper, and the wiki import."""
+        page = self.PAGE.read_text()
+        # [-1], NOT [1]. "characters.json" appears twice -- once in the
+        # comment explaining the rail and once in the fetch -- so [1]
+        # is the text BETWEEN them, which stops just before the code
+        # this test is about. It failed on correct code. Same family as
+        # every other grep-as-proxy fault in here: the assertion was
+        # about the file's spelling rather than about the page.
+        rail = page.split("characters.json")[-1].split("</script>")[0]
+        self.assertIn(".catch(", rail,
+                      "a failed roster fetch is unhandled")
+
+    def test_the_wiki_stays_on_the_deck(self):
+        """Ghost: "Doesnt need access to wiki this is more of a personal
+        RP one". It is also right for her register -- a lookup arrives
+        as "I looked up X and it says: <700 chars of encyclopedia>",
+        which is the shortest path to assistant collapse on a character
+        who has never heard of an encyclopedia."""
+        import yuzu_face
+        asked = []
+
+        class Fake:
+            def __init__(self, **kw): pass
+            def ask(self, text): asked.append(text); return "Mrow."
+
+        was = dict(yuzu_face._BRAINS)
+        try:
+            with mock.patch.object(yuzu_face, "_BRAINS", {}):
+                with mock.patch("yuzu_brain.YuzuBrain", Fake):
+                    with mock.patch.object(
+                            yuzu_brain.yuzu_wiki, "as_context",
+                            lambda t: ("I looked up %s: FACTS." % t, None)):
+                        yuzu_face.answer("/wiki cats", "cait")
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+            yuzu_face.set_state("idle")
+        self.assertEqual(asked[-1], "/wiki cats",
+                         "an encyclopedia reached the fairy cat")
 
 
 class TestDeckApps(unittest.TestCase):
@@ -3579,14 +3885,16 @@ class TestWikiLookup(unittest.TestCase):
                 asked.append(text)
                 return "..."
         import yuzu_face
-        was, yuzu_face._BRAIN = yuzu_face._BRAIN, FakeBrain()
+        was = dict(yuzu_face._BRAINS)
+        yuzu_face._BRAINS[yuzu_face.persona_for("saya")] = FakeBrain()
         try:
             with mock.patch.object(
                     yuzu_brain.yuzu_wiki, "as_context",
                     lambda t: ("I looked up %s and it says: FACTS." % t, None)):
-                yuzu_face.answer("/wiki cats")
+                yuzu_face.answer("/wiki cats", "saya")
         finally:
-            yuzu_face._BRAIN = was
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
             yuzu_face.set_state("idle")
         self.assertIn("I looked up cats", asked[-1],
                       "the chat bar under her face still hands her the "
@@ -6205,7 +6513,7 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn('id="saya"', page, "there is no Saya button")
         self.assertIn('data-go="face.html"', page)
 
-    def test_the_front_page_is_TWO_tiles_and_misc_is_the_drawer(self):
+    def test_the_front_page_is_THREE_tiles_and_misc_is_the_drawer(self):
         """Ghost, Sept 11: "lets hide the gameboy tab for now its not as
         important. or put it and the wikipedia tabs under a tab called
         ☆Misc☆ we can pile up our fancy future apps in that tab."
@@ -6232,9 +6540,13 @@ class TestHomeScreen(unittest.TestCase):
         #
         # Talk went the same way an hour earlier: it opened face.html
         # just like Saya did, so it was a wasted tile.
-        self.assertEqual(len(views["main"]), 2, "the front page is not two")
+        # THREE ON THE FRONT: Saya, Cait, and the drawer. Cait is a
+        # CHARACTER and a peer of Saya's -- Ghost asked for "its own
+        # tab", and a character filed in the drawer between the d20 and
+        # the calculator is not that.
+        self.assertEqual(len(views["main"]), 3, "the front page is not three")
         self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
-        self.assertIn("#grid.main { grid-template-columns: repeat(2, 1fr); }",
+        self.assertIn("#grid.main { grid-template-columns: repeat(3, 1fr); }",
                       page)
         self.assertIn("#grid.misc { grid-template-columns: repeat(3, 1fr); }",
                       page)
@@ -6247,6 +6559,8 @@ class TestHomeScreen(unittest.TestCase):
                          "a spanning tile is back, and an odd row with it")
         self.assertIn('data-go="face.html"', "".join(views["main"]),
                       "her tile left the front page")
+        self.assertIn('data-go="cait.html"', "".join(views["main"]),
+                      "Cait left the front page")
         self.assertIn('data-go="vpet.html"', "".join(views["misc"]),
                       "the pet left the drawer")
         self.assertIn('data-launch="browser"', "".join(views["misc"]),
@@ -6313,7 +6627,7 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 8, "not eight line icons")
+        self.assertEqual(page.count("<svg"), 9, "not nine line icons")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):

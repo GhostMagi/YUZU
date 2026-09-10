@@ -1,0 +1,330 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cait</title>
+<!--
+  CAIT — the cait sith. Her own tab, her own world, her own colours.
+
+  Ghost, Sept 11: "id like to have this. its own tab. and for it to act
+  like a cait sith... seperate thing from saya", and "id like her to not
+  be green and black xD the image colors are fine."
+
+  SO THIS PAGE IS NOT THE DECK. The green-on-black CRT is the deck's
+  look and it is locked there on purpose; this is a different thing that
+  happens to run on the same board, the same call already made for
+  vpet.html. Consistency across these particular pages matters less
+  than each one looking finished on its own.
+
+  THE PALETTE IS HER PICTURE'S, MEASURED NOT GUESSED. Sampled off the
+  PNG: slate-blue fur (#303048 / #484860, 15% of her opaque pixels),
+  deep crimson cape (#600018 / #780018), silver-cream hair and chest
+  (#d8d8f0 / #f0f0f0), gold on the crown and the bells. The background
+  is the dark end of her own fur so she sits IN the page rather than on
+  top of it.
+
+  SHE IS A STILL IMAGE AND STAYS ONE. No sprite folder, no expression
+  set, no blink frame -- Ghost, correctly: "Id have to design a new face
+  (anime faces look p much the same throughout sounds annoying)". This
+  art is one detailed pose and slicing it into expressions would be work
+  he does not want for a result that would look worse. Everything that
+  makes her feel alive here happens AROUND the picture: a slow breath,
+  and a warm light that rises while she is thinking.
+
+  No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --night:  #171423;          /* the dark end of her own fur          */
+  --deep:   #100e18;
+  --slate:  #303048;          /* her fur, the dominant colour in her   */
+  --edge:   #4a4266;
+  --ink:    #efe6da;          /* cream, off her chest and hair         */
+  --dim:    #a99fb8;
+  --gold:   #e3b34e;          /* crown, bells, the sceptre             */
+  --wine:   #7a0f22;          /* the cape                              */
+  --ember:  #c0392f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100vh; overflow: hidden; }
+body {
+  background:
+    radial-gradient(120% 90% at 50% 8%, #241f36 0%, var(--night) 45%,
+                    var(--deep) 100%);
+  color: var(--ink);
+  font: 16px/1.5 Georgia, 'Times New Roman', serif;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- the hall ------------------------------------------------------
+   A gold hairline and two corner flourishes. She is a king now and the
+   room should know it -- but thin, because the picture is the loud
+   thing on this screen and furniture that competes with it is just
+   noise. */
+#room {
+  position: fixed; inset: 10px; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent);
+  border-radius: 3px;
+}
+#room::before, #room::after {
+  content: ''; position: absolute; width: 26px; height: 26px;
+  border: 2px solid color-mix(in srgb, var(--gold) 60%, transparent);
+}
+#room::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+#room::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+/* ---- top ---------------------------------------------------------- */
+#top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 26px 4px;
+}
+#who { font-size: 21px; letter-spacing: .08em; color: var(--gold); }
+#title { font-size: 12.5px; color: var(--dim); letter-spacing: .04em;
+         font-style: italic; }
+/* ---- the rail ------------------------------------------------------
+   Ghost: "persona switcher button seems Boss Status."
+
+   ALWAYS VISIBLE, NOT A MENU. The design he was shown had a button
+   that opens a row and closes on a tap outside -- which is a mode, and
+   a mode needs a way out, and this deck has a rule about that written
+   in two power cycles. A row of names costs the same pixels at this
+   size and cannot trap anybody.
+
+   It is built from /characters.json, which comes from ONE roster in
+   yuzu_face.py. No list lives in this file, so it cannot drift.
+
+   NOT ON SAYA'S PAGE. Ghost: "saya needs no changes, shes kinda the
+   main live in ai." She is the default and she stays exactly as she
+   is; the rail lives on the character pages that came after her. */
+#rail { display: flex; gap: 6px; margin-left: 18px; }
+#rail a, #rail span {
+  font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
+  padding: 4px 11px; border-radius: 2px;
+  color: var(--dim); border: 1px solid transparent;
+}
+#rail a { cursor: pointer; }
+#rail a:hover { color: var(--ink); border-color: var(--edge); }
+#rail .here {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+  background: rgba(0,0,0,.3);
+}
+#home {
+  margin-left: auto; width: 38px; height: 38px; flex: none;
+  border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  font-size: 17px; color: var(--gold); background: rgba(0,0,0,.25);
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+  pointer-events: auto;
+}
+
+/* ---- her ----------------------------------------------------------- */
+/* SHE STANDS ON THE RIGHT, HER WORDS GO ON THE LEFT. The first
+   version centred her and put the bubble at left:4% width:46% -- which
+   ends exactly at the middle of the screen, i.e. exactly on top of her.
+   Every assertion passed; rendering it showed the speech box sitting
+   across her cape and the little pink cat. */
+#stage {
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
+  display: grid; align-items: start; justify-items: end;
+  padding-right: 4%;
+  /* minmax(0, 1fr) IS LOad-BEARING. A grid row is `auto` by default,
+     so it GREW to fit her and `max-height: 99%` had nothing bounded to
+     resolve against -- measured: a 779px image inside a 460px stage,
+     painting straight over the ask bar. Bounding the row is what makes
+     a percentage height mean anything. */
+  grid-template-rows: minmax(0, 1fr);
+}
+/* THE WARM LIGHT IS THE "SHE IS THINKING" CUE, and it is deliberately
+   not a mouth. It sits BEHIND her and rises while a reply is coming --
+   the honest loading spinner this project keeps re-deriving, in her
+   own idiom rather than the deck's. */
+#glow {
+  position: absolute; left: 50%; bottom: 2%; transform: translateX(-50%);
+  width: 62%; height: 78%; border-radius: 50%;
+  background: radial-gradient(circle,
+              color-mix(in srgb, var(--gold) 30%, transparent) 0%,
+              transparent 68%);
+  opacity: .25; transition: opacity .6s ease;
+}
+body.thinking #glow { animation: ember 2.2s ease-in-out infinite; }
+@keyframes ember {
+  0%, 100% { opacity: .3 }
+  50%      { opacity: .85 }
+}
+/* SHE STANDS BEHIND THE CONSOLE, cropped at the shins. A 600x1090
+   portrait shown whole inside a 1024x600 panel is 253px wide -- correct,
+   and tiny, and it wastes her. Letting her run past the bottom edge
+   makes her twice the size and reads as depth rather than as a mistake,
+   which is how every visual novel has ever framed a standing character.
+   The ask bar sits ON TOP of her (z-index below) and completes it. */
+#cait {
+  height: 136%; max-width: 46%;
+  object-fit: contain; object-position: top center;
+  filter: drop-shadow(0 10px 26px rgba(0,0,0,.65));
+  animation: breathe 5.5s ease-in-out infinite;
+  position: relative;
+}
+/* A 2% pulse. Enough that she is not a dead sticker, small enough that
+   you notice it only if you look for it.
+   TRANSFORM-ORIGIN IS THE WHOLE FIX: scaling from the default centre
+   grew her downward as well as up, so her feet went under the ask bar
+   on every breath. She is standing on a floor; she breathes UPWARD. */
+@keyframes breathe {
+  0%, 100% { transform: scale(1)      translateY(0) }
+  50%      { transform: scale(1.018)  translateY(-3px) }
+}
+#cait { transform-origin: bottom center; }
+
+/* ---- what she says -------------------------------------------------- */
+#says {
+  position: absolute; left: 4%; bottom: 7%; width: 42%; max-height: 72%;
+  overflow-y: auto; display: none;
+  background: rgba(14,11,20,.9);
+  border: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+  border-left: 3px solid var(--wine);
+  border-radius: 3px; padding: 16px 18px;
+  font-size: 17px; line-height: 1.55;
+}
+#says.on { display: block; }
+#says::after {                       /* a small tail toward her */
+  content: ''; position: absolute; right: -9px; top: 26px;
+  border: 8px solid transparent;
+  border-left-color: color-mix(in srgb, var(--gold) 32%, transparent);
+}
+
+/* ---- asking --------------------------------------------------------- */
+#ask {
+  /* ABOVE HER, ALWAYS. `#cait` is positioned, and a positioned element
+     paints above static siblings whatever the DOM order -- so without
+     this she covered her own Speak button. */
+  position: relative; z-index: 2;
+  background: linear-gradient(to top, var(--deep) 62%, transparent);
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 26px calc(20px + env(safe-area-inset-bottom));
+}
+#text {
+  flex: 1; font: inherit; font-size: 16px; color: var(--ink);
+  background: rgba(0,0,0,.32); padding: 12px 15px; border-radius: 3px;
+  border: 1px solid var(--edge);
+}
+#text::placeholder { color: var(--dim); opacity: .8; font-style: italic; }
+#text:focus { outline: none; border-color: var(--gold); }
+#send {
+  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  color: #241a09; background: var(--gold); padding: 12px 22px;
+  border: 0; border-radius: 3px;
+}
+#send:disabled { opacity: .5; cursor: default; }
+
+@media (max-width: 760px) {
+  #cait { max-width: 82%; height: 118%; }
+  #says { position: static; width: auto; margin: 0 18px 10px;
+          max-height: 34vh; }
+  #says::after { display: none; }
+  #stage { justify-items: center; padding-right: 0; }
+}
+</style>
+
+<div id="room"></div>
+
+<div id="top">
+  <div id="who">Cait</div>
+  <div id="title">King of the Cats</div>
+  <div id="rail"></div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<div id="stage">
+  <div id="glow"></div>
+  <img id="cait" src="cait/cait.png" alt="Cait">
+  <div id="says"></div>
+</div>
+
+<form id="ask" autocomplete="off">
+  <input id="text" placeholder="Say something to her..." maxlength="2000">
+  <button id="send" type="submit">Speak</button>
+</form>
+
+<script>
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+const says = document.getElementById('says');
+
+document.getElementById('home').onclick = () => {
+  location.href = 'home.html';
+};
+
+// ---- who else is here ------------------------------------------------
+// The roster comes from the server so this page holds no list of its
+// own. If it cannot be reached the rail is simply ABSENT -- her page
+// still works, you just cannot hop from it, which is the same call
+// sprites() makes about a missing folder. A broken switcher must never
+// take the character down with it.
+const ME = 'cait';
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => {
+    const rail = document.getElementById('rail');
+    cast.forEach(c => {
+      const here = c.who === ME;
+      const el = document.createElement(here ? 'span' : 'a');
+      el.textContent = c.name;
+      el.title = c.blurb;
+      if (here) el.className = 'here';
+      else el.href = c.page;
+      rail.appendChild(el);
+    });
+  })
+  .catch(() => {});
+
+// Stage directions are stripped from the BUBBLE, the same call
+// yuzu_voice already makes for the speaker. `[tail flicks]` is lovely
+// to write and it is not what she SAID -- on a small screen it crowds
+// out the words that are. She is encouraged to write them; they just
+// do not belong in the quote.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/\*[^*]*\*/g, ' ')
+             .replace(/\s{2,}/g, ' ')
+             .trim();
+}
+
+function said(text) {
+  const words = spoken(text);
+  says.textContent = words || text.trim();
+  says.classList.add('on');
+  says.scrollTop = 0;
+}
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const asked = input.value.trim();
+  if (!asked) return;
+  input.value = '';
+  send.disabled = true;
+  send.textContent = '...';
+  document.body.classList.add('thinking');
+
+  // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
+  // and refuses anything that is not in the dict, so nothing typed here
+  // can ever name a file.
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'cait' }),
+  })
+    .then(r => r.json())
+    .then(r => said(r.said || 'She said nothing.'))
+    .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
+    .then(() => {
+      send.disabled = false;
+      send.textContent = 'Speak';
+      document.body.classList.remove('thinking');
+      input.focus();
+    });
+};
+
+if (location.hash === '#say') input.focus();
+</script>
