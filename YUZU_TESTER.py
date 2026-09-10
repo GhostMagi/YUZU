@@ -3340,8 +3340,16 @@ class TestCait(unittest.TestCase):
         for name in ("Saya", "Byte", "Coco", "Shiro"):
             self.assertNotIn(">%s<" % name, page,
                              f"{name} is hardcoded into the rail")
+        # THE PROPERTY, NOT A LIST OF NAMES. This asserted the literal
+        # set {saya, cait, yuzu} and went red the moment Mimi landed --
+        # a test that has to be edited every time the thing it guards
+        # works correctly. The guarantee worth pinning is that the rail
+        # and the roster are the SAME cast, which is the whole reason
+        # /characters.json exists.
         cast = {c["who"] for c in yuzu_face.roster()}
-        self.assertEqual(cast, {"saya", "cait", "yuzu"})
+        self.assertEqual(cast, set(yuzu_face.CHARACTERS),
+                         "the rail and the roster disagree about the cast")
+        self.assertIn("cait", cast)
 
     def test_retired_characters_are_off_the_roster_but_still_on_disk(self):
         """Ghost, Sept 11: "we no longer need coco shes retired. or the
@@ -3983,19 +3991,24 @@ class TestMimiBody(unittest.TestCase):
                             "'%s' has no vowel -- espeak will spell it "
                             "out one letter at a time" % sound)
 
-    def test_it_carries_no_persona_and_leaves_her_temperament_to_ghost(self):
-        """The file must not quietly become a character. Her world and
-        her body are settled; whether she is gentle or awful is not, and
-        a body file that silently answers that is the shared-file bleed
-        wearing a different hat."""
-        text = self.FILE.read_text()
+    def test_the_world_file_still_carries_no_TEMPERAMENT(self):
+        """Ghost wrote her personality himself, Sept 12, so the gap this
+        file was holding open is closed -- but the SPLIT it exists for
+        is not. Her temperament belongs in `mimi.persona`; anything of
+        it that leaks in here is inherited by the next character on this
+        body, which is the shared-file bleed that cost this repo the
+        sounds rule and the avatar world's hair.
+
+        The needles are the load-bearing words of her own rules. Each
+        one is hers and none of them is true of a wisp in general."""
+        text = self.FILE.read_text().split("Referenced from")[-1].lower()
+        for hers in ("shiny", "sulk", "brat", "life force", "picked you",
+                     "partner in crime", "little sister", "dote"):
+            self.assertNotIn(hers, text,
+                             "the WORLD file has grown a temperament: %r "
+                             "would be inherited by the next character "
+                             "on this body" % hers)
         self.assertNotIn("---", text, "a body file has no composed prompt")
-        import yuzu_personas
-        on_this_body = [k for k in yuzu_personas.available()
-                        if yuzu_personas.load(k).hardware == "wisp"]
-        self.assertEqual(on_this_body, [],
-                         "somebody wrote her persona; her personality was "
-                         "Ghost's to decide")
 
     def test_she_travelled_here_and_therefore_knows_this_world(self):
         """Ghost, Sept 12, answering the one call this file left open:
@@ -4038,6 +4051,227 @@ class TestMimiBody(unittest.TestCase):
         self.assertGreaterEqual(len(pngs), 5)
         self.assertTrue((art / "ART.txt").exists(),
                         "nobody wrote down where her pictures came from")
+
+
+class TestMimi(unittest.TestCase):
+    """MIMI -- the imouto wisp, and the first character whose picture
+    changes during a conversation.
+
+    Ghost wrote her temperament himself, Sept 12, answering five
+    questions: "her chosen human to attach to (for energy consumption i
+    got alot of that as in she lives off my life force) and also my
+    partner in crime", "she can dote on me a bit", "she wants life force
+    or souls maybe shiny things too", and "she answers straight and
+    listens to me as my energy keeps her 'here'".
+    """
+
+    KEY = "mimi"
+
+    def persona(self):
+        import yuzu_personas
+        return yuzu_personas.load(self.KEY)
+
+    def test_she_loads_and_lives_in_the_wisp_world(self):
+        her = self.persona()
+        self.assertEqual(her.hardware, "wisp")
+        self.assertEqual(her.name, "Mimi")
+        self.assertFalse(her.moves, "the wisp body declares [MOVES] no")
+
+    def test_the_deck_self_is_nowhere_near_her(self):
+        """{DECK_SELF} was a MEASURED win on the deck -- "my battery's
+        always running low", unprompted -- and this repo has recorded
+        four times now that a win is measured against a SPECIFIC
+        failure. On a spirit with a real body it is not budget, it is
+        damage."""
+        prompt = self.persona().prompt.lower()
+        for machine in ("cyberdeck", "handheld computer", "battery",
+                        "language model", "no legs, no arms"):
+            self.assertNotIn(machine, prompt,
+                             "her prompt says %r" % machine)
+
+    def test_she_knows_this_world_unlike_cait(self):
+        """The half of Ghost's answer that is easy to lose. Cait has
+        never heard of a computer and a test BANS the word from her
+        prompt; running that rule here would make every modern question
+        something Mimi has to work around, which costs latency on every
+        turn forever. Five hundred years here is what buys her the
+        technical-question example."""
+        prompt = self.persona().prompt
+        self.assertIn("five hundred years", prompt.lower())
+        self.assertIn("CSS", prompt,
+                      "she has no technical-question example -- the one "
+                      "lever that fixed assistant collapse, four times")
+
+    def test_she_carries_the_three_measured_example_SHAPES(self):
+        """Bare command (yuzu4, 4/4), warm statement with nothing to
+        answer (Shiro round 2), technical question (round 3 -> 4, a
+        CATEGORICAL change). A character built without them restarts the
+        lineage from the worst prompt in the repo."""
+        asked = re.findall(r"^User: (.+)$", self.persona().prompt,
+                           re.MULTILINE)
+        self.assertTrue(any(a.rstrip(".!?").split() and
+                            a[0].isupper() and a.endswith(".") and
+                            "?" not in a and len(a.split()) <= 3
+                            for a in asked),
+                        "no bare command in %r" % (asked,))
+        self.assertTrue(any("?" not in a and "thank" in a.lower()
+                            for a in asked),
+                        "no warm statement with nothing to answer")
+        self.assertTrue(any("CSS" in a for a in asked),
+                        "no technical question")
+
+    def test_every_sound_she_is_taught_survives_the_voice(self):
+        """A sound with no vowel is spelled out letter by letter -- the
+        mechanism that made PFFT come out "Pee Eff Eff Tee". `Mmn` and
+        `Nn` were the obvious clingy little noises and both were cut
+        BEFORE they went in."""
+        import yuzu_voice
+        sounds = self.persona().blocks.get("SOUND_EXAMPLES", "")
+        self.assertTrue(sounds, "she teaches no sounds at all")
+        for sound in (s.strip() for s in sounds.split(",")):
+            self.assertTrue(yuzu_voice.for_speech(sound).strip(),
+                            "the voice drops %r" % sound)
+            self.assertTrue(set(sound.lower()) & set("aeiou"),
+                            "%r has no vowel -- espeak will spell it out "
+                            "one letter at a time" % sound)
+
+    def test_her_look_is_declared_in_HER_file(self):
+        """The avatar world's lesson, and the default is exactly the
+        thing that goes wrong quietly: the world file defaults {LOOK} to
+        Mimi's own cape and ears, so a second character on this body
+        would silently inherit them unless someone remembers. This is
+        what forces the decision instead of trusting a memory."""
+        self.assertIn("LOOK", self.persona().blocks,
+                      "she leans on the world file's default look")
+
+    def test_she_has_a_page_and_therefore_a_button(self):
+        """A character with art but no persona cannot be on the rail --
+        the button would open a face with no brain behind it. That was
+        true of her for a day and it is what the roster's middle column
+        is for."""
+        import yuzu_face
+        self.assertIn("mimi", yuzu_face.CHARACTERS)
+        self.assertEqual(yuzu_face.persona_for("mimi"), self.KEY)
+        page = Path(__file__).parent / "ui" / "mimi.html"
+        self.assertTrue(page.exists(), "she is on the rail with no page")
+        self.assertIn("mimi", [c["who"] for c in yuzu_face.roster()])
+
+
+class TestMimiPoses(unittest.TestCase):
+    """Her picture changes during a conversation, which no other
+    character's does. Saya swaps sprites by state; Cait is one still
+    image; Yuzu changes only on a button."""
+
+    PAGE = Path(__file__).parent / "ui" / "mimi.html"
+
+    def code(self):
+        """The page with its comments removed.
+
+        THE GREP-MATCHES-PROSE TRAP FIRED TWICE HERE, both times on
+        this page's own notes: the comment saying "NO /state POLLING,
+        deliberately" matched a test banning /state, and a comment
+        reading "standing versus crawling versus sitting" matched a
+        test counting how many of her pictures the page names. Both
+        were a check tripping over the sentence explaining the absence
+        it was checking for -- the seventh instance in this file, after
+        the four in TestCalculator. Assert on code, or assert on the
+        model; never on prose."""
+        body = self.PAGE.read_text()
+        body = re.sub(r"<!--.*?-->", " ", body, flags=re.S)
+        body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
+        return "\n".join(ln.split("//")[0] for ln in body.splitlines())
+
+    def test_every_pose_names_art_that_actually_exists(self):
+        """A state pointing at a missing PNG puts a broken image on
+        screen. Same rule as roles_for(): ABSENT beats wrong."""
+        import yuzu_face
+        served = yuzu_face.poses("mimi")
+        self.assertTrue(served, "she has no poses at all")
+        for state, url, scale in served:
+            self.assertTrue(
+                (Path(__file__).parent / "ui" / url).exists(),
+                "%s points at %s, which is not there" % (state, url))
+
+    def test_a_pose_whose_art_is_missing_is_DROPPED_not_served(self):
+        import yuzu_face
+        with mock.patch.dict(yuzu_face.POSES,
+                             {"mimi": (("idle", "bunny_ghosts", 1.0),
+                                       ("talking", "not_a_file", 1.0))},
+                             clear=False):
+            states = [s for s, _, _ in yuzu_face.poses("mimi")]
+        self.assertEqual(states, ["idle"])
+
+    def test_a_character_who_is_one_still_image_gets_no_poses(self):
+        """Cait and Yuzu must come back EMPTY rather than raising, and
+        their pages read that as "you are one picture", which they
+        are."""
+        import yuzu_face
+        for who in ("cait", "yuzu", "saya"):
+            self.assertEqual(yuzu_face.poses(who), [])
+
+    def test_the_who_parameter_is_an_allowlist_like_every_other_route(self):
+        """The server binds 0.0.0.0. `who` is a NAME looked up in a
+        fixed dict, so nothing in a query string can ever name a file --
+        same discipline as /launch/ and /vpet/."""
+        import yuzu_face
+        for hostile in ("../etc", "../../ui/yuzu", "mimi/../saya", "",
+                        "MIMI; rm -rf /", None):
+            self.assertEqual(yuzu_face.poses(hostile), [],
+                             "%r got an answer" % (hostile,))
+
+    def test_the_pose_comes_from_HER_OWN_stage_directions(self):
+        """Not from a sentiment score. A sentiment score is a guess, and
+        a wrong guess puts the wrong picture on a real reply; here a
+        wrong picture needs her to have written the wrong thing. It
+        reads mood_from, which is the ONE copy."""
+        import yuzu_face
+        self.assertEqual(yuzu_face.pose_for("[sulks] fine, whatever."),
+                         "sulking")
+        self.assertEqual(yuzu_face.pose_for("*pouts* I waited all day."),
+                         "sulking")
+        self.assertEqual(yuzu_face.pose_for("Ahh, there you are!"),
+                         "talking")
+        self.assertEqual(yuzu_face.pose_for(""), "talking")
+
+    def test_every_pose_scale_is_one_the_art_can_actually_take(self):
+        """RENDERING IS WHAT FOUND THIS. `ghost_crowd` is drawn edge to
+        edge, so a 1.22 scale pushed her head past the stage's overflow
+        and cut it off -- every assertion passed and the screenshot did
+        not. A scale can only ever be a modest bump, and a pose with no
+        headroom stays at 1.0."""
+        import yuzu_face
+        for state, url, scale in yuzu_face.poses("mimi"):
+            self.assertGreaterEqual(scale, 1.0, state)
+            self.assertLessEqual(scale, 1.25,
+                                 "%s is scaled past what the stage can "
+                                 "show without cropping her" % state)
+
+    def test_the_page_holds_no_list_of_her_pictures(self):
+        """The map lives in yuzu_face.POSES and arrives over
+        /poses.json, so the page cannot disagree with the server about
+        which picture means what. Only her opening pose is named in the
+        markup, and that is on purpose: a real src means a dead server
+        costs the pose changes and never costs HER."""
+        page = self.PAGE.read_text()
+        import yuzu_face
+        named = [stem for _, stem, _ in yuzu_face.POSES["mimi"]
+                 if stem in self.code()]
+        self.assertEqual(len(named), 1,
+                         "the page names %r -- it is keeping its own "
+                         "copy of the pose map" % (named,))
+        self.assertIn('src="mimi/', page,
+                      "no real src in the markup: a dead server would "
+                      "cost her entirely")
+
+    def test_talking_to_her_never_drives_SAYAS_face(self):
+        """THE CROSS-TALK TRAP. Saya's page polls /state to pick her
+        expression and that file is hers -- without a guard, talking to
+        Mimi in one window lights Saya's face up in another, which is
+        the confusing kind of wrong."""
+        page = self.code()
+        self.assertNotIn("'state'", page)
+        self.assertNotIn('"state"', page)
+        self.assertNotIn("/state", page)
 
 
 class TestDeckApps(unittest.TestCase):

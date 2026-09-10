@@ -1,0 +1,384 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mimi</title>
+<!--
+  MIMI — the wisp. Her own tab, her own world, her own colours.
+
+  Ghost, Sept 12, on her temperament: "her chosen human to attach to
+  (for energy consumption i got alot of that as in she lives off my
+  life force) and also my partner in crime". Five hundred years here,
+  and she acts like a little sister about it.
+
+  SHE IS THE FIRST CHARACTER WHOSE PICTURE CHANGES MID-CONVERSATION,
+  and that is the one thing this page does that Cait's does not. Saya
+  swaps sprites by state; Cait is one still image because her art is a
+  single detailed pose; Yuzu changes only when you press the button.
+  Mimi has six real poses, so the mechanism this repo already has twice
+  over -- semantic state -> whatever art exists -- finally has
+  something to work with.
+
+  THE MAP IS NOT IN THIS FILE. /poses.json comes from POSES in
+  yuzu_face.py, so the page holds no list of her pictures and cannot
+  drift from the server, exactly like the rail and the wardrobe. If it
+  cannot be reached she is simply the one pose in the markup, which is
+  the same call Yuzu's page makes about a dead server: a broken extra
+  must never cost you the character.
+
+  THE PALETTE IS HER OWN, MEASURED NOT GUESSED. Sampled across all six
+  PNGs: the white of her cape (#f0f0f0, far and away her most common
+  colour), the cool grey-lilac it shadows into (#a8a8c0), the black of
+  her gloves and legs (#181818), and the ice blue of her hair and the
+  soul-flames (#40b0e0). Cold, because the world file says she is cold
+  to be near.
+
+  No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --night:  #0d1018;          /* cold dark, not Cait's warm one       */
+  --deep:   #070910;
+  --slate:  #1d2434;
+  --edge:   #38445c;
+  --ink:    #eef2f6;          /* her cape                             */
+  --dim:    #a8a8c0;          /* what the cape shadows into           */
+  --ice:    #40b0e0;          /* hair, flames, the little lights      */
+  --pale:   #9fd8ef;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100vh; overflow: hidden; }
+body {
+  background:
+    radial-gradient(120% 90% at 50% 12%, #161c2a 0%, var(--night) 48%,
+                    var(--deep) 100%);
+  color: var(--ink);
+  font: 16px/1.5 Georgia, 'Times New Roman', serif;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- the room ------------------------------------------------------
+   A thin cold hairline, the same furniture Cait's hall has, in her
+   colour instead of gold. Thin, because the picture is the loud thing
+   on this screen. */
+#room {
+  position: fixed; inset: 10px; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ice) 22%, transparent);
+  border-radius: 3px;
+}
+#room::before, #room::after {
+  content: ''; position: absolute; width: 26px; height: 26px;
+  border: 2px solid color-mix(in srgb, var(--ice) 48%, transparent);
+}
+#room::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+#room::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+/* ---- top ---------------------------------------------------------- */
+#top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 26px 4px;
+}
+#who { font-size: 21px; letter-spacing: .08em; color: var(--pale); }
+#title { font-size: 12.5px; color: var(--dim); letter-spacing: .04em;
+         font-style: italic; }
+/* The rail is built from /characters.json — one roster in
+   yuzu_face.py, no list in any page, so it cannot drift. Absent rather
+   than broken if the server cannot be reached. */
+#rail { display: flex; gap: 6px; margin-left: 18px; }
+#rail a, #rail span {
+  font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
+  padding: 4px 11px; border-radius: 2px;
+  color: var(--dim); border: 1px solid transparent;
+}
+#rail a { cursor: pointer; }
+#rail a:hover { color: var(--ink); border-color: var(--edge); }
+#rail .here {
+  color: var(--pale);
+  border-color: color-mix(in srgb, var(--ice) 40%, transparent);
+  background: rgba(0,0,0,.3);
+}
+#home {
+  margin-left: auto; width: 38px; height: 38px; flex: none;
+  border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  font-size: 17px; color: var(--pale); background: rgba(0,0,0,.25);
+  border: 1px solid color-mix(in srgb, var(--ice) 35%, transparent);
+  pointer-events: auto;
+}
+
+/* ---- her ------------------------------------------------------------
+   She stands on the RIGHT and her words go on the LEFT, the layout
+   Cait's page arrived at by rendering it: a bubble at left:4%
+   width:46% ends exactly in the middle of the screen, which is exactly
+   where a centred character is. */
+#stage {
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
+  display: grid; align-items: end; justify-items: end;
+  padding-right: 5%;
+  /* minmax(0, 1fr) IS LOAD-BEARING -- a grid row is `auto` by default,
+     so it grows to fit the image and a percentage height has nothing
+     to resolve against. Measured on Cait: a 779px image in a 460px
+     stage, painting over her own Speak button. */
+  grid-template-rows: minmax(0, 1fr);
+}
+/* THE COLD LIGHT IS THE "SHE IS THINKING" CUE. Cait gets a warm ember;
+   Mimi is cold to be near and her light is the one that comes off her,
+   so hers is ice and it BREATHES rather than flickers. Same job in her
+   own idiom: the honest loading spinner, with no status text. */
+#glow {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 66%; height: 82%; border-radius: 50%;
+  background: radial-gradient(circle,
+              color-mix(in srgb, var(--ice) 26%, transparent) 0%,
+              transparent 68%);
+  opacity: .22; transition: opacity .6s ease;
+}
+body.thinking #glow { animation: chill 2.6s ease-in-out infinite; }
+@keyframes chill {
+  0%, 100% { opacity: .28 }
+  50%      { opacity: .8 }
+}
+/* SHE IS SHOWN WHOLE, at 94% of the stage, standing on its floor.
+   Cait is cropped at the shins because her picture is a POSE from the
+   knee up and nothing below it carries information. Mimi's poses are
+   whole-body and the difference BETWEEN them is the point -- standing
+   versus crawling versus sitting is unreadable if the legs are under
+   the ask bar.
+
+   94% and not 100% because the breath needs somewhere to go: she
+   scales 1.6% from bottom center, and `overflow: hidden` on the stage
+   would shave her ears off on every cycle. Found by rendering it. */
+#mimi {
+  height: 94%; max-width: 54%;
+  object-fit: contain; object-position: bottom center;
+  filter: drop-shadow(0 8px 26px rgba(0,0,0,.7));
+  animation: breathe 5.5s ease-in-out infinite;
+  transform-origin: bottom center;
+  position: relative;
+  /* A pose change is a CUT, and a cut wants to be instant or it reads
+     as a smear. What is eased is the OPACITY, briefly, so she does not
+     pop -- the picture itself never slides or scales between poses. */
+  transition: opacity .18s ease;
+}
+#mimi.swap { opacity: 0; }
+@keyframes breathe {
+  0%, 100% { transform: scale(1)      translateY(0) }
+  50%      { transform: scale(1.016)  translateY(-2px) }
+}
+
+/* ---- what she says -------------------------------------------------- */
+#says {
+  position: absolute; left: 4%; bottom: 7%; width: 42%; max-height: 72%;
+  overflow-y: auto; display: none;
+  background: rgba(8,11,18,.9);
+  border: 1px solid color-mix(in srgb, var(--ice) 30%, transparent);
+  border-left: 3px solid var(--ice);
+  border-radius: 3px; padding: 16px 18px;
+  font-size: 17px; line-height: 1.55;
+}
+#says.on { display: block; }
+#says::after {                       /* a small tail toward her */
+  content: ''; position: absolute; right: -9px; top: 26px;
+  border: 8px solid transparent;
+  border-left-color: color-mix(in srgb, var(--ice) 30%, transparent);
+}
+
+/* ---- asking --------------------------------------------------------- */
+#ask {
+  /* ABOVE HER, ALWAYS. #mimi is positioned, and a positioned element
+     paints above static siblings whatever the DOM order -- without
+     this she covers her own Speak button. */
+  position: relative; z-index: 2;
+  background: linear-gradient(to top, var(--deep) 62%, transparent);
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 26px calc(20px + env(safe-area-inset-bottom));
+}
+#text {
+  flex: 1; font: inherit; font-size: 16px; color: var(--ink);
+  background: rgba(0,0,0,.32); padding: 12px 15px; border-radius: 3px;
+  border: 1px solid var(--edge);
+}
+#text::placeholder { color: var(--dim); opacity: .8; font-style: italic; }
+#text:focus { outline: none; border-color: var(--ice); }
+#send {
+  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  color: #06131c; background: var(--ice); padding: 12px 22px;
+  border: 0; border-radius: 3px;
+}
+#send:disabled { opacity: .5; cursor: default; }
+
+/* INHERITED, NOT DESIGNED. Ghost, Sept 11: "dont need it to be
+   different per screen thats alot of extra work. long as she plug and
+   plays on a touch screen when i buy it." 1024x600 is the target and
+   the only view that gets rendered and looked at. This block keeps the
+   phone usable as the stand-in screen it has always been; nobody
+   should spend a round polishing it. */
+@media (max-width: 760px) {
+  #mimi { max-width: 82%; height: 74%; }
+  #says { position: static; width: auto; margin: 0 18px 10px;
+          max-height: 34vh; }
+  #says::after { display: none; }
+  #stage { justify-items: center; padding-right: 0; }
+}
+</style>
+
+<div id="room"></div>
+
+<div id="top">
+  <div id="who">Mimi</div>
+  <div id="title">five hundred years here</div>
+  <div id="rail"></div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<div id="stage">
+  <div id="glow"></div>
+  <!-- A REAL src IN THE MARKUP, so she is on screen before any fetch
+       happens and stays there if every one of them fails. -->
+  <img id="mimi" src="mimi/bunny_ghosts.png" alt="Mimi">
+  <div id="says"></div>
+</div>
+
+<form id="ask" autocomplete="off">
+  <input id="text" placeholder="Say something to her..." maxlength="2000">
+  <button id="send" type="submit">Speak</button>
+</form>
+
+<script>
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+const says = document.getElementById('says');
+const her = document.getElementById('mimi');
+const ME = 'mimi';
+
+document.getElementById('home').onclick = () => {
+  location.href = 'home.html';
+};
+
+// ---- her poses -------------------------------------------------------
+// The map lives in yuzu_face.POSES and arrives as [[state, url], ...].
+// This page holds no list of her pictures, so it cannot disagree with
+// the server about which one means what. A failed fetch leaves `pose`
+// empty and every swap below becomes a no-op, which means she stays on
+// the one pose in the markup -- absent, never broken.
+let pose = {};
+const ready = fetch('poses.json?who=' + ME, { cache: 'no-store' })
+  .then(r => r.json())
+  .then(list => {
+    list.forEach(([state, url, scale]) => {
+      pose[state] = { url: url, scale: scale };
+      new Image().src = url;   // decoded before the first swap needs it
+    });
+    // THE POSE IN THE MARKUP NEEDS SIZING TOO. She is `idle` before
+    // any fetch resolves, and show() was the only thing that ever set
+    // a height -- so her opening pose rendered at the base scale while
+    // every later one was correct. Caught by rendering it, not by an
+    // assertion: the page was never wrong, it was just never asked.
+    show('idle');
+  })
+  .catch(() => {});
+
+// A CUT, NOT A CROSSFADE. Two of her poses at once is a double
+// exposure; blinking out and back in reads as a camera change, which
+// is what it is. The `src` only changes while she is invisible.
+// The scale is the SERVER's, per pose, and it rides with the cut so
+// she never appears to grow -- she is simply a different shot.
+function sized(p) {
+  her.style.height = (94 * (p.scale || 1)).toFixed(1) + '%';
+}
+
+function show(state) {
+  const p = pose[state];
+  if (!p) return;
+  if (her.getAttribute('src') === p.url) {
+    sized(p);           // same picture, but its scale may not be on yet
+    return;
+  }
+  her.classList.add('swap');
+  setTimeout(() => {
+    her.src = p.url;
+    sized(p);
+    her.classList.remove('swap');
+  }, 180);
+}
+
+// ---- who else is here ------------------------------------------------
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => {
+    const rail = document.getElementById('rail');
+    cast.forEach(c => {
+      const here = c.who === ME;
+      const el = document.createElement(here ? 'span' : 'a');
+      el.textContent = c.name;
+      el.title = c.blurb;
+      if (here) el.className = 'here';
+      else el.href = c.page;
+      rail.appendChild(el);
+    });
+  })
+  .catch(() => {});
+
+// Stage directions are stripped from the BUBBLE, the same call
+// yuzu_voice makes for the speaker. `[the lights drift closer]` is
+// lovely to write and it is not what she SAID -- on a small screen it
+// crowds out the words that are. She is encouraged to write them; they
+// just do not belong in the quote.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/\*[^*]*\*/g, ' ')
+             .replace(/\s{2,}/g, ' ')
+             .trim();
+}
+
+function said(text) {
+  const words = spoken(text);
+  says.textContent = words || text.trim();
+  says.classList.add('on');
+  says.scrollTop = 0;
+}
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const asked = input.value.trim();
+  if (!asked) return;
+  input.value = '';
+  send.disabled = true;
+  send.textContent = '...';
+  document.body.classList.add('thinking');
+  // NO /state POLLING, deliberately. That file belongs to the live
+  // deck character, and writing to it from here would light Saya's
+  // face up in another window -- the cross-talk trap Cait's page
+  // already avoids. This page's own fetch is in flight while she
+  // thinks, so it knows without asking anybody.
+  ready.then(() => show('thinking'));
+
+  // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
+  // and refuses anything that is not in the dict, so nothing typed
+  // here can ever name a file.
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: ME }),
+  })
+    .then(r => r.json())
+    .then(r => {
+      said(r.said || 'She said nothing.');
+      // The pose comes from the SERVER, which picked it by reading her
+      // own stage directions through the one copy of mood_from. The
+      // page never guesses at her feelings.
+      show(r.pose || 'talking');
+    })
+    .catch(() => {
+      said('No answer from the deck. Is ~/YUZU/face running?');
+      show('idle');
+    })
+    .then(() => {
+      document.body.classList.remove('thinking');
+      send.disabled = false;
+      send.textContent = 'Speak';
+      input.focus();
+    });
+};
+</script>

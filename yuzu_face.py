@@ -35,6 +35,7 @@ import subprocess
 import zlib
 import struct
 import sys
+import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -200,6 +201,36 @@ def outfits(directory=None):
             continue
         found.append(stem)
     return found
+
+
+def poses(who):
+    """Ordered (state, url) for a character whose picture changes, or
+    [] for one whose does not.
+
+    Never raises, and a state whose PNG is not on disk is DROPPED
+    rather than served -- same rule as roles_for(): a state pointing at
+    art that is not there puts the wrong picture on screen, and a
+    missing picture is the more honest failure. Cait and Yuzu are
+    absent from POSES entirely and get an empty list, which their pages
+    read as "you are one still image", which they are.
+    """
+    out = []
+    for state, stem, scale in POSES.get((who or "").strip().lower(), ()):
+        if os.path.exists(os.path.join(UI_DIR, who, stem + ".png")):
+            out.append([state, "%s/%s.png" % (who, stem), scale])
+    return out
+
+
+def pose_for(text):
+    """Which pose a reply of hers asks for: `sulking` when she writes a
+    sulk into it, `talking` otherwise.
+
+    It reads her OWN stage directions through mood_from -- the one copy
+    -- rather than guessing at her feelings. A sentiment score would be
+    a guess, and a wrong guess puts the wrong picture on a real reply;
+    here a wrong picture needs her to have written the wrong thing.
+    """
+    return "sulking" if mood_from(text) in ("annoyed", "sad") else "talking"
 
 
 def roles_for(found):
@@ -533,6 +564,48 @@ CHARACTERS = {
     "saya": (None,                     "face.html",  "the deck"),
     "cait": ("cait",                   "cait.html",  "king of the cats"),
     "yuzu": ("yuzu_avatar",            "yuzu.html",  "gyaru, fully dressed"),
+    "mimi": ("mimi",                   "mimi.html",  "five hundred years here"),
+}
+
+# MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A
+# CONVERSATION, and this list is why it is a list.
+#
+# Yuzu's wardrobe is a FOLDER with no list anywhere, because her
+# outfits are one canvas and interchangeable -- any PNG in ui/yuzu/ is
+# a valid Yuzu. Mimi's six are different SHOTS of her, which ART.txt
+# says in as many words: "these are not interchangeable states of one
+# thing". A crawl cannot stand in for a bust. So the mapping from what
+# she is DOING to which picture shows it is a real decision, and a
+# decision belongs somewhere it can be read.
+#
+# It is the ROLES rule, one character over: semantic state -> whatever
+# art exists, and a state whose PNG is missing is ABSENT rather than
+# pointing at the wrong picture. Ghost picked `crawling` himself
+# ("deff use the one where she walks on fours"); the other three were
+# chosen by rendering all six side by side and looking, which is the
+# only check this repo has ever found that holds for art.
+# EACH POSE CARRIES ITS OWN SCALE, and that is not a fudge -- it is
+# the V-Pet lesson arriving in the one situation it does not fit. "ONE
+# box across every state of a character" is right when the states are
+# the same shot; these are not. The artist drew her small in a crowd of
+# ghosts and close-up on all fours, so one height rule renders her as a
+# thumbnail in half of them. Measured at the panel's real 1024x600: at
+# a single size she was a stamp in the corner for `idle` and filled the
+# screen for `talking`.
+#
+# The numbers below were tuned by rendering and looking, which is the
+# only check this repo has ever found that holds for art -- about the
+# sixteenth time. They are BOUNDED BY THE ART's own headroom, not by
+# taste: `ghost_crowd` is drawn edge to edge and 1.22 cut her head off
+# against the stage's overflow, so it is 1.0 and stays a wide shot.
+POSES = {
+    "mimi": (
+        # state      file            scale  why this one
+        ("idle",     "bunny_ghosts",  1.12),  # front on, arms down, calm
+        ("thinking", "graveyard",     1.00),  # looking off, hand at her face
+        ("talking",  "crawling",      1.00),  # right up to you, eyes on you
+        ("sulking",  "ghost_crowd",   1.00),  # head down, face behind hair
+    ),
 }
 
 # HER WARDROBE IS A FOLDER, exactly like the V-Pet's cast and her own
@@ -953,6 +1026,14 @@ class _Handler(SimpleHTTPRequestHandler):
         if self.path.split("?")[0].rstrip("/") in ("/outfits.json", "/outfits"):
             self._json(outfits())
             return
+        # Regenerated per request like the rest. `who` is a NAME and it
+        # is looked up in POSES, so nothing in the query string can ever
+        # reach a path -- same allowlist discipline as /launch/.
+        if self.path.split("?")[0].rstrip("/") in ("/poses.json", "/poses"):
+            query = urllib.parse.parse_qs(
+                urllib.parse.urlparse(self.path).query)
+            self._json(poses((query.get("who") or [""])[0]))
+            return
         if self.path.split("?")[0].rstrip("/") in ("/vpet.json", "/vpet"):
             self._json(_pet_look())
             return
@@ -999,7 +1080,8 @@ class _Handler(SimpleHTTPRequestHandler):
             # `who` is a NAME and gets looked up in CHARACTERS. Nothing
             # from the request reaches a path or a command.
             reply, error = answer(said, who)
-            self._json({"ok": error is None, "said": reply or error})
+            self._json({"ok": error is None, "said": reply or error,
+                        "pose": pose_for(reply) if error is None else "idle"})
             return
         if not path.startswith("/launch/"):
             self.send_error(404)

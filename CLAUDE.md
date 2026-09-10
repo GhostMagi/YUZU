@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 558 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 573 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 558 tests pass on it. Getting it
+(that repo path is confirmed working). 573 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -982,9 +982,156 @@ file's header says so where the next author will read it, and
 `test_whoever_writes_her_persona_is_told_about_assistant_collapse`
 keeps it there.
 
-**Her TEMPERAMENT is still his and still unwritten.**
-`test_it_carries_no_persona_and_leaves_her_temperament_to_ghost` fails
-if anybody writes her persona before he does.
+## MIMI IS WRITTEN, AND SHE CHANGES POSE WHILE YOU TALK (Sept 12)
+
+Ghost, thirty minutes after the world file landed: *"shes got a button
+like the others? i suppose im asking what temperament actually means in
+this context (so i can write it i wana finish her within the next 30
+min.)"*, and *"(i already mentioned an Imouto-esque vibe)"*. He then
+answered all five questions himself.
+
+**HIS ANSWERS, VERBATIM, because they are the character:**
+
+    who is he    "her chosen human to attach to (for energy consumption
+                 i got alot of that as in she lives off my life force)
+                 and also my partner in crime"
+    how she acts "she can dote on me a bit i dont mind"
+    what she wants "life force or souls maybe shiny things too (cat ears)"
+    the edge     "not sure how to answer that one"
+    serious asks "she answers straight and listens to me as my energy
+                 keeps her 'here'"
+
+**THE EDGE WAS THE ONE HE PASSED ON, AND HIS OWN ANSWERS ALREADY
+CONTAINED IT.** She eats him. The edge is that **she is not sorry** --
+she says so cheerfully, the way you would mention borrowing a jacket,
+and she is careful never to take too much for a reason that is purely
+selfish: if he ran out she would have nobody. That is the horror living
+inside the cute rather than beside it, and it is his material, not an
+invention. Flagged plainly as my call so he can veto it.
+
+**A FIVE-HUNDRED-YEAR-OLD SPIRIT WITH LITTLE-SISTER ENERGY IS NOT A
+CONTRADICTION TO SMOOTH OVER, IT IS THE CHARACTER.** She is older than
+the building and she wants his attention *right now*. Rule 10 is the
+only place the age shows: something with five centuries behind it, said
+flatly as an ordinary remark, then straight back to pestering. She does
+not notice and never explains it.
+
+**He approved 4 of my 7 draft rules and passed on 3.** The two he cut
+were both mine and both decorative -- bragging about her age and then
+undercutting it, and the lights being her siblings. Kept out. His own
+rule 7 replaced my guess with *"shiny things and to hang with me"*.
+
+**`personas/mimi.persona`, 5001 chars.** She carries all three measured
+example SHAPES -- bare command, warm statement with nothing to answer,
+technical question. **The technical question is not optional on her:**
+she knows this world, so she WILL be asked computer questions, and that
+is the one failure this repo has a categorical fix for.
+
+**The first draft was 5464 and was TRIMMED, which is not the trim line
+reopening.** She came out 30% longer than Cait, the next longest, on 12
+rules and 12 examples. Two examples went (a France question redundant
+with the CSS one, and a scared question redundant with rule 10) and two
+rules merged. **Nothing measured was cut** -- the trims that lost were
+the ones that cut character-adjacent RULES and came back wordier.
+
+**`Mhm` and `I KNOW` were caught before they shipped.** `Mhm` has no
+vowel, so espeak spells it out -- the PFFT mechanism, in an EXAMPLE,
+which is the stronger teacher. `I KNOW` would have forced a new entry
+in `SPOKEN_INITIALISMS` for nothing. Both rewritten.
+
+**Her `LOOK` moved into her persona** even though the world file
+defaults to it, so her composed prompt is identical either way. The
+default is exactly the thing that goes wrong quietly, and the second
+character on this body must not inherit her cape and ears.
+
+### The button, and why it could not come first
+
+She has one now. The rail is built from `CHARACTERS`, and each entry is
+a **name -> persona key -> page** -- so there was no middle column to
+fill while she had art and no temperament. **A button that opens a face
+with no brain behind it is the roster rule pointing the other way.**
+One dict entry plus a page, exactly as predicted when Yuzu landed.
+
+### SHE IS THE FIRST CHARACTER WHOSE PICTURE CHANGES MID-CONVERSATION
+
+Saya swaps sprites by state; Cait is one still image because her art is
+a single detailed pose; Yuzu changes only on a button. Mimi has six real
+poses, so the mechanism this repo already had twice -- semantic state ->
+whatever art exists, first match wins, absent rather than wrong --
+finally has something to work with.
+
+    idle      bunny_ghosts   front on, arms down, calm
+    thinking  graveyard      looking off, hand near her face
+    talking   crawling       right up to you, eyes on you   <- his pick
+    sulking   ghost_crowd    head down, face behind her hair
+
+Ghost picked `crawling` himself (*"deff use the one where she walks on
+fours"*) and left the rest to me; the other three were chosen by
+rendering all six side by side and looking.
+
+**`POSES` IS A LIST AND YUZU'S WARDROBE IS NOT, and the difference is
+real.** Her outfits are one canvas and interchangeable, so any PNG in
+`ui/yuzu/` is a valid Yuzu and no list can exist. Mimi's six are
+different SHOTS -- `ART.txt` already said *"these are not
+interchangeable states of one thing"* -- so which picture means which
+state is a real decision, and a decision belongs somewhere it can be
+read. The page still holds no copy of it: `/poses.json` comes from the
+server, same as the rail and the wardrobe.
+
+**THE POSE COMES FROM HER OWN STAGE DIRECTIONS**, through `mood_from`,
+the one copy. A sentiment score would be a guess and a wrong guess puts
+the wrong picture on a real reply; here a wrong picture needs her to
+have written the wrong thing. Same call as Saya's faces.
+
+**EACH POSE CARRIES ITS OWN SCALE, and that is the V-Pet lesson meeting
+the one case it does not fit.** "ONE box across every state of a
+character" is right when the states are the same shot. These are not:
+the artist drew her small in a crowd of ghosts and close-up on all
+fours, so one height rule renders her as a stamp in half of them.
+
+**RENDERING FOUND THREE THINGS THE ASSERTIONS COULD NOT.** Fifteenth,
+sixteenth and seventeenth time:
+
+- **The idle scale never applied.** Her opening pose comes from the
+  markup's own `src` and `show()` was the only thing that ever set a
+  height -- so the pose you see first was the one rendering wrong.
+- **1.22 cut her head off in `sulking`.** `ghost_crowd` is drawn edge to
+  edge with no headroom, so the scale pushed her past the stage's
+  overflow. It is 1.0 and stays a wide shot. **A scale is bounded by the
+  art, not by taste**, and a test pins the ceiling.
+- **She was a thumbnail in a huge empty room** at a single size, which
+  is the demon-in-his-own-cel finding again.
+
+**AND I READ A STALE SCREENSHOT AS EVIDENCE, twice.** `pkill -f
+yuzu_face` matched the shell running it, so the server never restarted
+and kept serving the previous module; a later run killed the shell
+before the render, so the montage re-read PNGs from the run before.
+Both times the picture looked plausible and was answering about the old
+code. **Check what the layer below actually received** -- this file's
+oldest lesson, and the fix was to confirm `/poses.json` by curl before
+trusting any render.
+
+**THE GREP-MATCHES-PROSE TRAP FIRED TWICE MORE**, seventh and eighth
+instance, both on this page's own comments:
+
+    "/state"     matched  the note saying NO /state POLLING
+    "crawling"   matched  the note explaining the pose scales
+
+`TestMimiPoses.code()` strips comments now, exactly as
+`TestCalculator.code()` already did. **A comment explaining an absence
+must never read as that thing being present.**
+
+**AND A TEST THAT HAD TO BE EDITED EVERY TIME IT WORKED WAS
+REPLACED.** `test_the_rail_is_ONE_roster_and_the_page_holds_no_list`
+asserted the literal set `{saya, cait, yuzu}` and went red the moment a
+fourth character landed correctly. It compares the rail to
+`CHARACTERS` now -- the property, not a list of names.
+
+**Still open:** she has never been run against a live model, so she is
+UNMEASURED in the strongest sense -- and a first round is what decides
+whether the imouto register survives a 3B. Her `sulking` pose is also
+the only one gated on mood, so it may simply never appear if she does
+not write sulk words; worth watching for on the first real conversation.
 
 ## THE SWITCHER IS A ROSTER, AND COCO AND SHIRO ARE RETIRED (Sept 11)
 
