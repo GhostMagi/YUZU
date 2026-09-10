@@ -218,6 +218,10 @@ body.thinking #glow { animation: ember 2.2s ease-in-out infinite; }
 #send:disabled { opacity: .5; cursor: default; }
 
 @media (max-width: 760px) {
+  /* The subtitle wraps straight through her name once the
+     rail carries four characters. It is decoration; the name
+     and the way out are not. */
+  #title { display: none; }
   #cait { max-width: 82%; height: 118%; }
   #says { position: static; width: auto; margin: 0 18px 10px;
           max-height: 34vh; }

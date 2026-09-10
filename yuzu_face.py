@@ -701,9 +701,21 @@ def answer(text, who="saya"):
         return "(%s)" % problem, None
     try:
         if key not in _BRAINS:
-            import yuzu_personas
-            _BRAINS[key] = yuzu_brain.YuzuBrain(
-                persona=yuzu_personas.load(key))
+            # A KEY, NOT A PERSONA OBJECT. YuzuBrain's `persona`
+            # argument is "key from personas/" and it calls load() on
+            # it itself -- so handing it the loaded object made the
+            # brain look for a file named after the object's repr and
+            # fail with `No persona '<Persona mimi (Imouto wisp)>'`,
+            # which lists `mimi` as available two words later. Ghost
+            # hit it the moment he tapped Speak.
+            #
+            # EVERY CHARACTER ON A PAGE WAS BROKEN BY THIS, not just
+            # the new one, and the suite was green the whole time
+            # because its fake brain accepts anything at all. A stub
+            # that is more permissive than the real thing cannot
+            # observe this class of failure -- the oldest lesson in
+            # this repo, wearing a mock's clothes.
+            _BRAINS[key] = yuzu_brain.YuzuBrain(persona=key)
         face("thinking")
         reply = _BRAINS[key].ask(text)
         # The brain already wrote `talking` WITH the token rate it just

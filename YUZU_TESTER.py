@@ -4274,6 +4274,74 @@ class TestMimiPoses(unittest.TestCase):
         self.assertNotIn("/state", page)
 
 
+class TestEveryCharacterCanActuallyBeAsked(unittest.TestCase):
+    """The bug Ghost hit the first time he tapped Speak on Mimi:
+
+        No persona '<Persona mimi (Imouto wisp)>'. Available: byte,
+        byte_deck, cait, coco, ... mimi, saya, ...
+
+    It names `mimi` as available two words after failing to find it,
+    because `answer()` handed YuzuBrain the LOADED PERSONA where its
+    `persona` argument wants a KEY -- and the brain calls load() on it
+    itself, so it looked for a file named after the object's repr.
+
+    EVERY CHARACTER ON A PAGE WAS BROKEN BY THIS, not just the new one.
+    The suite was green throughout because its fake brain is
+    `def __init__(self, **kw): pass` -- more permissive than the real
+    constructor, so it could not observe the failure. That is this
+    file's oldest lesson wearing a mock's clothes: a check that cannot
+    see the real failure mode is not a check.
+
+    So this fake validates its argument the way YuzuBrain does, and it
+    runs over the WHOLE roster rather than one name, which is what
+    makes it a guard for character #5 as well.
+    """
+
+    def test_the_brain_is_handed_a_key_it_can_actually_load(self):
+        import yuzu_face
+        import yuzu_personas
+
+        seen = []
+
+        class Strict:
+            def __init__(self, persona=None, **kw):
+                # Exactly what YuzuBrain does with this argument.
+                if not isinstance(persona, str):
+                    raise AssertionError(
+                        "persona= got %r, which is not a key" % (persona,))
+                yuzu_personas.load(persona)      # raises if it is wrong
+                seen.append(persona)
+
+            def ask(self, text):
+                return "..."
+
+        was = dict(yuzu_face._BRAINS)
+        try:
+            for who in sorted(yuzu_face.CHARACTERS):
+                with mock.patch.object(yuzu_face, "_BRAINS", {}):
+                    with mock.patch("yuzu_brain.YuzuBrain", Strict):
+                        reply, error = yuzu_face.answer("hello", who)
+                self.assertIsNone(error,
+                                  "asking %s failed: %s" % (who, error))
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+            yuzu_face.set_state("idle")
+        self.assertEqual(len(seen), len(yuzu_face.CHARACTERS))
+
+    def test_an_unknown_name_is_refused_rather_than_answered(self):
+        """Putting the wrong character on screen is the confusing kind
+        of wrong, so a name that is not in the roster gets a sentence
+        and never somebody else's brain."""
+        import yuzu_face
+        for hostile in ("nobody", "../saya", "", "MIMI; rm -rf /"):
+            reply, error = yuzu_face.answer("hello", hostile)
+            if hostile == "":
+                continue        # empty falls back to the live character
+            self.assertIsNone(reply, "%r got an answer" % hostile)
+            self.assertIn("no character", (error or "").lower())
+
+
 class TestDeckApps(unittest.TestCase):
     """`deckapps` -- real app icons, because a touchscreen is not a
     terminal.
@@ -7353,20 +7421,41 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn("home.html", self.FACE.read_text(),
                       "the home button still goes nowhere")
 
-    def test_her_tile_is_there_and_goes_to_her_face(self):
+    def test_every_character_is_reachable_from_this_screen(self):
+        """Ghost, Sept 12: "she also was only found by clicking cait 1st
+        then finding her name lmao."
+
+        MIMI SHIPPED INVISIBLE FROM HERE. She had a page, a persona and
+        a rail entry on every other character's screen, and this page
+        kept its OWN list of the cast -- so the one screen the deck
+        boots into was the one place she did not exist.
+
+        The fix is that there is now exactly one list, in
+        yuzu_face.CHARACTERS, and this page builds its A.I. drawer from
+        /characters.json like every rail already did. So the assertion
+        is not "Saya's tile is in the markup" any more -- that was the
+        shape of the bug. It is that NO character is named in this file
+        at all, because anything named here is something that can fall
+        behind."""
         page = self.PAGE.read_text()
-        self.assertIn('id="saya"', page, "there is no Saya button")
-        self.assertIn('data-go="face.html"', page)
+        import yuzu_face
+        self.assertIn("characters.json", page,
+                      "the home screen does not ask for the roster")
+        for who, (key, target, blurb) in yuzu_face.CHARACTERS.items():
+            self.assertNotIn('data-go="%s"' % target, page,
+                             "%s is hardcoded onto the home screen -- the "
+                             "exact way Mimi went missing" % who)
 
-    def test_the_front_page_is_THREE_tiles_and_misc_is_the_drawer(self):
-        """Ghost, Sept 11: "lets hide the gameboy tab for now its not as
-        important. or put it and the wikipedia tabs under a tab called
-        ☆Misc☆ we can pile up our fancy future apps in that tab."
+    def test_the_front_page_is_TWO_tiles_and_the_rest_are_drawers(self):
+        """Ghost, Sept 12: "homescreen should say 'A.I.' with them all in
+        it. own menu for personas. and Misc. the only 2 tabs/drawers we
+        really need right now."
 
-        So the front page is the four things he actually opens, and
-        every view is FOUR EQUAL TILES with nothing spanning -- which is
-        what the grid was before a fifth tile forced a wide row and a
-        screenshot caught it orphaning two others."""
+        So the front page is the two things this deck IS -- the
+        characters, and everything else -- and each view gets the
+        columns that fit it. The A.I. view has no tiles in the markup at
+        all: it is built from the roster, which is what stops it falling
+        behind the cast the way the old front page did."""
         page = self.PAGE.read_text()
         views = {}
         # `class="tile ..."`, not `class="tile"`: the d20 carries a
@@ -7375,6 +7464,9 @@ class TestHomeScreen(unittest.TestCase):
         for tile in re.findall(r'<div class="tile[ "][^>]*>', page):
             views.setdefault(
                 re.search(r'data-view="(\w+)"', tile).group(1), []).append(tile)
+        # The `ai` view is BUILT FROM THE ROSTER and has no tiles here,
+        # which is the whole point -- a character list in this file is
+        # what made Mimi invisible.
         self.assertEqual(sorted(views), ["main", "misc"])
         # TWO ON THE FRONT, SIX IN THE DRAWER, and each view gets the
         # columns that fit it. Ghost, Sept 11: "put vpet in misc drawer
@@ -7397,12 +7489,18 @@ class TestHomeScreen(unittest.TestCase):
         # screen, and that the fifth tile brought back once already.
         # The drawer stays three across because six fills two rows of
         # three exactly.
-        self.assertEqual(len(views["main"]), 4, "the front page is not four")
+        self.assertEqual(len(views["main"]), 2, "the front page is not two")
         self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
         self.assertIn("#grid.main { grid-template-columns: repeat(2, 1fr); }",
                       page)
         self.assertIn("#grid.misc { grid-template-columns: repeat(3, 1fr); }",
                       page)
+        # Both front tiles are DRAWERS now. Neither goes anywhere, which
+        # is what makes "A.I. and Misc, the only 2 tabs" true rather
+        # than decorative.
+        self.assertEqual(
+            sorted(re.findall(r'data-show="(\w+)"', "".join(views["main"]))),
+            ["ai", "misc"])
         # No view may end on a row with a hole in it. Stated as the
         # PROPERTY rather than as two numbers, so the next tile added
         # to either view has to answer for the layout it lands in.
@@ -7416,12 +7514,8 @@ class TestHomeScreen(unittest.TestCase):
         spans = re.findall(r"([#.][\w-]+)[^{}]*\{[^}]*grid-column:\s*span", page)
         self.assertEqual(spans, ["#screen"],
                          "a spanning tile is back, and an odd row with it")
-        self.assertIn('data-go="face.html"', "".join(views["main"]),
-                      "her tile left the front page")
-        self.assertIn('data-go="cait.html"', "".join(views["main"]),
-                      "Cait left the front page")
-        self.assertIn('data-go="yuzu.html"', "".join(views["main"]),
-                      "Yuzu left the front page")
+        self.assertIn('data-show="ai"', "".join(views["main"]),
+                      "there is no way to the characters")
         self.assertIn('data-go="vpet.html"', "".join(views["misc"]),
                       "the pet left the drawer")
         self.assertIn('data-launch="browser"', "".join(views["misc"]),

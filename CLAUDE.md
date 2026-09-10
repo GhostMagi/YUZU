@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 573 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 575 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 573 tests pass on it. Getting it
+(that repo path is confirmed working). 575 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1132,6 +1132,94 @@ UNMEASURED in the strongest sense -- and a first round is what decides
 whether the imouto register survives a 3B. Her `sulking` pose is also
 the only one gated on mood, so it may simply never appear if she does
 not write sulk words; worth watching for on the first real conversation.
+
+## SHE COULD NOT TALK, AND SHE WAS INVISIBLE FROM THE FRONT PAGE (Sept 12)
+
+Ghost pulled, tapped Mimi's Speak button, and got this in her bubble:
+
+    No persona '<Persona mimi (Imouto wisp)>'. Available: byte,
+    byte_deck, cait, coco, ... mimi, saya, ...
+
+**IT NAMES `mimi` AS AVAILABLE TWO WORDS AFTER FAILING TO FIND IT.**
+`answer()` handed `YuzuBrain` the LOADED PERSONA where its `persona`
+argument wants a KEY -- and the brain calls `load()` on it itself, so
+it looked for a file named after the object's repr.
+
+**EVERY CHARACTER ON A PAGE WAS BROKEN BY THIS, not just the new one.**
+Verified by breaking the fix on purpose: the failure comes back as
+`persona= got <Persona cait (Fae royalty)>`. Cait has been unable to
+answer from her own page since she shipped, and nobody noticed because
+Ghost talks to Saya in the terminal.
+
+**THE SUITE WAS GREEN THE WHOLE TIME, and the reason is the lesson.**
+Its fake brain is `def __init__(self, **kw): pass` -- **more permissive
+than the real constructor**, so it could not observe this class of
+failure. That is the oldest rule in this file wearing a mock's clothes:
+a check that cannot see the real failure mode is not a check.
+`TestEveryCharacterCanActuallyBeAsked` uses a fake that validates its
+argument exactly as `YuzuBrain` does, and drives the WHOLE roster, so
+character #5 is covered the day it lands.
+
+**Generalisable: a stub must be at least as strict as the thing it
+stands in for.** A permissive stub does not test the caller, it excuses
+it.
+
+### The front page is A.I. and ☆Misc☆
+
+Ghost: *"homescreen should say 'A.I.' with them all in it. own menu for
+personas. and Misc. the only 2 tabs/drawers we really need right now."*
+
+    front    A.I.   ☆Misc☆
+    ai       Saya  Cait  Yuzu  Mimi          <- built from the roster
+    drawer   Wikipedia  Game Boy  d20  Pet  Browser  Calculator
+
+**AND THE REASON IT HAD TO CHANGE IS NOT TIDINESS.** Mimi shipped with
+a page, a persona and a rail entry on every other character's screen --
+and she was INVISIBLE from the one screen the deck boots into, because
+**the cast was a list in `home.html`**. Ghost: *"she also was only found
+by clicking cait 1st then finding her name lmao."*
+
+So the A.I. view has **no character tiles in the markup at all**. It is
+built from `/characters.json`, the same roster the rail already used,
+so there is exactly ONE list of the cast on this deck. The test flipped
+with it: it used to assert `id="saya"` is in the page, which was the
+SHAPE OF THE BUG; it now asserts that **no character is named in that
+file at all**, because anything named there is something that can fall
+behind.
+
+**A CHARACTER WITH NO ICON STILL GETS A TILE.** The icons stay line art
+drawn in the file -- an emoji ignores `--ink` and sits on the black
+theme as a glossy blob -- but a missing one falls back to a generic
+figure rather than hiding the character, which is exactly the bug the
+drawer exists to fix. Same shape as `ROLES`.
+
+**`columnsFor(n)` exists because this is the first view whose tile
+count is unknown when the file is written.** Four goes in a 2x2; five
+goes three-then-two, which is a short row rather than a lone orphan --
+the `auto-fit` bug a screenshot caught on the first home screen and
+that a fifth tile brought back once already.
+
+**`wire()` is a function now, not a one-shot `forEach`.** The roster
+tiles are built after that loop runs, so without it every character
+tile would have been a tap that does nothing -- which reads as a broken
+deck, not a missing handler.
+
+**RENDERING FOUND TWO MORE.** Eighteenth and nineteenth time:
+
+- **`#saya .big svg { 72px }` outlived its layout.** It was right while
+  she was the one named tile on a front page of four; inside the A.I.
+  drawer she is one of four peers and equal thumb targets want equal
+  icons. **A rule that outlives the layout it was written for is the
+  same fault as a hardcoded cast, one size down.**
+- **Mimi's first icon was a second cat face.** Ears over a face is what
+  Cait's is, and they sit next to each other in the drawer. Hers is a
+  hood and a wisp now.
+
+**Her page's subtitle wrapped straight through her own name on his
+phone** once the rail carried four characters. `#title` is hidden under
+the existing narrow-screen block on all three character pages -- one
+line, no per-screen variant, which is the standing call. The panel keeps
+it.
 
 ## THE SWITCHER IS A ROSTER, AND COCO AND SHIRO ARE RETIRED (Sept 11)
 
