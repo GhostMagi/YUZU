@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 575 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 576 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 575 tests pass on it. Getting it
+(that repo path is confirmed working). 576 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1132,6 +1132,53 @@ UNMEASURED in the strongest sense -- and a first round is what decides
 whether the imouto register survives a 3B. Her `sulking` pose is also
 the only one gated on mood, so it may simply never appear if she does
 not write sulk words; worth watching for on the first real conversation.
+
+## SHE THOUGHT GHOST WAS A GIRL, AND HER RULES SAID OTHERWISE THIRTEEN TIMES (Sept 12)
+
+First working conversation with Mimi. Ghost: *"okay shes working hell
+yea, i did notice she thinks im a girl... that bothers me but its the
+only bit that does."* She had opened a reply with **"Ahh, good girl."**
+
+**HER PROMPT ALREADY SAID `him`, `he` or `his` THIRTEEN TIMES** -- more
+than any other persona in the repo, and the other three do not state
+the user's gender at all. So this is not a missing fact. **It is the
+rules-versus-examples finding again, and it is the cleanest instance of
+it yet:**
+
+    every pronoun     sat in a RULE, about a third party
+    every example     addressed him with no gender in it at all
+
+Handed that gap, a 3B fills it from the base model's prior -- and
+"good girl" is an extremely common thing for a small cute character to
+say. **Examples beat rules, measured repeatedly here, and thirteen
+pronouns in the rules lost to zero in the examples.**
+
+**THE FIX IS ONE EXAMPLE, IN THE EXACT SLOT THE FAULT APPEARED IN.**
+She said it while praising him for promising something shiny, so the
+shiny-thing example is where the address goes:
+
+    User: Look what I found.
+    Mimi: Oh, that's shiny. That's mine now. Good boy — you found it,
+    but I want it, and those are basically the same thing.
+
+Fifth time that lever has been reached for (bare command -> yuzu4,
+warm statement, technical question, Cait's whole example set, this).
+One clause also binds the pronoun to the listener in rule 3 -- "this
+one man" -- because thirteen third-person pronouns never connected to
+the person actually in the conversation. 5001 -> 5016 chars. UNMEASURED.
+
+**"Good boy" is a CHOICE and it is easy to change.** Nothing in his
+brief named a form of address, and a character with none demonstrated
+will invent one every time -- that is the whole finding. It is also in
+register for her: a five-hundred-year-old calling a modern man "boy"
+earns the age rule rather than fighting it. If he would rather be
+called something else it is one word in one example.
+
+**NOT changed: the other three characters.** None of them states the
+user's gender either, so the gap is repo-wide -- but none has ever
+shown the fault in a live round, their prompts are measured artifacts,
+and editing them would shift composed prompts for a bug nobody has hit.
+Watch for it; do not pre-emptively rewrite them.
 
 ## SHE COULD NOT TALK, AND SHE WAS INVISIBLE FROM THE FRONT PAGE (Sept 12)
 

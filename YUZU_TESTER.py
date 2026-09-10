@@ -4102,6 +4102,36 @@ class TestMimi(unittest.TestCase):
                       "she has no technical-question example -- the one "
                       "lever that fixed assistant collapse, four times")
 
+    def test_she_knows_she_is_talking_to_a_MAN(self):
+        """Ghost, Sept 12, on her first working conversation: "i did
+        notice she thinks im a girl... that bothers me but its the only
+        bit that does." She had opened with "Ahh, good girl."
+
+        HER RULES ALREADY SAID `him` THIRTEEN TIMES. That is what makes
+        this the rules-versus-examples finding again rather than a
+        missing fact: every pronoun sat in a RULE describing a third
+        party, every EXAMPLE addressed him with no gender in it at all,
+        and a 3B handed a gap fills it from the base model's prior --
+        where "good girl" is an extremely common thing for a small
+        cute character to say.
+
+        So the load-bearing half of the fix is the EXAMPLE, which is
+        the lever this repo has measured working four times, and it is
+        placed in the exact slot the fault appeared in: her praising
+        him for finding something shiny."""
+        persona = self.persona()
+        self.assertIn("this one man", persona.prompt,
+                      "nothing in her prompt says who she is talking to")
+        spoken = [ln for ln in persona.prompt.splitlines()
+                  if ln.startswith("Mimi:")]
+        self.assertTrue(
+            any("boy" in ln for ln in spoken),
+            "no example shows her addressing him -- the rules alone did "
+            "not hold, which is how 'good girl' got in")
+        self.assertFalse(
+            any("good girl" in ln.lower() for ln in spoken),
+            "an example teaches the exact thing that went wrong")
+
     def test_she_carries_the_three_measured_example_SHAPES(self):
         """Bare command (yuzu4, 4/4), warm statement with nothing to
         answer (Shiro round 2), technical question (round 3 -> 4, a
