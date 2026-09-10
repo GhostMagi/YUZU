@@ -124,7 +124,8 @@ body {
    The two views differ on purpose: the front page is a curated set
    that rarely changes, and the drawer is where he means to "pile up
    our fancy future apps". */
-#grid.main { grid-template-columns: repeat(3, 1fr); }
+#grid.main { grid-template-columns: repeat(2, 1fr); }
+#grid.misc { grid-template-columns: repeat(3, 1fr); }
 
 /* THE WAY OUT LIVES IN THE BAR, not in the grid. Ghost means to "pile
    up our fancy future apps" in the drawer, so a Back TILE would spend
@@ -150,6 +151,13 @@ body {
   letter-spacing: .02em; font-variant-numeric: tabular-nums;
 }
 #d20.rolling .roll { opacity: .55; }
+/* Before the first roll that span holds WORDS, not a number, and the
+   46px result styling made "tap to roll" the loudest thing on the
+   screen. Caught by rendering the drawer and looking at it -- the
+   assertion that the label exists passed perfectly well. */
+#d20.hint .roll {
+  font-size: 12.5px; font-weight: 400; opacity: .6; letter-spacing: 0;
+}
 /* The CRT flourish, and it is only ever on the two numbers that
    deserve one. A glow on every result is just a bright tile. */
 #d20.nat20 { border-color: var(--ink); }
@@ -233,7 +241,14 @@ body {
   fill: none; stroke: var(--ink); stroke-width: 1.6;
   stroke-linecap: round; stroke-linejoin: round;
 }
-#saya .big svg { width: 58px; height: 58px; }
+/* The front page is TWO tiles now, so each one is half the panel and a
+   46px icon floats in the middle of it looking lost. Scaled to the
+   room they actually have -- caught by rendering it, not by reading
+   the CSS. The drawer keeps 46px, where six tiles make that right. */
+#grid.main .tile .big svg { width: 76px; height: 76px; }
+#grid.main .tile b { font-size: 22px; }
+#grid.main .tile span { font-size: 14px; }
+#saya .big svg { width: 88px; height: 88px; }
 .tile b { font-size: 17px; font-weight: 700; }
 .tile span { font-size: 12.5px; opacity: .6; text-align: center; }
 .tile.busy { opacity: .55; }
@@ -269,11 +284,6 @@ body {
     <b>Saya</b>
     <span>look at her, talk to her</span>
   </div>
-  <div class="tile" id="pet" data-view="main" data-go="vpet.html">
-    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
-    <b>Pet</b>
-    <span>he lives here</span>
-  </div>
   <div class="tile" id="misc" data-view="main" data-show="misc">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 13.8v6.4M13.8 17h6.4"/></svg></div>
     <b class="stars">☆Misc☆</b>
@@ -290,10 +300,20 @@ body {
     <b>Game Boy</b>
     <span>newest ROM</span>
   </div>
-  <div class="tile" id="d20" data-view="misc" data-roll="20">
+  <div class="tile hint" id="d20" data-view="misc" data-roll="20">
     <div class="big"><svg viewBox="0 0 24 24"><path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z"/><path d="m12 2.2 5 7.3-5 8-5-8z"/><path d="M7 9.5 3.5 7M17 9.5 20.5 7M12 17.5V21.8"/></svg></div>
     <b>d20</b>
     <span class="roll">tap to roll</span>
+  </div>
+  <div class="tile" id="pet" data-view="misc" data-go="vpet.html">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
+    <b>Pet</b>
+    <span>he lives here</span>
+  </div>
+  <div class="tile" data-view="misc" data-launch="browser">
+    <div class="big"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3.5 9h17M3.5 15h17"/></svg></div>
+    <b>Browser</b>
+    <span>YouTube &amp; the web</span>
   </div>
   <div class="tile" id="calc" data-view="misc" data-show="calc">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><path d="M7.5 6.5h9"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h.01M16 18h.01"/></svg></div>
@@ -412,7 +432,7 @@ function d(sides) {
 function roll(tile, sides) {
   if (tile.classList.contains('rolling')) return;
   const out = tile.querySelector('.roll');
-  tile.className = tile.className.replace(/ (nat20|nat1|settled|rolling)/g, '');
+  tile.className = tile.className.replace(/ (nat20|nat1|settled|rolling|hint)/g, '');
   tile.classList.add('rolling');
   // Tumble first. A number that simply appears has not been ROLLED,
   // and the whole point of a dice button is the half-second of not

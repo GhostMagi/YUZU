@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 500 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 502 tests, ~18 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 500 tests pass on it. Getting it
+(that repo path is confirmed working). 502 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -513,6 +513,88 @@ for a tsundere is the same feeling.
 `test_every_sprite_he_drew_can_actually_be_reached` is the guard worth
 keeping: art in the repo that no state resolves to is art made for
 nothing, and it went unnoticed for two days.
+
+## IT IS HER UI, NOT A BROWSER TAB — and the browser stays reachable
+
+Ghost, Sept 11, forwarded from a design chat: *"I do not want it using
+a browser tab on the real hardware. I want that to be its actual UI...
+leme ask code if thats how its setup and if were just doing it this way
+for testing."* And: *"can i set it up to have youtube,browsing, etc on
+the same screen? (To my understanding its both ubuntu and a jetpack)"*
+
+**IT WAS NEVER A TAB.** `deckapps` has always opened every page with
+`chromium --app=URL`, which is a window with **no url bar and no
+tabs** -- that was the whole point of the original request. The other
+chat guessed the browser-window shape was "almost certainly temporary
+for testing"; it was not, it was already the app treatment.
+
+**What was missing is FULLSCREEN, and that is now added.**
+`--app=URL --start-fullscreen`. On the panel there is then no window
+edge, no title bar and nothing that reads as a web page.
+
+**`--start-fullscreen`, NEVER `--kiosk`, and the two look IDENTICAL.**
+Kiosk additionally takes away F11 and Alt+F4. That is the one thing
+this project will not build on a screen with no keyboard -- *"a UI that
+can trap him is strictly worse than a terminal"*, and two power cycles
+paid for that sentence. Fullscreen gives him the look and keeps the way
+out, so **there is nothing to trade**. The test asserts both halves.
+
+**AND THE FULLSCREEN CHANGE CREATED THE PROBLEM THE OTHER CHAT
+PREDICTED**, which is why it is fixed in the same commit: once her page
+fills the panel there is no way to reach the web at all. **A deck that
+locks out the browser it is built on is a worse computer than the bare
+board.** So there is a **Browser** tile in ☆Misc☆ and a Browser icon in
+the app menu, both deliberately NOT chromeless -- this is the one that
+wants a url bar.
+
+**`/launch/browser` carries NO URL.** It opens on whatever homepage the
+browser already has, so not one character from the request reaches a
+command line. The allowlist stays a list of NAMES, which is the only
+reason that route is safe on a server bound to 0.0.0.0.
+
+**YES to YouTube, with one honest caveat.** The board runs full Ubuntu
+ARM64 and Chromium plays YouTube. What is NOT verified on his board is
+hardware video decode -- distro Chromium on ARM often falls back to CPU,
+which is fine at 720p and can stutter at 1080p60. Untested here; he
+will know in ten seconds and it costs nothing to try.
+
+## THE FRONT PAGE IS TWO TILES (Sept 11)
+
+Ghost: *"put vpet in misc drawer too. remove button from says face for
+it. seems more streamlined."*
+
+    front    Saya   ☆Misc☆
+    drawer   Wikipedia  Game Boy  d20  Pet  Browser  Calculator
+
+**He is right, and it is the third time the same trim has been made in
+one evening.** Talk went because it opened the same page as Saya. The
+pet button on her face went for the same reason the colour dot did: a
+shortcut to another app parked on her face is clutter, and the drawer
+is where things you open occasionally belong.
+
+The front page is now the two things the deck IS -- her, and everything
+else -- and each view gets the columns that fit it: two across the
+front, three across the drawer. A single shared grid would have forced
+one of them to look wrong.
+
+**RENDERING FOUND TWO THINGS THE ASSERTIONS COULD NOT.** Eleventh and
+twelfth time:
+
+- **`tap to roll` rendered at 46px**, because that span is styled for
+  the d20's RESULT and a placeholder is words rather than a number. It
+  was the loudest thing in the drawer. A `hint` class holds it at
+  subtitle size until the first roll.
+- **The front-page icons were lost.** Two tiles means each one is half
+  the panel, and a 46px icon floats in the middle of it. Scaled to the
+  room they actually have; the drawer keeps 46px, where six tiles make
+  that right.
+
+**And the `hint` class broke a test by being there at all.** The tile
+count used `re.findall(r'<div class="tile"[^>]*>')` -- a literal match
+on the class attribute -- so `class="tile hint"` silently dropped the
+d20 from the count and the drawer read as five. Same family as every
+other grep-as-proxy fault this file records: **the assertion was about
+the markup's spelling rather than about the page.**
 
 ## `/wiki` WORKS — AND WAS FETCHING THE WRONG ARTICLE (Sept 11)
 

@@ -3188,17 +3188,54 @@ class TestDeckApps(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr.decode())
 
     def test_it_installs_every_app_when_the_desktop_has_what_it_needs(self):
-        """Five now: her FACE and the HOME screen joined the original
+        """Seven now. Her FACE and the HOME screen joined the original
         three when Ghost asked for "a desktop with my apps and a saya
-        button visible"."""
+        button visible", and BROWSER joined when the home screen started
+        opening fullscreen -- see the test below."""
         done, names, on_desktop, _ = self._run(have=("chromium", "xterm"))
-        self.assertEqual(names, ["yuzu-face.desktop", "yuzu-gba.desktop",
+        self.assertEqual(names, ["yuzu-browser.desktop",
+                                 "yuzu-face.desktop", "yuzu-gba.desktop",
                                  "yuzu-home.desktop", "yuzu-pet.desktop",
                                  "yuzu-saya.desktop",
                                  "yuzu-wiki.desktop"], done.stdout)
         # and on the Desktop too, which is where a touchscreen user taps
         self.assertIn("yuzu-wiki.desktop", on_desktop)
         self.assertIn("yuzu-home.desktop", on_desktop)
+
+    def test_her_pages_open_FULLSCREEN_but_never_as_a_kiosk(self):
+        """Ghost, Sept 11: "I do not want it using a browser tab on the
+        real hardware. I want that to be its actual UI."
+
+        --app= already removed the url bar and the tabs; fullscreen is
+        the rest of it, and on the panel there is then no window edge
+        and nothing that says "web page".
+
+        --kiosk WOULD LOOK IDENTICAL and take away F11 and Alt+F4. That
+        is the one thing this project will not build on a screen with no
+        keyboard: "a UI that can trap him is strictly worse than a
+        terminal", and two power cycles paid for that sentence.
+        Fullscreen gives the look and keeps the way out, so there is
+        nothing to trade -- which is why this asserts BOTH halves."""
+        body = self.SCRIPT.read_text()
+        chrome = body.split("browser_cmd()")[1].split("}")[0]
+        self.assertIn("--app=URL --start-fullscreen", chrome)
+        self.assertNotIn("chromium --kiosk", body,
+                         "her page can now trap him with no way out")
+
+    def test_there_is_a_PLAIN_browser_and_it_is_not_chromeless(self):
+        """The door back to the web. Ghost: "can i set it up to have
+        youtube,browsing, etc on the same screen?" -- yes, and once her
+        page fills the panel this is the only way to reach it. A deck
+        that locks out the browser it is built on is a worse computer
+        than the bare board.
+
+        Deliberately NOT --app=: this one wants the url bar."""
+        done, names, _, _ = self._run(have=("chromium", "xterm"))
+        self.assertIn("yuzu-browser.desktop", names, done.stdout)
+        body = self.SCRIPT.read_text()
+        plain = body.split("plain_browser()")[1].split("\n}")[0]
+        self.assertNotIn("--app=", plain, "the browser lost its url bar")
+        self.assertNotIn("--kiosk", plain)
 
     def test_the_wiki_app_opens_CHROMELESS_not_a_browser_tab(self):
         """The whole request. --app= gives a window with no url bar and
@@ -6168,7 +6205,7 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn('id="saya"', page, "there is no Saya button")
         self.assertIn('data-go="face.html"', page)
 
-    def test_the_front_page_is_three_tiles_and_misc_is_the_drawer(self):
+    def test_the_front_page_is_TWO_tiles_and_misc_is_the_drawer(self):
         """Ghost, Sept 11: "lets hide the gameboy tab for now its not as
         important. or put it and the wikipedia tabs under a tab called
         ☆Misc☆ we can pile up our fancy future apps in that tab."
@@ -6179,20 +6216,28 @@ class TestHomeScreen(unittest.TestCase):
         screenshot caught it orphaning two others."""
         page = self.PAGE.read_text()
         views = {}
-        for tile in re.findall(r'<div class="tile"[^>]*>', page):
+        # `class="tile ..."`, not `class="tile"`: the d20 carries a
+        # second class before its first roll, and a literal match
+        # silently dropped it from the count.
+        for tile in re.findall(r'<div class="tile[ "][^>]*>', page):
             views.setdefault(
                 re.search(r'data-view="(\w+)"', tile).group(1), []).append(tile)
         self.assertEqual(sorted(views), ["main", "misc"])
-        # THREE ON THE FRONT, FOUR IN THE DRAWER, and each view gets the
-        # row that fits it rather than a shared 2x2 with a hole in the
-        # corner. Ghost, Sept 11: "i noticed Face button and Talk button
-        # are the same thing now? is that accurate?" -- it was. Both
-        # opened face.html, so one of them was a wasted tile. Saya owns
-        # both jobs now; her chat bar has always been on that page.
-        self.assertEqual(len(views["main"]), 3, "the front page is not three")
-        self.assertEqual(len(views["misc"]), 4, "the drawer is not four")
-        self.assertIn("#grid.main { grid-template-columns: repeat(3, 1fr); }",
-                      page, "three tiles in a two-column grid orphans one")
+        # TWO ON THE FRONT, SIX IN THE DRAWER, and each view gets the
+        # columns that fit it. Ghost, Sept 11: "put vpet in misc drawer
+        # too. remove button from says face for it. seems more
+        # streamlined." He is right -- the front page is now the two
+        # things the deck IS (her, and everything else) and the drawer
+        # is where he means to "pile up our fancy future apps".
+        #
+        # Talk went the same way an hour earlier: it opened face.html
+        # just like Saya did, so it was a wasted tile.
+        self.assertEqual(len(views["main"]), 2, "the front page is not two")
+        self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
+        self.assertIn("#grid.main { grid-template-columns: repeat(2, 1fr); }",
+                      page)
+        self.assertIn("#grid.misc { grid-template-columns: repeat(3, 1fr); }",
+                      page)
         # The rule is about the TILE grid: a wide tile forced an odd row
         # and orphaned two others. The calculator's display spanning its
         # own keypad is not that, so pin WHICH selector may span rather
@@ -6200,9 +6245,12 @@ class TestHomeScreen(unittest.TestCase):
         spans = re.findall(r"([#.][\w-]+)[^{}]*\{[^}]*grid-column:\s*span", page)
         self.assertEqual(spans, ["#screen"],
                          "a spanning tile is back, and an odd row with it")
-        for wanted in ('data-go="face.html"', 'data-go="vpet.html"'):
-            self.assertIn(wanted, "".join(views["main"]) + page,
-                          f"{wanted} left the front page")
+        self.assertIn('data-go="face.html"', "".join(views["main"]),
+                      "her tile left the front page")
+        self.assertIn('data-go="vpet.html"', "".join(views["misc"]),
+                      "the pet left the drawer")
+        self.assertIn('data-launch="browser"', "".join(views["misc"]),
+                      "there is no way to the web from her screen")
         # TALK IS NOT A TERMINAL. It used to POST /launch/chat, which
         # starts an xterm ON THE DECK'S SCREEN -- from the phone that is
         # a window nobody can see, and on the panel it lands him in a
@@ -6265,7 +6313,7 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 7, "not seven line icons")
+        self.assertEqual(page.count("<svg"), 8, "not eight line icons")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):

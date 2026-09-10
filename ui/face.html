@@ -217,20 +217,18 @@ body.thinking #face { animation-duration: 2.6s; }
   background: var(--ink); color: #06080a; border-color: var(--ink);
   border-radius: 4px;
 }
-/* Two buttons, both round, both the same weight: one goes home, one
-   opens the V-Pet. The colour dot that used to sit here is GONE --
-   "id like it removed" -- and this is what its pixels bought. */
-#pet, #home {
+/* ONE button, round, and it goes home. The V-Pet lived here for a day
+   and moved into the ☆Misc☆ drawer -- Ghost, Sept 11: "put vpet in misc
+   drawer too. remove button from says face for it. seems more
+   streamlined." He is right: a shortcut to another app parked on her
+   face is the same shape as the colour dot that used to sit there, and
+   the drawer is where things you occasionally open belong. */
+#home {
   width: 42px; height: 42px; flex: none; border-radius: 50%;
   cursor: pointer; display: grid; place-items: center;
   background: rgba(13,13,17,.85); color: var(--ink); font-size: 19px;
   border: 2px solid color-mix(in srgb, var(--ink) 55%, transparent);
 }
-#pet svg {
-  width: 24px; height: 24px; fill: none; stroke: var(--ink);
-  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
-}
-
 #empty {
   padding: 28px; max-width: 30em; line-height: 1.6; margin: auto;
   color: rgba(0,0,0,.7); text-align: center;
@@ -256,7 +254,6 @@ body.thinking #face { animation-duration: 2.6s; }
   <input id="text" placeholder="Say something, or /wiki cats"
          maxlength="2000">
   <button id="send" type="submit">Send</button>
-  <div id="pet" title="her pet"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
   <div id="home" title="home">⌂</div>
 </form>
 
@@ -289,10 +286,6 @@ function show(i) {
   document.body.classList.add(e.name);
   try { localStorage.setItem('saya-face', e.name); } catch (err) {}
 }
-
-document.getElementById('pet').onclick = () => {
-  location.href = 'vpet.html';
-};
 
 fetch('sprites.json', { cache: 'no-store' })
   .then(r => r.json())

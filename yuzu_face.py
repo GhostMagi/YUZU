@@ -316,6 +316,26 @@ def write_rgba(path, w, h, px):
 TERMINALS = ("xfce4-terminal", "lxterminal", "mate-terminal",
              "gnome-terminal", "xterm")
 
+# A PLAIN browser -- url bar, tabs, the lot. Deliberately the opposite
+# of how every other page on this deck is opened.
+#
+# Ghost, Sept 11: "can i set it up to have youtube,browsing, etc on the
+# same screen?" Yes, and it needs a door. Her home screen fills the
+# panel now (`deckapps` opens it with --app= --start-fullscreen), so
+# without this there is no way from her face to the web at all -- a
+# deck that locks out the browser it is built on is a worse computer
+# than the bare board.
+BROWSERS = ("chromium", "chromium-browser", "google-chrome",
+            "brave-browser", "firefox")
+
+
+def _browser():
+    for name in BROWSERS:
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
 
 def _terminal():
     for t in TERMINALS:
@@ -338,6 +358,15 @@ def launchers():
         "wiki": ([os.path.join(here, "wiki")],
                  "Wikipedia is starting.", "http://127.0.0.1:8080"),
     }
+    web = _browser()
+    if web:
+        # NO URL ARGUMENT. It opens on whatever homepage the browser
+        # already has, which means not one character from the request
+        # reaches the command line -- the allowlist stays a list of
+        # NAMES, which is the only reason this route is safe on a
+        # server bound to 0.0.0.0.
+        plans["browser"] = ([web], "Browser is opening on the deck's "
+                                   "screen.", None)
     term = _terminal()
     if term:
         plans["chat"] = (
@@ -355,6 +384,9 @@ def launch(name):
         if name == "chat":
             return (False, "No terminal emulator on this board -- "
                            "install one: sudo apt install -y xterm", None)
+        if name == "browser":
+            return (False, "No browser on this board -- install one: "
+                           "sudo apt install -y chromium-browser", None)
         return (False, "Not a thing this deck knows how to open.", None)
     argv, said, opens = plans[name]
     if not os.path.exists(argv[0]) and not shutil.which(argv[0]):

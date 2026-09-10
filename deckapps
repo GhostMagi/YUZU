@@ -60,12 +60,39 @@ fi
 # Pick what is actually installed rather than assuming. Chromium's
 # --app= gives a chromeless window, which is the whole point; firefox
 # --kiosk is the closest equivalent.
+#
+# --start-fullscreen, NOT --kiosk. Ghost, Sept 11: "I do not want it
+# using a browser tab on the real hardware. I want that to be its
+# actual UI." Right call, and --app= was already most of the way there
+# -- no url bar, no tabs, no browser furniture at all. Fullscreen is
+# the rest of it: on the panel there is no window edge, no title bar,
+# nothing that says "web page".
+#
+# --kiosk would look IDENTICAL and take away F11 and Alt+F4. That is
+# the one thing this project will not build. CLAUDE.md: "a UI that can
+# trap him is strictly worse than a terminal", and two power cycles
+# paid for that sentence. Fullscreen gives him the look and keeps the
+# way out, so there is nothing to trade.
 browser_cmd() {
     for b in chromium chromium-browser google-chrome brave-browser; do
-        command -v "$b" >/dev/null 2>&1 && { echo "$b --app=URL"; return; }
+        command -v "$b" >/dev/null 2>&1 && {
+            echo "$b --app=URL --start-fullscreen"; return; }
     done
     command -v firefox >/dev/null 2>&1 && { echo "firefox --kiosk URL"; return; }
     command -v epiphany >/dev/null 2>&1 && { echo "epiphany -a URL"; return; }
+    echo ""
+}
+
+# A PLAIN browser window, url bar and all -- the opposite of the above
+# and the reason it exists. Once her page fills the panel there is no
+# way to reach YouTube or anything else on the web, and a deck that
+# locks out the browser it is built on is a worse computer than the
+# board already is. Ghost: "can i set it up to have youtube,browsing,
+# etc on the same screen?" Yes: this is that.
+plain_browser() {
+    for b in chromium chromium-browser google-chrome brave-browser firefox; do
+        command -v "$b" >/dev/null 2>&1 && { echo "$b"; return; }
+    done
     echo ""
 }
 
@@ -127,6 +154,19 @@ if [ -n "$TERM_APP" ]; then
 else
     echo "  SKIPPED Saya: no terminal emulator found."
     echo "    sudo apt install -y xterm"
+fi
+
+# --- Browser ----------------------------------------------------------
+# Her face fills the panel, so this is the way back to the rest of the
+# web. Ordinary window, url bar, tabs -- deliberately NOT the chromeless
+# treatment every other icon here gets.
+PLAIN=$(plain_browser)
+if [ -n "$PLAIN" ]; then
+    write_app "Browser" "YouTube and the rest of the web" \
+        "$PLAIN" "web-browser" "yuzu-browser"
+else
+    echo "  SKIPPED Browser: no browser found."
+    echo "    sudo apt install -y chromium-browser"
 fi
 
 # --- Wikipedia --------------------------------------------------------
