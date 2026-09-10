@@ -180,6 +180,28 @@ def sprites(directory=None):
     return found
 
 
+def outfits(directory=None):
+    """Every outfit PNG in ui/yuzu/, sorted, as bare names.
+
+    Never raises and never returns None -- same guard as sprites(). A
+    missing folder is an empty list, and the page treats that as "no
+    wardrobe button", not as "no Yuzu": her <img> carries a real src in
+    the markup, so she is on screen before this is ever asked for.
+    """
+    directory = directory or OUTFIT_DIR
+    found = []
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return found
+    for entry in names:
+        stem, ext = os.path.splitext(entry)
+        if ext.lower() not in EXTS or entry.startswith("."):
+            continue
+        found.append(stem)
+    return found
+
+
 def roles_for(found):
     """Map semantic state -> sprite name, using only art that exists."""
     have = {s["name"] for s in found}
@@ -501,14 +523,23 @@ def get_state():
 # That is the ROLES rule one level up: a role with no art is ABSENT
 # rather than pointing at the wrong face.
 #
-# Yuzu is coming back as a portrait like Cait's ("Yuzu has future plans
-# very similar to cait... will provide pngs"). When her PNG lands she
-# is one entry here plus a copy of cait.html.
+# Yuzu came back the next day, exactly as predicted: one entry here
+# plus a page shaped like Cait's. She is `yuzu_avatar`, NOT `yuzu_deck`
+# -- the deck version is the record of her bodiless era, the same way
+# saya_quad is of the robot one, and the whole point of the new arm is
+# that she HAS a body now.
 CHARACTERS = {
     # name      persona key            page          what she is
     "saya": (None,                     "face.html",  "the deck"),
     "cait": ("cait",                   "cait.html",  "king of the cats"),
+    "yuzu": ("yuzu_avatar",            "yuzu.html",  "gyaru, fully dressed"),
 }
+
+# HER WARDROBE IS A FOLDER, exactly like the V-Pet's cast and her own
+# sprite set: whatever PNGs are in ui/yuzu/ ARE the outfits, and the
+# filename is the name on the button. Adding one is dropping a file in,
+# with no list to update here, in the page, or in her prompt.
+OUTFIT_DIR = os.path.join(UI_DIR, "yuzu")
 
 _BRAINS = {}
 
@@ -914,6 +945,13 @@ class _Handler(SimpleHTTPRequestHandler):
         if self.path.split("?")[0].rstrip("/") in ("/characters.json",
                                                    "/characters"):
             self._json(roster())
+            return
+        # Regenerated PER REQUEST, same as /sprites.json: a new outfit
+        # is a PNG dropped in ui/yuzu/ and a page refresh, never a
+        # server restart. On a phone over a serial link that is a much
+        # bigger difference than it sounds.
+        if self.path.split("?")[0].rstrip("/") in ("/outfits.json", "/outfits"):
+            self._json(outfits())
             return
         if self.path.split("?")[0].rstrip("/") in ("/vpet.json", "/vpet"):
             self._json(_pet_look())

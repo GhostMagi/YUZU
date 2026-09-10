@@ -114,17 +114,18 @@ body {
 }
 .stars { letter-spacing: .06em; }
 
-/* THE FRONT PAGE IS THREE, THE DRAWER IS FOUR, and each gets the row
-   that fits it. Ghost, Sept 11: "i noticed Face button and Talk button
-   are the same thing now? is that accurate?" -- it was, and two tiles
-   opening one page is a tile wasted. Saya owns both jobs now (the chat
-   bar is on her face and always has been), so the front page is three
-   and sits in ONE ROW rather than a 2x2 with a hole in the corner.
+/* EACH VIEW GETS THE COLUMNS THAT FIT IT, and that is the whole rule
+   here. The front page held three in one row while Saya and Cait were
+   the only characters; Yuzu made it FOUR, and four across three
+   columns orphans one onto a row of its own -- the `auto-fit` bug
+   that a screenshot caught on the very first home screen, and that
+   the fifth tile brought back once already. Four goes in a 2x2.
 
-   The two views differ on purpose: the front page is a curated set
-   that rarely changes, and the drawer is where he means to "pile up
-   our fancy future apps". */
-#grid.main { grid-template-columns: repeat(3, 1fr); }
+   The drawer stays three across: it is where he means to "pile up our
+   fancy future apps", so it grows, and six fills two rows of three
+   exactly. A single shared grid would force one of them to look
+   wrong. */
+#grid.main { grid-template-columns: repeat(2, 1fr); }
 #grid.misc { grid-template-columns: repeat(3, 1fr); }
 
 /* THE WAY OUT LIVES IN THE BAR, not in the grid. Ghost means to "pile
@@ -291,6 +292,18 @@ body {
     <div class="big"><svg viewBox="0 0 24 24"><path d="M5.5 20.5c-1-2.4-1.2-5.2-.6-7.9L3.2 5.4l4 3.1a9.6 9.6 0 0 1 9.6 0l4-3.1-1.7 7.2c.6 2.7.4 5.5-.6 7.9z"/><path d="M9.5 13h.01M14.5 13h.01"/><path d="M12 15.6v1.2"/><path d="M10.4 17.4h3.2"/></svg></div>
     <b>Cait</b>
     <span>king of the cats</span>
+  </div>
+  <!-- YUZU IS A PEER TOO. Ghost, Sept 11: "Yuzu has future plans very
+       similar to cait", then the art and "let her be able to 'switch
+       outfits'". Same call as Cait: a character is not a utility and
+       does not live in the drawer. The icon is a dress on a hanger
+       because the wardrobe is the thing that is HERS -- drawn in the
+       file as line art, never an emoji, which would ignore --ink and
+       sit on the black theme as a glossy blob. -->
+  <div class="tile" id="yuzu" data-view="main" data-go="yuzu.html">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 3.2a1.6 1.6 0 1 0 1.6 1.6c0 .9-1.6 1.3-1.6 2.4"/><path d="M12 7.2 4.4 11.6"/><path d="M12 7.2l7.6 4.4"/><path d="M8.6 9.2 6.2 20.5h11.6L15.4 9.2"/></svg></div>
+    <b>Yuzu</b>
+    <span>gyaru, fully dressed</span>
   </div>
   <div class="tile" id="misc" data-view="main" data-show="misc">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 13.8v6.4M13.8 17h6.4"/></svg></div>

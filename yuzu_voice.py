@@ -169,6 +169,15 @@ class VoiceError(RuntimeError):
 SPOKEN_INITIALISMS = {
     "OMG", "OG", "IDK", "TBH", "LOL", "LMAO", "BRB", "BFF",
     "AF", "FR", "DIY", "DJ", "TV", "PC", "AI", "OK",
+    # CSS joined the list the day a persona example started SAYING it.
+    # The technical-question example is the lever that fixed assistant
+    # collapse, so every character gets one and hers answers out loud
+    # with "the only thing in CSS that's ever been nice to me".
+    # Lowercased, espeak phonemises "css" into mush; spelled out it is
+    # "see ess ess", which is how the word is actually pronounced.
+    # Evidence, not speculation -- the same standard as the rest of
+    # this list: it is here because she says it.
+    "CSS",
 }
 _SHOUTED = re.compile(r'\b[A-Z]{2,}\b')
 _TILDE_RUN = re.compile(r'~+')

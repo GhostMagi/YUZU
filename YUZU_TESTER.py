@@ -3341,7 +3341,7 @@ class TestCait(unittest.TestCase):
             self.assertNotIn(">%s<" % name, page,
                              f"{name} is hardcoded into the rail")
         cast = {c["who"] for c in yuzu_face.roster()}
-        self.assertEqual(cast, {"saya", "cait"})
+        self.assertEqual(cast, {"saya", "cait", "yuzu"})
 
     def test_retired_characters_are_off_the_roster_but_still_on_disk(self):
         """Ghost, Sept 11: "we no longer need coco shes retired. or the
@@ -3427,6 +3427,345 @@ class TestCait(unittest.TestCase):
             yuzu_face.set_state("idle")
         self.assertEqual(asked[-1], "/wiki cats",
                          "an encyclopedia reached the fairy cat")
+
+
+class TestYuzuAvatar(unittest.TestCase):
+    """Yuzu, back with a body she can be dressed in.
+
+    Ghost, Sept 11: "Yuzu. let her be able to 'switch outfits' and also
+    if she doesnt already think she has a virtual body or body let that
+    be a thing. (in case i wana paint her nails she wouldnt just be
+    like 'ima computer') same treatment as Cait."
+
+    The parenthesis is the spec and most of these tests pin it."""
+
+    PAGE = Path(__file__).parent / "ui" / "yuzu.html"
+    ART = Path(__file__).parent / "ui" / "yuzu"
+
+    def test_she_loads_and_is_the_gyaru_on_a_new_body(self):
+        yuzu = yuzu_personas.load("yuzu_avatar")
+        self.assertEqual(yuzu.name, "Yuzu")
+        self.assertEqual(yuzu.hardware, "avatar")
+        self.assertFalse(yuzu.moves, "the avatar world has no servos")
+        self.assertFalse(yuzu.retired)
+        # SHE SHARES A NAME WITH THE WHOLE yuzu2..yuzu6 LINEAGE AND WITH
+        # yuzu_deck, which is legitimate and deliberate -- same
+        # character, different bodies, exactly like shiro/shiro_deck and
+        # saya_quad/saya_deck. The name-leak rule says the fix belongs
+        # in what gets DISPLAYED, not in forbidding it, and the boot
+        # banner already prints the KEY whenever it differs from the
+        # name. This pins that the keys stay distinct.
+        same_name = [k for k in yuzu_personas.available()
+                     if yuzu_personas.load(k).name == "Yuzu"]
+        self.assertIn("yuzu_avatar", same_name)
+        self.assertIn("yuzu_deck", same_name)
+        self.assertEqual(len(same_name), len(set(same_name)))
+
+    def test_she_has_a_body_and_never_answers_with_the_machine(self):
+        """THE WHOLE ASK. "in case i wana paint her nails she wouldnt
+        just be like 'ima computer'".
+
+        {DECK_SELF} says, in as many words, "You have no legs, no arms,
+        no camera and no face" -- so that block IS the failure he
+        named, and this is the third time this repo has had to record
+        that a measured win is measured against a SPECIFIC failure. On
+        the deck it was a win. On a character with a wardrobe it is
+        damage."""
+        prompt = yuzu_personas.load("yuzu_avatar").prompt.lower()
+        for machine in ("no legs", "no arms", "handheld computer",
+                        "battery", "cyberdeck", "language model"):
+            self.assertNotIn(machine, prompt,
+                             f"the avatar prompt still says '{machine}'")
+        for body in ("nails", "outfit", "tail", "hair"):
+            self.assertIn(body, prompt, f"she has no '{body}'")
+
+    def test_the_body_is_DRAWN_which_is_the_honest_bound(self):
+        """"You have a body" with nothing bounding it is how deck Shiro
+        ended up offering to "'walk' over to the kitchen" -- recorded
+        above as a self-concept fault.
+
+        A drawn body is the line that is both true and useful: a
+        drawing has nails you can paint and a jacket you can change,
+        and it does not walk anywhere."""
+        prompt = yuzu_personas.load("yuzu_avatar").prompt.lower()
+        self.assertIn("drawn", prompt)
+        self.assertIn("not one that walks anywhere", prompt,
+                      "nothing stops her offering to fetch the milk")
+
+    def test_no_outfit_is_named_in_her_prompt(self):
+        """THE WARDROBE IS DATA. ui/yuzu/ is the list, /outfits.json is
+        generated from it per request, and the filename is the button.
+        Naming the outfits in the prompt would make it code again and
+        the list would go stale the first time he draws another one --
+        the same reason `sprites()` scans a folder instead of reading a
+        manifest."""
+        prompt = yuzu_personas.load("yuzu_avatar").prompt.lower()
+        import yuzu_face
+        for outfit in yuzu_face.outfits():
+            self.assertNotIn(outfit, prompt,
+                             f"'{outfit}' is hardcoded into her prompt")
+
+    def test_she_carries_the_levers_this_repo_actually_measured(self):
+        """The three example SHAPES that each fixed a measured failure:
+        the bare command (yuzu4, 4/4), the warm statement with nothing
+        to answer (Shiro round 2), and the technical question (Shiro
+        round 3 -> 4, a categorical fix of assistant collapse).
+
+        A new arm built without them restarts the lineage from the
+        worst prompt in the repo."""
+        prompt = yuzu_personas.load("yuzu_avatar").prompt
+        self.assertIn("User: Spin around.", prompt, "no bare command")
+        self.assertIn("made my whole day", prompt,
+                      "no warm statement with nothing to answer")
+        self.assertIn("center a div", prompt, "no technical question")
+        tech = prompt.split("center a div in CSS?")[1].split("User:")[0]
+        self.assertIn("flex", tech.lower(),
+                      "she dodges the technical question, which teaches "
+                      "her to dodge every question")
+
+    def test_a_body_request_is_ANSWERED_in_her_examples(self):
+        """Examples beat rules -- measured twice in this repo. The rule
+        telling her she has a body is worth much less than her being
+        SHOWN taking a body request and running with it, so the two
+        shapes he actually named get an example each."""
+        prompt = yuzu_personas.load("yuzu_avatar").prompt
+        for ask in ("Can I paint your nails?", "Can I have a hug?"):
+            self.assertIn("User: " + ask, prompt, f"no example for '{ask}'")
+            reply = prompt.split(ask)[1].split("User:")[0]
+            for dodge in ("no arms", "no hands", "I'm a computer",
+                          "I don't have"):
+                self.assertNotIn(dodge.lower(), reply.lower(),
+                                 f"she deflects '{ask}' with '{dodge}'")
+
+    def test_she_still_sounds_like_the_gyaru(self):
+        """The body changed; the character did not. Her register is
+        hers and this repo pins it to yuzu4 for exactly that reason."""
+        prompt = yuzu_personas.load("yuzu_avatar").prompt.lower()
+        for hers in ("cutie", "pink", "gyaru", "mall"):
+            self.assertIn(hers, prompt, f"she lost '{hers}'")
+
+    def test_every_sound_she_is_taught_survives_the_voice(self):
+        """Same check Cait gets. A sound with no vowel is spelled out
+        letter by letter by espeak -- the PFFT mechanism."""
+        import yuzu_voice
+        prompt = yuzu_personas.load("yuzu_avatar").prompt
+        line = [l for l in prompt.splitlines() if "just write them:" in l]
+        self.assertTrue(line, "the sounds rule is gone")
+        sounds = line[0].split("just write them:")[1].strip(" .")
+        for sound in (x.strip() for x in sounds.split(",")):
+            self.assertTrue(yuzu_voice.for_speech(sound).strip(),
+                            f"the voice drops '{sound}'")
+            self.assertTrue(set(sound.lower()) & set("aeiou"),
+                            f"'{sound}' has no vowel -- espeak will "
+                            f"spell it out one letter at a time")
+
+    def test_CSS_is_spelled_out_rather_than_phonemised(self):
+        """Her technical-question example SAYS the word out loud, which
+        no other persona's does. Lowercased by unshout() it becomes
+        mush; kept capitalised espeak spells it, and "see ess ess" is
+        how the word is actually pronounced. It went on the list the
+        day a persona started saying it -- evidence, not speculation."""
+        import yuzu_voice
+        self.assertIn("CSS", yuzu_voice.SPOKEN_INITIALISMS)
+        self.assertIn("CSS", yuzu_voice.for_speech("it's the only CSS I like"))
+
+    # ---- her wardrobe -------------------------------------------------
+
+    def test_a_folder_is_the_wardrobe_and_a_png_is_an_outfit(self):
+        """Same rule as "a folder is a character" in the V-Pet and "the
+        filename is the expression" in her sprites. Adding an outfit is
+        dropping a file in, with nothing else to edit anywhere."""
+        import yuzu_face
+        found = yuzu_face.outfits()
+        self.assertGreaterEqual(len(found), 2,
+                                "there is nothing to switch between")
+        for outfit in found:
+            self.assertTrue((self.ART / (outfit + ".png")).exists())
+        self.assertNotIn("ART", found, "the provenance note became an outfit")
+
+    def test_a_missing_wardrobe_is_empty_and_never_an_exception(self):
+        """Same guard as sprites(): the page treats an empty list as
+        "no button", not as "no Yuzu" -- her <img> carries a real src
+        in the markup, so a dead route costs the wardrobe and never
+        costs her."""
+        import yuzu_face
+        self.assertEqual(yuzu_face.outfits("/nowhere/at/all"), [])
+        page = self.PAGE.read_text()
+        self.assertIn('src="yuzu/', page,
+                      "she has no picture until JavaScript supplies one")
+
+    def test_every_outfit_is_the_same_canvas_so_she_does_not_jump(self):
+        """ONE box across every state of a character, never one per
+        state -- the V-Pet lesson, where a per-state crop made him
+        change size when his mood did.
+
+        Here it is worse than cosmetic: two outfits of the same girl at
+        two different scales read as a glitch rather than a change of
+        clothes."""
+        import yuzu_face
+        sizes = set()
+        for outfit in yuzu_face.outfits():
+            size = yuzu_face._png_size(str(self.ART / (outfit + ".png")))
+            self.assertIsNotNone(size, f"{outfit}.png is not a readable PNG")
+            sizes.add(size)
+        self.assertEqual(len(sizes), 1,
+                         f"her outfits are different sizes: {sizes}")
+
+    def test_the_button_names_the_outfit_it_will_PUT_HER_IN(self):
+        """Same call as the V-Pet's swap button and the old colour dot:
+        what she is wearing right now is standing in the middle of the
+        screen, so a button labelling it tells you nothing."""
+        page = self.PAGE.read_text()
+        self.assertIn("outfits[(wearing + 1) % outfits.length]", page,
+                      "the wardrobe button names what she already has on")
+
+    def test_the_outfits_route_is_regenerated_per_request(self):
+        """A new PNG needs a page refresh, never a server restart. On a
+        phone over a serial link that is a much bigger difference than
+        it sounds -- the same reason /sprites.json is rebuilt per GET.
+
+        DRIVEN, NOT GREPPED. An assertion that "outfits()" appears in
+        do_GET's source would pass just as happily against a list
+        cached at import time, which is the exact failure it exists to
+        catch. This one starts the real server, adds a real file, and
+        asks the real route twice."""
+        import json as _json
+        import shutil
+        import threading
+        import urllib.request
+        import yuzu_face
+
+        room = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, room, True)
+        shutil.copy(str(self.ART / "zebra.png"),
+                    os.path.join(room, "zebra.png"))
+
+        from http.server import ThreadingHTTPServer
+        server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        url = "http://127.0.0.1:%d/outfits.json" % server.server_address[1]
+
+        def ask():
+            with urllib.request.urlopen(url, timeout=5) as got:
+                return _json.loads(got.read().decode())
+
+        with mock.patch.object(yuzu_face, "OUTFIT_DIR", room):
+            self.assertEqual(ask(), ["zebra"])
+            shutil.copy(str(self.ART / "cream.png"),
+                        os.path.join(room, "cream.png"))
+            self.assertEqual(ask(), ["cream", "zebra"],
+                             "a new outfit needs a server restart to "
+                             "show up, which on a phone is a real cost")
+
+    # ---- her page ------------------------------------------------------
+
+    def test_her_page_exists_offline_with_her_art(self):
+        self.assertTrue(self.PAGE.exists())
+        self.assertTrue((self.ART / "ART.txt").exists(),
+                        "nobody wrote down where her picture came from")
+        page = self.PAGE.read_text()
+        for reach in ("http://", "https://", "//cdn", "@import",
+                      "fonts.googleapis"):
+            self.assertNotIn(reach, page,
+                             f"yuzu.html reaches outside itself: {reach}")
+
+    def test_she_is_NOT_green_on_black_either(self):
+        """The CRT look is locked to the deck screens on purpose --
+        the same call cait.html and vpet.html already make. Her palette
+        is sampled off her own PNGs, except the hot pink, which is
+        character."""
+        page = self.PAGE.read_text()
+        self.assertNotIn("#39ff5e", page, "she got the deck's neon green")
+        for hers in ("--pink", "--blonde", "--slate"):
+            self.assertIn(hers, page, f"{hers} is missing from her palette")
+
+    def test_she_is_shown_WHOLE_because_her_shoes_are_half_the_outfit(self):
+        """The one place this page refuses to copy Cait's.
+
+        Cait is deliberately cropped at the shins -- her picture is a
+        pose and nothing below the knee carries information. Yuzu's
+        picture is an OUTFIT, and the most legible difference between
+        her two looks is at the bottom of it: grey fur boots and leg
+        warmers against white knee socks. Measured by rendering it at
+        the panel's real 1024x600: at Cait's 136% she is cut just above
+        the leg warmers, which hides the exact thing the wardrobe
+        button exists to show."""
+        page = self.PAGE.read_text()
+        height = re.search(r"#yuzu\s*\{[^}]*height:\s*(\d+)%", page)
+        self.assertIsNotNone(height, "her height is not set in percent")
+        self.assertLessEqual(int(height.group(1)), 100,
+                             "she overruns the stage and loses her shoes")
+        # and the breath needs headroom, or `overflow: hidden` shaves
+        # her hair off the top on every cycle
+        self.assertLess(int(height.group(1)), 100,
+                        "the breath has nowhere to go")
+        self.assertIn("align-items: end", page,
+                      "she is hung from the ceiling rather than standing")
+
+    def test_her_page_holds_no_list_of_the_cast_and_no_list_of_outfits(self):
+        """Both come from the server: /characters.json from ONE roster
+        in yuzu_face.py, /outfits.json from ONE folder. A page that
+        keeps its own copy of either drifts the first time something is
+        added."""
+        page = self.PAGE.read_text()
+        self.assertIn("characters.json", page)
+        self.assertIn("outfits.json", page)
+        for name in ("Saya", "Cait", "Byte", "Coco", "Shiro"):
+            self.assertNotIn(">%s<" % name, page,
+                             f"{name} is hardcoded into her rail")
+
+    def test_she_has_a_way_out_and_it_is_never_a_mode(self):
+        """Every screen on this deck has an exit, which is the rule two
+        power cycles paid for. And the switcher is a visible row rather
+        than a menu: a menu is a mode, and a mode needs a way out of
+        its own."""
+        page = self.PAGE.read_text()
+        self.assertIn("home.html", page, "there is no way off her page")
+        self.assertNotIn("kiosk", page)
+
+    def test_she_asks_as_a_NAME_and_the_server_refuses_anything_else(self):
+        """Same allowlist discipline as /launch/ and /vpet/. The server
+        binds 0.0.0.0, so a name crossing the wire must never be able
+        to reach a file."""
+        import yuzu_face
+        page = self.PAGE.read_text()
+        self.assertIn("who: 'yuzu'", page)
+        self.assertEqual(yuzu_face.persona_for("yuzu"), "yuzu_avatar")
+        self.assertEqual(yuzu_face.persona_for("  YUZU "), "yuzu_avatar")
+        for hostile in ("yuzu_avatar", "../../etc/passwd", "yuzu;rm -rf /",
+                        "yuzu4", "yuzu_deck", "yuzu\x00"):
+            self.assertIsNone(yuzu_face.persona_for(hostile),
+                              f"'{hostile}' resolved to a persona")
+
+    def test_talking_to_her_never_drives_SAYAS_face(self):
+        """THE CROSS-TALK TRAP. Saya's page polls /state to pick her
+        expression and that file is hers. Without the guard, talking to
+        Yuzu in one window would light Saya's face up in another --
+        which would look haunted rather than broken."""
+        import yuzu_face
+
+        class Fake:
+            def __init__(self, **kw): pass
+            def ask(self, text): return "Ehehe~ hi."
+
+        yuzu_face.set_state("idle")
+        was = dict(yuzu_face._BRAINS)
+        try:
+            with mock.patch.object(yuzu_face, "_BRAINS", {}):
+                with mock.patch("yuzu_brain.YuzuBrain", Fake):
+                    yuzu_face.answer("hello", "yuzu")
+                    self.assertEqual(yuzu_face.get_state().get("state"),
+                                     "idle", "Yuzu drove Saya's face")
+                    yuzu_face.answer("hello", "saya")
+                    self.assertEqual(yuzu_face.get_state().get("state"),
+                                     "talking", "Saya stopped driving it")
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+            yuzu_face.set_state("idle")
 
 
 class TestDeckApps(unittest.TestCase):
@@ -6540,16 +6879,30 @@ class TestHomeScreen(unittest.TestCase):
         #
         # Talk went the same way an hour earlier: it opened face.html
         # just like Saya did, so it was a wasted tile.
-        # THREE ON THE FRONT: Saya, Cait, and the drawer. Cait is a
-        # CHARACTER and a peer of Saya's -- Ghost asked for "its own
-        # tab", and a character filed in the drawer between the d20 and
-        # the calculator is not that.
-        self.assertEqual(len(views["main"]), 3, "the front page is not three")
+        # FOUR ON THE FRONT: Saya, Cait, Yuzu and the drawer. The
+        # characters are PEERS of Saya's -- Ghost asked for "its own
+        # tab" for each, and a character filed in the drawer between
+        # the d20 and the calculator is not that.
+        #
+        # AND FOUR MEANS TWO COLUMNS, which is the whole reason this
+        # assertion pins the grid as well as the count. Four tiles
+        # across three columns orphans one onto a row of its own --
+        # the `auto-fit` bug a screenshot caught on the first home
+        # screen, and that the fifth tile brought back once already.
+        # The drawer stays three across because six fills two rows of
+        # three exactly.
+        self.assertEqual(len(views["main"]), 4, "the front page is not four")
         self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
-        self.assertIn("#grid.main { grid-template-columns: repeat(3, 1fr); }",
+        self.assertIn("#grid.main { grid-template-columns: repeat(2, 1fr); }",
                       page)
         self.assertIn("#grid.misc { grid-template-columns: repeat(3, 1fr); }",
                       page)
+        # No view may end on a row with a hole in it. Stated as the
+        # PROPERTY rather than as two numbers, so the next tile added
+        # to either view has to answer for the layout it lands in.
+        for view, columns in (("main", 2), ("misc", 3)):
+            self.assertEqual(len(views[view]) % columns, 0,
+                             f"the {view} view orphans a tile on its own row")
         # The rule is about the TILE grid: a wide tile forced an odd row
         # and orphaned two others. The calculator's display spanning its
         # own keypad is not that, so pin WHICH selector may span rather
@@ -6561,6 +6914,8 @@ class TestHomeScreen(unittest.TestCase):
                       "her tile left the front page")
         self.assertIn('data-go="cait.html"', "".join(views["main"]),
                       "Cait left the front page")
+        self.assertIn('data-go="yuzu.html"', "".join(views["main"]),
+                      "Yuzu left the front page")
         self.assertIn('data-go="vpet.html"', "".join(views["misc"]),
                       "the pet left the drawer")
         self.assertIn('data-launch="browser"', "".join(views["misc"]),
@@ -6627,7 +6982,15 @@ class TestHomeScreen(unittest.TestCase):
         because a library is a download and this deck has to work with
         the WiFi off."""
         page = self.PAGE.read_text()
-        self.assertEqual(page.count("<svg"), 9, "not nine line icons")
+        # EVERY TILE HAS ONE, stated as the property rather than as a
+        # magic number. The count version had to be edited every time a
+        # tile was added, which is a test that costs attention without
+        # ever catching anything -- and it would pass a page with ten
+        # icons and nine tiles just as happily.
+        tiles = re.findall(r'<div class="tile[^"]*"[^>]*>(.*?)(?=<div class="tile|</div>\s*\n\s*<div id=)',
+                           page, re.S)
+        self.assertGreaterEqual(page.count("<svg"), page.count('class="tile'),
+                                "a tile is short of a line icon")
         self.assertIn("stroke: var(--ink)", page,
                       "the icons do not take the ink colour")
         for emoji in ("💬", "📖", "🎮", "☺"):

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 519 tests, ~18 seconds.
+- Run `python YUZU_TESTER.py` before committing. 540 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 519 tests pass on it. Getting it
+(that repo path is confirmed working). 540 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -633,6 +633,151 @@ flight while she thinks.
 **Saya's entry follows `LIVE_PERSONA`; Cait's names her file.** Seventh
 instance of the name-leak rule: decide whether a fact belongs to THIS
 CHARACTER or to WHOEVER IS LIVE, and pin it accordingly.
+
+## YUZU HAS A BODY NOW, AND IT CAN BE DRESSED (Sept 11)
+
+Ghost, with two outfits in one picture: *"Yuzu. let her be able to
+'switch outfits' and also if she doesnt already think she has a virtual
+body or body let that be a thing. (in case i wana paint her nails she
+wouldnt just be like 'ima computer') same treatment as Cait."*
+
+**THE PARENTHESIS IS THE SPEC, and the failure he named is WRITTEN INTO
+`{DECK_SELF}` in as many words:** *"You have no legs, no arms, no
+camera and no face."* Reach for her body on the deck and that sentence
+is what answers. So this could not be a deck persona with a wardrobe
+bolted on — it is a third body file.
+
+**Third instance of the rule, and it is now the most reused idea in
+this file: a measured win is measured against a SPECIFIC failure.**
+`{DECK_SELF}` was a real win on the deck ("my battery's always running
+low", unprompted). It was budget on Cait. It is damage here.
+
+**`personas/_hardware_avatar.txt` DELIBERATELY DOES NOT COPY THE
+FAERIE WORLD.** Cait has never heard of a computer, and banning the
+word from Yuzu would be the same mistake pointing the other way — she
+is a modern girl who would obviously know what one is, and a rule she
+has to work around costs latency on every turn forever. **The fault to
+design against here is DEFLECTION, not knowledge.** So nothing in the
+file names the machine at all; it just gives her somewhere better to
+go.
+
+**AND THE BODY IS DRAWN ON PURPOSE, not vague.** "You have a body"
+with no bound is how deck Shiro ended up offering to *"'walk' over to
+the kitchen"* — recorded above as a self-concept fault. A drawn body is
+the honest line and it is the one that serves the ask: **a drawing has
+nails you can paint and a jacket you can change, and it does not walk
+anywhere.**
+
+**`personas/yuzu_avatar.persona` is yuzu4's character on that body**,
+3542 chars, carrying all three measured example SHAPES (bare command,
+warm statement with nothing to answer, technical question) plus two
+that are new and are the whole point: `Can I paint your nails?` and
+`Can I have a hug?`. Deck Yuzu answers the hug with *"no arms on this
+thing, cutie"* — which is exactly the sentence he does not want — so
+that example was rewritten rather than ported. `yuzu_deck` is KEPT as
+the record of the bodiless era, same as `saya_quad` and yuzu2/3/5/6.
+UNMEASURED.
+
+**"never a generic AI assistant" STAYS, unlike on Cait.** Her removal
+had a second reason — she has never heard the word, so the line is
+self-defeating on her. Yuzu has no such reason, the sentence is in
+every measured deck arm, and its removal has never been measured. It
+also happens to push AWAY from the machine answer, which is the fault
+here. Not the place to run an experiment on a brand-new character.
+
+**HER WARDROBE IS A FOLDER.** `ui/yuzu/<outfit>.png`, `/outfits.json`
+regenerated per request, and the filename is the name on the button.
+Adding an outfit is dropping a PNG in — no list in the page, no list in
+the server, **and no list in her prompt**, which is the one that would
+have been easy to get wrong: naming the outfits in the prompt makes the
+wardrobe code again and goes stale the first time he draws another.
+Same rule as "a folder is a character" and "the filename is the
+expression". A test pins that no outfit name appears in her prompt.
+
+**THE BUTTON NAMES THE OUTFIT IT WILL PUT HER IN**, not the one she has
+on — the V-Pet swap button and the old colour dot again: what she is
+wearing is standing in the middle of the screen. It is ABSENT with one
+outfit and absent when the route cannot be reached, and her `<img>`
+carries a real `src` in the markup, so **a dead server costs the
+wardrobe and never costs her.**
+
+### Splitting the picture, and why it is not a straight cut
+
+The two figures OVERLAP in x: the right one's raised fist crosses into
+the left one's column, so the thinnest vertical cut left a scrap of her
+hand floating beside the wrong girl. They are, however, **exactly two
+connected components** and nothing else in the image is — so each is
+masked by its own component, dilated 2px to put the anti-aliased fringe
+back (a bare mask at alpha>=32 shaves the soft edge and leaves a hard
+one), with the original pixels kept inside it.
+
+**ONE CANVAS ACROSS BOTH OUTFITS, NEVER ONE PER OUTFIT.** Each is
+pasted at the same offset from her HEAD CENTRE and top of head into a
+canvas sized by the union. That is the V-Pet lesson — *"ONE box across
+every state of a character, or he changes size when his mood does"* —
+and here it is worse than cosmetic: the same girl at two scales reads
+as a glitch rather than a change of clothes. **Verified by compositing
+the two on top of each other and looking**: head, shoulders and feet
+land in the same place. A test pins that every outfit PNG is the same
+size.
+
+### Her page
+
+**`ui/yuzu.html` is Cait's shape with one deliberate refusal.** Cait is
+cropped at the shins because her picture is a POSE and nothing below
+the knee carries information. **Yuzu's picture is an OUTFIT, and the
+most legible difference between her two looks is at the bottom of it**
+— grey fur boots and leg warmers against white knee socks. Measured by
+rendering at the panel's real 1024x600: at Cait's 136% she is cut just
+above the leg warmers, hiding the exact thing the wardrobe button
+exists to show. So she is shown WHOLE, at 96% of the stage, standing on
+its floor.
+
+**96% and not 100% because the breath needs somewhere to go.** She
+scales 1.8% from `transform-origin: bottom center`, and `overflow:
+hidden` on the stage would shave her hair off the top on every cycle.
+Found by rendering it, like everything else in this file's UI work.
+
+**She reads smaller than Cait and that is correct rather than a
+compromise** — she is a whole standing figure and Cait is a pose from
+the knee up. A 220x551 portrait in a landscape panel is narrow because
+that is what a whole person looks like.
+
+**Her palette is sampled off her own PNGs** — warm skin and cream
+(`#f0d0c0` / `#f0e0d0`, the two most common colours in her), her blonde
+(`#e8c98f`), the cool slate of the zebra fit's jacket and leg warmers
+(`#505060`). **The one colour that is NOT sampled is the hot pink**:
+that is character, it lives in her persona files, and the
+no-chassis-colours rule has always been about the CASE and never about
+her taste.
+
+**THE FRONT PAGE IS FOUR TILES AND THEREFORE TWO COLUMNS.** Saya, Cait,
+Yuzu, ☆Misc☆. Four across three columns orphans one onto a row of its
+own — the `auto-fit` bug a screenshot caught on the first home screen
+and that the fifth tile brought back once already. The test now pins
+the PROPERTY (`len(view) % columns == 0`) rather than two numbers, so
+the next tile has to answer for the layout it lands in.
+
+**`CSS` joined `SPOKEN_INITIALISMS`**, because her technical-question
+example is the first in the repo that SAYS the word out loud.
+Lowercased by `unshout()` it is mush; kept capitalised espeak spells it
+and "see ess ess" is how the word is pronounced. Evidence rather than
+speculation — the same standard as the rest of that list.
+
+**AND A TEST THAT COST ATTENTION WITHOUT CATCHING ANYTHING WAS
+REPLACED.** `test_the_icons_are_line_art_and_not_emoji` asserted the
+home page contains exactly nine `<svg>`, so every new tile made it red
+for no reason — and it would have passed a page with ten icons and nine
+tiles just as happily. It compares the two counts now. Same family as
+every other grep-as-proxy fault here: **the assertion was about the
+file's spelling rather than about the page.**
+
+**Still open:** she does not know which outfit is currently on her. He
+switches it with a button and the picture is on screen, so the gap is
+small — but a warm "cute right?" after a switch gets an answer that
+cannot see what he is looking at. The honest fix is the `/wiki` shape
+(ground it into the turn), and it is deliberately NOT built in the same
+pass as everything above: one variable at a time.
 
 ## THE SWITCHER IS A ROSTER, AND COCO AND SHIRO ARE RETIRED (Sept 11)
 

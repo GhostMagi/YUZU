@@ -1,0 +1,55 @@
+YUZU — where her pictures came from
+===================================
+
+  zebra.png   220x551 RGBA, transparent background.
+  cream.png   220x551 RGBA, transparent background.
+
+              Both were cut out of ONE image Ghost sent on Sept 11
+              2026 (420x594 RGBA) showing the same character twice,
+              side by side, in two winter outfits:
+
+                zebra   dark fur-trimmed jacket over a zebra-print
+                        cardigan, black skirt, grey fluffy leg
+                        warmers and boots, grey tail
+                cream   white beret with a pompom, cream poncho,
+                        white shorts, white knee socks, white tail
+
+PROVENANCE IS NOT RECORDED, same as Cait's picture and for the same
+reason: it arrived as a finished image and nobody wrote down where it
+came from at the time. Saya's faces are Ghost's OWN drawings (ui/raw/
+holds the originals off his phone). These are not known to be.
+
+Being straight about it, once, in the place it matters: this is a
+personal build on his own hardware, which is fine. If the deck is ever
+shown off publicly, credit these or swap them.
+
+HOW THEY WERE SPLIT, and why it is not a straight cut
+-----------------------------------------------------
+The two figures OVERLAP in x (210..220): the right one's raised fist
+crosses into the left one's column. A vertical cut at the thinnest
+column left a scrap of her hand floating beside the wrong girl.
+
+They are two connected components, though, and nothing else in the
+image is. So each figure is masked by its own component, the mask is
+dilated 2px to put the anti-aliased fringe back (a bare component mask
+at alpha>=32 shaves the soft edge and leaves a hard one), and the
+original pixels are kept inside it.
+
+ONE CANVAS ACROSS BOTH, NEVER ONE PER OUTFIT. Each is pasted at the
+same offset from her HEAD CENTRE and her top of head, into a canvas
+sized by the union of the two. That is why she does not jump, grow or
+shuffle sideways when the outfit changes -- the same rule the V-Pet's
+sprites follow ("ONE box across every state of a character, never one
+per state, or he changes size when his mood does"). Verified by
+compositing the two on top of each other and looking: head, shoulders
+and feet land in the same place.
+
+ADDING A THIRD OUTFIT
+---------------------
+Drop a PNG in this folder. That is the whole procedure -- yuzu_face.
+outfits() lists the folder, /outfits.json is regenerated per request,
+and the filename is the name on the button. No list in the page, no
+list in her prompt, no server restart.
+
+Match this canvas (220x551) and register her head to the same place,
+or she will jump when he switches to it.
