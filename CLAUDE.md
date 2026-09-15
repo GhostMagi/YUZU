@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 610 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 619 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 610 tests pass on it. Getting it
+(that repo path is confirmed working). 619 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,73 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## HIS BOARD IS NAMED `localhost`, AND I HANDED HIM THAT (Sept 15)
+
+One screenshot, from his phone, minutes after the mDNS line shipped:
+
+    DNS_PROBE_FINISHED_NXDOMAIN
+    Check if there is a typo in localhost.local.
+
+**`localhost` MEANS THE DEVICE ASKING.** His Orin really is called that,
+so `face` printed `http://localhost.local:8081/` and the phone went
+looking for ITSELF. The numbers worked the whole time -- *"The 1st link
+that pops works"* -- so this was the one line that was supposed to save
+him a cable, and it was the only thing on the screen that did not work.
+
+**SECOND MISTAKE IN THAT SAME LINE IN ONE HOUR, and the same shape both
+times.** The first draft used bare `hostname` and printed the docker
+bridge inside an address; the suite caught that one. The fix I wrote
+for it asked *"is this a syntactically legal hostname"* -- and
+`localhost` passes that perfectly. **The question is "will this reach
+THIS board from ANOTHER device", and my guard could not observe the
+difference.** That is the oldest line in this file, broken an hour
+after I quoted it.
+
+`localhost` and `localhost.*` are refused now, and a test drives the
+real script with the hostname stubbed to `localhost` and asserts no
+`.local` line comes out at all. **Absent rather than wrong.** The
+harness had to learn that `hostname` and `hostname -s` are DIFFERENT
+QUESTIONS, which is exactly how the docker bug got in: one stub
+answering both.
+
+### `~/YUZU/name` — and the trap that is not the rename
+
+    ~/YUZU/name              what it is called, and whether .local works
+    ~/YUZU/name ghostnano    call it that
+
+His call: *"Can we change board to be named ghostnano"*. Right answer --
+a name follows the board across DHCP leases, and an address he has to
+re-read off a serial terminal is an address he needs a cable to learn.
+
+**`hostnamectl` IS ONE LINE AND THAT IS NOT WHY THIS SCRIPT EXISTS.**
+What it does not do on Ubuntu is update `/etc/hosts`, so the `127.0.1.1`
+entry goes on naming the OLD host, sudo cannot resolve the new one, and
+**every `sudo` from then on stalls ten seconds printing "unable to
+resolve host"** -- a slow, confusing, unrelated-looking fault landing on
+a board whose only shell is a serial cable. That is the thing worth
+automating, and it is the thing a test pins.
+
+A `sed` that matches nothing SUCCEEDS SILENTLY, so a hosts file with no
+`127.0.1.1` line gets one appended rather than being left alone while
+the script reports DONE -- the same class as every "reported healthy
+while broken" entry in this file.
+
+**Everything is validated BEFORE anything is touched**, and a failed
+rename stops rather than half-doing it: a box renamed in one place and
+not the other is worse than one not renamed at all. Verified by breaking
+all three guards -- skipping the hosts fix, letting `localhost` through,
+and carrying on past a failed rename.
+
+**The .local address is OFFERED, never promised.** Whether a phone
+resolves it is a property of the PHONE, not of this board, and is not
+checkable from here. The fallback goes in the same breath as the
+suggestion, every time -- unverified specifics stated as steps already
+cost an hour on the 8BitDo.
+
+**And the prompt keeps saying the old name until the next login**, which
+is cosmetic and is said out loud, because on this board it looks exactly
+like the rename having silently failed.
 
 ## THE DECK IS CABLE-FREE NOW (Sept 15)
 

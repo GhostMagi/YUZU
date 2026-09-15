@@ -119,7 +119,19 @@ report() {
     # he cannot use is worse than no suggestion.
     local name; name=$(hostname -s 2>/dev/null)
     case "$name" in
-        *[!A-Za-z0-9-]*|"") name="" ;;
+        # A NAME CAN BE PERFECTLY VALID AND STILL BE USELESS TO HIM, and
+        # this is the second mistake in that line in one hour. The first
+        # guard asked "is this a syntactically legal hostname" when the
+        # question is "will this reach THIS board from ANOTHER device".
+        # `localhost` passes the first and fails the second absolutely:
+        # it means *the machine asking*, so his board -- which really is
+        # named localhost -- told his phone to open ITSELF.
+        #
+        # Measured, on his phone: DNS_PROBE_FINISHED_NXDOMAIN on
+        # http://localhost.local:8081/. A check that cannot observe the
+        # actual failure is not a check, which is the oldest line in
+        # CLAUDE.md, and I wrote one an hour after quoting it.
+        localhost|localhost.*|*[!A-Za-z0-9-]*|"") name="" ;;
     esac
     if [ -n "$name" ]; then
         echo

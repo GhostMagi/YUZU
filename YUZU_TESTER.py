@@ -4673,6 +4673,144 @@ class TestFour(unittest.TestCase):
                              f"{who} moved bodies; the wiki gate follows")
 
 
+class TestNamingTheBoard(unittest.TestCase):
+    """`name` -- give the board a name so the phone stops needing an IP.
+
+    MEASURED, on his phone, in one screenshot:
+
+        DNS_PROBE_FINISHED_NXDOMAIN
+        Check if there is a typo in localhost.local.
+
+    HIS BOARD IS CALLED `localhost`, which means THE DEVICE ASKING --
+    so the address pointed his phone at itself. The only way in was a
+    number he has to re-read off a serial terminal whenever the DHCP
+    lease moves, which is a cable, for an address."""
+
+    SCRIPT = Path(__file__).parent / "name"
+
+    def _run(self, *args, current="localhost", hosts="127.0.1.1\toldname\n"):
+        """Drive the REAL script against stub sudo/hostnamectl/systemctl
+        and a scratch hosts file."""
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        try:
+            binv = Path(tmp) / "bin"
+            binv.mkdir()
+            state = Path(tmp) / "current"
+            state.write_text(current)
+            hostsfile = Path(tmp) / "hosts"
+            hostsfile.write_text(hosts)
+            # `sudo` just runs the thing, so the stubs below are what
+            # actually answer.
+            (binv / "sudo").write_text('#!/bin/bash\nexec "$@"\n')
+            (binv / "hostname").write_text(
+                '#!/bin/bash\ncat %s\n' % state)
+            (binv / "hostnamectl").write_text(
+                '#!/bin/bash\n[ "${1:-}" = set-hostname ] && '
+                'printf "%%s" "$2" > %s\nexit 0\n' % state)
+            (binv / "systemctl").write_text("#!/bin/bash\nexit 0\n")
+            (binv / "apt-get").write_text("#!/bin/bash\nexit 0\n")
+            for f in binv.iterdir():
+                f.chmod(0o755)
+            done = subprocess.run(
+                ["bash", str(self.SCRIPT), *args], capture_output=True,
+                text=True, timeout=60,
+                env=dict(os.environ, YUZU_HOSTS=str(hostsfile),
+                         PATH=f"{binv}:{os.environ['PATH']}"))
+            return done, hostsfile.read_text(), state.read_text()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_it_fixes_etc_hosts_which_is_the_whole_point(self):
+        """`hostnamectl` is one line and this script is not one line
+        because of THIS. Renaming without updating 127.0.1.1 leaves sudo
+        unable to resolve the new host, so every sudo from then on stalls
+        ten seconds printing "unable to resolve host" -- a slow,
+        confusing, unrelated-looking fault landing on a board whose only
+        shell is a serial cable."""
+        done, hosts, now = self._run("ghostnano")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(now, "ghostnano")
+        self.assertIn("127.0.1.1", hosts)
+        self.assertIn("ghostnano", hosts,
+                      "sudo will now stall on every command he runs")
+        self.assertNotIn("oldname", hosts, "the old name is still mapped")
+
+    def test_a_hosts_file_with_no_127_0_1_1_line_gains_one(self):
+        """Not every image ships that entry, and a `sed` that matches
+        nothing succeeds silently -- which would leave exactly the
+        ten-second sudo this script exists to prevent, while reporting
+        DONE."""
+        done, hosts, _ = self._run("ghostnano", hosts="127.0.0.1\tlocalhost\n")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("127.0.1.1\tghostnano", hosts)
+
+    def test_it_refuses_a_name_that_means_THIS_DEVICE(self):
+        """The bug that caused all of this, refused at the door -- and
+        refused BEFORE anything is touched, because a board that argues
+        with sudo is not a typo you fix casually over a serial cable."""
+        done, hosts, now = self._run("localhost")
+        self.assertNotEqual(done.returncode, 0)
+        self.assertEqual(now, "localhost", "it renamed anyway")
+        self.assertIn("oldname", hosts, "it edited hosts before checking")
+
+    def test_it_refuses_a_name_that_would_break_the_box(self):
+        for bad in ("-lead", "gh ost", "under_score", "a" * 64, ""):
+            done, hosts, now = self._run(bad)
+            if bad == "":
+                # No argument at all is the REPORT, not a rename.
+                self.assertEqual(done.returncode, 0)
+                self.assertIn("called", done.stdout)
+                continue
+            self.assertNotEqual(done.returncode, 0, "accepted %r" % bad)
+            self.assertIn("oldname", hosts, "it edited hosts for %r" % bad)
+
+    def test_the_report_tells_him_localhost_is_the_problem(self):
+        """He had no reason to suspect the board's own name -- the page
+        worked perfectly on the numbers. Running this with no argument
+        has to name the fault, not just print a string."""
+        done, _, _ = self._run(current="localhost")
+        self.assertEqual(done.returncode, 0)
+        self.assertIn("CANNOT REACH", done.stdout)
+        self.assertIn("~/YUZU/name", done.stdout, "it names no way forward")
+
+    def test_mDNS_is_offered_and_never_promised(self):
+        """Whether a given phone resolves .local is a property of the
+        PHONE, not of this board, and is not checkable from here.
+        Unverified specifics stated as steps already cost an hour on the
+        8BitDo -- so the fallback goes in the same breath."""
+        done, _, _ = self._run("ghostnano")
+        self.assertIn("http://ghostnano.local:8081/", done.stdout)
+        self.assertIn("If it does not load", done.stdout)
+        self.assertIn("~/YUZU/face", done.stdout,
+                      "the fallback does not say how to get the numbers")
+
+    def test_a_failed_rename_stops_instead_of_half_doing_it(self):
+        """A box renamed in one place and not the other is worse than one
+        not renamed at all."""
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        try:
+            binv = Path(tmp) / "bin"; binv.mkdir()
+            hostsfile = Path(tmp) / "hosts"
+            hostsfile.write_text("127.0.1.1\toldname\n")
+            (binv / "sudo").write_text('#!/bin/bash\nexec "$@"\n')
+            (binv / "hostname").write_text("#!/bin/bash\necho localhost\n")
+            (binv / "hostnamectl").write_text("#!/bin/bash\nexit 1\n")
+            for f in binv.iterdir():
+                f.chmod(0o755)
+            done = subprocess.run(
+                ["bash", str(self.SCRIPT), "ghostnano"], capture_output=True,
+                text=True, timeout=60,
+                env=dict(os.environ, YUZU_HOSTS=str(hostsfile),
+                         PATH=f"{binv}:{os.environ['PATH']}"))
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn("oldname", hostsfile.read_text(),
+                          "it edited hosts after the rename failed")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestUpdatingWithoutTheCable(unittest.TestCase):
     """`POST /pull`, and the Update button in the home screen's bar.
 
@@ -8959,7 +9097,7 @@ class TestFaceServer(unittest.TestCase):
         s.close()
         return port
 
-    def _run(self, *args, lan="10.1.2.3", port=None):
+    def _run(self, *args, lan="10.1.2.3", port=None, host_name=None):
         """Drive the REAL script against a stub `ip`/`hostname`, so the
         no-network path can be exercised on a machine that has one.
 
@@ -8977,7 +9115,15 @@ class TestFaceServer(unittest.TestCase):
                 ip_out = "exit 1\n"          # no route: board is offline
                 host_out = 'echo "172.17.0.1 192.168.55.1"\n'
             (binv / "ip").write_text("#!/bin/bash\n" + ip_out)
-            (binv / "hostname").write_text("#!/bin/bash\n" + host_out)
+            # `hostname` and `hostname -s` are DIFFERENT QUESTIONS and
+            # the stub has to answer them separately -- collapsing them
+            # is how the real script's mDNS line ended up printing the
+            # docker bridge inside an address.
+            (binv / "hostname").write_text(
+                "#!/bin/bash\n"
+                'if [ "${1:-}" = "-s" ]; then echo "%s"; exit 0; fi\n'
+                % (host_name if host_name is not None else "deckbox")
+                + host_out)
             for name in ("ip", "hostname"):
                 (binv / name).chmod(0o755)
             env = dict(os.environ, YUZU_FACE_PORT=str(port),
@@ -9135,6 +9281,49 @@ class TestFaceServer(unittest.TestCase):
             self.assertNotIn(f"http://{wrong}", done.stdout,
                              f"it told him to open {wrong}, which is not "
                              "reachable from the phone")
+
+    def test_a_name_that_means_THIS_DEVICE_is_never_offered(self):
+        """MEASURED, on his phone, in one screenshot:
+
+            DNS_PROBE_FINISHED_NXDOMAIN
+            Check if there is a typo in localhost.local.
+
+        His board really is named `localhost`. The mDNS line took the
+        hostname, checked it was made of legal characters, and printed
+        http://localhost.local:8081/ -- which tells the PHONE to open
+        ITSELF. Perfectly valid, and absolutely useless to anyone who is
+        not the board.
+
+        SECOND MISTAKE IN THAT ONE LINE IN AN HOUR, and the same shape
+        both times: the guard asked "is this a syntactically legal
+        hostname" when the question is "will this reach THIS board from
+        ANOTHER device". A check that cannot observe the actual failure
+        is not a check -- the oldest line in CLAUDE.md, broken an hour
+        after quoting it."""
+        real = self._this_machines_lan_ip()
+        if not real:
+            self.skipTest("this machine has no routable address to serve on")
+        done, port = self._run(lan=real, host_name="localhost")
+        self.assertNotIn(".local", done.stdout,
+                         "it offered a name that means 'the device asking'")
+        # The numbers still work, which is the point of absent-not-wrong.
+        self.assertIn(f"http://{real}:{port}/", done.stdout)
+
+    def test_a_real_name_IS_offered_because_an_IP_he_must_reread_needs_a_cable(self):
+        """The line earns its place: an address he has to read off a
+        serial terminal is an address he needs a cable to learn, and it
+        changes with the DHCP lease. A name does not."""
+        real = self._this_machines_lan_ip()
+        if not real:
+            self.skipTest("this machine has no routable address to serve on")
+        done, port = self._run(lan=real, host_name="ghostnano")
+        self.assertIn(f"http://ghostnano.local:{port}/", done.stdout,
+                      done.stdout)
+        # And it is OFFERED, never promised -- whether avahi answers on
+        # his board is not checkable from here, and a stated fact that
+        # turns out false costs more than an untried suggestion.
+        self.assertIn("If it does not load", done.stdout,
+                      "it promises mDNS works, which nothing here can know")
 
     def test_an_unreachable_address_is_not_reported_as_UP(self):
         """The other half of the split, and the reason it is a split:

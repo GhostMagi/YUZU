@@ -48,7 +48,7 @@ Pydroid, press Run. No commands.
 
 ```
 python yuzu_all_in_one.py     # talk to Yuzu, watch the fake robot move
-python YUZU_TESTER.py         # 610 tests, ~19 seconds
+python YUZU_TESTER.py         # 619 tests, ~19 seconds
 python muto_leg_control.py    # dry-run every gait, no robot required
 ```
 
@@ -94,7 +94,7 @@ $400.
 | `yuzu_personas.py` | Persona loader and composer |
 | `personas/` | One file per character; body rules shared |
 | **Measure her** | |
-| `YUZU_TESTER.py` | Test suite. 610 tests. `--shuffle` catches test pollution |
+| `YUZU_TESTER.py` | Test suite. 619 tests. `--shuffle` catches test pollution |
 | `yuzu_prompt_eval.py` | Scores prompt compliance against the real model |
 | `YUZU_AB.py` | Runs two personas head to head and prints one table |
 | `yuzu_doctor.py` | Tap-to-run checkup. Standalone, no arguments |
@@ -105,7 +105,8 @@ $400.
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_voice.py` | Piper TTS. The project's one dependency boundary |
 | **The deck** | One word each, no arguments to remember |
-| `face` | Serve her face; open the address on the phone |
+| `face` | Serve her face; open the address on the phone. `--boot` serves at every boot with no screen attached |
+| `name` | Give the board a name, so the phone stops needing an IP |
 | `wiki` | Offline Wikipedia (kiwix-serve). `--test` says why a lookup missed |
 | `gba` | VNC desktop + mGBA on the newest ROM |
 | `pad` | Pair the 8BitDo. Try the USB cable first |

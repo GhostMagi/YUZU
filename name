@@ -1,0 +1,142 @@
+#!/bin/bash
+# Give the board a NAME, so the phone stops needing an IP address.
+#
+#   ~/YUZU/name              what is it called now, and does it advertise
+#   ~/YUZU/name ghostnano    call it that
+#
+# WHY. Ghost, Sept 15, opening the deck on his phone and getting
+# DNS_PROBE_FINISHED_NXDOMAIN: the board is named `localhost`, and
+# `localhost` means THE DEVICE ASKING. It is a name that can only ever
+# point a phone at itself. So the mDNS line `face` prints was useless,
+# and the only way in was a number he has to re-read off a serial
+# terminal every time the DHCP lease moves -- which is a cable, for an
+# address.
+#
+# A real name fixes that permanently: http://<name>.local:8081/ follows
+# the board wherever its address goes.
+#
+# THE TRAP THIS SCRIPT EXISTS FOR IS NOT THE RENAME. `hostnamectl` is
+# one line. What it does NOT do on Ubuntu is update /etc/hosts -- so the
+# 127.0.1.1 entry goes on naming the OLD host, sudo cannot resolve the
+# new one, and every `sudo` from then on stalls for ten seconds printing
+# "unable to resolve host". That is a slow, confusing, unrelated-looking
+# fault landing on a board whose only shell is a serial cable, and it is
+# exactly the kind of thing that should never be left for him to find.
+
+set -u
+# Overridable so the SUITE can drive the real script against a scratch
+# copy -- same reason PAD_INPUTS and YUZU_FACE_PORT are. The /etc/hosts
+# edit is the whole point of this script, so it is the one thing that
+# most needs a test, and a test that cannot touch it is not one.
+HOSTS=${YUZU_HOSTS:-/etc/hosts}
+
+
+avahi_state() {
+    if ! command -v avahi-daemon >/dev/null 2>&1; then
+        echo "not installed"
+    elif systemctl is-active --quiet avahi-daemon 2>/dev/null; then
+        echo "running"
+    else
+        echo "installed but not running"
+    fi
+}
+
+now=$(hostname -s 2>/dev/null)
+want=${1:-}
+
+# --- no argument: report, and say what it means ------------------------
+if [ -z "$want" ]; then
+    echo
+    echo "  This board is called:  $now"
+    case "$now" in
+        localhost|localhost.*)
+            echo
+            echo "  THAT NAME CANNOT REACH IT FROM YOUR PHONE. 'localhost'"
+            echo "  means whichever device is asking, so it points the"
+            echo "  phone at itself. Give it a real one:"
+            echo
+            echo "      ~/YUZU/name ghostnano"
+            ;;
+        *)
+            echo "  Phones on this WiFi should find it at:"
+            echo "      http://$now.local:8081/"
+            ;;
+    esac
+    echo
+    echo "  mDNS (what answers .local):  $(avahi_state)"
+    echo
+    exit 0
+fi
+
+# --- validate BEFORE touching anything ---------------------------------
+# A bad hostname is not a typo you notice later, it is a box that argues
+# with sudo. Letters, digits and hyphens; not starting with a hyphen;
+# and never a name that means "me".
+case "$want" in
+    localhost|localhost.*)
+        echo; echo "  No. 'localhost' means the device asking, which is"
+        echo "  the whole reason you are renaming it."; echo; exit 1 ;;
+    -*|*[!A-Za-z0-9-]*|"")
+        echo; echo "  '$want' is not a usable hostname. Letters, digits"
+        echo "  and hyphens only, and it cannot start with a hyphen."
+        echo; exit 1 ;;
+esac
+if [ "${#want}" -gt 63 ]; then
+    echo; echo "  '$want' is too long -- 63 characters is the limit."; echo
+    exit 1
+fi
+
+if [ "$want" = "$now" ]; then
+    echo; echo "  It is already called $want. Nothing to do."; echo; exit 0
+fi
+
+echo
+echo "  Renaming $now -> $want. This needs sudo."
+echo
+
+sudo hostnamectl set-hostname "$want" || { echo "  Rename failed."; exit 1; }
+
+# --- /etc/hosts, which is the actual point of this script --------------
+# Without this, every sudo stalls for ten seconds on a board he can only
+# reach over a serial cable.
+if grep -q '^127\.0\.1\.1' "$HOSTS" 2>/dev/null; then
+    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$want/" "$HOSTS"
+else
+    printf '127.0.1.1\t%s\n' "$want" | sudo tee -a "$HOSTS" >/dev/null
+fi
+
+# --- and the thing that actually answers .local ------------------------
+if ! command -v avahi-daemon >/dev/null 2>&1; then
+    echo "  Installing avahi-daemon, which is what answers .local..."
+    sudo apt-get install -y avahi-daemon >/dev/null 2>&1 \
+        || echo "  (could not install it -- the numbers still work)"
+fi
+sudo systemctl enable --now avahi-daemon >/dev/null 2>&1
+sudo systemctl restart avahi-daemon >/dev/null 2>&1
+
+# --- the verdict, FIRST ------------------------------------------------
+echo
+if [ "$(hostname -s 2>/dev/null)" = "$want" ]; then
+    echo "  DONE. This board is $want."
+    echo
+    echo "  Try this on your phone, and bookmark it:"
+    echo "      http://$want.local:8081/"
+    echo
+    echo "  mDNS:  $(avahi_state)"
+    echo
+    # NOT PROMISED. Whether a given phone resolves .local is a property
+    # of the phone, not of this board, and it is not checkable from
+    # here. Unverified specifics stated as steps already cost an hour on
+    # the 8BitDo -- so the fallback goes in the same breath as the
+    # suggestion, every time.
+    echo "  If it does not load, the numbers still work -- run"
+    echo "  ~/YUZU/face for the address. Some phones do not do .local."
+else
+    echo "  The rename did not take. It is still $(hostname -s)."
+fi
+# The shell prompt keeps saying the old name until the next login. That
+# is cosmetic and it is worth saying, because on this board it looks
+# exactly like the rename having silently failed.
+echo
+echo "  (Your prompt will keep saying $now until you log in again.)"
+echo
