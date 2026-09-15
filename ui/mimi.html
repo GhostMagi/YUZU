@@ -214,6 +214,19 @@ body.thinking #glow { animation: chill 2.6s ease-in-out infinite; }
    phone usable as the stand-in screen it has always been; nobody
    should spend a round polishing it. */
 @media (max-width: 760px) {
+  /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
+     412px: the home button sat 15 to 169px past the right edge on ALL
+     FOUR character pages, worse the longer the rail got, because the
+     rail is content-width and pushes it. On the panel it is fine and
+     it has been fine since Cait shipped, which is exactly why nobody
+     saw it -- 1024x600 is the only view that gets designed.
+     The rail takes the leftover space and scrolls; the exit keeps its
+     corner. `min-width: 0` is the load-bearing half: a flex item will
+     not shrink below its content without it. */
+  #rail { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  #rail::-webkit-scrollbar { display: none; }
+  #who { flex: none; }
+  #home { flex: none; }
   /* The subtitle wraps straight through her name once the
      rail carries four characters. It is decoration; the name
      and the way out are not. */

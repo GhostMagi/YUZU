@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 600 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 602 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 600 tests pass on it. Getting it
+(that repo path is confirmed working). 602 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,52 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## THE WAY OUT FELL OFF THE PHONE, ON EVERY CHARACTER PAGE (Sept 15)
+
+Found by rendering Four at 412px before Ghost opened her on his phone
+-- he was walking to the Nano to test her there. Twenty-sixth time.
+
+**The ⌂ home button was 15 to 169px PAST the right edge on all four
+character pages.** Measured, by reading its own bounding box:
+
+    four  right 477 of 412      cait  right 427 of 412
+    yuzu  right 581 of 412      mimi  right 438 of 412
+
+**The rail pushes it.** `#rail` is content-width and `#home` has
+`margin-left: auto`, so every character that shipped made the row wider
+and shoved the exit further off. Yuzu is worst because her blurb is the
+longest. **It has been broken since Cait shipped and got worse four
+times**, and nobody saw it because 1024x600 is the only view that gets
+designed and there it is fine.
+
+**THIS IS THE ONE RULE THIS PROJECT WILL NOT TRADE.** Every screen on
+this deck has a way off it; two power cycles paid for that sentence. It
+is also why `--start-fullscreen` is used and `--kiosk` never is. On the
+phone he still has browser chrome, so he was not trapped -- but on the
+panel, where `deckapps` opens these pages chromeless and fullscreen,
+the ⌂ IS the exit and losing it is the whole failure.
+
+`#rail { flex: 1; min-width: 0; overflow-x: auto }` -- the rail takes
+the leftover space and scrolls, the exit keeps its corner. **`min-width:
+0` is the load-bearing half**: a flex item will not shrink below its
+content width without it, which is exactly how a row of five names
+shoved a button out of the viewport.
+
+**AND THE STANDING SCOPE CALL WAS RIGHT AND STILL IS.** Ghost: *"dont
+need it to be different per screen thats alot of extra work."* This is
+not a per-screen variant and nobody should read it as the phone view
+reopening. It is the EXIT, which is not a layout preference -- and the
+fix is four identical lines in a block that already existed.
+
+**What is pinned is AGREEMENT, not spelling.** No stdlib test can
+measure a layout; that was done by rendering at 412, 360 and 1024 and
+reading the button's box on every page. What a test can see is that the
+four pages still say the same thing, which is the failure that actually
+threatens this: a fifth character page copied from one of them before
+the fix, or three updated and one missed. Same guard and same reason as
+the two copies of the battery renderer. Verified by breaking one page's
+rule and by deleting one page's button.
 
 ## A RUNNING SERVER KEPT SERVING THE OLD CODE (Sept 15)
 

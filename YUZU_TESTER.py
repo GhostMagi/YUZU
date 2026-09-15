@@ -4673,6 +4673,66 @@ class TestFour(unittest.TestCase):
                              f"{who} moved bodies; the wiki gate follows")
 
 
+class TestTheWayOutSurvivesANarrowScreen(unittest.TestCase):
+    """EVERY SCREEN ON THIS DECK HAS A WAY OFF IT. Two power cycles paid
+    for that rule and it is the one thing this project will not trade.
+
+    MEASURED at 412px, the width of the phone that is his only screen
+    until the panel arrives: the home button sat 15 to 169px PAST the
+    right edge on all four character pages -- Four, Cait, Yuzu and Mimi
+    -- because the rail is content-width and grows with the cast, and
+    it pushes the exit out of the viewport ahead of it. Worse every time
+    a character shipped, and invisible the whole time, because 1024x600
+    is the only view that gets designed and there it is fine.
+
+    The fix is that the rail takes the leftover space and scrolls while
+    the exit keeps its corner.
+
+    WHAT IS PINNED HERE IS AGREEMENT, NOT SPELLING. No stdlib test can
+    measure a layout -- that was done by rendering at 412, 360 and 1024
+    and reading the button's own bounding box on every page. What a test
+    CAN see is that the four pages still say the same thing, which is
+    the failure that actually threatens this: a fifth character page
+    copied from one of them before the fix, or three updated and one
+    missed. Same guard, same reason, as the two copies of the battery
+    renderer and the two copies of the Jetson check."""
+
+    PAGES = ("four", "cait", "yuzu", "mimi")
+
+    def block(self, name):
+        text = (Path(__file__).parent / "ui" / ("%s.html" % name)).read_text()
+        start = text.index("@media (max-width: 760px)")
+        end = text.index("}" + chr(10) + "</style>", start)
+        chunk = text[start:end]
+        keep = [ln.strip() for ln in chunk.splitlines()
+                if ("#rail" in ln or "#home" in ln or "#who" in ln)
+                and not ln.strip().startswith(("*", "/*"))]
+        return keep
+
+    def test_every_character_page_keeps_the_exit_on_a_narrow_screen(self):
+        first = self.block(self.PAGES[0])
+        self.assertTrue(first, "the narrow-screen exit rules are gone")
+        # The rail must be allowed to SHRINK. `min-width: 0` is the
+        # load-bearing half -- a flex item will not go below its content
+        # width without it, which is exactly how it shoved the button off.
+        joined = " ".join(first)
+        self.assertIn("min-width: 0", joined)
+        self.assertIn("overflow-x: auto", joined)
+        for other in self.PAGES[1:]:
+            self.assertEqual(self.block(other), first,
+                             "%s disagrees with %s about keeping the way "
+                             "out on screen" % (other, self.PAGES[0]))
+
+    def test_every_character_page_has_a_way_out_at_all(self):
+        """One level up from the CSS: a page with no home button cannot
+        be fixed by any amount of layout."""
+        for name in self.PAGES:
+            text = (Path(__file__).parent / "ui" / ("%s.html" % name)).read_text()
+            self.assertIn('id="home"', text, "%s has no way out" % name)
+            self.assertIn("home.html", text,
+                          "%s has a home button that goes nowhere" % name)
+
+
 class TestEveryCharacterCanActuallyBeAsked(unittest.TestCase):
     """The bug Ghost hit the first time he tapped Speak on Mimi:
 
