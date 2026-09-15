@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 597 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 600 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 597 tests pass on it. Getting it
+(that repo path is confirmed working). 600 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,73 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## A RUNNING SERVER KEPT SERVING THE OLD CODE (Sept 15)
+
+Ghost pulled Four, opened the deck on the laptop, and sent a photo:
+**one full-width ☆Stuff☆ tile, no character on it at all.** *"new ones
+not there but its organized. (Laptop different or should we fix this b4
+i pull to nano lol)"*
+
+**Not the laptop. It will do the same thing on the Nano, and the fix is
+in `pull`.**
+
+**BOTH HALVES WERE TRUE AT ONCE, and that is the whole trap:**
+
+    home.html            a FILE, re-read from disk per request   -> NEW
+    /characters.json     a PYTHON PROCESS started before the pull -> OLD
+
+So he had the new markup asking an old roster for its cast. The old
+`roster()` has no `front` key and no Four in it, and the page's honest
+fallback for "no front character" is exactly one full-width tile. **The
+deck rendered as though the work never landed, while being completely
+correct about what it had been told.**
+
+**REPRODUCED BEFORE ANYTHING WAS CHANGED**, by serving the new page from
+a server whose `roster()` drops the `front` key: pixel for pixel his
+photo. That is what turned "laptop quirk?" into a finding in one step,
+and it is the same discipline as reproducing a CI failure before fixing
+it -- guessing here would have had him restarting things on a board he
+was about to walk away from.
+
+**IT CANNOT BE FIXED INSIDE `face`.** The server re-reads `ui/` on every
+request -- deliberately, so a new sprite needs a page refresh rather
+than a restart, which on a phone over a serial link is a real
+difference. What it never re-reads is its own module. A long-running
+process cannot notice that its own source changed.
+
+**So `pull` does it, because `pull` already knows what changed.** If the
+update touched a top-level `.py` AND a face server is already up, it
+stops it and starts it again, and says so. Two guards, each with a
+reason:
+
+- **Only when one is ALREADY RUNNING.** Starting a server he never asked
+  for is its own surprise, and on a board he uses as a computer a port
+  opening by itself is the wrong kind of helpful.
+- **Only for `.py`, never for art or pages.** `ui/` is re-read per
+  request, so bouncing the server to deliver a PNG it would have served
+  anyway drops his conversation for nothing.
+
+**The general shape, and this file has it in three other costumes
+already:** `face` reporting a live server as dead, `pad --status` on a
+working controller, `gnome-extensions list` on a fresh install. Every
+one of them is a layer answering about its own cached view rather than
+about the world. **Check what the layer below actually received** --
+and this time the layer below was a process that had simply been alive
+too long.
+
+**It bit me first, an hour earlier in the same session.** Rendering
+Mimi's poses, `pkill -f yuzu_face` matched the shell running it, so the
+server never restarted and kept serving the previous module -- twice.
+Written up then as "read a stale screenshot as evidence". Same fault,
+his end, with a photo instead of a screenshot.
+
+**Three tests drive the REAL script** with a stub git, a stub `pgrep`
+and a `face` that records how it was called -- in a temp directory,
+because `pull` cds to its own folder and would otherwise stop the real
+server. Verified by breaking the fix three ways: removing the restart,
+removing the already-running gate, and widening it to any changed file.
+All three go red.
 
 ## FOUR — the deck's own voice, and the first front door (Sept 15)
 

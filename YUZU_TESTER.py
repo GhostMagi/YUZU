@@ -6781,6 +6781,103 @@ class TestPull(unittest.TestCase):
                 'certificate verification failed. CAfile: none" >&2; exit 128 ;;\n'
                 '*) exit 0 ;;\nesac\n')
 
+    # ---- a running server keeps serving the OLD code ------------------
+
+    def _restart_run(self, changed, server_up):
+        """Drive the REAL pull script in a temp dir, with stubs beside it.
+
+        A copy rather than the repo itself, because `pull` cds to its own
+        directory and would otherwise call the real `face` and stop the
+        real server."""
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        try:
+            here = Path(tmp)
+            shutil.copy(self.SCRIPT, here / "pull")
+            (here / "pull").chmod(0o755)
+
+            # `face` records how it was called instead of doing anything.
+            log = here / "face.log"
+            (here / "face").write_text(
+                '#!/bin/bash\necho "face $*" >> %s\n' % log)
+            (here / "face").chmod(0o755)
+
+            binv = here / "bin"
+            binv.mkdir()
+            # rev-parse is called TWICE and must differ, or the script
+            # correctly reports ALREADY UP TO DATE and restarts nothing.
+            names = " ".join("'%s'" % c for c in changed)
+            (binv / "git").write_text(
+                '#!/bin/bash\n'
+                'case "$*" in\n'
+                '  "rev-parse HEAD")\n'
+                '     n=$(cat {t}/n 2>/dev/null || echo 0)\n'
+                '     echo $((n+1)) > {t}/n\n'
+                '     echo "rev$n" ;;\n'
+                '  "pull origin main") echo ok ;;\n'
+                '  log*) echo "  abc123 a change" ;;\n'
+                '  diff*) printf "%s\\n" {names} ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n'.format(t=tmp, names=names))
+            (binv / "git").chmod(0o755)
+            (binv / "pgrep").write_text(
+                "#!/bin/bash\nexit %d\n" % (0 if server_up else 1))
+            (binv / "pgrep").chmod(0o755)
+
+            done = subprocess.run(
+                ["bash", str(here / "pull")], capture_output=True, text=True,
+                timeout=60,
+                env=dict(os.environ, YUZU_PULL_WAITS="0",
+                         PATH=f"{binv}:{os.environ['PATH']}"))
+            calls = log.read_text() if log.exists() else ""
+            return done, calls
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_a_pull_that_changes_server_code_restarts_a_LIVE_server(self):
+        """MEASURED, Sept 15, and it looked exactly like a feature that
+        had not arrived.
+
+        Ghost pulled the round that added Four, opened the deck, and got
+        ONE full-width Stuff tile with no character on it. Both halves
+        were true at once, which is the trap: home.html is a FILE,
+        re-read per request, so the markup was new -- and
+        /characters.json comes out of a PYTHON PROCESS that had been
+        running since before the pull, so the roster was old. No Four,
+        no `front` flag, and the page's honest fallback for an empty
+        roster is what he saw.
+
+        Reproduced by serving the new page from a server with the old
+        roster: pixel for pixel his screenshot. `face` cannot fix this
+        from inside -- it re-reads ui/ but never its own module -- so
+        the fix belongs where the changed files are already known."""
+        done, calls = self._restart_run(["yuzu_face.py"], server_up=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("face --off", calls, "the stale server was left running")
+        self.assertIn("face \n", calls.replace("face\n", "face \n"),
+                      "it was stopped and never started again")
+        self.assertIn("OLD CODE", done.stdout,
+                      "it restarted silently; he cannot tell it happened")
+
+    def test_it_does_NOT_start_a_server_he_never_asked_for(self):
+        """Starting one because a .py moved is its own surprise -- and on
+        a board he is using as a computer, a port opening by itself is
+        the wrong kind of helpful. Restart only what was already up."""
+        done, calls = self._restart_run(["yuzu_face.py"], server_up=False)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(calls, "", "pull started a server on its own")
+
+    def test_art_alone_does_not_bounce_a_healthy_server(self):
+        """ui/ is re-read per request, so a new PNG or a new page needs a
+        page refresh and nothing more. Dropping his conversation to
+        deliver a file the server would have served anyway is a cost with
+        no purchase."""
+        done, calls = self._restart_run(
+            ["ui/sprites/idle.png", "ui/home.html"], server_up=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(calls, "", "a picture restarted the server")
+        self.assertIn("HER FACE CHANGED", done.stdout)
+
     def test_it_is_valid_shell_and_executable(self):
         import subprocess
         self.assertTrue(os.access(self.SCRIPT, os.X_OK))

@@ -89,13 +89,45 @@ else
     echo "  UPDATED."
     echo
     git log --oneline "$before..$after" 2>/dev/null | head -6 | sed 's/^/    /'
-    changed=$(git diff --name-only "$before" "$after" 2>/dev/null | wc -l)
+    files=$(git diff --name-only "$before" "$after" 2>/dev/null)
     echo
-    echo "    $changed files changed."
+    echo "    $(printf '%s\n' "$files" | grep -c .) files changed."
     # Her art is the thing he notices, so name it when it moved.
-    if git diff --name-only "$before" "$after" 2>/dev/null \
-        | grep -q '^ui/sprites/'; then
+    if printf '%s\n' "$files" | grep -q '^ui/sprites/'; then
         echo "    HER FACE CHANGED -- reload the page, do not just look at it."
+    fi
+
+    # --- A RUNNING SERVER GOES ON SERVING THE OLD CODE ----------------
+    # MEASURED, Sept 15, and it looked exactly like a feature that had
+    # not arrived. Ghost pulled the round that added Four, opened the
+    # deck, and got ONE full-width ☆Stuff☆ tile with no character on it
+    # -- which is the page's own honest fallback for "the roster has no
+    # front character in it".
+    #
+    # Both halves were true at once and that is the trap. The PAGE is a
+    # file, re-read from disk on every request, so home.html was the new
+    # one. /characters.json comes out of a PYTHON PROCESS that has been
+    # running since before the pull, so the roster was the old one --
+    # no Four, no `front` flag. Fresh markup, stale data, and the deck
+    # renders as though the work never landed.
+    #
+    # Reproduced here by serving the new page from a server with the old
+    # roster: pixel for pixel his screenshot.
+    #
+    # `face` re-reads ui/ per request but NOT its own module, so this
+    # is not fixable inside the server. It is fixable here, where we
+    # already know what changed -- and restarting only when the server
+    # is ALREADY UP, because starting one he never asked for is its own
+    # surprise. Same rule as everything else on this deck: the thing
+    # that knows should act, not report.
+    if printf '%s\n' "$files" | grep -q '^[^/]*\.py$'; then
+        if pgrep -f "yuzu_face.py --serve" >/dev/null 2>&1; then
+            echo "    THE FACE SERVER WAS RUNNING THE OLD CODE. Restarting"
+            echo "    it, so what answers is what you just pulled."
+            echo
+            ./face --off >/dev/null 2>&1
+            ./face
+        fi
     fi
 fi
 echo
