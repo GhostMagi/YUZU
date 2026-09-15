@@ -930,12 +930,72 @@ rather than one tile sitting in half a screen. Same call as Yuzu's
 wardrobe button being absent when the route cannot be reached. Verified
 by serving `ui/` with a plain `http.server` and looking at it.
 
-**Still open, and it is his call not mine:** he sent three pictures with
-that message -- a green ASCII/matrix face, a white ceramic android with
-an exposed spine, and a white armoured hooded girl on a four-legged
-mech. It is genuinely ambiguous whether those are candidates for the
-front tile or the next three characters, and guessing would build the
-wrong thing. Ask before drawing anything.
+**ANSWERED: the three pictures are CANDIDATES FOR THE NEW MAIN.** Ghost,
+asked straight out whether they were front-tile contenders or the next
+three characters: *"Candadates for the new main."* A green ASCII/matrix
+face, a white ceramic android with an exposed spine, and a white
+armoured hooded girl on a four-legged mech. One of them becomes the
+front door; the other two are not commissioned.
+
+**AND THE FRONT TILE IS A DEMO FACE NOW, which is a CHARACTER spec and
+not a layout one.** His reason for moving off Saya is in the same
+sentence as the ask: *"sayas attitude and blushing stuff might be too
+extra for demos/showing to parents."* So whoever takes the front page
+is the character a stranger meets with no context, which means:
+
+- **She must survive being poked by someone who is not Ghost.** A demo
+  is an adversarial round with a friendly face on it -- and the one
+  failure this repo has a CATEGORICAL fix for is assistant collapse,
+  five times over. The technical-question example is not optional on
+  her; it is the most load-bearing line she will have.
+- **Her register has to work cold.** Saya is great BECAUSE she is
+  difficult, and difficult needs a relationship to read as charm. The
+  front character wants the opposite default: answers straight, warms
+  up rather than starts warm.
+- **Saya is NOT retired and nothing about her changes.** She is one tap
+  away under Stuff -> A.I., exactly as before. This is a front door,
+  not a demotion, and `retired: yes` is a different mechanism that
+  nobody should reach for here.
+
+**WHAT IT COSTS, AND WHY IT IS NOT ONE LINE.** `FRONT` is one line to
+move, but only to a character who EXISTS. None of these three do. The
+full path is the one Mimi walked: art into `ui/art_in/`, a recipe in
+`yuzu_cutout.py` if the backdrop fights, a world/body file, a persona,
+a page, a `CHARACTERS` entry -- and only then `FRONT`.
+
+**THE THREE ARE NOT THE SAME AMOUNT OF WORK, and that is worth knowing
+before he picks on looks alone:**
+
+    green ASCII/matrix face   the DECK with a face. `_hardware_cyberdeck`
+                              already fits it exactly -- she IS the
+                              machine, and {DECK_SELF} is a MEASURED win
+                              on that body rather than damage. Cheapest
+                              by a distance, and the only one of the
+                              three that reuses a body file unchanged.
+
+    ceramic android, spine    a drawn body that is not alive and not
+                              the deck. `_hardware_avatar` is close
+                              (a drawn body that does not walk) but its
+                              whole point is a MODERN GIRL, so this
+                              probably wants its own world.
+
+    hooded girl on a mech     the most art and the most world. A rider
+                              plus a machine is two things to keep
+                              straight, and nothing in the repo has a
+                              body that is a VEHICLE. New world file,
+                              and the self-concept question ("are you
+                              the girl or the mech") has to be answered
+                              before a line of her is written.
+
+**THE ART HAS TO REACH THE REPO.** All three are in chat only; nothing
+new is in `ui/art_in/`. `yuzu_cutout.py` reads files, not messages --
+same as every character before her.
+
+**Nothing was built on this.** He has not picked, not named one, and
+not given a temperament, and the last time that call came up the split
+was recorded as the entire reason body files exist: *"Dont design the
+characters persona yet im still trying to brainstrorm her
+personality."* Ask; do not draft.
 
 ## MIMI, AND `yuzu_cutout.py` — the ghosts survive the cut (Sept 12)
 
