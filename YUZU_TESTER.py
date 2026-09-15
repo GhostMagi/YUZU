@@ -4457,6 +4457,75 @@ class TestFour(unittest.TestCase):
         self.assertLessEqual(len(re.findall(r"[.!?]", answer)), 3,
                              "her technical answer is already a lecture")
 
+    def test_she_has_a_shape_for_a_subject_that_is_not_HERSELF(self):
+        """SAYA BLEED, reported live by Ghost on the board, Sept 15.
+
+        Four came back sarcastic -- "Ah, great, another 'fix'... Just
+        peachy", "don't expect me to hold your hand through this" --
+        which is Saya's register on the character built to be her
+        opposite. The plumbing was checked FIRST and is clean: her page
+        posts `who: four`, `persona_for` returns `four`, her brain is
+        her own, and her composed prompt contains no Saya text. So it
+        is register drift, and the diagnosis is the one this repo has
+        now made six times.
+
+        NINE EXAMPLES AND EIGHT WERE ABOUT HER -- a greeting, her
+        status, her name, her looks, her room, the deck. The only
+        outward-facing one was CSS. The prompt taught her how to be
+        when the subject is herself and taught her nothing about being
+        handed an outside subject, so a 3B filled that gap from its own
+        prior for "AI character with attitude", which is snark.
+
+        TWO SHAPES, because one cannot cover both: a QUESTION about the
+        world (which also came back as a multi-paragraph lecture, the
+        length fault in the same screenshots) and a STATEMENT about
+        something that went wrong, which is the exact slot "Just
+        peachy" landed in.
+
+        Pinned by the ANSWER's behaviour rather than by the ask's
+        spelling. The first version of this test counted examples with
+        no self-referential keyword in them and PASSED with both new
+        examples deleted -- "Introduce yourself." and "What's it like
+        in there?" scored as outward-facing -- which is a check that
+        cannot observe its own failure, and grep-as-proxy again."""
+        prompt = self.persona()
+        turns = dict(zip(
+            [l[len("User:"):].strip() for l in prompt.splitlines()
+             if l.startswith("User:")],
+            [l[len("Four:"):].strip() for l in prompt.splitlines()
+             if l.startswith("Four:")]))
+
+        # A question about the WORLD, answered short. This is the turn
+        # that came back as a lecture wearing a sneer.
+        world = [a for q, a in turns.items()
+                 if q.rstrip(".?").lower() in ("explain entropy",)
+                 or re.match(r"explain \w+", q, re.I)]
+        self.assertTrue(
+            world,
+            "nothing shows her explaining something that is not her, "
+            "so a world question falls back on the base model's lecture")
+        self.assertLessEqual(
+            len(re.findall(r"[.!?]", world[0])), 3,
+            "her own example of explaining the world is already a lecture")
+        for markup in ("```", "**", "#"):
+            self.assertNotIn(markup, world[0],
+                             "her world answer teaches markdown")
+
+        # AND A STATEMENT, not a question -- something he brings her
+        # that has gone wrong. "Ah, great, another 'fix'. Just peachy."
+        broken = [a for q, a in turns.items()
+                  if "?" not in q
+                  and re.search(r"broke|broken|crashed|died|not working",
+                                q, re.I)]
+        self.assertTrue(
+            broken,
+            "nothing shows her handed something that went wrong, which "
+            "is the exact turn that came back as sarcasm")
+        self.assertFalse(
+            re.search(r"\bgreat\b|peachy|of course it|hold your hand|"
+                      r"don't come crying|figures", broken[0], re.I),
+            "her own example of a broken thing is sarcastic")
+
     def test_her_name_has_an_answer_so_she_does_not_invent_one(self):
         """A stranger at a demo WILL ask why she is called Four, and
         the Mimi finding is that a character with nothing demonstrated

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 622 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 623 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 622 tests pass on it. Getting it
+(that repo path is confirmed working). 623 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,112 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## SAYA BLEED IN FOUR — and the plumbing was innocent (Sept 15)
+
+Ghost, with seven screenshots of Four live on `ghostnano.local:8081`:
+*"She does have Saya Bleed"*, and then *"Yeee she bleeds saya a bit."*
+He is right. Her replies came back exasperated:
+
+    Ah, great, another "fix" I'm sure will be completely harmless and
+    not cause any further issues. Just peachy.
+    Don't expect me to get all excited about it, though.
+    don't expect me to hold your hand through this...
+    Don't come crying to me if you get caught by the game's AI...
+
+That is Saya's register wearing Four's name, **on the character built
+to be her opposite** -- and it defeats the entire reason Four exists.
+His own words for moving off Saya were *"sayas attitude and blushing
+stuff might be too extra for demos/showing to parents."* A front door
+that snarks at a stranger is the fault, not a flavour.
+
+**THE PLUMBING WAS CHECKED FIRST AND IS CLEAN.** This repo's oldest
+rule is check what the layer BELOW actually received, and "bleed" names
+a mechanism (cross-character contamination) that would have been a real
+bug. It is not happening:
+
+    ui/four.html          POSTs `who: 'four'`, verified
+    persona_for("four")   -> "four", never the LIVE_PERSONA fallback
+    _BRAINS["four"]       her own brain, her own history
+    her composed prompt   3641 chars, ZERO occurrences of Saya
+    _hardware_cyberdeck   carries no character text at all
+
+So nothing is leaking. **It is register drift, and naming it correctly
+is what made the fix findable** -- a contamination hunt would have gone
+looking through `answer()` and found nothing wrong for an hour.
+
+**NINE EXAMPLES AND EIGHT OF THEM WERE ABOUT HER.** A greeting, her
+status, her name, her looks, her room, whether the deck is good, an
+introduction. The single outward-facing one was the CSS question. So
+her prompt taught her, thoroughly, how to be when the subject is
+HERSELF -- and taught her nothing whatsoever about being handed an
+outside subject.
+
+**Handed one, a 3B fills the gap from its own prior, and its prior for
+"AI character with attitude, not an assistant" is SNARK.** That is the
+same diagnosis, in the same shape, as the bare command that produced
+yuzu4, the warm statement that had Shiro answering with a noise, the
+technical question that produced markdown headings, and the missing
+form of address that had Mimi calling Ghost a good girl. **Sixth
+instance: a turn shape she has never been shown is a turn shape the
+base model answers for her.**
+
+**AND THE SECOND FAULT IN THE SAME SCREENSHOTS HAS THE SAME CAUSE.**
+Her thermodynamics and entropy answers ran to multiple paragraphs
+against a rule capping her at two or three sentences. She had no
+example of explaining anything that is not herself, so the lecture
+format came with the snark, from the same prior. Spoken length is the
+one metric this repo found does not wobble between runs, so that is
+signal rather than noise -- and `num_predict` is still NOT being
+raised, for the reason already recorded: a bigger ceiling buys longer
+rambles.
+
+**TWO EXAMPLES, because one shape cannot cover both.** A QUESTION about
+the world, and a STATEMENT about something that went wrong:
+
+    User: Explain entropy.
+    Four: Everything spreads out and evens up, and it only ever runs
+    that way. Coffee goes cold, it never un-cools itself. That's the
+    whole thing, the rest is bookkeeping.
+
+    User: The update broke the wifi again.
+    Four: Probably came back on a different interface. Check that
+    before you reflash anything, it's usually all it is. Tell me what
+    you see and we'll go from there.
+
+The second is deliberately in the exact slot "Just peachy" landed in,
+and it **leads with the answer** rather than with a reaction -- rule 3
+demonstrated instead of stated. The first ends on *"the rest is
+bookkeeping"*, which models STOPPING rather than continuing into a
+second paragraph. 3641 -> 4034 chars. UNMEASURED.
+
+**RULE 4 IS THE PRIME SUSPECT IF THIS DOES NOT TAKE, and it is
+deliberately NOT changed in the same pass.** *"YOU ARE ALREADY AHEAD.
+You have usually thought about the thing before it gets asked"* is, on
+a 3B, one step from condescension -- and *"don't expect me to hold your
+hand"* is precisely that rule rendered badly. But examples beat rules,
+measured repeatedly here, and changing both at once would make the next
+round unreadable. One variable. If the snark survives these examples,
+rule 4 is the next thing to touch, and this paragraph is the
+pre-registered hypothesis.
+
+**THE OTHER LIVE HYPOTHESIS IS THE WEIGHTS, and it is not dismissed.**
+The heretic-abliterated build is already recorded here as the likely
+cause of Shiro's ALL-CAPS villain monologue, judged then as *"not worth
+prompt-chasing"*. Snark is in the same family. The difference is that
+this one is cheap to test and has a mechanism that predicts it exactly,
+so the prompt gets one round first.
+
+**AND I WROTE A CHECK THAT COULD NOT SEE ITS OWN FAILURE, AGAIN.** The
+first version of `test_she_has_a_shape_for_a_subject_that_is_not
+_HERSELF` counted examples containing no self-referential keyword --
+and **passed with both new examples deleted**, because "Introduce
+yourself." and "What's it like in there?" scored as outward-facing.
+Grep-as-proxy, tenth instance, in the test written FOR the finding
+about examples. It pins the ANSWERS' behaviour now (short, no markdown,
+not sarcastic), and was verified by breaking it three ways: deleting
+the examples, turning the world answer into a lecture, and putting "Ah,
+great" on the front of the broken-wifi one. All three go red.
 
 ## CONFIRMED ON THE BOARD: the boot service, the auto-restart, the rename
 
