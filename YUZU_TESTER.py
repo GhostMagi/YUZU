@@ -7529,16 +7529,21 @@ class TestHomeScreen(unittest.TestCase):
                              "%s is hardcoded onto the home screen -- the "
                              "exact way Mimi went missing" % who)
 
-    def test_the_front_page_is_TWO_tiles_and_the_rest_are_drawers(self):
-        """Ghost, Sept 12: "homescreen should say 'A.I.' with them all in
-        it. own menu for personas. and Misc. the only 2 tabs/drawers we
-        really need right now."
+    def test_the_front_page_is_ONE_CHARACTER_and_ONE_DRAWER(self):
+        """Ghost, Sept 15, in his own words: "i wana put the Ais in the
+        misc drawer and maybe have 1 specific one take over (have yet to
+        choose the new main...)", then the layout: "Feel free to cluster
+        the etc stuff into one new misc drawer. Rename the outer front
+        page drawer to ☆Stuff☆ so layout Homescreen (central new
+        undecided ai and ☆stuff☆ > inside stuff theres ai tab and misc
+        tab with the rest of the stuff in that one."
 
-        So the front page is the two things this deck IS -- the
-        characters, and everything else -- and each view gets the
-        columns that fit it. The A.I. view has no tiles in the markup at
-        all: it is built from the roster, which is what stops it falling
-        behind the cast the way the old front page did."""
+        THE FRONT TILE IS NOT IN THE MARKUP AT ALL, and that is the
+        point this test exists to keep. It is built from whichever
+        roster entry carries `front`. A character typed onto this page
+        is exactly how Mimi went missing, and a hardcoded FRONT DOOR is
+        the same bug with a shorter list: it goes stale the day he picks
+        his new main."""
         page = self.PAGE.read_text()
         views = {}
         # `class="tile ..."`, not `class="tile"`: the d20 carries a
@@ -7548,47 +7553,26 @@ class TestHomeScreen(unittest.TestCase):
             views.setdefault(
                 re.search(r'data-view="(\w+)"', tile).group(1), []).append(tile)
         # The `ai` view is BUILT FROM THE ROSTER and has no tiles here,
-        # which is the whole point -- a character list in this file is
-        # what made Mimi invisible.
-        self.assertEqual(sorted(views), ["main", "misc"])
-        # TWO ON THE FRONT, SIX IN THE DRAWER, and each view gets the
-        # columns that fit it. Ghost, Sept 11: "put vpet in misc drawer
-        # too. remove button from says face for it. seems more
-        # streamlined." He is right -- the front page is now the two
-        # things the deck IS (her, and everything else) and the drawer
-        # is where he means to "pile up our fancy future apps".
-        #
-        # Talk went the same way an hour earlier: it opened face.html
-        # just like Saya did, so it was a wasted tile.
-        # FOUR ON THE FRONT: Saya, Cait, Yuzu and the drawer. The
-        # characters are PEERS of Saya's -- Ghost asked for "its own
-        # tab" for each, and a character filed in the drawer between
-        # the d20 and the calculator is not that.
-        #
-        # AND FOUR MEANS TWO COLUMNS, which is the whole reason this
-        # assertion pins the grid as well as the count. Four tiles
-        # across three columns orphans one onto a row of its own --
-        # the `auto-fit` bug a screenshot caught on the first home
-        # screen, and that the fifth tile brought back once already.
-        # The drawer stays three across because six fills two rows of
-        # three exactly.
-        self.assertEqual(len(views["main"]), 2, "the front page is not two")
+        # and so is the front character -- which is why `main` holds one
+        # tile in this file and two on screen.
+        self.assertEqual(sorted(views), ["main", "misc", "stuff"])
+        self.assertEqual(len(views["main"]), 1,
+                         "something other than ☆Stuff☆ is typed onto the "
+                         "front page")
+        self.assertEqual(len(views["stuff"]), 2, "☆Stuff☆ is not two")
         self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
-        self.assertIn("#grid.main { grid-template-columns: repeat(2, 1fr); }",
-                      page)
-        self.assertIn("#grid.misc { grid-template-columns: repeat(3, 1fr); }",
-                      page)
-        # Both front tiles are DRAWERS now. Neither goes anywhere, which
-        # is what makes "A.I. and Misc, the only 2 tabs" true rather
-        # than decorative.
-        self.assertEqual(
-            sorted(re.findall(r'data-show="(\w+)"', "".join(views["main"]))),
-            ["ai", "misc"])
-        # No view may end on a row with a hole in it. Stated as the
-        # PROPERTY rather than as two numbers, so the next tile added
-        # to either view has to answer for the layout it lands in.
-        for view, columns in (("main", 2), ("misc", 3)):
-            self.assertEqual(len(views[view]) % columns, 0,
+        for css in ("#grid.main { grid-template-columns: repeat(2, 1fr); }",
+                    "#grid.stuff { grid-template-columns: repeat(2, 1fr); }",
+                    "#grid.misc { grid-template-columns: repeat(3, 1fr); }"):
+            self.assertIn(css, page)
+        # NO VIEW MAY END ON A ROW WITH A HOLE IN IT. Stated as the
+        # PROPERTY rather than as numbers, so the next tile added has to
+        # answer for the layout it lands in. `main` counts the generated
+        # front character as well as the ☆Stuff☆ tile in the markup --
+        # one typed plus one built is the two that reach the screen.
+        for view, built, columns in (("main", 1, 2), ("stuff", 0, 2),
+                                     ("misc", 0, 3)):
+            self.assertEqual((len(views[view]) + built) % columns, 0,
                              f"the {view} view orphans a tile on its own row")
         # The rule is about the TILE grid: a wide tile forced an odd row
         # and orphaned two others. The calculator's display spanning its
@@ -7597,8 +7581,12 @@ class TestHomeScreen(unittest.TestCase):
         spans = re.findall(r"([#.][\w-]+)[^{}]*\{[^}]*grid-column:\s*span", page)
         self.assertEqual(spans, ["#screen"],
                          "a spanning tile is back, and an odd row with it")
-        self.assertIn('data-show="ai"', "".join(views["main"]),
-                      "there is no way to the characters")
+        # EVERY LEVEL HAS A WAY DOWN INTO THE NEXT ONE.
+        self.assertIn('data-show="stuff"', "".join(views["main"]),
+                      "the front page does not open ☆Stuff☆")
+        self.assertEqual(
+            sorted(re.findall(r'data-show="(\w+)"', "".join(views["stuff"]))),
+            ["ai", "misc"], "☆Stuff☆ does not hold exactly A.I. and ☆Misc☆")
         self.assertIn('data-go="vpet.html"', "".join(views["misc"]),
                       "the pet left the drawer")
         self.assertIn('data-launch="browser"', "".join(views["misc"]),
@@ -7606,15 +7594,53 @@ class TestHomeScreen(unittest.TestCase):
         # TALK IS NOT A TERMINAL. It used to POST /launch/chat, which
         # starts an xterm ON THE DECK'S SCREEN -- from the phone that is
         # a window nobody can see, and on the panel it lands him in a
-        # terminal with no keyboard. Ghost, Sept 11: "the chat in the ui
-        # ismt actually clickable. like u can but it doesnt take you to
-        # a chat." The chat bar under her face is the one that works on
-        # both, so Talk goes there. `deckapps` still installs the
-        # terminal chat as its own app icon, for when the keyboard is
-        # in the case.
+        # terminal with no keyboard. The chat bar under her face is the
+        # one that works on both.
         self.assertNotIn('data-launch="chat"', page,
                          "Talk opens a terminal again")
-        self.assertIn("☆Misc☆", page, "the stars are gone")
+        for stars in ("☆Stuff☆", "☆Misc☆"):
+            self.assertIn(stars, page, f"{stars} lost its stars")
+        # AND THE TWO DRAWERS MUST NOT READ AS THE SAME DRAWER. They sit
+        # one level apart in the same position on screen, and the first
+        # draft gave both of them the subtitle "everything else" -- which
+        # rendering it is what showed.
+        subs = re.findall(r'<b class="stars">[^<]+</b>\s*\n\s*<span>([^<]+)', page)
+        self.assertEqual(len(subs), len(set(subs)),
+                         "☆Stuff☆ and ☆Misc☆ describe themselves identically")
+
+    def test_the_front_character_is_a_ROLE_and_not_a_name(self):
+        """`FRONT` in yuzu_face.py, one line to move, exactly like
+        LIVE_PERSONA and for the same reason: Ghost has contenders and
+        has not picked, so changing his mind has to cost one word in one
+        place.
+
+        IT IS DELIBERATELY NOT LIVE_PERSONA. That one is a MEASUREMENT
+        pointer -- the promotion rule moves it to whichever prompt last
+        scored best. This one decides who GREETS you. One variable doing
+        two jobs is a fault this file records more than once."""
+        import yuzu_face
+        self.assertIn(yuzu_face.FRONT, yuzu_face.CHARACTERS,
+                      "FRONT names nobody on the roster")
+        front = [c for c in yuzu_face.roster() if c["front"]]
+        self.assertEqual(len(front), 1, "the deck has no single front door")
+        self.assertEqual(front[0]["who"], yuzu_face.FRONT)
+        # A FRONT DOOR WITH NO PAGE IS A TAP THAT DOES NOTHING -- the
+        # same rule that keeps a persona with no art off the rail.
+        self.assertTrue(
+            (Path(__file__).parent / "ui" / front[0]["page"]).exists(),
+            "the front character has no page to open")
+        # SHE IS STILL IN THE A.I. DRAWER. Being the front tile is a
+        # shortcut, not a filing cabinet -- a character who vanished
+        # from the roster because she was promoted would be the Mimi bug
+        # pointing the other way.
+        self.assertEqual(len(yuzu_face.roster()), len(yuzu_face.CHARACTERS))
+        # And the highlight follows the ROLE. It used to be `#saya`,
+        # which is the hardcoded-cast bug in stylesheet form: the day
+        # the front door is somebody else the glow stays on a tile that
+        # has moved into a drawer.
+        page = self.PAGE.read_text()
+        self.assertNotIn("#saya {", page, "the bright tile is pinned by name")
+        self.assertIn(".lead {", page, "nothing marks the front tile")
 
     def test_the_drawer_has_a_way_back_and_needs_no_second_page(self):
         """It is the SAME PAGE with the tiles swapped. A second file
@@ -7631,10 +7657,32 @@ class TestHomeScreen(unittest.TestCase):
         self.assertIn('id="back"', page, "there is no way back")
         self.assertIn('data-show="misc"', page, "nothing opens the drawer")
         self.assertNotIn("misc.html", page, "the drawer became a page")
-        # it walks DOWN one level rather than keeping a history -- a
-        # stack is a thing that can strand you
-        self.assertIn("'calc' ? 'misc'", page,
-                      "Back out of the calculator does not reach the drawer")
+        # IT WALKS DOWN ONE LEVEL rather than keeping a history -- a
+        # stack is a thing that can strand you. It was a ternary reading
+        # "calc goes to misc, everything else goes home", which was true
+        # while home was one hop from everywhere; with ☆Stuff☆ in
+        # between, "go home" from the calculator would skip two levels
+        # he walked down on purpose.
+        #
+        # SO PIN THE PROPERTY, NOT THE SPELLING: parse the map out and
+        # walk it. Every view must reach `main` in finite steps, and no
+        # view may be its own ancestor -- a loop is a screen with no way
+        # out, which is the one thing this deck must never ship.
+        block = re.search(r"const PARENT = \{(.*?)\};", page, re.S)
+        self.assertTrue(block, "Back has no map of the deck")
+        parent = dict(re.findall(r"(\w+):\s*'(\w+)'", block.group(1)))
+        self.assertEqual(parent.get("calc"), "misc",
+                         "Back out of the calculator does not reach the drawer")
+        self.assertEqual(parent.get("main"), "main",
+                         "the front page has a parent")
+        for view in set(re.findall(r'data-show="(\w+)"', page)) | {"calc"}:
+            seen, at = [], view
+            while at != "main":
+                self.assertNotIn(at, seen, f"Back loops forever from {view}")
+                seen.append(at)
+                self.assertIn(at, parent, f"{at} has no way back")
+                at = parent[at]
+            self.assertLessEqual(len(seen), 3, f"{view} is buried too deep")
         self.assertNotIn('data-view="calc"', page,
                          "the calculator became a tile that needs a view")
 

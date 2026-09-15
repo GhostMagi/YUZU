@@ -109,8 +109,8 @@ body {
    It also puts the grid back to four equal thumb targets, which is
    what it was before the fifth tile forced a spanning row. */
 [data-view] { display: none !important; }
-#grid.main [data-view="main"], #grid.misc [data-view="misc"],
-#grid.ai [data-view="ai"] {
+#grid.main [data-view="main"], #grid.stuff [data-view="stuff"],
+#grid.misc [data-view="misc"], #grid.ai [data-view="ai"] {
   display: flex !important;
 }
 .stars { letter-spacing: .06em; }
@@ -127,6 +127,7 @@ body {
    exactly. A single shared grid would force one of them to look
    wrong. */
 #grid.main { grid-template-columns: repeat(2, 1fr); }
+#grid.stuff { grid-template-columns: repeat(2, 1fr); }
 #grid.misc { grid-template-columns: repeat(3, 1fr); }
 /* THE A.I. VIEW SETS ITS OWN COLUMNS FROM JAVASCRIPT, because it is
    the only view whose tile count is not known when this file is
@@ -250,13 +251,19 @@ body {
   fill: none; stroke: var(--ink); stroke-width: 1.6;
   stroke-linecap: round; stroke-linejoin: round;
 }
-/* The front page is TWO tiles now, so each one is half the panel and a
-   46px icon floats in the middle of it looking lost. Scaled to the
-   room they actually have -- caught by rendering it, not by reading
-   the CSS. The drawer keeps 46px, where six tiles make that right. */
-#grid.main .tile .big svg { width: 76px; height: 76px; }
-#grid.main .tile b { font-size: 26px; }
-#grid.main .tile span { font-size: 15px; }
+/* A TWO-TILE VIEW gives each tile half the panel, and a 46px icon
+   floats in the middle of that looking lost. Scaled to the room they
+   actually have -- caught by rendering it, not by reading the CSS.
+   ☆Misc☆ keeps 46px, where six tiles make that right.
+
+   BOTH two-tile views take it, not just the front one. ☆Stuff☆ holds
+   two tiles for exactly the same reason the front page does, and a
+   rule that names one layout and not its twin is how `#saya`'s 72px
+   outlived the page it was written for. */
+#grid.main .tile .big svg,
+#grid.stuff .tile .big svg { width: 76px; height: 76px; }
+#grid.main .tile b, #grid.stuff .tile b { font-size: 26px; }
+#grid.main .tile span, #grid.stuff .tile span { font-size: 15px; }
 /* SAYA'S ICON IS NOT BIGGER THAN THE OTHERS ANY MORE. That 72px was
    right while she was the one named tile on a front page of four; she
    is now one of four PEERS inside the A.I. drawer, and equal thumb
@@ -266,10 +273,14 @@ body {
 .tile span { font-size: 12.5px; opacity: .6; text-align: center; }
 .tile.busy { opacity: .55; }
 
-/* Her tile is the one he asked for by name, so it is the bright one --
-   same size as the rest, because equal targets are what a thumb wants,
-   but unmistakably the main thing. */
-#saya { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+/* THE FRONT CHARACTER IS THE BRIGHT TILE -- by ROLE, never by name.
+   This used to be `#saya`, which is the hardcoded-cast bug in
+   stylesheet form: the day the front door is somebody else, the glow
+   stays on a tile that has moved into a drawer. `.lead` is put on
+   whichever roster entry carries `front`, so the highlight follows
+   `FRONT` in yuzu_face.py the way everything else on this deck
+   follows the roster. */
+.lead { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 
 /* ---- bottom: what a tap is doing ---------------------------------- */
 #bar {
@@ -293,25 +304,46 @@ body {
 
 <style id="aicols"></style>
 <div id="grid" class="main">
-  <!-- THE FRONT PAGE IS THE TWO THINGS THIS DECK IS: the characters,
-       and everything else. Ghost, Sept 12: "homescreen should say
-       'A.I.' with them all in it. own menu for personas. and Misc. the
-       only 2 tabs/drawers we really need right now."
+  <!-- THE FRONT PAGE IS ONE CHARACTER AND ONE DRAWER. Ghost, Sept 15:
+       "i wana put the Ais in the misc drawer and maybe have 1 specific
+       one take over", then the layout in his own words: "Rename the
+       outer front page drawer to ☆Stuff☆ so layout Homescreen (central
+       new undecided ai and ☆stuff☆ > inside stuff theres ai tab and
+       misc tab with the rest of the stuff in that one."
 
-       It replaces four front tiles that were Saya, Cait, Yuzu and the
-       drawer -- and the reason it had to change is not tidiness. Mimi
-       shipped with a page, a persona and a rail entry, and she was
-       INVISIBLE from this screen, because the cast was hardcoded here.
-       Ghost found her by opening Cait and reading the rail: "she also
-       was only found by clicking cait 1st then finding her name lmao".
+       So it is three levels deep now:
 
-       So the roster is the only list, exactly like the rail. -->
-  <div class="tile" id="ai" data-view="main" data-show="ai">
-    <div class="big"><svg viewBox="0 0 24 24"><rect x="4.5" y="6.5" width="15" height="12" rx="3"/><path d="M12 2.5v4"/><circle cx="12" cy="2.2" r="1.2"/><path d="M9.5 11.5h.01M14.5 11.5h.01"/><path d="M9.5 15h5"/><path d="M2.5 10.5v4M21.5 10.5v4"/></svg></div>
+           home     <the front character>   ☆Stuff☆
+           ☆Stuff☆  A.I.                    ☆Misc☆
+           ☆Misc☆   Wikipedia Game Boy d20 Pet Browser Calculator
+           A.I.     built from the roster
+
+       THE FRONT TILE IS NOT IN THIS FILE, and that is the whole
+       lesson of the round before this one. Mimi shipped with a page, a
+       persona and a rail entry and was INVISIBLE from this screen,
+       because the cast was typed here -- "she also was only found by
+       clicking cait 1st then finding her name lmao". A hardcoded front
+       door is the same bug with a shorter list: it goes stale the day
+       Ghost picks his new main. The tile is built from whichever roster
+       entry carries `front`, which is `FRONT` in yuzu_face.py, one line
+       to move. Nothing below names a character.
+
+       STILL THE SAME PAGE, with the tiles swapped three ways rather
+       than two. A new file would need its own way out, and every screen
+       on this deck having an exit is the rule two power cycles paid
+       for. -->
+  <div class="tile" id="stuff" data-view="main" data-show="stuff">
+    <div class="big"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 12h17"/><path d="M10 8.2h4M10 15.8h4"/></svg></div>
+    <b class="stars">☆Stuff☆</b>
+    <span>the rest of the deck</span>
+  </div>
+
+  <div class="tile" id="ai" data-view="stuff" data-show="ai">
+    <div class="big"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.4" r="3.3"/><path d="M6 19.8c0-3.4 2.7-5.2 6-5.2s6 1.8 6 5.2"/><circle cx="4.5" cy="7.6" r="2.1"/><path d="M1.2 16.6c0-2.2 1.3-3.7 3.3-3.7"/><circle cx="19.5" cy="7.6" r="2.1"/><path d="M22.8 16.6c0-2.2-1.3-3.7-3.3-3.7"/></svg></div>
     <b>A.I.</b>
     <span>everyone who talks back</span>
   </div>
-  <div class="tile" id="misc" data-view="main" data-show="misc">
+  <div class="tile" id="misc" data-view="stuff" data-show="misc">
     <div class="big"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M17 13.8v6.4M13.8 17h6.4"/></svg></div>
     <b class="stars">☆Misc☆</b>
     <span>everything else</span>
@@ -557,29 +589,54 @@ function columnsFor(n) {
   return n % 3 === 0 ? 3 : n % 2 === 0 ? 2 : 3;
 }
 
+// ONE BUILDER, TWO PLACES SHE CAN APPEAR. The front door and the
+// drawer are the same tile with a different view on it, so there is no
+// second copy to forget -- the same reason there is no second list.
+function character(c, view) {
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.setAttribute('data-view', view);
+  tile.dataset.go = c.page;
+  tile.innerHTML =
+    '<div class="big"><svg viewBox="0 0 24 24">' +
+    (FACES[c.who] || FACES._) + '</svg></div><b></b><span></span>';
+  // textContent, never innerHTML, for anything that came off the
+  // wire. The roster is this deck's own, but the rule costs nothing.
+  tile.querySelector('b').textContent = c.name;
+  tile.querySelector('span').textContent = c.blurb;
+  wire(tile);
+  return tile;
+}
+
 fetch('characters.json', { cache: 'no-store' })
   .then(r => r.json())
   .then(list => {
     document.getElementById('ai').querySelector('span').textContent =
       list.length + ' of them';
-    list.forEach(c => {
-      const tile = document.createElement('div');
-      tile.className = 'tile';
-      tile.setAttribute('data-view', 'ai');
-      tile.dataset.go = c.page;
-      tile.innerHTML =
-        '<div class="big"><svg viewBox="0 0 24 24">' +
-        (FACES[c.who] || FACES._) + '</svg></div><b></b><span></span>';
-      // textContent, never innerHTML, for anything that came off the
-      // wire. The roster is this deck's own, but the rule costs nothing.
-      tile.querySelector('b').textContent = c.name;
-      tile.querySelector('span').textContent = c.blurb;
-      wire(tile);
-      grid.appendChild(tile);
-    });
+    list.forEach(c => grid.appendChild(character(c, 'ai')));
+
+    // THE FRONT DOOR, and it goes FIRST rather than appended -- the
+    // character he meets is on the left, ☆Stuff☆ is beside her.
+    //
+    // SHE IS STILL IN THE A.I. DRAWER TOO, on purpose. Being the front
+    // tile is a shortcut, not a filing cabinet: a character who
+    // vanished from the roster because she was promoted would be the
+    // Mimi bug pointing the other way.
+    const lead = list.filter(c => c.front)[0];
+    if (lead) {
+      const tile = character(lead, 'main');
+      tile.classList.add('lead');
+      grid.insertBefore(tile, grid.firstChild);
+    }
+
+    // A DEAD ROSTER COSTS THE CHARACTER AND NEVER COSTS THE WAY IN.
+    // ☆Stuff☆ is in the markup and works with no server at all, so the
+    // front page falls back to one tile across rather than one tile
+    // sitting in half a screen. Same call as Yuzu's wardrobe button.
     document.getElementById('aicols').textContent =
       '#grid.ai { grid-template-columns: repeat(' +
-      columnsFor(list.length) + ', 1fr); }';
+      columnsFor(list.length) + ', 1fr); }' +
+      (lead ? '' : ' #grid.main { grid-template-columns: 1fr; }');
   })
   .catch(() => {
     const gone = document.createElement('div');
@@ -587,6 +644,8 @@ fetch('characters.json', { cache: 'no-store' })
     gone.setAttribute('data-view', 'ai');
     gone.innerHTML = '<b>No answer</b><span>start ~/YUZU/face</span>';
     grid.appendChild(gone);
+    document.getElementById('aicols').textContent =
+      '#grid.main { grid-template-columns: 1fr; }';
   });
 
 // ---- the calculator -------------------------------------------------
@@ -754,9 +813,17 @@ draw();
 // One Back, in the bottom bar, in the same place whatever is on screen.
 // It walks DOWN one level rather than remembering a history, because a
 // stack can strand you and this deck has no keyboard to escape with.
+//
+// IT IS A MAP NOW BECAUSE THE DECK IS THREE DEEP. The old ternary read
+// "calc goes to misc, everything else goes home", which was true while
+// home was one hop from everywhere. With ☆Stuff☆ in between, "go home"
+// from the calculator would skip two levels he walked down on purpose.
+// Every view names its parent, `main` is its own, so repeated taps
+// always land at the front and can never loop.
+const PARENT = { calc: 'misc', misc: 'stuff', ai: 'stuff',
+                 stuff: 'main', main: 'main' };
 document.getElementById('back').onclick = () => {
-  grid.className = grid.className === 'main' ? 'main'
-    : grid.className === 'calc' ? 'misc' : 'main';
+  grid.className = PARENT[grid.className] || 'main';
   say('');
 };
 </script>

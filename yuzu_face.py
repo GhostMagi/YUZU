@@ -608,6 +608,27 @@ POSES = {
     ),
 }
 
+# WHO OWNS THE FRONT PAGE. Ghost, Sept 15: "maybe have 1 specific one
+# take over (have yet to choose the new main, sayas attitude and blushing
+# stuff might be too extra for demos/showing to parents)".
+#
+# ONE LINE TO MOVE, exactly like LIVE_PERSONA, and for the same reason:
+# he has contenders and has not picked, so the cost of changing his mind
+# has to be one word in one place.
+#
+# IT IS DELIBERATELY *NOT* `LIVE_PERSONA`, and that is the one variable
+# doing two jobs rule again. LIVE_PERSONA is a MEASUREMENT pointer -- the
+# promotion rule moves it to whichever prompt last scored best, and it
+# decides what `yuzu_brain --chat` and the eval boot. This decides who
+# GREETS YOU. A character can be the front door without being the arm
+# under test, and the reverse.
+#
+# AND IT HIDES NOBODY. The front tile is who you meet first; every
+# character is still two taps away under Stuff -> A.I. If the ask ever
+# becomes "my mother must not find Saya", that is a different feature
+# and this is not it.
+FRONT = "saya"
+
 # HER WARDROBE IS A FOLDER, exactly like the V-Pet's cast and her own
 # sprite set: whatever PNGs are in ui/yuzu/ ARE the outfits, and the
 # filename is the name on the button. Adding one is dropping a file in,
@@ -641,7 +662,11 @@ def roster():
         if persona.retired:
             continue
         out.append({"who": who, "name": persona.name,
-                    "page": page, "blurb": blurb})
+                    "page": page, "blurb": blurb,
+                    # The home screen reads this rather than holding a
+                    # name of its own. One roster, one truth -- the same
+                    # rule that stopped Mimi being invisible.
+                    "front": who == FRONT})
     return out
 
 

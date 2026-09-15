@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 580 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 581 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 580 tests pass on it. Getting it
+(that repo path is confirmed working). 581 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -831,6 +831,111 @@ small — but a warm "cute right?" after a switch gets an answer that
 cannot see what he is looking at. The honest fix is the `/wiki` shape
 (ground it into the turn), and it is deliberately NOT built in the same
 pass as everything above: one variable at a time.
+
+## THE DECK IS THREE DEEP NOW, AND THE FRONT DOOR IS A ROLE (Sept 15)
+
+**THE DECK IS LOCKED IN AND STACK-CHAN IS SHELVED.** Ghost, after a
+week of weighing them: *"Alright deck locked in. Stacky can be another
+mes project."* The brainstorm is recorded below under its own heading;
+nothing about it is built and nothing about it should be.
+
+Then the ask: *"Can we do something with the 'main menu'? Like i wana
+put the Ais in the misc drawer and maybe have 1 specific one take over
+(have yet to choose the new main, sayas attitude and blushing stuff
+might be too extra for demos/showing to parents) but i have a couple
+contendors."* And the layout, in his own words: *"Feel free to cluster
+the etc stuff into one new misc drawer. Rename the outer front page
+drawer to ☆Stuff☆ so layout Homescreen (central new undecided ai and
+☆stuff☆>inside stuff theres ai tab and misc tab with the rest of the
+stuff in that one."*
+
+    home      <the front character>   ☆Stuff☆
+    ☆Stuff☆   A.I.                    ☆Misc☆
+    ☆Misc☆    Wikipedia Game Boy d20 Pet Browser Calculator
+    A.I.      built from the roster
+
+**STILL ONE FILE.** Three levels, four views, one `home.html` with the
+tiles swapped -- a new page would need its own way out, and every
+screen on this deck having an exit is the rule two power cycles paid
+for. The cheapest way to keep that true is still to not add a screen.
+
+**`FRONT` IN `yuzu_face.py` IS THE WHOLE FEATURE, AND IT IS ONE LINE TO
+MOVE.** He has contenders and has not picked one, so the cost of
+changing his mind has to be one word in one place -- the promotion
+rule's shape, applied to a different question. It is `"saya"` today, so
+**nothing changed behaviourally**: the front tile is the same character
+that was there before, one level up from everything else.
+
+**IT IS DELIBERATELY *NOT* `LIVE_PERSONA`, and that is the one-variable
+-doing-two-jobs rule again.** `LIVE_PERSONA` is a MEASUREMENT pointer --
+the promotion rule moves it to whichever prompt last scored best, and
+it decides what `yuzu_brain --chat` and the eval boot. `FRONT` decides
+who GREETS you. A character can be the front door without being the arm
+under test, and the reverse. This file already records paying for one
+variable doing two jobs more than once (`banner` vs `who`, `state` vs
+`mood`).
+
+**AND THE FRONT TILE IS NOT IN THE PAGE.** It is built from whichever
+roster entry carries `front`, exactly like the A.I. drawer and the rail.
+**A hardcoded front door is the Mimi bug with a shorter list** -- it
+goes stale the day he picks his new main, and the failure looks like
+the deck working. Nothing in `home.html` names a character, and a test
+pins that.
+
+**SHE IS STILL IN THE A.I. DRAWER TOO.** Being the front tile is a
+shortcut, not a filing cabinet; a character who vanished from the
+roster because she was promoted would be the Mimi bug pointing the
+other way.
+
+**`#saya { border-color: ... }` WAS THE HARDCODED CAST IN STYLESHEET
+FORM.** The bright tile is `.lead` now, put on whichever roster entry
+is front -- otherwise the day the front door is somebody else, the glow
+stays on a tile that has moved into a drawer. Same family as
+`#saya .big svg { 72px }` outliving its layout three days earlier.
+
+**BACK IS A MAP, BECAUSE THE DECK GOT DEEPER THAN THE TERNARY.** It read
+*"calc goes to misc, everything else goes home"*, which was true while
+home was one hop from everywhere. With ☆Stuff☆ in between, "go home"
+from the calculator would skip two levels he walked down on purpose.
+`PARENT` names every view's parent, `main` is its own, so repeated taps
+always land at the front and can never loop. **Still a walk DOWN, never
+a history stack** -- a stack is a thing that can strand you.
+
+**The test walks the map instead of matching the spelling.** The old
+one asserted the literal string `'calc' ? 'misc'`, which is a check
+about how the line is written rather than about where Back goes. It now
+parses `PARENT` out and walks every view to `main`, failing on a loop
+or a missing parent -- **a screen with no way out is the one thing this
+deck must never ship**, and that is worth asserting as a property.
+
+**RENDERING FOUND TWO THINGS THE ASSERTIONS COULD NOT.** Twenty-first
+and twenty-second time:
+
+- **☆Stuff☆ and ☆Misc☆ both said "everything else".** They sit one level
+  apart, in the same position on screen, and read as the same drawer
+  twice. ☆Stuff☆ says *"the rest of the deck"* now, and a test asserts
+  the two star-drawers never describe themselves identically.
+- **The A.I. icon was a robot HEAD one level under a robot HEAD.** With
+  Saya on the front page, the left tile was her face; one tap in, the
+  left tile was the A.I. drawer's robot face. **The same fault as Mimi's
+  first icon being a second cat face** -- two icons that collide are
+  worse the closer together they appear, and these were one tap apart in
+  the same spot. It is a group of three figures now, which is what that
+  drawer actually holds and which stays right whoever `FRONT` becomes.
+
+**A DEAD ROSTER COSTS THE CHARACTER AND NEVER COSTS THE WAY IN.**
+☆Stuff☆ is in the markup and works with no server at all; with no
+`/characters.json` the front page falls back to one full-width tile
+rather than one tile sitting in half a screen. Same call as Yuzu's
+wardrobe button being absent when the route cannot be reached. Verified
+by serving `ui/` with a plain `http.server` and looking at it.
+
+**Still open, and it is his call not mine:** he sent three pictures with
+that message -- a green ASCII/matrix face, a white ceramic android with
+an exposed spine, and a white armoured hooded girl on a four-legged
+mech. It is genuinely ambiguous whether those are candidates for the
+front tile or the next three characters, and guessing would build the
+wrong thing. Ask before drawing anything.
 
 ## MIMI, AND `yuzu_cutout.py` — the ghosts survive the cut (Sept 12)
 
