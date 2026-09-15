@@ -120,7 +120,16 @@ else
     # is ALREADY UP, because starting one he never asked for is its own
     # surprise. Same rule as everything else on this deck: the thing
     # that knows should act, not report.
-    if printf '%s\n' "$files" | grep -q '^[^/]*\.py$'; then
+    #
+    # SUPPRESSED WHEN THE SERVER ITSELF IS THE CALLER. `POST /pull` runs
+    # this script from inside yuzu_face.py, and a restart there would
+    # pkill the process that is holding the open request -- he taps Pull
+    # and gets a network error over an update that worked perfectly.
+    # Same ordering drop.py had to learn: the reply goes out FIRST. The
+    # server restarts itself afterwards, from a detached child.
+    if [ "${YUZU_PULL_NO_RESTART:-}" = 1 ]; then
+        :
+    elif printf '%s\n' "$files" | grep -q '^[^/]*\.py$'; then
         if pgrep -f "yuzu_face.py --serve" >/dev/null 2>&1; then
             echo "    THE FACE SERVER WAS RUNNING THE OLD CODE. Restarting"
             echo "    it, so what answers is what you just pulled."

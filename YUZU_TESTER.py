@@ -4673,6 +4673,163 @@ class TestFour(unittest.TestCase):
                              f"{who} moved bodies; the wiki gate follows")
 
 
+class TestUpdatingWithoutTheCable(unittest.TestCase):
+    """`POST /pull`, and the Update button in the home screen's bar.
+
+    Ghost, Sept 15, having walked away from the cable: "And can i make
+    her pull the current that way? Idk how to use my phone wirelessly
+    with it."
+
+    EVERYTHING ELSE ON THIS DECK ALREADY REACHES HIM OVER WIFI -- her
+    face, the chat, the wiki, the pet, the launcher. `git pull` needed
+    the one shell he can only get by plugging his phone into the board,
+    and it is the thing he runs most, so the update loop was the single
+    part that kept the deck tethered."""
+
+    import yuzu_face as face
+
+    def _stub(self, body):
+        """A `pull` that records how it was called instead of pulling."""
+        tmp = tempfile.mkdtemp()
+        script = Path(tmp) / "pull"
+        script.write_text(body)
+        script.chmod(0o755)
+        return tmp, script
+
+    def test_it_never_lets_pull_bounce_the_server_mid_REQUEST(self):
+        """`pull` restarts a running face server -- which HERE is the
+        process holding the open request. He would tap Update and get a
+        network error over a pull that worked perfectly.
+
+        Same ordering drop.py had to learn: the reply goes out first,
+        and the restart is a detached child afterwards."""
+        tmp, script = self._stub(
+            '#!/bin/bash\necho "NO_RESTART=[${YUZU_PULL_NO_RESTART:-unset}]"\n')
+        try:
+            with unittest.mock.patch.object(self.face, "PULL_SCRIPT",
+                                            str(script)):
+                said, restart = self.face.run_pull()
+            self.assertIn("NO_RESTART=[1]", said,
+                          "pull was allowed to kill the server it is "
+                          "answering through")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_pull_itself_obeys_that_and_still_restarts_normally(self):
+        """The suppression must be the CALLER's choice, not a new default
+        -- a pull from his terminal still has to bounce a stale server,
+        which is the fault the flag sits next to."""
+        body = self.face and None       # (keep the import used above)
+        text = (Path(__file__).parent / "pull").read_text()
+        self.assertIn("YUZU_PULL_NO_RESTART", text)
+        # And driven, both ways, through TestPull's own harness.
+        run = TestPull("test_it_is_valid_shell_and_executable")
+        done, calls = run._restart_run(["yuzu_face.py"], server_up=True)
+        self.assertIn("face --off", calls,
+                      "a terminal pull stopped restarting a stale server")
+
+    def test_a_restart_is_only_promised_when_something_actually_landed(self):
+        """ALREADY UP TO DATE must not bounce her. Restarting costs the
+        page's chat history, and spending it on a pull that changed
+        nothing is a cost with no purchase."""
+        tmp, script = self._stub('#!/bin/bash\necho "  ALREADY UP TO DATE."\n')
+        try:
+            with unittest.mock.patch.object(self.face, "PULL_SCRIPT",
+                                            str(script)):
+                said, restart = self.face.run_pull()
+            self.assertFalse(restart, "a no-op pull restarted the server")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        tmp, script = self._stub('#!/bin/bash\necho "  UPDATED."\n')
+        try:
+            with unittest.mock.patch.object(self.face, "PULL_SCRIPT",
+                                            str(script)):
+                said, restart = self.face.run_pull()
+            self.assertTrue(restart, "a real update left stale code serving")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_the_route_takes_NOTHING_from_the_request(self):
+        """The whole reason this is safe on a server bound to 0.0.0.0.
+
+        Same discipline as /launch/ and /vpet/: one fixed script that
+        lives in this repo, no branch, no remote, no path, no shell
+        string. A route that could be told WHAT to pull would be a box
+        on his WiFi that runs what it is told."""
+        source = inspect.getsource(self.face.run_pull)
+        # Nothing about the request is in scope at all -- it takes no
+        # arguments, which is the strongest form of the guarantee.
+        sig = inspect.signature(self.face.run_pull)
+        self.assertEqual(list(sig.parameters), [],
+                         "run_pull grew a parameter; the request can reach it")
+        self.assertNotIn("shell=True", source)
+        handler = inspect.getsource(self.face._Handler.do_POST)
+        self.assertIn('path == "/pull"', handler,
+                      "the route matches by prefix; a subpath would differ")
+
+    def test_the_button_lives_in_the_BAR_and_not_in_the_drawer(self):
+        """A tile would spend an app slot forever in the drawer he means
+        to "pile up our fancy future apps" in -- and seven tiles across
+        three columns orphans one onto a row of its own, which is the
+        layout bug this page has already had twice. In the bar it is in
+        the same place whatever is on screen, which is what maintenance
+        wants."""
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        self.assertIn('id="update"', page, "there is no way to update")
+        bar = page[page.index('<div id="bar">'):page.index("</div>",
+                   page.index('<div id="bar">') + 400)]
+        self.assertIn('id="update"', bar, "Update left the bottom bar")
+        tiles = re.findall(r'<div class="tile[ "][^>]*>', page)
+        for tile in tiles:
+            self.assertNotIn("update", tile, "Update became a tile")
+
+    def test_she_can_serve_with_NOBODY_LOGGED_IN(self):
+        """THE OTHER HALF, and it is the one that made "use just my
+        phone" impossible rather than awkward.
+
+        `deckapps --autostart` does start this server -- from a .desktop
+        file in ~/.config/autostart, which runs when a DESKTOP SESSION
+        LOGS IN. The Nano has no screen on it, so nothing logs in, so
+        nothing serves, so the phone has nothing to reach. The thing
+        standing between him and a cable-free deck was a login that
+        never happens.
+
+        A systemd unit does not care whether anyone is looking."""
+        text = (Path(__file__).parent / "face").read_text()
+        self.assertIn("--boot", text, "there is no way to serve at boot")
+        self.assertIn("WantedBy=multi-user.target", text,
+                      "the unit waits for a graphical login, which is the "
+                      "bug it exists to fix")
+        self.assertIn("Restart=always", text)
+
+    def test_the_cheap_STOP_is_not_the_word_that_uninstalls(self):
+        """`tile` already paid for this: on a board whose only shell is a
+        serial cable, the quick "turn it off" must never be the same word
+        that tears the install out. `--off` stops the process; `--boot
+        --off` is what removes the service."""
+        text = (Path(__file__).parent / "face").read_text()
+        off = text[text.index('case "${1:-}" in'):]
+        off = off[:off.index("esac")]
+        self.assertNotIn("systemctl", off,
+                         "plain --off now disables the boot service too")
+        boot = text[text.index('if [ "${1:-}" = "--boot" ]'):]
+        boot = boot[:boot.index("\ncase ")]
+        self.assertIn('"${2:-}" = "--off"', boot,
+                      "there is no way to undo --boot")
+
+    def test_the_page_waits_for_her_server_instead_of_reloading_blind(self):
+        """The server restarts itself behind the reply, so a reload fired
+        immediately lands on a dead port -- and "unable to connect" reads
+        as an update that broke the deck rather than one that worked."""
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        block = page[page.index("update.onclick"):]
+        block = block[:block.index("// ---- getting out")]
+        self.assertIn("location.reload", block)
+        reload_at = block.index("location.reload")
+        self.assertLess(block.index("setInterval"), reload_at,
+                        "it reloads without waiting for her to come back")
+
+
 class TestTheWayOutSurvivesANarrowScreen(unittest.TestCase):
     """EVERY SCREEN ON THIS DECK HAS A WAY OFF IT. Two power cycles paid
     for that rule and it is the one thing this project will not trade.

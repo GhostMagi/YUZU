@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 602 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 610 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 602 tests pass on it. Getting it
+(that repo path is confirmed working). 610 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,97 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## THE DECK IS CABLE-FREE NOW (Sept 15)
+
+Ghost, testing Four and away from his cable: *"She gotta be powered on
+then do what to use just my phone?? And can i make her pull the current
+that way? Idk how to use my phone wirelessly with it."*
+
+**THE HONEST ANSWER WAS "PLUG THE CABLE IN FIRST", AND THAT WAS TWO
+SEPARATE GAPS.** Everything else on this deck already reaches him over
+WiFi -- her face, the chat, the wiki, the pet, the launcher. Two things
+did not, and both are now closed.
+
+### 1. Nothing served unless somebody logged in
+
+**`deckapps --autostart` DOES start the face server -- from a `.desktop`
+file in `~/.config/autostart`.** That runs when a DESKTOP SESSION LOGS
+IN. The Nano has no screen on it, so nothing logs in, so nothing serves,
+so the phone has nothing to reach. **The single thing standing between
+him and a cable-free deck was a login that never happens.**
+
+`~/YUZU/face --boot` installs a systemd unit instead. `WantedBy=multi-
+user.target`, `Restart=always`, runs as him. Power on, WiFi up, she
+answers -- no screen, nobody logged in. It VERIFIES rather than
+assuming, and prints the service's own output when it fails to come up.
+
+**`--boot --off` is a separate word from `--off`**, which is the rule
+`tile` already paid for: on a board whose only shell is a serial cable,
+the cheap "stop it now" must never be the word that also tears the
+install out.
+
+### 2. `git pull` was the last thing that needed a shell
+
+And it is the thing he runs most, so the update loop was what kept the
+deck tethered. **`POST /pull` and an Update button in the home screen's
+bottom bar.**
+
+**IT TAKES NO ARGUMENTS AND IT NEVER WILL** -- same discipline as
+`/launch/` and `/vpet/`. One fixed script that lives in this repo, and
+nothing from the request reaches it: no branch, no remote, no path, no
+shell string. `run_pull()` takes no parameters at all, which is the
+strongest form of that guarantee and is what a test pins. The server
+binds 0.0.0.0, so a route that could be told WHAT to pull would be a
+box on his WiFi that runs what it is told.
+
+**IN THE BAR, NOT THE DRAWER**, and the reasoning is already written
+here for Back: a tile spends an app slot forever in the drawer he means
+to *"pile up our fancy future apps"* in, and MOVES every time that
+drawer grows. It is also arithmetic -- seven tiles across three columns
+orphans one onto a row of its own, the layout bug this page has had
+twice. Maintenance is not an app.
+
+**THE REPLY GOES OUT BEFORE THE RESTART.** `pull` now bounces a stale
+face server (the round before this one) -- and here that server is the
+process holding the open request, so it would `pkill` itself mid-reply
+and he would get a network error over a pull that worked perfectly.
+`YUZU_PULL_NO_RESTART=1` suppresses it for this one caller, and the
+server restarts itself afterwards from a DETACHED CHILD rather than
+`exec`, because the response is written but not necessarily received.
+**Same ordering `drop.py` had to learn, with slack.**
+
+**And the page WAITS for her to come back** rather than reloading blind.
+A reload fired immediately lands on a dead port, and "unable to connect"
+reads as an update that broke the deck rather than one that worked.
+
+**ALREADY UP TO DATE does not bounce her.** A restart costs the page's
+chat history, and spending it on a pull that changed nothing is a cost
+with no purchase.
+
+### And the suite caught me putting the docker bridge in an address
+
+`report()` gained an mDNS line -- `http://<name>.local:8081/` -- because
+an address he has to re-read off a serial terminal is an address he
+needs a cable to learn, and a name survives the DHCP lease changing.
+
+**The first draft used bare `hostname`, and
+`test_it_prints_the_lan_address_never_docker_or_the_usb_link` went red
+inside a minute.** The suite's stub returns the decoy list this script
+exists to filter, so the line rendered as
+
+    http://172.17.0.1 192.168.55.1 192.0.2.2.local:8081/
+
+-- the docker bridge, inside an address, in the one line written to save
+him a cable. **Fourth time that address has cost this project
+something**, and the first time a test caught it before he did. `-s`
+now, and refused outright unless it looks like a hostname and nothing
+else: absent rather than wrong.
+
+**The mDNS name is offered, never promised.** Whether avahi answers on
+his board is not checkable from here, and a stated fact that turns out
+false costs more than an untried suggestion -- so the line says to fall
+back to the numbers. He will know in ten seconds.
 
 ## THE WAY OUT FELL OFF THE PHONE, ON EVERY CHARACTER PAGE (Sept 15)
 

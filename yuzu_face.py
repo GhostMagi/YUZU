@@ -1163,6 +1163,12 @@ class _Handler(SimpleHTTPRequestHandler):
             self._json({"ok": error is None, "said": reply or error,
                         "pose": pose_for(reply) if error is None else "idle"})
             return
+        if path == "/pull":
+            said, restart = run_pull()
+            self._json({"ok": True, "said": said})
+            if restart:
+                restart_later()
+            return
         if not path.startswith("/launch/"):
             self.send_error(404)
             return
@@ -1176,6 +1182,77 @@ class _Handler(SimpleHTTPRequestHandler):
 
     def log_message(self, *a):
         pass                      # the shell script prints what matters
+
+
+PULL_SCRIPT = None      # the suite points this at a stub
+
+
+def run_pull():
+    """Update the deck from the browser. (text, needs_restart)
+
+    Ghost, Sept 15, with the cable on the other side of the room:
+    "And can i make her pull the current that way? Idk how to use my
+    phone wirelessly with it."
+
+    UPDATING WAS THE LAST THING THAT NEEDED A CABLE. Everything else on
+    this deck reaches him over WiFi -- her face, the chat, the wiki, the
+    pet -- and `git pull` needed the one shell he can only get by
+    plugging his phone into the board. So the update loop was the part
+    that kept the deck tethered, and it is the part he runs most.
+
+    IT TAKES NO ARGUMENTS AND IT NEVER WILL. Same discipline as
+    /launch/ and /vpet/: this route runs ONE fixed script that lives in
+    this repo, and nothing from the request reaches it -- no branch, no
+    remote, no path, no shell string. The server binds 0.0.0.0, so a
+    route that could be told WHAT to pull would be a box on his WiFi
+    that runs what it is told. This one can only ever do the thing the
+    button says.
+
+    `pull` is already safe to tap twice: it stops on local changes
+    rather than overwriting them, and says so."""
+    import subprocess
+    script = PULL_SCRIPT or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "pull")
+    if not os.path.exists(script):
+        return "No pull script on this board.", False
+    try:
+        done = subprocess.run(
+            ["bash", script], capture_output=True, text=True, timeout=300,
+            # THE RESTART IS OURS TO DO, NOT ITS. `pull` normally bounces
+            # a running face server, which here is the process holding
+            # this very request -- he would tap Pull and get a network
+            # error over an update that worked. The reply goes out first.
+            env=dict(os.environ, YUZU_PULL_NO_RESTART="1"))
+        text = (done.stdout or "") + (done.stderr or "")
+    except subprocess.TimeoutExpired:
+        return "The pull is taking longer than five minutes. Check WiFi.", False
+    except Exception as exc:
+        return "Could not run the pull script (%s)." % exc, False
+    # ALWAYS restart on a real update rather than working out whether
+    # this particular one needs it. A restart costs the page's chat
+    # history and nothing else, and getting the condition subtly wrong
+    # is how a fresh page ends up asking a stale process -- which is the
+    # exact fault this whole route was written the day after.
+    return text.strip(), "UPDATED." in text
+
+
+def restart_later(delay=2):
+    """Bounce the server AFTER the reply has gone out.
+
+    A detached child rather than exec: the response is written but not
+    necessarily received, and killing this process while the socket is
+    still draining turns a successful update into a network error. Same
+    ordering drop.py had to learn, with slack."""
+    import subprocess
+    here = os.path.dirname(os.path.abspath(__file__))
+    face = os.path.join(here, "face")
+    if not os.path.exists(face):
+        return
+    subprocess.Popen(
+        ["bash", "-c", "sleep %d; '%s' --off >/dev/null 2>&1; "
+                       "'%s' >/dev/null 2>&1" % (delay, face, face)],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def serve(port=8081, bind="0.0.0.0"):

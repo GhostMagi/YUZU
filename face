@@ -4,6 +4,8 @@
 #   ~/YUZU/face           serve it, print the address for the phone
 #   ~/YUZU/face --off     stop
 #   ~/YUZU/face --status  is it up, and can the phone reach it
+#   ~/YUZU/face --boot    start it at every boot, with no screen attached
+#   ~/YUZU/face --boot --off    stop doing that
 #
 # The PHONE is the screen here, not the deck. It is a touchscreen
 # already, the face is built for touch, and it needs no VNC, no X
@@ -98,6 +100,33 @@ report() {
     fi
     echo "  UP.  Open this on your phone:"
     echo "      http://$ip:$PORT/"
+    # AND A NAME, because an address he has to re-read off a serial
+    # terminal is an address he needs a cable to learn. mDNS gives the
+    # board a name that follows it across DHCP leases, so this is the
+    # one worth bookmarking. It is NOT promised: whether avahi answers
+    # on his board is not checkable from here, and a stated fact that
+    # turns out false costs more than an untried suggestion. He will
+    # know in ten seconds.
+    # `hostname` WITH NO ARGUMENT IS NOT A NAME on every box, and the
+    # suite caught this within a minute: its stub returns the decoy list
+    # this script exists to filter, so the first draft told him to open
+    # "http://172.17.0.1 192.168.55.1 192.0.2.2.local" -- the docker
+    # bridge, inside an address, in the one line meant to save him a
+    # cable. Fourth time that address has cost this project something.
+    #
+    # `-s` is the short name, and it is REFUSED unless it looks like a
+    # hostname and nothing else. Absent rather than wrong: a suggestion
+    # he cannot use is worse than no suggestion.
+    local name; name=$(hostname -s 2>/dev/null)
+    case "$name" in
+        *[!A-Za-z0-9-]*|"") name="" ;;
+    esac
+    if [ -n "$name" ]; then
+        echo
+        echo "  Or try this, which survives the address changing:"
+        echo "      http://$name.local:$PORT/"
+        echo "  (mDNS. If it does not load, use the numbers above.)"
+    fi
     echo
     echo "  That is the HOME SCREEN, not her face. Ghost, Sept 12:"
     echo "  \"id like to choose what i wana do before sayas face pops"
@@ -110,6 +139,77 @@ report() {
     echo
     return 0
 }
+
+# --- start at every boot, with NO SCREEN ATTACHED ----------------------
+# Ghost, Sept 15: "She gotta be powered on then do what to use just my
+# phone?? ... Idk how to use my phone wirelessly with it."
+#
+# THE ANSWER WAS "PLUG IN THE CABLE FIRST", AND THAT IS THE GAP.
+# `deckapps --autostart` starts this server, but it does it from a
+# .desktop file in ~/.config/autostart -- which runs when a DESKTOP
+# SESSION LOGS IN. The Nano has no screen on it, so nothing logs in,
+# so nothing serves, so the phone has nothing to reach. The one thing
+# standing between him and a cable-free deck was a login that never
+# happens.
+#
+# A systemd service does not care whether anyone is looking at the
+# board. Power on, WiFi up, she answers.
+#
+# SEPARATE FROM `--off`, deliberately, and the same reason `tile` keeps
+# --off and --remove apart: the cheap "stop it now" must never be the
+# word that also tears the install out.
+if [ "${1:-}" = "--boot" ]; then
+    unit=/etc/systemd/system/yuzu-face.service
+    me="$(cd "$(dirname "$0")" && pwd)"
+    if [ "${2:-}" = "--off" ]; then
+        sudo systemctl disable --now yuzu-face.service 2>/dev/null
+        sudo rm -f "$unit"
+        sudo systemctl daemon-reload 2>/dev/null
+        echo
+        echo "  It will no longer start at boot. It is still installed;"
+        echo "  run ~/YUZU/face to start it by hand."
+        echo
+        exit 0
+    fi
+    echo
+    echo "  Installing a boot service. This needs sudo once."
+    echo
+    sudo tee "$unit" >/dev/null <<UNIT
+[Unit]
+Description=YUZU face server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$(id -un)
+WorkingDirectory=$me
+ExecStart=/usr/bin/python3 $me/yuzu_face.py --serve --port $PORT
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    sudo systemctl daemon-reload || exit 1
+    sudo systemctl enable --now yuzu-face.service || exit 1
+    sleep 2
+    # VERIFY, never assume. This project has reported a dead thing as
+    # working and a working thing as dead, both, and the fix both times
+    # was to go and look.
+    if up; then
+        echo "  DONE. She is serving now and will serve at every boot,"
+        echo "  with no screen and nobody logged in."
+        report
+    else
+        echo "  INSTALLED, but she did not come up. Its own output:"
+        sudo systemctl status yuzu-face.service --no-pager -l 2>&1 \
+            | tail -12 | sed 's/^/    /'
+        echo
+        exit 1
+    fi
+    exit 0
+fi
 
 case "${1:-}" in
 --off)

@@ -287,7 +287,21 @@ body {
   display: flex; align-items: center; gap: 14px;
   padding: 0 20px calc(16px + env(safe-area-inset-bottom));
 }
-#note { font-size: 13px; opacity: .75; min-height: 1.2em; }
+#note { font-size: 13px; opacity: .75; min-height: 1.2em;
+         white-space: pre-line; line-height: 1.45; }
+/* UPDATE LIVES IN THE BAR FOR THE REASON BACK DOES. He means to "pile
+   up our fancy future apps" in the drawer, so a tile spends an app slot
+   forever and MOVES every time the drawer grows -- and seven tiles in
+   three columns orphans one onto a row of its own, which is the layout
+   bug this page has now had twice. In the bar it is in the same place
+   whatever is on screen, and it is maintenance rather than an app. */
+#update {
+  margin-left: auto; flex: none;
+  font: inherit; font-weight: 700; font-size: 13px;
+  color: var(--ink); background: var(--tile); cursor: pointer;
+  border: 2px solid var(--edge); border-radius: 4px; padding: 7px 14px;
+}
+#update:disabled { opacity: .5; cursor: default; }
 
 /* Pure #000 also kills glare on a panel and hides the bezel edge,
    which is the practical half of why green on black is worth having on
@@ -400,6 +414,7 @@ body {
 <div id="bar">
   <button id="back" type="button">⌂ Back</button>
   <div id="note"></div>
+  <button id="update" type="button" title="git pull">↻ Update</button>
 </div>
 
 <script>
@@ -809,6 +824,59 @@ document.addEventListener('keydown', e => {
 });
 
 draw();
+
+// ---- updating, without the cable -------------------------------------
+// Ghost, Sept 15: "And can i make her pull the current that way? Idk
+// how to use my phone wirelessly with it."
+//
+// Everything else on this deck already reaches him over WiFi. `git
+// pull` was the last thing that needed the one shell he can only get
+// by plugging his phone into the board -- and it is the thing he runs
+// most often, so the update loop was what kept the deck tethered.
+//
+// THE VERDICT GOES IN THE BAR, which is where he is already looking
+// after tapping. `pull` puts its answer on the first line on purpose --
+// UPDATED / ALREADY UP TO DATE / PULL FAILED -- and names the fix
+// underneath when it fails, so the first few lines ARE the whole
+// message.
+const update = document.getElementById('update');
+update.onclick = () => {
+  update.disabled = true;
+  update.textContent = '...';
+  say('Pulling. This can take a moment on a cold board.');
+
+  fetch('pull', { method: 'POST' })
+    .then(r => r.json())
+    .then(r => {
+      const text = (r.said || '').trim();
+      // The first lines are the verdict and, when it failed, the fix.
+      say(text.split('\n').filter(l => l.trim()).slice(0, 4).join('\n'));
+      if (text.indexOf('UPDATED.') >= 0) {
+        // HER SERVER IS RESTARTING ITSELF behind this reply, so the
+        // page has to wait for it rather than reloading into a dead
+        // port. Poll until it answers -- a reload that lands on
+        // "unable to connect" reads as an update that broke the deck.
+        update.textContent = 'restarting';
+        let tries = 0;
+        const wait = setInterval(() => {
+          fetch('characters.json', { cache: 'no-store' })
+            .then(() => { clearInterval(wait); location.reload(); })
+            .catch(() => { if (++tries > 30) { clearInterval(wait);
+              update.disabled = false; update.textContent = '↻ Update';
+              say('Updated, but her server has not come back. '
+                  + 'Start it with ~/YUZU/face', 15000); } });
+        }, 1000);
+        return;
+      }
+      update.disabled = false;
+      update.textContent = '↻ Update';
+    })
+    .catch(() => {
+      update.disabled = false;
+      update.textContent = '↻ Update';
+      say('No answer from the deck. Is ~/YUZU/face running?', 9000);
+    });
+};
 
 // ---- getting out ----------------------------------------------------
 // One Back, in the bottom bar, in the same place whatever is on screen.
