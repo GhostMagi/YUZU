@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 619 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 622 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 619 tests pass on it. Getting it
+(that repo path is confirmed working). 622 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,65 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## CONFIRMED ON THE BOARD: the boot service, the auto-restart, the rename
+
+All three landed on the real Orin within twenty minutes of shipping,
+and his terminal log is the evidence. Worth recording because
+`deckapps` and `deck` still carry a standing "UNVERIFIED on the board"
+note and this is the first time any of this layer has been seen working
+on the hardware.
+
+**`face --boot`:**
+
+    Created symlink /etc/systemd/system/multi-user.target.wants/
+        yuzu-face.service -> /etc/systemd/system/yuzu-face.service
+    DONE. She is serving now and will serve at every boot,
+    with no screen and nobody logged in.
+    UP.  Open this on your phone:
+        http://192.168.4.138:8081/
+
+**The auto-restart, unprompted, on his next pull:**
+
+    THE FACE SERVER WAS RUNNING THE OLD CODE. Restarting
+    it, so what answers is what you just pulled.
+
+That is the fault from two hours earlier -- fresh page, stale process --
+fixing itself without him knowing it had ever been a problem.
+
+**And the rename:**
+
+    Renaming localhost -> ghostnano. This needs sudo.
+    DONE. This board is ghostnano.
+    mDNS:  running
+
+**`avahi-daemon` IS present and running on that board**, which was
+explicitly unverifiable from here. So `.local` at least has something
+answering on the deck's side; whether his phone resolves it is still
+the phone's business.
+
+### "No such file or directory", twice, and it was not a bug
+
+Between those two wins he ran `~/YUZU/name ghostnano` and got
+
+    -bash: /home/ghost/YUZU/name: No such file or directory
+
+then `cd ~/YUZU/` and got it again. **Nothing was wrong.** He had
+pulled ten minutes before the script was pushed, so it simply was not
+there yet -- and the obvious second guess is that you are in the wrong
+directory, which is why he tried twice.
+
+**A new FILE is invisible inside "37 files changed". A new COMMAND is
+something he is about to TYPE**, so `pull` gives it its own line now:
+
+    NEW COMMAND: ~/YUZU/name
+
+Same reason `HER FACE CHANGED` has one, a layer over. It names only
+top-level executables with no extension -- a new `.py` module is not
+something he types at a prompt, and a notice that fires on things he
+cannot run is the same noise as one that fires every time. Both halves
+are pinned, and verified by removing the line and by making it fire
+unconditionally.
 
 ## HIS BOARD IS NAMED `localhost`, AND I HANDED HIM THAT (Sept 15)
 

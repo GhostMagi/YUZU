@@ -97,6 +97,25 @@ else
         echo "    HER FACE CHANGED -- reload the page, do not just look at it."
     fi
 
+    # AND NAME A COMMAND THAT DID NOT EXIST BEFORE. Measured, Sept 15:
+    # he was told to run `~/YUZU/name ghostnano`, had pulled ten minutes
+    # earlier, and got "No such file or directory" -- twice, because the
+    # obvious next guess is that you are in the wrong directory. Nothing
+    # was wrong; the script simply landed after his pull.
+    #
+    # A new FILE is invisible in "37 files changed". A new COMMAND is a
+    # thing he is about to type, so it gets its own line -- same reason
+    # the sprites line above exists, one layer over.
+    new=$(git diff --name-only --diff-filter=A "$before" "$after" 2>/dev/null \
+          | grep -v '/' | while read -r f; do
+              [ -x "$f" ] && [ ! -f "$f.py" ] && case "$f" in
+                  *.*) ;; *) printf ' ~/YUZU/%s' "$f" ;;
+              esac
+          done)
+    if [ -n "$new" ]; then
+        echo "    NEW COMMAND:$new"
+    fi
+
     # --- A RUNNING SERVER GOES ON SERVING THE OLD CODE ----------------
     # MEASURED, Sept 15, and it looked exactly like a feature that had
     # not arrived. Ghost pulled the round that added Four, opened the

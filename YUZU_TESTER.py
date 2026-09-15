@@ -7138,7 +7138,7 @@ class TestPull(unittest.TestCase):
 
     # ---- a running server keeps serving the OLD code ------------------
 
-    def _restart_run(self, changed, server_up):
+    def _restart_run(self, changed, server_up, added=()):
         """Drive the REAL pull script in a temp dir, with stubs beside it.
 
         A copy rather than the repo itself, because `pull` cds to its own
@@ -7162,6 +7162,13 @@ class TestPull(unittest.TestCase):
             # rev-parse is called TWICE and must differ, or the script
             # correctly reports ALREADY UP TO DATE and restarts nothing.
             names = " ".join("'%s'" % c for c in changed)
+            fresh = " ".join("'%s'" % c for c in added) or "''"
+            # Added files answer a DIFFERENT git question, and the stub
+            # has to keep them apart -- one stub answering two questions
+            # is how the docker bridge got into an address an hour ago.
+            for f in added:
+                (here / f).write_text("#!/bin/bash\n")
+                (here / f).chmod(0o755)
             (binv / "git").write_text(
                 '#!/bin/bash\n'
                 'case "$*" in\n'
@@ -7171,9 +7178,10 @@ class TestPull(unittest.TestCase):
                 '     echo "rev$n" ;;\n'
                 '  "pull origin main") echo ok ;;\n'
                 '  log*) echo "  abc123 a change" ;;\n'
+                '  "diff --name-only --diff-filter=A"*) printf "%s\\n" {fresh} ;;\n'
                 '  diff*) printf "%s\\n" {names} ;;\n'
                 '  *) exit 0 ;;\n'
-                'esac\n'.format(t=tmp, names=names))
+                'esac\n'.format(t=tmp, names=names, fresh=fresh))
             (binv / "git").chmod(0o755)
             (binv / "pgrep").write_text(
                 "#!/bin/bash\nexit %d\n" % (0 if server_up else 1))
@@ -7188,6 +7196,39 @@ class TestPull(unittest.TestCase):
             return done, calls
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_a_pull_NAMES_a_command_that_did_not_exist_before(self):
+        """MEASURED, Sept 15. He was told to run `~/YUZU/name ghostnano`,
+        had pulled ten minutes earlier, and got
+
+            -bash: /home/ghost/YUZU/name: No such file or directory
+
+        twice -- because the obvious second guess is that you are in the
+        wrong directory, so he cd'd there and tried again. Nothing was
+        wrong. The script simply landed after his pull.
+
+        A new FILE is invisible inside "37 files changed". A new COMMAND
+        is a thing he is about to TYPE, so it gets its own line -- the
+        same reason HER FACE CHANGED has one, a layer over."""
+        done, _ = self._restart_run(
+            ["name", "ui/home.html"], server_up=False, added=["name"])
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("NEW COMMAND: ~/YUZU/name", done.stdout, done.stdout)
+
+    def test_an_ordinary_pull_announces_no_new_commands(self):
+        """A line that appears every time is a line he stops reading."""
+        done, _ = self._restart_run(["ui/home.html"], server_up=False)
+        self.assertNotIn("NEW COMMAND", done.stdout,
+                         "it announces commands that are not new")
+
+    def test_a_new_MODULE_is_not_a_new_command(self):
+        """`yuzu_cutout.py` is not something he types at a prompt, and a
+        notice that fires on things he cannot run is the same noise as
+        one that fires every time."""
+        done, _ = self._restart_run(
+            ["yuzu_thing.py"], server_up=False, added=["yuzu_thing.py"])
+        self.assertNotIn("NEW COMMAND", done.stdout,
+                         "it offered him a python module to type")
 
     def test_a_pull_that_changes_server_code_restarts_a_LIVE_server(self):
         """MEASURED, Sept 15, and it looked exactly like a feature that
