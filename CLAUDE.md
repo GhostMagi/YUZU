@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 581 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 597 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 581 tests pass on it. Getting it
+(that repo path is confirmed working). 597 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -930,72 +930,173 @@ rather than one tile sitting in half a screen. Same call as Yuzu's
 wardrobe button being absent when the route cannot be reached. Verified
 by serving `ui/` with a plain `http.server` and looking at it.
 
-**ANSWERED: the three pictures are CANDIDATES FOR THE NEW MAIN.** Ghost,
-asked straight out whether they were front-tile contenders or the next
-three characters: *"Candadates for the new main."* A green ASCII/matrix
-face, a white ceramic android with an exposed spine, and a white
-armoured hooded girl on a four-legged mech. One of them becomes the
-front door; the other two are not commissioned.
+**HE PICKED, AND SHE IS BUILT. See "FOUR" below.** The three pictures
+were candidates for the front tile, not three new characters -- Ghost,
+asked straight out: *"Candadates for the new main."* He chose the green
+ASCII/matrix face, uploaded it to the repo, asked for it to be animated
+if possible, and named her **Four**.
 
-**AND THE FRONT TILE IS A DEMO FACE NOW, which is a CHARACTER spec and
-not a layout one.** His reason for moving off Saya is in the same
+**THE FRONT TILE IS A DEMO FACE, and that is a CHARACTER spec rather
+than a layout one.** His reason for moving off Saya is in the same
 sentence as the ask: *"sayas attitude and blushing stuff might be too
 extra for demos/showing to parents."* So whoever takes the front page
-is the character a stranger meets with no context, which means:
+is the character a stranger meets with no context:
 
 - **She must survive being poked by someone who is not Ghost.** A demo
-  is an adversarial round with a friendly face on it -- and the one
-  failure this repo has a CATEGORICAL fix for is assistant collapse,
-  five times over. The technical-question example is not optional on
-  her; it is the most load-bearing line she will have.
+  is an adversarial round with a friendly face on it, and the one
+  failure this repo has a CATEGORICAL fix for is assistant collapse.
+  The technical-question example is not optional on her; it is the most
+  load-bearing line she has.
 - **Her register has to work cold.** Saya is great BECAUSE she is
   difficult, and difficult needs a relationship to read as charm. The
   front character wants the opposite default: answers straight, warms
   up rather than starts warm.
-- **Saya is NOT retired and nothing about her changes.** She is one tap
-  away under Stuff -> A.I., exactly as before. This is a front door,
-  not a demotion, and `retired: yes` is a different mechanism that
-  nobody should reach for here.
+- **Saya is NOT retired and nothing about her changed.** She is one tap
+  away under Stuff -> A.I. A front door is not a demotion, and
+  `retired: yes` is a different mechanism nobody should reach for here.
 
-**WHAT IT COSTS, AND WHY IT IS NOT ONE LINE.** `FRONT` is one line to
-move, but only to a character who EXISTS. None of these three do. The
-full path is the one Mimi walked: art into `ui/art_in/`, a recipe in
-`yuzu_cutout.py` if the backdrop fights, a world/body file, a persona,
-a page, a `CHARACTERS` entry -- and only then `FRONT`.
 
-**THE THREE ARE NOT THE SAME AMOUNT OF WORK, and that is worth knowing
-before he picks on looks alone:**
+## FOUR — the deck's own voice, and the first front door (Sept 15)
 
-    green ASCII/matrix face   the DECK with a face. `_hardware_cyberdeck`
-                              already fits it exactly -- she IS the
-                              machine, and {DECK_SELF} is a MEASURED win
-                              on that body rather than damage. Cheapest
-                              by a distance, and the only one of the
-                              three that reuses a body file unchanged.
+Ghost picked the ASCII/matrix face out of his three candidates, pushed
+it to the repo himself, and asked for two things: *"Can u make it like..
+animated somehow if possible?"* and, on temperament, *"Maybe a
+futureistic 'Cortana' vibe while being casual still"*. Then: *"Name her
+Four."*
 
-    ceramic android, spine    a drawn body that is not alive and not
-                              the deck. `_hardware_avatar` is close
-                              (a drawn body that does not walk) but its
-                              whole point is a MODERN GIRL, so this
-                              probably wants its own world.
+`FRONT = "four"`. `LIVE_PERSONA` is untouched and still `saya_deck` --
+the two pointers do different jobs and this is the round that proved it
+was worth splitting them.
 
-    hooded girl on a mech     the most art and the most world. A rider
-                              plus a machine is two things to keep
-                              straight, and nothing in the repo has a
-                              body that is a VEHICLE. New world file,
-                              and the self-concept question ("are you
-                              the girl or the mech") has to be answered
-                              before a line of her is written.
+**SHE WAS THE CHEAP ONE AND THE PREDICTION HELD.** The note written
+before he chose said the ASCII face reuses `_hardware_cyberdeck`
+unchanged, because she IS the machine and `{DECK_SELF}` is a MEASURED
+win on that body rather than damage. No new world file, no new body
+file, no `{LOOK}` token. 3641 chars, the trimmest character in the repo.
 
-**THE ART HAS TO REACH THE REPO.** All three are in chat only; nothing
-new is in `ui/art_in/`. `yuzu_cutout.py` reads files, not messages --
-same as every character before her.
+**CORTANA IS THE RIGHT ARCHETYPE FOR A DEMO FACE, which is a happy
+accident worth naming.** The spec written a day earlier -- answers
+straight, works cold, survives a stranger -- is a description of that
+character. Her `temperature` is **0.75**, lower than anyone else's
+(Saya 0.85, Shiro 0.8), and for a reason rather than taste: those two
+are characters whose whole appeal is being unpredictable, and Four is
+the front door.
 
-**Nothing was built on this.** He has not picked, not named one, and
-not given a temperament, and the last time that call came up the split
-was recorded as the entire reason body files exist: *"Dont design the
-characters persona yet im still trying to brainstrorm her
-personality."* Ask; do not draft.
+**"WHY ARE YOU CALLED FOUR?" IS AN EXAMPLE, because a stranger WILL ask
+it.** Ghost did not say why, so nothing here decides it for him -- but
+a character with nothing demonstrated invents something every single
+time, which is exactly how "good girl" got into a prompt that says
+`him` thirteen times. Her answer is lore-free on purpose: *"It's a
+designation, not a name. Nobody ever told me what the other three were,
+and I stopped wondering a while ago."* One line to change the day he
+decides what the other three were.
+
+**SHE USES NO PET NAME AT ALL, and that is deliberate.** The Mimi
+finding is that an unstated form of address gets invented; the fix for
+a character who will be handed to other people is not to pick one, it
+is to demonstrate none. It also sidesteps the gender fault entirely
+rather than guessing at it.
+
+### Her art is NOT cut out, and that is the finding
+
+**MEASURED BEFORE THE DECISION**, on the source he uploaded:
+
+    border brightness   median 1.0 of 255   (the backdrop is pure black)
+    near-black pixels   55.8% of the picture
+
+The second number decides it. **Her shadow side IS the backdrop
+colour**, and unlike `ghost_crowd` there is no outline between them --
+she fades continuously into it. That is the case ART.txt calls
+unfixable with none of what saved the cape: a flood from the edge walks
+straight into her face at any tolerance that clears the backdrop at all.
+
+**AND SHE DOES NOT NEED CUTTING. `mix-blend-mode: screen` IS the
+cutout**, done by arithmetic rather than by a flood's guess: black
+contributes nothing under screen, so the backdrop falls away exactly,
+every soft edge intact, no alpha, no recipe, no PIL, no generated file.
+
+**The generalisable line: a backdrop that matches the PAGE does not
+have to be removed at all.** `yuzu_cutout.py` exists to remove a
+backdrop that CLASHES. Check which one you have before reaching for it.
+
+It is also what makes the animation work: the rain runs BEHIND her and
+shows through her dark side, so she is made of running characters and
+the characters run.
+
+### The animation
+
+**A CANVAS RAIN LAYER, vanilla, ~30 lines.** No library -- this deck
+has to work with the WiFi off and a CDN is the one thing it can never
+have.
+
+**DIGITS AND ASCII, NEVER KATAKANA.** The Matrix glyph set is the
+obvious choice and a trap on this board: a machine with no CJK font
+draws every glyph as a tofu box, and whether Ubuntu on his Orin has one
+is not checkable from here. Her own art is made of digits anyway, so
+the safe set is also the faithful one -- same family as refusing to
+print unverified button combos. A test pins every glyph under U+0080.
+
+**IT THROTTLES ITSELF to ~14fps and speeds up while she is thinking.**
+A canvas loop at the panel's refresh rate is heat and watts spent on
+wallpaper, on a handheld running off a battery bank with an LLM sharing
+its memory. The speed-up is her loading spinner, in her own idiom --
+Cait's warm light, one character over.
+
+**Her idle is a FLICKER, not a breath.** Cait and Yuzu breathe because
+they are drawn people standing in a room. Four is a picture made of
+running characters; the honest idle for her is an unsteady feed, at
+irregular steps because an even pulse reads as a broken GIF.
+
+**RENDERING FOUND THREE THINGS THE ASSERTIONS COULD NOT.** Twenty-third,
+fourth and fifth time:
+
+- **`#stage { z-index: 1 }` SILENTLY SWITCHED HER BLEND OFF.** A
+  positioned element with a z-index creates a STACKING CONTEXT, and
+  `mix-blend-mode` only blends against the backdrop *inside* its own
+  context -- so she composited against nothing and her JPEG's black
+  painted as an opaque rectangle. The right third of the panel went
+  dead flat while every rain column on the left kept falling. `position:
+  relative` alone does not create one, so deleting the z-index is the
+  whole fix, and a test now pins its absence.
+- **The rail was unreadable** with rain falling straight through it --
+  four other characters' names and the way out of her screen. The top
+  bar has a backing now. A tap he cannot read is the same dead end as a
+  tap that does nothing.
+- **Her home icon rendered as `!!!!`.** Short code columns with a
+  bright square under each one ARE exclamation marks at tile size. They
+  are full-height dashed columns now, which cannot be mistaken for
+  punctuation. Third instance of the icon-collision fault, after Mimi's
+  second cat face and the A.I. drawer's second robot head.
+
+### Two things this round pulled apart
+
+**`/wiki` IS A PROPERTY OF THE BODY, NOT OF WHOEVER IS LIVE.** Both the
+lookup and "does this character drive Saya's face sprites" hung off ONE
+flag, and the two agreed only by accident while the live arm was the
+only character on the deck body at all. Four is on the deck and is not
+live, which is what separated them. The gate reads `hardware ==
+"cyberdeck"` now. Same rule as every name-leak instance: decide whether
+a fact belongs to THIS BODY or to WHOEVER IS LIVE, and pin it there.
+
+**THE ANSWER-FIRST WIN IS AN ORDER, NOT A PHRASE -- second instance of
+the identical fault.** `MEASURED_WINS` matched the literal "answer it
+first", which Four fails while saying *"Answer the question first and
+plainly"* -- the same rule, same position, same job. This repo already
+records the identical false positive twice against the brevity rule. It
+is `ANSWER_FIRST_RE` now.
+
+**And the brevity regex was special-cased in ONE of five consumers**,
+so the other four went on matching a literal. A second regex would have
+made that four copies of the same `if`. `TestYuzu5.carries(name, text)`
+is the one place that knows which wins are phrases and which are
+behaviours, and all five callers ask it. Verified by breaking her rule
+two different ways and watching it fail both times.
+
+**Still open:** she has never been run against a live model, so she is
+UNMEASURED in the strongest sense -- and the round that matters is an
+adversarial one, because that is what a demo is. The two things to
+watch are the two this repo already measures on this body: assistant
+collapse under a technical question, and length.
 
 ## MIMI, AND `yuzu_cutout.py` — the ghosts survive the cut (Sept 12)
 

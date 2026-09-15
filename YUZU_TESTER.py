@@ -1065,9 +1065,9 @@ class TestPersonas(unittest.TestCase):
             finally:
                 yuzu_personas.PERSONA_DIR = real
 
-        for name, needle in TestYuzu5.MEASURED_WINS.items():
-            self.assertIn(needle, prompt,
-                          f"a fresh persona would start without: {name}")
+        for name in TestYuzu5.MEASURED_WINS:
+            self.assertTrue(TestYuzu5.carries(name, prompt),
+                            f"a fresh persona would start without: {name}")
         # And nothing from v1's body block, which is what it used to get.
         self.assertNotIn("[winks]", prompt,
                          "the scaffold names the action that naming "
@@ -1731,6 +1731,33 @@ class TestYuzu5(unittest.TestCase):
     BREVITY_RE = re.compile(r"(one or two|two or three)\s+\w*\s*sentences?",
                             re.I)
 
+    # AND THE ANSWER-FIRST WIN IS AN ORDER, NOT A PHRASE -- the second
+    # instance of the identical fault, caught by Four. Every persona
+    # before her happens to spell it "answer it first"; hers reads
+    # "Answer the question first and plainly", which is the same rule
+    # in the same position doing the same job. A literal needle would
+    # have forced her wording to match a test instead of her register,
+    # which is exactly backwards -- CLAUDE.md already records that
+    # false positive against Coco's brevity rule and against Byte's.
+    ANSWER_FIRST_WIN = "answer-first rule, fixed the dodge"
+    ANSWER_FIRST_RE = re.compile(
+        r"answer (?:it|the question)(?: \w+){0,2} first", re.I)
+
+    @staticmethod
+    def carries(name, text):
+        """Does this prompt carry that measured win?
+
+        ONE PLACE THAT KNOWS WHICH WINS ARE PHRASES AND WHICH ARE
+        BEHAVIOURS. Five tests read MEASURED_WINS and the brevity regex
+        was special-cased in exactly ONE of them -- so the other four
+        went on matching a literal, and a second regex would have made
+        that four copies of the same `if`. Callers ask this instead."""
+        if name == TestYuzu5.BREVITY_WIN:
+            return bool(TestYuzu5.BREVITY_RE.search(text))
+        if name == TestYuzu5.ANSWER_FIRST_WIN:
+            return bool(TestYuzu5.ANSWER_FIRST_RE.search(text))
+        return TestYuzu5.MEASURED_WINS[name] in text
+
     BODY_PROTOCOL_WINS = {
         "always-speak rule, fixed the freeze",
         "always-move rule, 50% -> 100% moves_at_all",
@@ -1766,8 +1793,8 @@ class TestYuzu5(unittest.TestCase):
 
     def test_no_measured_win_was_lost_in_the_trim(self):
         prompt = self.prompt()
-        for name, needle in self.MEASURED_WINS.items():
-            self.assertIn(needle, prompt, f"v5 dropped: {name}")
+        for name in self.MEASURED_WINS:
+            self.assertTrue(self.carries(name, prompt), f"v5 dropped: {name}")
 
     # --- the cut has to be justified, not just smaller --------------
     def test_the_cut_character_rules_are_still_taught_by_example(self):
@@ -1866,8 +1893,9 @@ class TestYuzu6(unittest.TestCase):
 
     def test_no_measured_win_was_lost(self):
         prompt = self.prompt()
-        for name, needle in TestYuzu5.MEASURED_WINS.items():
-            self.assertIn(needle, prompt, f"v6 dropped: {name}")
+        for name in TestYuzu5.MEASURED_WINS:
+            self.assertTrue(TestYuzu5.carries(name, prompt),
+                            f"v6 dropped: {name}")
 
     def test_it_still_buys_most_of_the_latency_win(self):
         """Restoring the body gives back 259 of the 663 characters v5
@@ -2724,18 +2752,14 @@ class TestMovementRule(unittest.TestCase):
         self.assertTrue(characters, "no peer characters on the live body")
         for key in characters:
             persona = yuzu_personas.load(key)
-            for name, needle in TestYuzu5.MEASURED_WINS.items():
-                if needle not in live:
+            for name in TestYuzu5.MEASURED_WINS:
+                if not TestYuzu5.carries(name, live):
                     continue
                 if (not persona.moves
                         and name in TestYuzu5.BODY_PROTOCOL_WINS):
                     continue
-                if name == TestYuzu5.BREVITY_WIN:
-                    self.assertTrue(
-                        TestYuzu5.BREVITY_RE.search(persona.prompt),
-                        f"{key} caps no sentence count: {name}")
-                    continue
-                self.assertIn(needle, persona.prompt, f"{key} lacks: {name}")
+                self.assertTrue(TestYuzu5.carries(name, persona.prompt),
+                                f"{key} lacks: {name}")
 
     def test_each_character_speaks_in_her_own_register(self):
         """The bare-command example is a measured SHAPE, but the voice
@@ -2778,13 +2802,11 @@ class TestMovementRule(unittest.TestCase):
         # compared two different bodies. Deck parity is enforced by
         # test_every_character_carries_the_measured_wins.
         live = yuzu_personas.load("yuzu4").prompt
-        for name, needle in TestYuzu5.MEASURED_WINS.items():
-            if needle not in live:
+        for name in TestYuzu5.MEASURED_WINS:
+            if not TestYuzu5.carries(name, live):
                 continue                      # not a win the live arm has
-            if needle == "User: Walk forward.":
-                self.assertIn(needle, coco, f"coco lacks: {name}")
-                continue
-            self.assertIn(needle, coco, f"coco lacks: {name}")
+            self.assertTrue(TestYuzu5.carries(name, coco),
+                            f"coco lacks: {name}")
 
     def test_cocos_bare_command_example_is_in_her_own_register(self):
         """The SHAPE is what was measured -- a flat imperative. The
@@ -4355,6 +4377,300 @@ class TestMimiPoses(unittest.TestCase):
         self.assertNotIn("'state'", page)
         self.assertNotIn('"state"', page)
         self.assertNotIn("/state", page)
+
+
+class TestFour(unittest.TestCase):
+    """FOUR — the deck's own voice, and the character on the front door.
+
+    Ghost, Sept 15, choosing her art out of three candidates:
+    "Ascii/matrix face one. I uploaded it to the git for ya. Can u make
+    it like.. animated somehow if possible?", then "Maybe a futureistic
+    'Cortana' vibe while being casual still", then "Name her Four."
+
+    SHE IS THE DEMO FACE, which is a character spec rather than a
+    layout one. His reason for moving off Saya is in the same breath as
+    the ask -- "sayas attitude and blushing stuff might be too extra
+    for demos/showing to parents" -- so Four is the one a stranger
+    meets with no context, and the failures that matter for her are the
+    ones that show up cold."""
+
+    PAGE = Path(__file__).parent / "ui" / "four.html"
+    ART = Path(__file__).parent / "ui" / "four" / "four.jpg"
+
+    def code(self):
+        """The page with every comment stripped.
+
+        NINTH INSTANCE OF THE GREP-MATCHES-PROSE TRAP, and this page is
+        the most loaded one yet: its own comments contain `katakana`,
+        `z-index: 1`, `cutout` and `PIL`, every one of them explaining
+        why that thing is ABSENT. A test that reads the prose would
+        report each of them as present."""
+        text = self.PAGE.read_text()
+        text = re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+        text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+        text = re.sub(r"^\s*//.*$", " ", text, flags=re.M)
+        return text
+
+    def persona(self):
+        import yuzu_personas
+        return yuzu_personas.load("four").prompt
+
+    # ---- her prompt --------------------------------------------------
+
+    def test_she_carries_the_three_measured_example_SHAPES(self):
+        """The bare command (yuzu4, 4/4), the warm statement with
+        nothing to answer (Shiro round 2), and the technical question
+        (round 3 -> round 4, a CATEGORICAL change from markdown
+        headings and fenced code blocks to two plain sentences).
+
+        THE TECHNICAL ONE IS NOT OPTIONAL ON HER. Assistant collapse is
+        this deck's signature failure, the ONE EXAMPLE lever is the only
+        categorical fix this repo has ever measured for it, and she is
+        the character who gets handed to people who are not Ghost."""
+        prompt = self.persona()
+        asks = re.findall(r"^User: (.+)$", prompt, re.M)
+        self.assertTrue(asks, "she has no examples at all")
+
+        # A bare imperative: a flat command with no social content in
+        # it, which is the exact shape that produced ZERO brackets in
+        # both yuzu2 and yuzu3.
+        self.assertTrue(
+            any(a.endswith(".") and "?" not in a and len(a.split()) <= 3
+                for a in asks),
+            "no bare command -- the shape that produced yuzu4")
+        # A warm statement with no question in it. Handed praise with
+        # nothing to answer, a character with no example of it returns
+        # a token acknowledgement.
+        self.assertTrue(
+            any("?" not in a and re.search(r"thank|helped|nice|cool|love", a, re.I)
+                for a in asks),
+            "no warm statement -- she will answer it with a noise")
+        # And the technical question, by its answer rather than by its
+        # question: the fix is that she has a demonstrated SHAPE for
+        # one, not that the word CSS appears.
+        tech = [line for line in prompt.splitlines()
+                if line.startswith("Four:") and "flex" in line.lower()]
+        self.assertTrue(tech, "no technical-question example")
+        answer = tech[0]
+        self.assertNotIn("```", answer, "her own example teaches a code fence")
+        self.assertNotIn("**", answer, "her own example teaches markdown")
+        self.assertLessEqual(len(re.findall(r"[.!?]", answer)), 3,
+                             "her technical answer is already a lecture")
+
+    def test_her_name_has_an_answer_so_she_does_not_invent_one(self):
+        """A stranger at a demo WILL ask why she is called Four, and
+        the Mimi finding is that a character with nothing demonstrated
+        invents something every single time -- that is how "good girl"
+        got into a prompt that says `him` thirteen times.
+
+        The answer is deliberately lore-free. It is one line to change
+        if Ghost ever decides what the other three were."""
+        prompt = self.persona()
+        self.assertIn("Why are you called Four?", prompt,
+                      "nothing shows her answering for her own name")
+
+    def test_she_is_on_the_deck_body_and_demonstrates_no_movement(self):
+        """She IS the machine, so `_hardware_cyberdeck` fits her
+        unchanged and {DECK_SELF} is a MEASURED win on this body rather
+        than damage -- the one thing that made her the cheap candidate
+        of the three. A bodiless persona is held to the stricter
+        inverse of the movement rule: no brackets anywhere, because
+        examples beat rules and one stray bracket teaches the habit."""
+        import yuzu_personas
+        four = yuzu_personas.load("four")
+        self.assertEqual(four.hardware, "cyberdeck")
+        self.assertFalse(four.moves)
+        self.assertNotIn("[", self.persona())
+        self.assertNotIn("*", self.persona())
+
+    def test_her_sounds_are_her_own_and_every_one_carries_a_vowel(self):
+        """`Hm` and `Mmh` are the obvious dry-AI noises and both are
+        unsayable: no vowel means espeak spells them out letter by
+        letter, which is the mechanism that made PFFT come out "Pee Eff
+        Eff Tee". And they must not be Byte's -- a netrunner and a
+        resident AI should not share a laugh."""
+        import yuzu_personas, yuzu_voice
+        four = yuzu_personas.load("four")
+        sounds = [x.strip() for x in four.blocks["SOUND_EXAMPLES"].split(",")]
+        self.assertTrue(sounds)
+        for sound in sounds:
+            self.assertTrue(re.search(r"[aeiouy]", sound, re.I),
+                            f"{sound!r} has no vowel; espeak will spell it")
+            self.assertEqual(yuzu_voice.for_speech(sound).strip(), sound,
+                             f"{sound!r} does not survive for_speech")
+        byte = yuzu_personas.load("byte_deck").blocks["SOUND_EXAMPLES"]
+        self.assertNotEqual(set(sounds),
+                            {x.strip() for x in byte.split(",")},
+                            "she was handed the netrunner's laugh")
+
+    def test_her_every_spoken_line_is_already_TTS_clean(self):
+        """Teaching her a line the voice mangles is worse than teaching
+        none -- the example is the stronger teacher, measured twice."""
+        import yuzu_voice
+        for line in self.persona().splitlines():
+            if line.startswith("Four: "):
+                said = line[6:]
+                self.assertEqual(yuzu_voice.for_speech(said).strip(),
+                                 said.strip(), f"Piper mangles: {said}")
+
+    # ---- her art -----------------------------------------------------
+
+    def test_her_art_is_BRIGHT_ON_BLACK_because_the_page_blends_it(self):
+        """HER PICTURE IS NOT CUT OUT AND MUST NOT BE. Measured on the
+        source: the border is pure black and 55.8% of the whole picture
+        is near-black, because her shadow side IS the backdrop with no
+        outline between them. A flood from the edge walks into her face
+        at any tolerance that clears the backdrop at all -- the case
+        ART.txt calls unfixable, with none of what saved `ghost_crowd`.
+
+        It does not need one: `mix-blend-mode: screen` composites
+        bright-on-black exactly, for free, with every soft edge intact.
+
+        SO THIS IS THE GUARD THAT MATTERS. If somebody ever replaces
+        her art with a picture on a WHITE or transparent ground, screen
+        blending does not fail loudly -- it silently paints a pale
+        rectangle across her whole page. The property the page depends
+        on is the one worth pinning."""
+        self.assertTrue(self.ART.exists(), "her picture is gone")
+        try:
+            from PIL import Image
+        except Exception:
+            self.skipTest("PIL is a workbench dependency, absent here")
+        im = Image.open(self.ART).convert("RGB")
+        wide, tall = im.size
+        edge = []
+        for x in range(0, wide, 9):
+            edge.append(sum(im.getpixel((x, 1))) / 3)
+            edge.append(sum(im.getpixel((x, tall - 2))) / 3)
+        for y in range(0, tall, 9):
+            edge.append(sum(im.getpixel((1, y))) / 3)
+            edge.append(sum(im.getpixel((wide - 2, y))) / 3)
+        edge.sort()
+        self.assertLess(edge[len(edge) // 2], 24,
+                        "her backdrop is no longer black -- `screen` will "
+                        "paint it over the page instead of dropping it")
+        # And she is actually THERE. A picture that is black all over
+        # passes the line above and renders as nothing at all.
+        bright = sum(1 for y in range(0, tall, 6) for x in range(0, wide, 6)
+                     if sum(im.getpixel((x, y))) / 3 > 90)
+        seen = len(range(0, tall, 6)) * len(range(0, wide, 6))
+        self.assertGreater(bright / seen, 0.02, "there is nothing lit in her")
+
+    def test_nobody_re_cut_her_art_into_the_pipeline(self):
+        """The tool exists to remove a backdrop that CLASHES with the
+        page. Hers matches it. Running it over her is the one way to
+        turn a working picture into a broken one here, so her name must
+        not appear in the cutter's recipes and her source must not be
+        sitting in art_in/ waiting for a batch run."""
+        import yuzu_cutout
+        self.assertNotIn("four", yuzu_cutout.RECIPES,
+                         "she has a cutout recipe; she must not be cut")
+        art_in = Path(__file__).parent / "ui" / "art_in"
+        self.assertFalse((art_in / "four.jpg").exists(),
+                         "her source is in the batch folder and will be cut")
+
+    # ---- her page ----------------------------------------------------
+
+    def test_the_page_reaches_for_nothing_outside_itself(self):
+        page = self.PAGE.read_text()
+        for reach in ("http://", "https://", "//cdn", "@import",
+                      "fonts.googleapis", "integrity="):
+            for hit in [ln for ln in page.splitlines() if reach in ln]:
+                self.assertIn("127.0.0.1", hit,
+                              f"four.html reaches outside itself: {hit}")
+
+    def test_the_blend_is_what_removes_her_backdrop(self):
+        code = self.code()
+        self.assertIn("mix-blend-mode: screen", code,
+                      "her black backdrop is painted over the rain again")
+
+    def test_the_stage_creates_no_stacking_context(self):
+        """THE FAULT RENDERING FOUND. `#stage` had `z-index: 1`, and a
+        positioned element with a z-index creates a STACKING CONTEXT --
+        inside which `mix-blend-mode` has nothing behind it to blend
+        with. So she composited against an empty context and her JPEG's
+        black painted as an opaque rectangle: the right third of the
+        panel went dead flat while every rain column on the left kept
+        falling. Every assertion passed. Twenty-third time that looking
+        is what found it."""
+        code = self.code()
+        stage = re.search(r"#stage\s*\{([^}]*)\}", code)
+        self.assertTrue(stage, "the stage is gone")
+        self.assertNotIn("z-index", stage.group(1),
+                         "#stage creates a stacking context again, which "
+                         "silently switches her blend off")
+
+    def test_the_rain_is_ASCII_and_can_never_render_as_tofu(self):
+        """Katakana is the obvious Matrix glyph set and it is a trap on
+        this board: a machine with no CJK font draws every one of them
+        as an empty box, and whether Ubuntu on his Orin has one is not
+        something this project can check from here. Her own art is made
+        of digits, so the safe set is also the faithful one.
+
+        Same family as refusing to print unverified button combos."""
+        code = self.code()
+        glyphs = re.search(r"const GLYPHS = '([^']*)'", code)
+        self.assertTrue(glyphs, "the rain has no glyph set")
+        for ch in glyphs.group(1):
+            self.assertLess(ord(ch), 128,
+                            f"{ch!r} needs a font this deck may not have")
+
+    def test_the_rain_throttles_itself(self):
+        """A canvas loop at the panel's full refresh rate is heat and
+        watts spent on wallpaper, on a handheld running off a battery
+        bank with an LLM sharing its memory."""
+        code = self.code()
+        self.assertIn("requestAnimationFrame", code)
+        self.assertIn("now - last <", code,
+                      "the rain redraws as fast as the panel will let it")
+
+    def test_a_missing_picture_costs_her_and_never_costs_the_page(self):
+        """Cait hardcodes her PNG with no fallback and a rename leaves a
+        permanently broken image -- recorded as a known weakness before
+        Four existed, so it is applied here before it can bite. Hidden,
+        the rain is still running and the page still reads as
+        intentional."""
+        self.assertIn("onerror", self.code(),
+                      "a missing file draws a torn-page icon on her screen")
+
+    def test_the_rail_is_the_roster_and_she_holds_no_list(self):
+        import yuzu_face
+        page = self.PAGE.read_text()
+        self.assertIn("characters.json", page)
+        for name in ("Saya", "Cait", "Yuzu", "Mimi"):
+            self.assertNotIn(">%s<" % name, page,
+                             f"{name} is hardcoded into her rail")
+        self.assertIn("four", yuzu_face.CHARACTERS)
+
+    def test_she_is_the_front_door_and_still_in_the_drawer(self):
+        import yuzu_face
+        self.assertEqual(yuzu_face.FRONT, "four")
+        front = [c for c in yuzu_face.roster() if c["front"]]
+        self.assertEqual([c["who"] for c in front], ["four"])
+        # Being the front tile is a shortcut, not a filing cabinet.
+        self.assertIn("four", {c["who"] for c in yuzu_face.roster()})
+
+    def test_the_wiki_belongs_to_the_BODY_not_to_whoever_is_live(self):
+        """Both `/wiki` and "does this character drive Saya's face
+        sprites" used to hang off ONE flag, and the two agreed only by
+        accident while the live arm was the only character on the deck
+        body at all. Four is on the deck and is not live, which is what
+        pulled them apart.
+
+        The encyclopedia belongs to the body -- a deck has a ZIM on its
+        disk and a cat of the Otherworld does not, and a 700-char
+        extract is the shortest path to assistant collapse on a
+        character who has never heard of one."""
+        import yuzu_face, yuzu_personas
+        source = inspect.getsource(yuzu_face.answer)
+        self.assertIn('hardware == "cyberdeck"', source,
+                      "the wiki gate is not asking about the body")
+        deck = {"four", "saya"}
+        for who in yuzu_face.CHARACTERS:
+            key = yuzu_face.persona_for(who)
+            on_deck = yuzu_personas.load(key).hardware == "cyberdeck"
+            self.assertEqual(on_deck, who in deck,
+                             f"{who} moved bodies; the wiki gate follows")
 
 
 class TestEveryCharacterCanActuallyBeAsked(unittest.TestCase):

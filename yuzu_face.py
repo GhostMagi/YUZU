@@ -565,6 +565,7 @@ CHARACTERS = {
     "cait": ("cait",                   "cait.html",  "king of the cats"),
     "yuzu": ("yuzu_avatar",            "yuzu.html",  "gyaru, fully dressed"),
     "mimi": ("mimi",                   "mimi.html",  "five hundred years here"),
+    "four": ("four",                   "four.html",  "the deck's own voice"),
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A
@@ -627,7 +628,7 @@ POSES = {
 # character is still two taps away under Stuff -> A.I. If the ask ever
 # becomes "my mother must not find Saya", that is a different feature
 # and this is not it.
-FRONT = "saya"
+FRONT = "four"
 
 # HER WARDROBE IS A FOLDER, exactly like the V-Pet's cast and her own
 # sprite set: whatever PNGs are in ui/yuzu/ ARE the outfits, and the
@@ -706,6 +707,23 @@ def answer(text, who="saya"):
     # flight while she thinks, so it already knows.
     drives_face = (key == persona_for("saya"))
 
+    # AND `/wiki` IS A SEPARATE QUESTION FROM THAT, which it was not
+    # until Four landed. Both used to hang off `drives_face`, and the
+    # two only agreed by accident while the live deck arm was the only
+    # character on the deck body at all.
+    #
+    # THE ENCYCLOPEDIA BELONGS TO THE BODY. A deck has a ZIM on its
+    # disk; a cat of the Otherworld does not, and a lookup arriving as
+    # "I looked up X and it says: <700 chars of encyclopedia>" is the
+    # shortest path to assistant collapse on a character who has never
+    # heard of one. So the gate reads the HARDWARE -- which is exactly
+    # the split this repo keeps paying for: decide whether a fact
+    # belongs to WHOEVER IS LIVE or to THIS BODY, and pin it there.
+    try:
+        has_wiki = yuzu_personas.load(key).hardware == "cyberdeck"
+    except Exception:
+        has_wiki = drives_face
+
     def face(*args, **kw):
         if drives_face:
             set_state(*args, **kw)
@@ -717,7 +735,7 @@ def answer(text, who="saya"):
     # encyclopedia>", which is the shortest path to assistant collapse
     # on a character who has never heard of an encyclopedia.
     problem = None
-    if drives_face:
+    if has_wiki:
         text, problem = yuzu_brain.ground(text)
     if problem:
         # The VERDICT, in the bubble, where he is already looking --

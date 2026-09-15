@@ -1,0 +1,404 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Four</title>
+<!--
+  FOUR — the deck's own voice, and the front door.
+
+  Ghost, Sept 15, picking her art out of three candidates: "Ascii/matrix
+  face one. I uploaded it to the git for ya. Can u make it like..
+  animated somehow if possible?" and "Name her Four."
+
+  SHE IS GREEN ON BLACK, AND SHE IS THE ONLY CHARACTER WHO SHOULD BE.
+  Cait, Yuzu and Mimi each get a palette sampled off their own art,
+  because each of them is a different thing that happens to run on this
+  board. Four is not a guest on the deck -- she IS the deck, on the
+  cyberdeck body, and her picture is already the deck's exact colours.
+  Giving her a palette of her own would be inventing a difference that
+  is not there.
+
+  HER ART IS NOT CUT OUT, AND THAT IS THE FINDING.
+  Measured on the source: the border is pure black (median brightness
+  1.0 of 255) and 55.8% of the whole picture is near-black -- because
+  her shadow side IS the backdrop colour, with no outline between them.
+  ART.txt already says a costume that matches the backdrop cannot be
+  floodfilled, and `ghost_crowd` only survived because her own outline
+  closed the bridge. There is no bridge to close here: a flood from the
+  edge would walk straight into her face and take half of it.
+
+  It does not need one. She is BRIGHT ON BLACK, and `mix-blend-mode:
+  screen` composites exactly that for free -- black contributes nothing,
+  so the backdrop falls away by arithmetic rather than by a flood's
+  guess, and every soft edge survives perfectly. No cutout, no alpha, no
+  recipe, no PIL. The right tool was already in the browser.
+
+  It also means the rain behind her shows THROUGH her dark side, which
+  is the whole animation: she is made of running characters, so the
+  characters run.
+
+  THE RAIN IS DIGITS AND ASCII, NEVER KATAKANA. The Matrix glyph set is
+  the obvious choice and it is a trap on this board: a missing CJK font
+  renders every glyph as a tofu box, and whether Ubuntu on his Orin has
+  one is not something this project can check from here. Her own art is
+  made of digits and latin characters anyway, so the safe set is also
+  the faithful one.
+
+  No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --bg:   #000000;
+  --ink:  #39ff5e;            /* the deck's neon green, unchanged      */
+  --dim:  #1f7a37;
+  --box:  rgba(6, 14, 8, .88);
+  --edge: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100vh; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 ui-monospace, 'DejaVu Sans Mono', Menlo, Consolas, monospace;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- the rain -------------------------------------------------------
+   Behind everything, including her. It is the floor she stands on and
+   the thing she is made of, so it is not decoration that can be
+   dropped -- but it IS the one expensive thing on this page, so it
+   throttles itself and stops dead when the page is hidden. */
+#rain {
+  position: fixed; inset: 0; z-index: 0;
+  /* QUIET. The first pass ran at .5 idle and .9 thinking and the
+     picture it produced was a wall of code with a girl somewhere in
+     it -- she is the subject and the rain is the room. */
+  opacity: .32; transition: opacity .5s ease;
+}
+body.thinking #rain { opacity: .6; }
+
+/* ---- the scanline sweep --------------------------------------------
+   One bright band travelling down the panel. It is what makes a STILL
+   picture read as a live signal rather than a wallpaper, and it costs
+   one element and one keyframe. */
+#sweep {
+  position: fixed; left: 0; right: 0; height: 26%; z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+              transparent 0%,
+              color-mix(in srgb, var(--ink) 7%, transparent) 45%,
+              color-mix(in srgb, var(--ink) 12%, transparent) 50%,
+              transparent 100%);
+  animation: sweep 7s linear infinite;
+}
+@keyframes sweep {
+  0%   { transform: translateY(-30%) }
+  100% { transform: translateY(420%) }
+}
+/* And the fixed scanlines under it. 3px, faint -- at 1024x600 anything
+   tighter turns into a moiré against her own character grid, which was
+   visible the moment it was rendered. */
+#lines {
+  position: fixed; inset: 0; z-index: 4; pointer-events: none;
+  background: repeating-linear-gradient(to bottom,
+              rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+}
+
+/* ---- top ----------------------------------------------------------- */
+/* IT NEEDS A BACKING, and rendering is what said so. The rail is four
+   other characters' names and the way out of her screen, and both were
+   illegible against rain falling straight through them. A tap he
+   cannot read is the same dead end as a tap that does nothing. */
+#top {
+  position: relative; z-index: 5;
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 24px 10px;
+  background: linear-gradient(to bottom, rgba(0,0,0,.94) 55%, transparent);
+}
+#who { font-size: 20px; font-weight: 700; letter-spacing: .22em; }
+#title { font-size: 12px; color: var(--dim); letter-spacing: .1em; }
+#rail { display: flex; gap: 6px; margin-left: 18px; }
+#rail a, #rail span {
+  font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
+  padding: 4px 11px; border-radius: 2px;
+  color: var(--dim); border: 1px solid transparent;
+}
+#rail a { cursor: pointer; }
+#rail a:hover { color: var(--ink); border-color: var(--edge); }
+#rail .here {
+  color: var(--ink); border-color: var(--edge); background: rgba(0,0,0,.45);
+}
+#home {
+  margin-left: auto; width: 38px; height: 38px; flex: none;
+  border-radius: 3px; cursor: pointer; display: grid; place-items: center;
+  font-size: 17px; color: var(--ink); background: rgba(0,0,0,.4);
+  border: 1px solid var(--edge);
+}
+
+/* ---- her ------------------------------------------------------------ */
+#stage {
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
+  display: grid; align-items: start; justify-items: end;
+  padding-right: 3%;
+  /* minmax(0, 1fr), for the reason Cait's page records: a grid row is
+     `auto` by default, so it grows to fit the image and a percentage
+     height has nothing bounded to resolve against. */
+  grid-template-rows: minmax(0, 1fr);
+  /* NO z-index HERE, AND THAT IS LOAD-BEARING. It had `z-index: 1`,
+     which -- with `position: relative` -- creates a STACKING CONTEXT,
+     and `mix-blend-mode` only ever blends against the backdrop inside
+     its own context. So she was compositing against nothing and her
+     black JPEG painted as an opaque black rectangle over the rain:
+     measured by rendering it, where the right third of the screen went
+     dead flat while every column on the left kept falling. `position:
+     relative` alone does not create one, so dropping the z-index is
+     the whole fix. */
+}
+#four {
+  height: 122%; max-width: 50%;
+  object-fit: contain; object-position: top center;
+  /* THE WHOLE CUTOUT, IN ONE DECLARATION. Her backdrop is black and
+     black contributes nothing under `screen`, so it disappears exactly
+     -- soft edges and all -- and the rain runs through her. */
+  mix-blend-mode: screen;
+  animation: flicker 6s steps(1, end) infinite;
+  position: relative;
+}
+/* A SIGNAL, NOT A BREATH. Cait and Yuzu breathe because they are drawn
+   people standing in a room. Four is a picture made of running
+   characters; the honest idle for her is an unsteady feed. Irregular
+   steps on purpose -- an even pulse reads as a broken GIF, which is
+   the same finding as the blink timing on Saya's face. */
+@keyframes flicker {
+  0%, 38%, 41%, 72%, 74%, 100% { opacity: 1 }
+  39%   { opacity: .82 }
+  40%   { opacity: 1 }
+  73%   { opacity: .88 }
+}
+body.thinking #four { animation-duration: 1.6s; }
+
+/* ---- what she says --------------------------------------------------
+   She stands right, her words go left -- the fix Cait's page paid for
+   by rendering it: a box at left with width 46% ends exactly in the
+   middle of the screen, which is exactly where a centred figure is. */
+#says {
+  position: absolute; left: 3.5%; bottom: 6%; width: 44%; max-height: 74%;
+  overflow-y: auto; display: none; z-index: 2;
+  background: var(--box);
+  border: 1px solid var(--edge); border-left: 3px solid var(--ink);
+  border-radius: 2px; padding: 15px 17px;
+  font-size: 15.5px; line-height: 1.6;
+}
+#says.on { display: block; }
+#says::before {
+  content: '> '; color: var(--dim);
+}
+
+/* ---- asking ---------------------------------------------------------- */
+#ask {
+  position: relative; z-index: 5;
+  background: linear-gradient(to top, #000 62%, transparent);
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 24px calc(18px + env(safe-area-inset-bottom));
+}
+#text {
+  flex: 1; font: inherit; font-size: 15px; color: var(--ink);
+  background: rgba(0,0,0,.55); padding: 12px 15px; border-radius: 2px;
+  border: 1px solid var(--edge);
+}
+#text::placeholder { color: var(--dim); }
+#text:focus { outline: none; border-color: var(--ink); }
+#send {
+  font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  color: #04120a; background: var(--ink); padding: 12px 22px;
+  border: 0; border-radius: 2px;
+}
+#send:disabled { opacity: .5; cursor: default; }
+
+@media (max-width: 760px) {
+  /* Inherited from the other character pages and NOT a supported
+     layout -- 1024x600 is the panel and the only view that gets
+     designed. The subtitle is what wraps through her name first. */
+  #title { display: none; }
+  #four { max-width: 84%; height: 108%; }
+  #says { position: static; width: auto; margin: 0 16px 10px;
+          max-height: 34vh; }
+  #stage { justify-items: center; padding-right: 0; }
+}
+</style>
+
+<canvas id="rain"></canvas>
+<div id="sweep"></div>
+<div id="lines"></div>
+
+<div id="top">
+  <div id="who">FOUR</div>
+  <div id="title">resident</div>
+  <div id="rail"></div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<div id="stage">
+  <img id="four" src="four/four.jpg" alt="Four">
+  <div id="says"></div>
+</div>
+
+<form id="ask" autocomplete="off">
+  <input id="text" placeholder="Say something, or /wiki black holes" maxlength="2000">
+  <button id="send" type="submit">Speak</button>
+</form>
+
+<script>
+// ---- the rain ---------------------------------------------------------
+// Vanilla canvas, no library, because this deck has to work with the
+// WiFi off and a CDN is the one thing it can never have.
+//
+// DIGITS AND ASCII ONLY. Katakana is the obvious glyph set and it is a
+// trap: a board with no CJK font draws every one of them as a tofu box,
+// and her own art is made of digits anyway.
+const GLYPHS = '01234567890123456789ABCDEF<>[]{}/\\|=+*-_:;.';
+const canvas = document.getElementById('rain');
+const ctx = canvas.getContext('2d');
+const CELL = 18;   // fewer, wider columns; 14 was a wall
+let cols = [], wide = 0, tall = 0;
+
+function fit() {
+  wide = canvas.width = window.innerWidth;
+  tall = canvas.height = window.innerHeight;
+  const n = Math.ceil(wide / CELL);
+  cols = [];
+  for (let i = 0; i < n; i++) {
+    // Start scattered ABOVE the screen so it is already raining when
+    // the page opens rather than starting as one tidy line.
+    cols.push(-Math.random() * (tall / CELL));
+  }
+}
+
+// THROTTLED ON PURPOSE, and this is not a micro-optimisation. This is a
+// handheld running off a battery bank with an LLM sharing its memory;
+// a canvas loop at the panel's full refresh rate is heat and watts
+// spent on wallpaper. Fourteen frames a second is what falling text
+// wants anyway -- faster stops reading as discrete characters.
+let last = 0;
+function draw(now) {
+  requestAnimationFrame(draw);
+  const step = document.body.classList.contains('thinking') ? 45 : 72;
+  if (now - last < step) return;
+  last = now;
+
+  // A translucent wipe rather than a clear: what is left behind is the
+  // trail, and its alpha is the trail's length.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.13)';   // shorter trails
+  ctx.fillRect(0, 0, wide, tall);
+  ctx.font = CELL + 'px ui-monospace, monospace';
+
+  for (let i = 0; i < cols.length; i++) {
+    const y = cols[i] * CELL;
+    const ch = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+    // The leading character is bright and the tail is dim. One bright
+    // head per column is what makes it read as falling rather than as
+    // static noise.
+    ctx.fillStyle = '#c8ffd4';
+    ctx.fillText(ch, i * CELL, y);
+    ctx.fillStyle = 'rgba(57, 255, 94, 0.55)';
+    ctx.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], i * CELL, y - CELL);
+
+    cols[i]++;
+    if (y > tall && Math.random() > 0.975) cols[i] = 0;
+  }
+}
+
+fit();
+window.addEventListener('resize', fit);
+requestAnimationFrame(draw);
+
+// A page nobody is looking at must not burn the battery. rAF already
+// stops in a hidden tab in Chromium, but the deck opens her with
+// --app and the guard costs one line.
+document.addEventListener('visibilitychange', () => { last = 0; });
+
+// HER PICTURE IS ABSENT RATHER THAN BROKEN. A missing file would
+// otherwise draw the browser's torn-page icon in the middle of her own
+// screen; hidden, the rain is still running and the page still reads as
+// intentional. Same rule as a character with no icon still getting a
+// tile.
+document.getElementById('four').onerror = function () {
+  this.style.visibility = 'hidden';
+};
+
+// ---- the page ---------------------------------------------------------
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+const says = document.getElementById('says');
+
+document.getElementById('home').onclick = () => { location.href = 'home.html'; };
+
+// The roster comes from the server, so this page holds no list of the
+// cast and cannot drift from it. An unreachable rail is ABSENT -- her
+// page still works, you just cannot hop from it.
+const ME = 'four';
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => {
+    const rail = document.getElementById('rail');
+    cast.forEach(c => {
+      const here = c.who === ME;
+      const el = document.createElement(here ? 'span' : 'a');
+      el.textContent = c.name;
+      el.title = c.blurb;
+      if (here) el.className = 'here';
+      else el.href = c.page;
+      rail.appendChild(el);
+    });
+  })
+  .catch(() => {});
+
+// Stage directions are stripped from the BUBBLE, the same call
+// yuzu_voice makes for the speaker: it is lovely to write and it is not
+// what she SAID, and on a small screen it crowds out the words that are.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/\*[^*]*\*/g, ' ')
+             .replace(/\s{2,}/g, ' ')
+             .trim();
+}
+
+function said(text) {
+  const words = spoken(text);
+  says.textContent = words || text.trim();
+  says.classList.add('on');
+  says.scrollTop = 0;
+}
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const asked = input.value.trim();
+  if (!asked) return;
+  input.value = '';
+  send.disabled = true;
+  send.textContent = '...';
+  document.body.classList.add('thinking');
+
+  // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
+  // and refuses anything that is not in the dict, so nothing typed here
+  // can ever name a file.
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'four' }),
+  })
+    .then(r => r.json())
+    .then(r => said(r.said || 'She said nothing.'))
+    .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
+    .then(() => {
+      send.disabled = false;
+      send.textContent = 'Speak';
+      document.body.classList.remove('thinking');
+      input.focus();
+    });
+};
+
+if (location.hash === '#say') input.focus();
+</script>

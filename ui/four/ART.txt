@@ -1,0 +1,35 @@
+FOUR — one picture, and the one character whose art is NOT cut out.
+
+source    bdecaf879c2e9278a374af2f7be206db.jpg, dropped in the repo root
+          by Ghost on Sept 15 and moved here. 736x1104, 114KB, untouched.
+          An ASCII/matrix portrait: a girl rendered in green characters
+          on black, one eye lit.
+
+cut       NONE. Do not run yuzu_cutout.py over this file.
+
+WHY NOT, measured on the source before the decision:
+
+    border brightness   median 1.0 of 255   (the backdrop is pure black)
+    near-black pixels   55.8% of the whole picture
+
+The second number is the one that decides it. Her shadow side IS the
+backdrop colour, and unlike `ghost_crowd` there is no outline between
+them -- she fades continuously into it. ART.txt's own rule applies with
+nothing to get around it: a flood from the edge walks straight into her
+face and takes half of it, at any tolerance that clears the backdrop at
+all.
+
+AND SHE DOES NOT NEED CUTTING. She is BRIGHT ON BLACK and her page is
+black, so `mix-blend-mode: screen` in ui/four.html composites her
+exactly: black contributes nothing, the backdrop disappears with every
+soft edge intact, and the code rain behind her shows through her dark
+side. That is the animation, not a workaround -- she is made of running
+characters, so the characters run.
+
+The general note, worth having next to the cutout tool: a backdrop that
+matches the PAGE does not have to be removed at all. The tool exists to
+get rid of a backdrop that clashes. Check which one you have first.
+
+NOT resized. 114KB is already smaller than any of Mimi's six, and she
+renders about 560px tall on the panel against a 1104px source, so there
+is headroom rather than waste.
