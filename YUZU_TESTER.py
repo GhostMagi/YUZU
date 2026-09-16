@@ -5365,6 +5365,18 @@ class TestFour(unittest.TestCase):
                 self.assertIn("127.0.0.1", hit,
                               f"four.html reaches outside itself: {hit}")
 
+    def skins(self):
+        """The colours she cycles, read off the page's own SKINS.
+
+        A LIST OF NAMES IN A TEST GOES STALE THE DAY A COLOUR LANDS
+        CORRECTLY -- which is the fault this repo already recorded when
+        the rail test pinned {saya, cait, yuzu} and a fourth character
+        turned it red. Derive it, so a fifth colour has to answer for
+        its palette rather than for this file."""
+        found = re.search(r"const SKINS = \[([^\]]*)\]", self.PAGE.read_text())
+        self.assertTrue(found, "nothing cycles her colour")
+        return [x.strip().strip("'\"") for x in found.group(1).split(",")]
+
     def test_tapping_her_screen_cycles_green_red_purple_and_back(self):
         """Ghost, Sept 16: "Id like for Fours screen to be tappable on
         touch... neon red... Neon Purple. Tap again to go back to the
@@ -5375,12 +5387,14 @@ class TestFour(unittest.TestCase):
         nothing to explain -- and what anyone who is not Ghost meets,
         since she is the front door."""
         page = self.PAGE.read_text()
-        skins = re.search(r"const SKINS = \[([^\]]*)\]", page)
-        self.assertTrue(skins, "nothing cycles her colour")
-        names = [x.strip().strip("'\"") for x in skins.group(1).split(",")]
-        self.assertEqual(names, ["", "red", "purple"],
-                         "the cycle is not green -> red -> purple")
-        for skin in ("red", "purple"):
+        names = self.skins()
+        self.assertEqual(names[0], "",
+                         "green is not first, so a reload lands elsewhere")
+        self.assertEqual(len(set(names)), len(names), "a colour repeats")
+        # Hot pink joined Sept 16, at his ask. Every colour after the
+        # first must bring a palette; a name in SKINS with no block is a
+        # tap that appears to do nothing.
+        for skin in names[1:]:
             self.assertIn("body.%s {" % skin, page,
                           "%s has no palette to switch to" % skin)
 
@@ -5419,9 +5433,9 @@ class TestFour(unittest.TestCase):
         by making a fast reader wait for text he could already have
         read. This answers the same question at a glance.
 
-        Verified by RENDERING all three themes idle and thinking at
+        Verified by RENDERING every theme idle and thinking at
         1024x600, because no stdlib test can see a canvas."""
-        for theme in ("", "red", "purple"):
+        for theme in self.skins():
             classes = [c for c in (theme,) if c]
             idle = self.rain_palette(*classes)
             busy = self.rain_palette(*classes, "thinking")
@@ -5430,18 +5444,52 @@ class TestFour(unittest.TestCase):
                 "%s has no thinking signal in the rain" % (theme or "green"))
             self.assertNotEqual(idle.get("--tail"), busy.get("--tail"))
 
-    def test_the_thinking_rain_is_PURPLE_except_when_she_is(self):
-        """His rule exactly: purple in general, green when purple is
-        already the theme, so all three colours are used and the signal
-        can never be the colour it is signalling against."""
-        green = self.rain_palette()
-        purple = self.rain_palette("purple")
-        self.assertEqual(self.rain_palette("thinking")["--head"],
-                         purple["--head"], "green thinks in something else")
-        self.assertEqual(self.rain_palette("red", "thinking")["--head"],
-                         purple["--head"], "red thinks in something else")
-        self.assertEqual(self.rain_palette("purple", "thinking")["--head"],
-                         green["--head"], "purple thinks in its own colour")
+    # What each theme's rain turns while she thinks, in HIS words.
+    # "Just turn the raining code neon purple when thinking. In general.
+    # (Except for purple main should have green code)", and for the
+    # fourth: "Hot glowy pink art and code rain", then "make the cyan
+    # code on pink face a bright purple instead".
+    #
+    # A TABLE RATHER THAN A RULE, because there is no rule -- he picked
+    # each one. Keyed by skin, so a fifth colour fails here until
+    # somebody decides what it thinks in, which is the same job
+    # `test_every_all_caps_word_she_has_ever_said_is_classified` does.
+    #
+    # ("theme", x)  borrows theme x's own rain, exactly
+    # ("hex",   h)  a colour she never wears -- pink's purple is bluer
+    #               and brighter than the deck's, because the deck's sits
+    #               49 degrees of hue from her and vanished against her.
+    THINKS_IN = {"":       ("theme", "purple"),
+                 "red":    ("theme", "purple"),
+                 "purple": ("theme", ""),
+                 "pink":   ("hex",   "#e8dcff")}
+
+    def test_each_theme_thinks_in_the_colour_he_chose(self):
+        """Every colour gets used across the four, and the signal can
+        never be the colour it is signalling against."""
+        self.assertEqual(set(self.skins()), set(self.THINKS_IN),
+                         "a colour cycles with no thinking colour decided")
+        for skin, (kind, value) in self.THINKS_IN.items():
+            classes = [c for c in (skin,) if c]
+            busy = self.rain_palette(*classes, "thinking")
+            if kind == "hex":
+                self.assertEqual(busy["--head"].lower(), value,
+                                 "%s does not think in %s" % (skin, value))
+                continue
+            want = self.rain_palette(*[c for c in (value,) if c])
+            self.assertEqual(busy["--head"], want["--head"],
+                             "%s thinks in something else" % (skin or "green"))
+
+    def test_no_theme_thinks_in_its_OWN_colour(self):
+        """The property under the table, and the one that actually
+        matters: a signal you cannot tell from the thing it signals
+        against is not a signal."""
+        for skin in self.skins():
+            classes = [c for c in (skin,) if c]
+            idle = self.rain_palette(*classes)
+            busy = self.rain_palette(*classes, "thinking")
+            self.assertNotEqual(idle["--head"], busy["--head"],
+                                "%s thinks in its own colour" % (skin or "green"))
 
     def test_thinking_leaves_HER_alone(self):
         """*"Leave her colors alone actually."* A first pass tinted
@@ -5452,7 +5500,8 @@ class TestFour(unittest.TestCase):
 
         The rain is drawn by us, character by character, so its colour
         is ours to set. Nothing about her may move with it."""
-        for classes in ((), ("red",), ("purple",)):
+        for theme in self.skins():
+            classes = [c for c in (theme,) if c]
             idle = self.rain_palette(*classes)
             busy = self.rain_palette(*classes, "thinking")
             for prop in ("--ink", "--tint", "--dim", "--box", "--key"):
@@ -5522,7 +5571,11 @@ class TestFour(unittest.TestCase):
         changing one and watching this go red."""
         page = self.PAGE.read_text()
         lum = (0.2126, 0.7152, 0.0722)
-        for skin, fid in (("red", "four-red"), ("purple", "four-purple")):
+        # Derived, so a new colour's matrix is checked the day it lands
+        # rather than the day somebody remembers to add it here.
+        pairs = [(s, "four-" + s) for s in self.skins() if s]
+        self.assertTrue(pairs, "no tinted skins at all")
+        for skin, fid in pairs:
             ink = re.search(r"body\.%s \{[^}]*?--ink:\s*(#[0-9a-fA-F]{6})"
                             % skin, page, re.S)
             self.assertTrue(ink, "body.%s declares no --ink" % skin)

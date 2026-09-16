@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 679 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 680 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 679 tests pass on it. Getting it
+(that repo path is confirmed working). 680 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1521,6 +1521,53 @@ as the page turning red around rain that stayed green.
 **The guard had to learn that `contains` is a READ.** Its first version
 flagged the rain's own speed check as an un-repainted toggle. Narrowed
 to add/remove/toggle. Five new tests, each verified by breaking it.
+
+## A FOURTH COLOUR: HOT PINK (Sept 16)
+
+Ghost: *"I still got ya lets add a 4th color. Hot glowy pink art and
+code rain. (Thinking makes the code bright Cyan on that one)"*, then
+*"make the cyan code on pink face a bright purple instead. My bad"*.
+
+    green -> red -> purple -> pink -> green
+
+**HIS OWN HOT PINK, `#ff2d95`, not a new one.** It is one of the four
+he named for Saya's face months ago -- *"Hot pink, Cyan, Neon green,
+And a Lavender or purple color. Only those colors."* So the deck gains
+a colour without gaining a taste decision, which is the only standard
+this project accepts for one.
+
+**AND THE PURPLE ON PINK IS NOT THE DECK'S PURPLE, because rendering
+said so.** The obvious move is to reuse `#c04dff` like green and red
+do. It sits **49 degrees of hue from her `#ff2d95`** -- both
+magenta-ish -- so against her art it came out the WEAKEST of the four
+signals, reading as dim pink-on-pink rather than as another colour.
+Three candidates were rendered side by side at 1024x600 and looked at;
+`#e8dcff` over `rgba(157, 92, 255, .68)` is bluer and brighter and
+separates cleanly. The bluest candidate read as blue-violet rather
+than purple and lost.
+
+**Twenty-eighth time rendering found what the assertions could not** --
+and the assertion would have been perfectly happy, because "pink thinks
+in purple" is true of the version that was invisible.
+
+**THE TESTS NOW DERIVE THE CAST OF COLOURS FROM THE PAGE.** Three of
+them carried `("", "red", "purple")` as a literal, which is the fault
+this file already records when the rail test pinned `{saya, cait,
+yuzu}` and a fourth character turned it red. `TestFour.skins()` reads
+`SKINS` out of the page, so a fifth colour has to answer for its own
+palette rather than for the test file. Same for the tint matrices.
+
+**`THINKS_IN` IS A TABLE, NOT A RULE, and that is deliberate.** There
+is no rule -- he picked each one. It is keyed by skin and asserted to
+cover every skin, so a fifth colour fails until somebody decides what
+it thinks in: the same job `test_every_all_caps_word_she_has_ever
+_said_is_classified` does. Entries are either "borrow that theme's own
+rain" or a literal hex, because pink's purple is a colour she never
+wears.
+
+**The property under the table is the one that matters**, and it has
+its own test: no theme ever thinks in its own colour. A signal you
+cannot tell from the thing it signals against is not a signal.
 
 ## SAYA BLEED IN FOUR — and the plumbing was innocent (Sept 15)
 

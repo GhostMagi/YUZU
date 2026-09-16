@@ -95,6 +95,19 @@ body.purple {
   --key:  #0d0414;
   --tint: url(#four-purple) brightness(1.22);
 }
+/* HIS OWN HOT PINK, not a new one. `#ff2d95` and the cyan below are two
+   of the four he picked for Saya's face by name -- "Hot pink, Cyan,
+   Neon green, And a Lavender or purple color. Only those colors." --
+   so the deck gains a colour without gaining a taste decision. */
+body.pink {
+  --ink:  #ff2d95;
+  --dim:  #8a1850;
+  --box:  rgba(16, 4, 10, .88);
+  --head: #ffd0e8;
+  --tail: rgba(255, 45, 149, .55);
+  --key:  #120409;
+  --tint: url(#four-pink) brightness(1.26);
+}
 /* ---- SHE THINKS IN THE OTHER COLOUR ---------------------------------
    Ghost, Sept 16: *"i dislike the words typing up as she says it thing
    as im a speed reader. Can we just give her a thinking pose somehow
@@ -128,6 +141,18 @@ body.thinking {
 body.purple.thinking {
   --head: #c8ffd4;                     /* and green when she IS purple */
   --tail: rgba(57, 255, 94, .55);
+}
+/* PINK THINKS IN A BLUER, BRIGHTER PURPLE THAN THE DECK'S OWN, and
+   rendering is the whole reason. His word was "bright purple", and the
+   theme purple `#c04dff` sits 49 degrees of hue from her `#ff2d95` --
+   both magenta-ish -- so against her art it came out the WEAKEST of
+   the four signals, reading as dim pink-on-pink rather than as another
+   colour. Pushed bluer and up in alpha until it separates, checked by
+   rendering three candidates side by side at 1024x600 and looking.
+   The other three keep the deck purple, where there is no clash. */
+body.pink.thinking {
+  --head: #e8dcff;
+  --tail: rgba(157, 92, 255, .68);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -368,6 +393,13 @@ body.thinking #four { animation-duration: 1.6s; }
               0.0475 0.1599 0.0161 0 0
               0 0 0 1 0"/>
   </filter>
+  <filter id="four-pink" color-interpolation-filters="sRGB">
+    <!-- hot pink -- #ff2d95, matching --ink on body.pink -->
+    <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0
+              0.0375 0.1262 0.0127 0 0
+              0.1242 0.4179 0.0422 0 0
+              0 0 0 1 0"/>
+  </filter>
   <filter id="four-purple" color-interpolation-filters="sRGB">
     <!-- neon purple -- #c04dff, matching --ink on body.purple -->
     <feColorMatrix type="matrix" values="0.1601 0.5385 0.0544 0 0
@@ -514,7 +546,7 @@ document.getElementById('home').onclick = () => { location.href = 'home.html'; }
 // the deck is, and it is the state anyone else who picks her up meets --
 // she is the front door. One line of localStorage makes it sticky if he
 // would rather; this is the version with nothing to explain.
-const SKINS = ['', 'red', 'purple'];
+const SKINS = ['', 'red', 'purple', 'pink'];
 let skin = 0;
 document.getElementById('stage').addEventListener('click', (event) => {
   if (event.target.closest('#says')) return;
