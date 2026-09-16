@@ -5545,6 +5545,42 @@ class TestFour(unittest.TestCase):
         self.assertNotIn("getReader", code, "the incremental reader is back")
         self.assertIn("'say'", code, "she has no way to answer at all")
 
+    def test_the_cycle_COMES_BACK_and_leaves_no_colour_behind(self):
+        """Ghost, one tap after pink shipped: *"Okay its amazing but
+        doesnt loop back to the green etc"*.
+
+        The handler read `classList.remove('red', 'purple')` -- a
+        SECOND hardcoded list of the colours, one layer under the one
+        this page already deletes. Green is the EMPTY class, so the
+        fourth tap added nothing and pink stayed on the body forever:
+        green -> red -> purple -> pink -> pink -> pink.
+
+        The whole cycle is simulated here rather than the line being
+        matched, because the bug is what the BODY ends up wearing, and
+        the spelling of the remove call is exactly what looked fine."""
+        code = self.code()
+        names = self.skins()
+        taken = re.search(r"classList\.remove\(([^)]*)\)", code)
+        self.assertTrue(taken, "the tap takes no colour off")
+
+        # Walk the cycle: whatever remove() names comes off, then the
+        # next skin goes on. A colour left behind shows up as a body
+        # wearing two.
+        drops = set(re.findall(r"[\w-]+", taken.group(1)))
+        universal = "SKINS" in drops
+        worn, seen = set(), []
+        for step in range(1, len(names) * 2 + 1):
+            worn = set() if universal else worn - drops
+            nxt = names[step % len(names)]
+            if nxt:
+                worn.add(nxt)
+            seen.append(frozenset(worn))
+            self.assertLessEqual(
+                len(worn), 1,
+                "tap %d leaves her wearing %s" % (step, sorted(worn)))
+        self.assertEqual(seen[len(names) - 1], frozenset(),
+                         "the cycle never comes back to green")
+
     def test_the_tap_is_on_the_STAGE_and_never_steals_the_way_out(self):
         """The top bar carries the rail and the ⌂, the ask bar carries
         the text box, and #says can scroll. A tap that lands on any of

@@ -550,7 +550,13 @@ const SKINS = ['', 'red', 'purple', 'pink'];
 let skin = 0;
 document.getElementById('stage').addEventListener('click', (event) => {
   if (event.target.closest('#says')) return;
-  document.body.classList.remove('red', 'purple');
+  // EVERY skin comes off, from SKINS itself. It read
+  // `remove('red', 'purple')` -- a SECOND hardcoded list of the
+  // colours, one layer under the one this page already deletes -- so
+  // the day pink landed, the fourth tap added nothing (green is the
+  // empty class) and pink stayed stuck on the body forever. Measured
+  // by Ghost in one tap: "doesnt loop back to the green etc".
+  document.body.classList.remove(...SKINS.filter(Boolean));
   skin = (skin + 1) % SKINS.length;
   if (SKINS[skin]) document.body.classList.add(SKINS[skin]);
   // The canvas keeps its own copy of the two colours, so it has to be

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 680 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 681 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 680 tests pass on it. Getting it
+(that repo path is confirmed working). 681 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1568,6 +1568,39 @@ wears.
 **The property under the table is the one that matters**, and it has
 its own test: no theme ever thinks in its own colour. A signal you
 cannot tell from the thing it signals against is not a signal.
+
+### AND THE CYCLE GOT STUCK ON PINK, IN THE SAME COMMIT
+
+Ghost, one tap later: *"Okay its amazing but doesnt loop back to the
+green etc"*. Right, and it was one line:
+
+    document.body.classList.remove('red', 'purple');
+
+**A SECOND HARDCODED LIST OF THE COLOURS, one layer under the one this
+round had just finished deleting.** Green is the EMPTY class, so the
+fourth tap added nothing and pink stayed on the body forever: green ->
+red -> purple -> pink -> pink -> pink. It is `...SKINS` now.
+
+**The irony is the finding.** The same commit moved three TESTS off a
+hardcoded theme list and congratulated itself for it -- and left the
+hardcoded list in the CODE those tests check. **Deriving the list in
+one place does not find the other place**, and a grep for the theme
+names would have: `red` and `purple` sat in that remove call in plain
+sight.
+
+**The test SIMULATES THE WHOLE CYCLE rather than matching the line.**
+It reads whatever `remove()` names, walks two full laps, and fails if
+the body is ever wearing two colours or never comes back to green --
+because the bug is what she ENDS UP WEARING, and the spelling of that
+call is exactly what looked fine. Verified by putting the original line
+back (red) and by removing nothing at all (red).
+
+**And then it was driven in a browser**, six real taps on `#stage`,
+reading her `--ink` and the rain's `--head` after each one:
+
+    start   green    tap 3   pink
+    tap 1   red      tap 4   green   <- home
+    tap 2   purple   tap 5   red
 
 ## SAYA BLEED IN FOUR — and the plumbing was innocent (Sept 15)
 
