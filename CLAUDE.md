@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 668 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 672 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 668 tests pass on it. Getting it
+(that repo path is confirmed working). 672 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1068,6 +1068,56 @@ surface. Timbre comes from WHICH VOICE, so changing voice IS the pitch
 control (`YUZU_KOKORO_VOICE=af_sarah`), and speed comes from her own
 `piper_length_scale`, inverted. Saying that here saves the next person
 hunting for a knob that does not exist.
+
+### THE PULL THAT DELIVERS A CHANGE TO `pull` RAN THE OLD COPY
+
+One screenshot, minutes after that shipped. His pull said **UPDATED**,
+listed `022414f One word: pull sets her voice up, and ends with where
+she is` -- and then printed the OLD tail, with no Welcome line and no
+voice setup in it. Ghost: *"Still doesnt say Welcome Ghost just says
+some shit about saya and a homescreen still."*
+
+**NOTHING WAS BROKEN AND HE READ IT EXACTLY RIGHT.** Bash had the file
+OPEN before `git pull` replaced it underneath, so **the run that brings
+a change to this script is the one run that cannot contain it.** Same
+shape as `~/YUZU/name` saying "No such file or directory" a day
+earlier: the work landed, one run late, and that is indistinguishable
+from the work not landing.
+
+**AND IT IS WORSE THAN A DELAY, which is why it is a fix and not a
+note.** Verified by replacing a running script mid-execution: bash
+re-reads the NEW file at **the byte offset it had reached in the OLD
+one**, so it executes a FRAGMENT of the new script spliced onto the old
+run --
+
+    OLD: line one
+    OLD: line two
+    NEW: Welcome Ghost,
+
+That is undefined behaviour, not a late delivery.
+
+**So `pull` re-runs its own new self, ONCE.** `YUZU_PULL_REEXEC` is set
+on the way out and checked on the way in, which is both the handover and
+the loop guard -- **verified by removing it and watching the thing run
+until it was killed.** It carries the commit the first run started from,
+so the second run reports the REAL update rather than ALREADY UP TO DATE
+about something it just delivered.
+
+**IT IS ANNOUNCED, NOT SILENT.** If the new copy is broken, a silent
+`exec` gives him an empty pull with nothing to read. One line, and a
+test pins it.
+
+**AND THE FIRST FIXTURE COULD NOT OBSERVE ITS OWN FAILURE, AGAIN.** Its
+stub `git rev-parse HEAD` handed out a fresh commit on every call, so a
+re-run that FORGOT what it started from still looked like an update --
+the test went green with the wrong commit passed on purpose. It is
+driven by whether the pull happened now. Oldest line in this file,
+broken in the test written to guard the fix for it.
+
+**This could not fix the pull he was looking at, and that is inherent.**
+A self-update lands from the run after the one that delivers it, so his
+next pull shows the Welcome line from the copy he already has, and this
+fix makes the pull after THAT one land immediately.
 
 ### AND `pull` ENDS WITH WHERE SHE IS
 

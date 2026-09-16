@@ -25,7 +25,15 @@
 # wondering why nothing changed.
 
 set -u
-cd "$(cd "$(dirname "$0")" && pwd)" || exit 1
+# Absolute, computed BEFORE the cd, because the re-exec below has to be
+# able to name this file however it was invoked.
+self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+cd "$(dirname "$self")" || exit 1
+
+# Set by the run that exec'd us, and it carries the commit that run
+# started from. Empty on an ordinary pull. It is also the loop guard:
+# a re-exec never re-execs.
+reexec="${YUZU_PULL_REEXEC:-}"
 
 # --- wait for the clock ------------------------------------------------
 # Not a sleep: it watches, tells him why, and gives up saying something
@@ -52,17 +60,59 @@ if [ "$year" -lt 2020 ]; then
 fi
 
 # --- pull, with retries ------------------------------------------------
-before=$(git rev-parse HEAD 2>/dev/null)
-# Overridable so the SUITE does not sit through 14 seconds of backoff
-# three times over. The default is what he actually gets.
-WAITS=${YUZU_PULL_WAITS:-"0 2 4 8"}
-out=""; ok=0
-for wait in $WAITS; do
-    [ "$wait" -gt 0 ] && sleep "$wait"
-    out=$(git pull origin main 2>&1) && { ok=1; break; }
-    echo "  retrying..."
-done
-after=$(git rev-parse HEAD 2>/dev/null)
+if [ -n "$reexec" ]; then
+    # The run that exec'd us already pulled. It handed over the commit it
+    # started from, so the verdict below is about the REAL update rather
+    # than about a second no-op pull we are not going to run.
+    before="$reexec"
+    after=$(git rev-parse HEAD 2>/dev/null)
+    ok=1
+    out=""
+else
+    before=$(git rev-parse HEAD 2>/dev/null)
+    # Overridable so the SUITE does not sit through 14 seconds of backoff
+    # three times over. The default is what he actually gets.
+    WAITS=${YUZU_PULL_WAITS:-"0 2 4 8"}
+    out=""; ok=0
+    for wait in $WAITS; do
+        [ "$wait" -gt 0 ] && sleep "$wait"
+        out=$(git pull origin main 2>&1) && { ok=1; break; }
+        echo "  retrying..."
+    done
+    after=$(git rev-parse HEAD 2>/dev/null)
+fi
+
+# --- THE PULL THAT DELIVERS A CHANGE TO THIS SCRIPT RAN THE OLD COPY ---
+# MEASURED, Sept 16, on his screen. He pulled the round that added the
+# voice setup and the Welcome line, the output said UPDATED and listed
+# the very commit that added them -- and then printed the OLD tail, with
+# neither of the new things in it.
+#
+# Nothing was broken and he read it exactly right. Bash had this file
+# OPEN before `git pull` replaced it underneath, so the run that brought
+# the change is the one run that cannot contain it. Same shape as the
+# `~/YUZU/name` "No such file or directory" a day earlier: the work
+# landed, one run late, and the failure looks like the work not landing.
+#
+# AND IT IS WORSE THAN A DELAY, which is why this is a fix and not a
+# note. Verified by replacing a running script mid-execution: bash
+# re-reads the NEW file at the byte offset it had reached in the OLD
+# one, so it executes a FRAGMENT of the new script spliced onto the old
+# run. That is undefined behaviour, not a late delivery.
+#
+# So: re-run the new self, once, carrying the commit we started from so
+# the verdict stays true. `reexec` is the loop guard -- it is set here
+# and checked above, so this can happen at most once per pull. And it is
+# announced, because if the new copy is broken, a SILENT exec would give
+# him an empty pull with nothing to read.
+if [ -z "$reexec" ] && [ "$ok" = 1 ] && [ "$before" != "$after" ] \
+   && [ -r "$self" ] \
+   && git diff --name-only "$before" "$after" 2>/dev/null | grep -qx pull; then
+    echo
+    echo "  THIS SCRIPT UPDATED ITSELF. Running the new one, so the"
+    echo "  changes land now rather than on your next pull."
+    YUZU_PULL_REEXEC="$before" exec bash "$self" "$@"
+fi
 
 # --- the verdict, FIRST ------------------------------------------------
 echo

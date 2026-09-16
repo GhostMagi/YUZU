@@ -8163,6 +8163,127 @@ class TestPull(unittest.TestCase):
         self.assertEqual(calls, "", "a picture restarted the server")
         self.assertIn("HER FACE CHANGED", done.stdout)
 
+    # ---- the pull that delivers a change to THIS SCRIPT ---------------
+
+    def _selfchange_run(self, tail, changed=("pull",)):
+        """Replace the running script mid-run, exactly as `git pull` does.
+
+        This is not a simulation of the fault, it IS the fault: bash has
+        the file open, git swaps a new one in underneath, and the run
+        that brought the change is the one run that cannot contain it."""
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        try:
+            here = Path(tmp)
+            shutil.copy(self.SCRIPT, here / "pull")
+            (here / "pull").chmod(0o755)
+            # What `git pull` will swap in: the same script plus a line
+            # that can only come from the NEW copy.
+            (here / "new_pull").write_text(
+                self.SCRIPT.read_text() + "\n" + tail + "\n")
+
+            (here / "yuzu_voice.py").write_text(
+                "class _V:\n    ready = True\n"
+                "def pick_voice(**kw): return _V()\n")
+
+            binv = here / "bin"
+            binv.mkdir()
+            names = " ".join("'%s'" % c for c in changed)
+            (binv / "git").write_text(
+                '#!/bin/bash\n'
+                'case "$*" in\n'
+                # DRIVEN BY WHETHER THE PULL HAPPENED, never by a
+                # counter. A counter hands out a fresh commit on every
+                # call, so a re-run that FORGOT what it started from
+                # still looks like an update -- the fixture would then
+                # be a check that cannot observe its own failure, which
+                # is the oldest line in CLAUDE.md. Verified by handing
+                # the re-run the wrong commit on purpose.
+                '  "rev-parse HEAD")\n'
+                '     if [ -f {t}/pulls ]; then echo new; else echo old; fi ;;\n'
+                '  "pull origin main")\n'
+                '     echo pulled >> {t}/pulls\n'
+                '     cp {t}/new_pull {t}/pull ;;\n'
+                '  log*) echo "  abc123 the commit that changes pull" ;;\n'
+                '  "diff --name-only --diff-filter=A"*) echo "" ;;\n'
+                '  diff*) printf "%s\\n" {names} ;;\n'
+                '  *) exit 0 ;;\n'
+                'esac\n'.format(t=tmp, names=names))
+            (binv / "git").chmod(0o755)
+            for name, body in (("pgrep", "exit 1"), ("hostname", "echo deck")):
+                (binv / name).write_text("#!/bin/sh\n%s\n" % body)
+                (binv / name).chmod(0o755)
+
+            done = subprocess.run(
+                ["bash", str(here / "pull")], capture_output=True, text=True,
+                timeout=60,
+                env=dict(os.environ, YUZU_PULL_WAITS="0",
+                         PATH=f"{binv}:{os.environ['PATH']}"))
+            pulls = (here / "pulls").read_text().count("pulled") \
+                if (here / "pulls").exists() else 0
+            return done, pulls
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    MARK = 'echo "  MARKER-FROM-THE-NEW-COPY"'
+
+    def test_a_pull_that_changes_THIS_SCRIPT_runs_the_new_one(self):
+        """MEASURED, Sept 16, on his screen. He pulled the round that
+        added the voice setup and the Welcome line; the output said
+        UPDATED and listed the exact commit that added them -- and then
+        printed the OLD tail, with neither of the new things in it.
+
+        Nothing was broken and he read it exactly right. Bash had the
+        file open before git replaced it, so the run that brings a
+        change to this script is the one run that cannot contain it.
+        Same shape as `~/YUZU/name` saying "No such file or directory"
+        a day earlier: the work landed, one run late, and that looks
+        exactly like the work not landing.
+
+        And it is worse than a delay -- verified by replacing a running
+        script mid-run, bash re-reads the NEW file at the byte offset it
+        had reached in the OLD one and executes a FRAGMENT of the new
+        script spliced onto the old run. Undefined behaviour, not a late
+        delivery."""
+        done, _ = self._selfchange_run(self.MARK)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("MARKER-FROM-THE-NEW-COPY", done.stdout,
+                      "the new copy never ran; he got the old tail again")
+        self.assertIn("UPDATED ITSELF", done.stdout,
+                      "it re-ran silently -- a broken new copy would give "
+                      "him an empty pull with nothing to read")
+
+    def test_the_re_run_reports_the_REAL_update(self):
+        """The second run must not pull again, and must not report
+        ALREADY UP TO DATE about an update it just delivered. It is
+        handed the commit the first run started from, so the verdict
+        and the commit list stay true."""
+        done, pulls = self._selfchange_run(self.MARK)
+        self.assertIn("UPDATED.", done.stdout, done.stdout)
+        self.assertNotIn("ALREADY UP TO DATE", done.stdout,
+                         "the re-run forgot what it had just pulled")
+        self.assertIn("the commit that changes pull", done.stdout,
+                      "the commit list was lost across the re-run")
+        self.assertEqual(pulls, 1, "it pulled twice")
+
+    def test_it_re_runs_AT_MOST_ONCE(self):
+        """The stub reports `pull` as changed on EVERY run, so without
+        the guard this is an infinite loop -- verified by removing the
+        guard and watching it run until it was killed. One env var,
+        set on the way out and checked on the way in, bounds it."""
+        done, _ = self._selfchange_run(self.MARK)
+        self.assertEqual(done.stdout.count("UPDATED ITSELF"), 1,
+                         "it re-ran itself more than once")
+        self.assertEqual(done.stdout.count("MARKER-FROM-THE-NEW-COPY"), 1)
+
+    def test_an_ordinary_pull_does_not_re_run_itself(self):
+        """Every other pull pays nothing for this. A second run costs a
+        second git round trip and a second screen of output, for a
+        script that did not change."""
+        done, _ = self._restart_run(["ui/home.html"], server_up=False)
+        self.assertNotIn("UPDATED ITSELF", done.stdout,
+                         "it re-ran itself over somebody else's file")
+
     def test_it_is_valid_shell_and_executable(self):
         import subprocess
         self.assertTrue(os.access(self.SCRIPT, os.X_OK))
