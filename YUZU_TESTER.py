@@ -4588,6 +4588,162 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         self.assertFalse(os.path.exists(saved))
 
 
+class TestSheSpeaksOutOfThePage(unittest.TestCase):
+    """AUDIO HAS TO TRAVEL. `yuzu_voice.say()` plays on the machine
+    running the module -- the ORIN -- and the Orin has no speaker on it
+    (the USB sound card is in the parts list, not bought). Every device
+    Ghost actually looks at has speakers already, so the server renders
+    a wav and the BROWSER plays it.
+
+    Ghost: "Finish the page audio so i can hear on steam deck."
+    """
+
+    def setUp(self):
+        import json, struct, tempfile, threading, time
+        from http.server import ThreadingHTTPServer
+        import yuzu_face
+        self.face, self.json = yuzu_face, json
+
+        def a_real_wav(text, clean=True):
+            handle, path = tempfile.mkstemp(suffix=".wav")
+            os.close(handle)
+            data = b"\x00\x00" * 400
+            with open(path, "wb") as fh:
+                fh.write(b"RIFF" + struct.pack("<I", 36 + len(data)) +
+                         b"WAVEfmt " +
+                         struct.pack("<IHHIIHH", 16, 1, 1, 16000, 32000, 2, 16) +
+                         b"data" + struct.pack("<I", len(data)) + data)
+            return path
+
+        outer = self
+        class Fake:
+            ready, failures = True, []
+            def render(self, text, clean=True):
+                outer.rendered = text
+                return a_real_wav(text)
+            def why_not(self):
+                return ""
+        self.rendered = None
+        self._saved = dict(yuzu_face._VOICES)
+        yuzu_face._VOICES.clear()
+        yuzu_face._VOICES["four"] = Fake()
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.face._VOICES.clear()
+        self.face._VOICES.update(self._saved)
+
+    def post(self, payload):
+        import urllib.request
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d/voice.wav" % self.port,
+            data=self.json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"})
+        return urllib.request.urlopen(req, timeout=20)
+
+    def test_it_returns_REAL_WAV_BYTES_and_not_a_promise(self):
+        got = self.post({"text": "hello there", "who": "four"})
+        body = got.read()
+        self.assertEqual(got.headers["Content-Type"], "audio/wav")
+        self.assertEqual(body[:4], b"RIFF", "that is not a wav")
+        self.assertEqual(int(got.headers["Content-Length"]), len(body),
+                         "a short read would cut her off mid-word")
+
+    def test_every_failure_is_a_SENTENCE_with_a_real_status(self):
+        """A 200 carrying a sad sentence cannot be told apart from
+        audio by an <audio> element -- it would just play nothing. The
+        page has to know the difference between "no voice installed"
+        and "the deck is not answering", so the code says so."""
+        import urllib.error
+        for payload in ({"text": "hi", "who": "nobody"},
+                        {"text": "   ", "who": "four"},
+                        {"text": "hi", "who": "cait"}):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                self.post(payload).read()
+            self.assertEqual(caught.exception.code, 503)
+            said = self.json.loads(caught.exception.read())["said"]
+            self.assertTrue(said and said[0].isupper() or "'" in said,
+                            "a failure with no sentence in it: %r" % said)
+
+    def test_stage_directions_are_never_read_out_loud(self):
+        """`*leans in*` spoken is the word "leans" in the middle of a
+        sentence -- measured on the board, and the whole reason
+        strip_stage_directions exists. The bubble, the terminal and now
+        the page all make the same call."""
+        self.post({"text": "Hey. [leans in close] All good.",
+                   "who": "four"}).read()
+        self.assertNotIn("leans", self.rendered)
+        self.assertIn("All good", self.rendered)
+
+    def test_the_voice_is_built_ONCE_per_character(self):
+        """Kokoro loads a ~310MB model. Building one per request would
+        make her slower than Piper rather than nicer than it, and on a
+        board with ONE pool of 8GB it would thrash."""
+        import inspect
+        source = inspect.getsource(self.face.voice_for)
+        self.assertIn("_VOICES", source, "nothing caches the voice")
+        built = []
+        real = self.face._VOICES["four"]
+        self.face._VOICES.clear()
+        import yuzu_voice
+        original = yuzu_voice.pick_voice
+        yuzu_voice.pick_voice = lambda **kw: (built.append(kw), real)[1]
+        try:
+            for _ in range(3):
+                self.face.voice_for("four")
+        finally:
+            yuzu_voice.pick_voice = original
+        self.assertEqual(len(built), 1, "a voice was built per call")
+
+    def test_she_speaks_at_HER_OWN_speed(self):
+        """`piper_length_scale` is in every persona file and is hers --
+        Four runs 0.9. It has to reach the voice or every character
+        speaks identically."""
+        import yuzu_voice, yuzu_personas
+        want = float(yuzu_personas.load("four").settings["piper_length_scale"])
+        seen = {}
+        self.face._VOICES.clear()
+        original = yuzu_voice.pick_voice
+        yuzu_voice.pick_voice = lambda **kw: (seen.update(kw), None)[1]
+        try:
+            self.face.voice_for("four")
+        finally:
+            yuzu_voice.pick_voice = original
+        self.assertEqual(seen.get("length_scale"), want,
+                         "her persona's speed never reached the voice")
+
+    def test_a_missing_voice_costs_the_AUDIO_and_never_the_REPLY(self):
+        """The oldest promise on this deck, and the one the face, the
+        wiki and Piper all already make. Verified by driving the real
+        function with the voice module absent."""
+        import sys
+        self.face._VOICES.clear()
+        saved = sys.modules.pop("yuzu_voice", None)
+        sys.modules["yuzu_voice"] = None      # an import that yields None
+        try:
+            wav, problem = self.face.voice_wav("hello", "four")
+            self.assertIsNone(wav)
+            self.assertTrue(problem, "it failed without saying why")
+        finally:
+            if saved is not None:
+                sys.modules["yuzu_voice"] = saved
+            else:
+                sys.modules.pop("yuzu_voice", None)
+
+    def test_the_page_plays_it_and_stays_silent_when_there_is_none(self):
+        with open("ui/four.html", encoding="utf-8") as fh:
+            page = fh.read()
+        self.assertIn("voice.wav", page, "the page never asks for audio")
+        self.assertIn("r.ok ? r.blob() : null", page,
+                      "a 503 would be played as if it were audio")
+        self.assertIn("revokeObjectURL", page,
+                      "one object url leaks per reply, on a battery")
+
+
 class TestKokoro(unittest.TestCase):
     """A SECOND ENGINE THAT CANNOT BREAK THE FIRST.
 
@@ -4683,6 +4839,50 @@ class TestKokoro(unittest.TestCase):
         cli = inspect.getsource(self.voice._cli)
         self.assertEqual(cli.count("voice.say(candidate"), 1,
                          "the audition logic was duplicated per engine")
+
+    def test_synthesis_is_SPLIT_from_playback_on_both_engines(self):
+        """`say()` plays on the machine running this module -- the
+        BOARD -- and the board has no speaker yet. What Ghost asked for
+        is audio on the device he is LOOKING at: the Steam Deck, his
+        phone, the laptop. Bytes have to travel, so something must hand
+        back a FILE rather than a sound.
+
+        `render()` is that, on both engines, with the same shape and
+        the same promise as `say()`: it never raises, and it returns
+        None rather than a path when it cannot work."""
+        for made in (self.voice.Voice(model=None, piper=None),
+                     self.voice.KokoroVoice()):
+            name = type(made).__name__
+            self.assertTrue(hasattr(made, "render"), "%s cannot render" % name)
+            self.assertFalse(made.ready, "this test wants an ABSENT engine")
+            self.assertIsNone(made.render("hello"),
+                              "%s returned a path with no engine" % name)
+            self.assertIs(made.say("hello"), False,
+                          "%s claimed to speak with no engine" % name)
+
+    def test_say_RENDERS_rather_than_carrying_a_second_copy(self):
+        """Both `say()` methods used to hold their own synthesis --
+        the invocation, the empty-wav check and the cleanup -- so
+        `render()` landing beside them made two places for a spelling
+        fix to be forgotten. Same fault as the two copies of the
+        battery renderer and the four copies of the way out.
+
+        Verified by breaking it: making render() return None must make
+        say() return False, which it cannot do if say() synthesises on
+        its own."""
+        import inspect
+        for cls in (self.voice.Voice, self.voice.KokoroVoice):
+            body = inspect.getsource(cls.say)
+            self.assertIn("self.render(", body,
+                          "%s.say does not call render" % cls.__name__)
+            self.assertNotIn("mkstemp", body,
+                             "%s.say still synthesises its own wav"
+                             % cls.__name__)
+
+        # And drive it: a render that fails must not produce a claim.
+        made = self.voice.KokoroVoice()
+        made.render = lambda *a, **k: None
+        self.assertIs(made.say("hello"), False)
 
     def test_it_says_plainly_that_the_board_has_not_answered_yet(self):
         """Unverified specifics stated as steps already cost this

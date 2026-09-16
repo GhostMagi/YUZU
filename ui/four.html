@@ -525,6 +525,41 @@ function said(text) {
   says.textContent = words || text.trim();
   says.classList.add('on');
   says.scrollTop = 0;
+  hear(words || text.trim());
+}
+
+// ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
+// The board has no speaker on it. Every device that opens this page
+// does -- the Steam Deck, a phone, the panel -- so the server renders
+// the wav and the BROWSER plays it.
+//
+// AUTOPLAY IS ALLOWED HERE because he tapped Speak to get this reply,
+// and that tap is the user gesture browsers require. Audio that arrives
+// unasked, on a page he never touched, is the thing they block -- and
+// it is also the thing nobody wants on a handheld.
+//
+// A MISSING VOICE IS SILENT, NEVER AN ERROR ON SCREEN. The reply is the
+// product; the audio is a nicety, the same promise the face, Piper and
+// the wiki all make. If Kokoro is not installed the page behaves
+// exactly as it did before this existed.
+let sound = null;
+function hear(words) {
+  if (!words) return;
+  fetch('voice.wav', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: words, who: 'four' }),
+  })
+    .then(r => (r.ok ? r.blob() : null))
+    .then(blob => {
+      if (!blob) return;
+      // The PREVIOUS url is revoked, or a long conversation leaks one
+      // object per reply into a browser on a battery-powered handheld.
+      if (sound) { try { URL.revokeObjectURL(sound.src); } catch (e) {} }
+      sound = new Audio(URL.createObjectURL(blob));
+      sound.play().catch(() => {});
+    })
+    .catch(() => {});
 }
 
 form.onsubmit = (event) => {

@@ -460,6 +460,16 @@ def detect_flags(help_text):
 # The voice itself
 # ---------------------------------------------------------------------
 
+def _drop(path):
+    """Delete a temp wav, quietly. Losing the cleanup must never lose
+    the audio that already worked."""
+    if path:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
 class Voice:
     """A Piper voice. Construct it once; call say() per line.
 
@@ -519,16 +529,20 @@ class Voice:
             argv += [flags["length"], str(self.length_scale)]
         return argv
 
-    def say(self, text, clean=True):
-        """Speak one line. Returns True if audio actually played.
+    def render(self, text, clean=True):
+        """Synthesise one line to a WAV path, WITHOUT playing it.
 
-        clean=False speaks the string exactly as given, which is how
-        `--raw` and `--tryout` audition a spelling without for_speech
-        rewriting it first.
-        """
+        THE SPLIT EXISTS SO THE PAGE CAN SPEAK. `say()` plays on the
+        machine running this module -- which is the BOARD -- and the
+        board has no speaker yet. The thing Ghost actually wants is
+        audio on whatever device he is LOOKING at: his phone, the Steam
+        Deck, the laptop. That means the bytes have to travel, so
+        something has to hand back a file rather than a sound.
+
+        Returns a path the CALLER must delete, or None. Never raises."""
         spoken = for_speech(text) if clean else text.strip()
         if not spoken or not self.ready:
-            return False
+            return None
         wav = None
         try:
             handle, wav = tempfile.mkstemp(suffix=".wav", prefix="yuzu-")
@@ -537,16 +551,39 @@ class Voice:
                 self.command(wav), input=spoken, text=True,
                 capture_output=True, timeout=TIMEOUT)
             if result.returncode != 0:
-                # Surface Piper's OWN message. It names the real problem
-                # -- a missing json, a bad flag, an incompatible model --
-                # far better than anything guessed from here.
                 self.failures.append(
                     (result.returncode,
                      (result.stderr or "").strip().splitlines()[-1:] or ["?"]))
-                return False
+                _drop(wav)
+                return None
             if not os.path.getsize(wav):
                 self.failures.append((0, ["piper produced an empty wav"]))
-                return False
+                _drop(wav)
+                return None
+            return wav
+        except (OSError, subprocess.SubprocessError) as exc:
+            self.failures.append((None, [str(exc)]))
+            _drop(wav)
+            return None
+
+    def say(self, text, clean=True):
+        """Speak one line HERE. Returns True if audio actually played.
+
+        ONE SYNTHESIS PATH. This used to carry its own copy of the
+        piper invocation, the empty-wav check and the cleanup -- so
+        `render()` arriving beside it made two places for a spelling
+        fix to be forgotten, which is the fault this repo has recorded
+        against the battery renderer, the exit check and the audition
+        logic. It renders and then plays what came back.
+
+        clean=False speaks the string exactly as given, which is how
+        `--raw` and `--tryout` audition a spelling without for_speech
+        rewriting it first.
+        """
+        wav = self.render(text, clean=clean)
+        if not wav:
+            return False
+        try:
             subprocess.run([self.player, *self.player_args, wav],
                            capture_output=True, timeout=TIMEOUT)
             return True
@@ -554,11 +591,7 @@ class Voice:
             self.failures.append((None, [str(exc)]))
             return False
         finally:
-            if wav:
-                try:
-                    os.unlink(wav)
-                except OSError:
-                    pass
+            _drop(wav)
 
 
 # ---------------------------------------------------------------------
@@ -680,10 +713,15 @@ class KokoroVoice:
             self._engine = kokoro_onnx.Kokoro(str(self.model), str(self.voices))
         return self._engine
 
-    def say(self, text, clean=True):
+    def render(self, text, clean=True):
+        """Synthesise to a WAV path WITHOUT playing it. See Voice.render
+        -- the split is what lets audio travel to the device Ghost is
+        actually looking at rather than out of the board he is not.
+
+        Returns a path the CALLER must delete, or None. Never raises."""
         spoken = for_speech(text) if clean else text.strip()
         if not spoken or not self.ready:
-            return False
+            return None
         wav = None
         try:
             import soundfile
@@ -694,22 +732,31 @@ class KokoroVoice:
             soundfile.write(wav, samples, rate)
             if not os.path.getsize(wav):
                 self.failures.append((0, ["kokoro produced an empty wav"]))
-                return False
-            subprocess.run([self.player, *self.player_args, wav],
-                           capture_output=True, timeout=TIMEOUT)
-            return True
+                _drop(wav)
+                return None
+            return wav
         except Exception as exc:          # noqa: BLE001
             # Surface the engine's OWN message, same reasoning as Piper's
             # stderr: it names a missing file or a bad speaker name far
             # better than anything guessed from here.
             self.failures.append((None, [str(exc)]))
+            _drop(wav)
+            return None
+
+    def say(self, text, clean=True):
+        """Speak one line HERE. One synthesis path, same as Voice."""
+        wav = self.render(text, clean=clean)
+        if not wav:
+            return False
+        try:
+            subprocess.run([self.player, *self.player_args, wav],
+                           capture_output=True, timeout=TIMEOUT)
+            return True
+        except Exception as exc:          # noqa: BLE001
+            self.failures.append((None, [str(exc)]))
             return False
         finally:
-            if wav:
-                try:
-                    os.unlink(wav)
-                except OSError:
-                    pass
+            _drop(wav)
 
 
 def pick_voice(engine=None, length_scale=None):

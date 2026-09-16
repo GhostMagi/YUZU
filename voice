@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# ~/YUZU/voice -- give her a voice, in one word.
+#
+# Ghost, Sept 16: "id like a different voice than amy_medium id like to
+# see about sumn called Kokoro?" and then "Board has wifi access whats
+# rhe easiest way to do this in short steps".
+#
+# So this is the short step. No arguments, nothing to type, nothing to
+# remember -- the standing preference in CLAUDE.md for every tool here.
+#
+#     ~/YUZU/voice           what she can do right now, and get it
+#     ~/YUZU/voice --check   say only, change nothing
+#
+# IT ASKS GITHUB WHICH FILES TO FETCH rather than carrying a URL. That
+# is the `tile` lesson: a guessed URL is one release away from wrong,
+# and an asked one survives. It also means nothing here is a filename
+# somebody typed from memory -- this project has already paid an hour
+# for unverified specifics stated as steps.
+set -u
+HERE="$(cd "$(dirname "$0")" && pwd)"
+VOICES="$HERE/voices"
+REPO="thewh1teagle/kokoro-onnx"
+CHECK=0
+[ "${1:-}" = "--check" ] && CHECK=1
+
+echo
+python3 "$HERE/yuzu_voice.py" --engines 2>/dev/null | sed -n '1,4p'
+echo
+
+if [ "$CHECK" = 1 ]; then
+    echo "Read-only. Run ~/YUZU/voice with no arguments to install."
+    exit 0
+fi
+
+# 1. the python side
+if ! python3 -c "import kokoro_onnx" 2>/dev/null; then
+    echo "Installing kokoro-onnx and soundfile..."
+    pip install --quiet kokoro-onnx soundfile 2>&1 | tail -3
+    if ! python3 -c "import kokoro_onnx" 2>/dev/null; then
+        echo
+        echo "IT DID NOT INSTALL, and on this board that is the expected"
+        echo "risk: onnxruntime does not always publish an aarch64 wheel."
+        echo "NOTHING IS BROKEN -- Piper still works and she still talks."
+        echo "Try the Steam Deck or the laptop, where it will install."
+        exit 1
+    fi
+fi
+echo "kokoro-onnx: installed"
+
+# 2. the model files, by NAME FROM THE RELEASE rather than from memory
+mkdir -p "$VOICES"
+echo "Asking GitHub which files this release ships..."
+urls=$(python3 - "$REPO" <<'PY'
+import json, sys, urllib.request
+repo = sys.argv[1]
+try:
+    with urllib.request.urlopen(
+            "https://api.github.com/repos/%s/releases" % repo, timeout=25) as r:
+        releases = json.load(r)
+except Exception as exc:
+    print("ERROR %s" % exc)
+    raise SystemExit
+# The newest release that carries BOTH an .onnx and a voices .bin.
+# Asking for the pair together is what stops a half-download that
+# reports success and then cannot speak.
+for rel in releases:
+    names = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
+    model = [n for n in names if n.endswith(".onnx")]
+    binp = [n for n in names if n.endswith(".bin")]
+    if model and binp:
+        print(names[sorted(model)[-1]])
+        print(names[sorted(binp)[-1]])
+        raise SystemExit
+print("ERROR no release carries both an .onnx and a .bin")
+PY
+)
+
+case "$urls" in
+    ERROR*|"")
+        echo "$urls"
+        echo
+        echo "Could not reach the release list. Check WiFi, or fetch the two"
+        echo "files by hand into:  $VOICES"
+        exit 1 ;;
+esac
+
+for url in $urls; do
+    name="$(basename "$url")"
+    if [ -s "$VOICES/$name" ]; then
+        echo "already here: $name"
+        continue
+    fi
+    echo "Downloading $name  (this is the big one, be patient)"
+    # -L follows the redirect to the CDN; --fail so a 404 is a failure
+    # rather than an HTML error page saved as a model.
+    if ! curl -fL --progress-bar -o "$VOICES/$name.part" "$url"; then
+        rm -f "$VOICES/$name.part"
+        echo "FAILED on $name. Nothing half-written was kept."
+        exit 1
+    fi
+    mv "$VOICES/$name.part" "$VOICES/$name"
+done
+
+echo
+python3 "$HERE/yuzu_voice.py" --engines 2>/dev/null | sed -n '1,4p'
+echo
+echo "Now hear her:"
+echo "    python3 ~/YUZU/yuzu_voice.py --say \"hey, it's Four\""
+echo
+echo "And on the Steam Deck: open her page and just talk to her."
+echo "The reply plays through whatever you are holding."

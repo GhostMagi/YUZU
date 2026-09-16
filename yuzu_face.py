@@ -795,6 +795,83 @@ def forget(key):
         pass
 
 
+# HER VOICE, SENT TO WHATEVER IS LOOKING AT HER.
+#
+# Ghost: "Finish the page audio so i can hear on steam deck."
+#
+# THE BOARD IS NOT WHERE THE SPEAKER IS. `yuzu_voice.say()` plays on the
+# machine running the module -- the Orin -- and the Orin has no speaker
+# on it yet (the USB sound card is in the parts list, not bought). Every
+# device he actually looks at ALREADY has speakers: the Steam Deck, his
+# phone, the laptop. So the audio has to TRAVEL, which is why
+# `yuzu_voice.render()` exists beside `say()`.
+#
+# THE VOICE IS CACHED PER SPEED, and that is not a micro-optimisation.
+# Kokoro loads a ~310MB model; building one per request would make her
+# slower than Piper rather than nicer than it, and on a board with ONE
+# pool of 8GB it would thrash. Piper is cheap to build but re-runs
+# `piper --help` for flag detection, which is also not free per reply.
+_VOICES = {}
+
+
+def voice_for(key):
+    """The voice a character speaks in, built once. None if the module
+    is absent -- the same guard Piper, the wiki and the face all carry:
+    a missing voice costs the AUDIO, never the reply."""
+    try:
+        import yuzu_voice
+    except Exception:
+        return None
+    # HER OWN SPEED, from her own persona file. `piper_length_scale`
+    # has been in every persona since the format was written, and
+    # KokoroVoice INVERTS it because Piper's is a duration and Kokoro's
+    # is a rate -- handled there, not here.
+    scale = None
+    try:
+        import yuzu_personas
+        scale = yuzu_personas.load(key).settings.get("piper_length_scale")
+        scale = float(scale) if scale else None
+    except Exception:
+        pass
+    if key not in _VOICES:
+        try:
+            _VOICES[key] = yuzu_voice.pick_voice(length_scale=scale)
+        except Exception:
+            _VOICES[key] = None
+    return _VOICES[key]
+
+
+def voice_wav(text, who="saya"):
+    """(wav_bytes, error). The caller gets audio or a sentence, never
+    an exception -- a speaker that fails must not take the page with
+    it, which is the promise every nicety on this deck makes."""
+    key = persona_for(who)
+    if key is None:
+        return None, "This deck has no character by that name."
+    voice = voice_for(key)
+    if voice is None:
+        return None, "The voice module is not here."
+    if not voice.ready:
+        return None, voice.why_not()
+    try:
+        import yuzu_voice
+        # STAGE DIRECTIONS ARE STRIPPED, the same call the bubble and
+        # the terminal both make. `*leans in*` read out loud is the
+        # word "leans" in the middle of a sentence -- measured, and the
+        # whole reason strip_stage_directions exists.
+        wav = voice.render(yuzu_voice.strip_stage_directions(text))
+        if not wav:
+            return None, "She could not say that. (%s)" % (
+                voice.failures[-1][1][0] if voice.failures else "no audio")
+        try:
+            with open(wav, "rb") as fh:
+                return fh.read(), None
+        finally:
+            yuzu_voice._drop(wav)
+    except Exception as exc:
+        return None, str(exc)
+
+
 def answer(text, who="saya", on_chunk=None):
     """One turn with a character, for the page. (reply, error).
 
@@ -1309,9 +1386,13 @@ class _Handler(SimpleHTTPRequestHandler):
         self.send_error(404, "File not found")
         return None
 
-    def _json(self, obj):
+    def _json(self, obj, code=200):
+        # `code` so a route can say 503 and mean it. /voice.wav needs
+        # the page to tell "she has no voice installed" apart from "the
+        # deck is not answering", and a 200 carrying a sad sentence
+        # cannot -- absent rather than wrong, one layer down.
         body = json.dumps(obj).encode()
-        self.send_response(200)
+        self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
@@ -1397,6 +1478,35 @@ class _Handler(SimpleHTTPRequestHandler):
             push({"done": True, "ok": error is None,
                   "said": reply or error,
                   "pose": pose_for(reply) if error is None else "idle"})
+            return
+        if path == "/voice.wav":
+            # AUDIO, not JSON. The page feeds these bytes straight to an
+            # <audio> element, so whatever device is LOOKING at her is
+            # what speaks -- the Steam Deck, the phone, the panel.
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(size) or b"{}")
+                said = (body.get("text") or "").strip()[:2000]
+                who = body.get("who", "saya")
+            except Exception:
+                said = who = ""
+            wav, problem = (None, "Say something first.") if not said \
+                else voice_wav(said, who)
+            if wav is None:
+                # A SENTENCE, with a real status code, so the page can
+                # tell "she has no voice installed" from "the deck is
+                # not answering". Absent rather than a silent 200.
+                self._json({"ok": False, "said": problem}, code=503)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(wav)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            try:
+                self.wfile.write(wav)
+            except Exception:
+                pass          # he closed the page mid-download
             return
         if path == "/forget":
             # STARTING CLEAN HAS TO BE POSSIBLE, now that she remembers.
