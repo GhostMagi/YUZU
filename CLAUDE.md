@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 674 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 679 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 674 tests pass on it. Getting it
+(that repo path is confirmed working). 679 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1422,6 +1422,105 @@ _colours`, which recomputes the matrices from `--ink` and is the
 two-copies guard the battery renderer and the way out already have. A
 page that turns red around a girl who turned some other red is exactly
 the drift those exist for.
+
+## SHE THINKS IN THE OTHER COLOUR, AND 250 TOKENS (Sept 16)
+
+**HER VOICE WORKS ON THE STEAM DECK.** First confirmation that anything
+on a page has ever spoken -- `POST /voice.wav` through Kokoro, heard by
+him, off the board and out of a device that is not the Orin. The
+"NOT VERIFIED on his board" note on Kokoro is closed.
+
+### `num_predict` 200 -> 250, and this REVERSES a recorded rule
+
+Ghost: *"Can we bump her tokens up by 50 to the original amount she
+had?"* and *"she cuts off too much when im just getting into the
+paragraph."*
+
+**This file said DO NOT RAISE IT, twice, and the rule was written about
+a different failure.** It came from SHIRO, rambling five to ten times
+over a two-or-three-sentence cap on replies nobody asked to be long:
+there the truncation IS the symptom and a bigger ceiling buys longer
+rambles. Ghost's case is the other one -- he is deliberately in a long
+exchange and the reply dies MID-WORD. **An unfinished sentence is worse
+than a shorter finished one either way**, so the ceiling was never what
+held brevity; her prompt is.
+
+**It costs no memory, which was his actual question.** `num_predict`
+caps generated TOKENS, not anything resident, and 250 sits far inside
+`num_ctx` 4096. It costs a couple of seconds on the longest replies.
+
+**It is in the SETTINGS block, above the `---`, so every composed
+prompt is byte-identical** -- no A/B invalidated, nothing re-composed.
+The archives yuzu2..yuzu6 carry no `num_predict` at all and were not
+touched; they inherit the brain's 150 and stay the record.
+
+**The ceiling stays and is now SHARED.** `test_num_predict_has_a
+_CEILING_and_every_character_shares_it` asserts one number across every
+character rather than a maximum, so nobody raises it quietly on one.
+Unbounded is how a 3B monologues until the context fills.
+
+### The word-by-word reveal is gone, and the RAIN is the spinner
+
+Ghost: *"i dislike the words typing up as she says it thing as im a
+speed reader. Can we just give her a thinking pose somehow that only
+shows when shes thinking? Thatd be a better indicator and would annoy
+me less."*
+
+**He is right and it retires a feature that shipped the same day.**
+Streaming existed to answer *"is it working or is it stuck"* -- a real
+question this deck keeps answering one layer at a time -- but it
+answers it by making a fast reader wait for text he could already have
+read. A whole-screen colour change answers the same question at a
+glance and costs him nothing.
+
+    green   thinking ->  purple rain
+    red     thinking ->  purple rain
+    purple  thinking ->  green rain
+
+His rule, in his words: *"Just turn the raining code neon purple when
+thinking. In general. (Except for purple main should have green code)"*
+and *"Only during thinking."* All three colours get used and the signal
+can never be the colour it is signalling against.
+
+**`/stream` IS NOT REMOVED FROM THE SERVER.** Saya's face still calls
+it, it is the same `answer()` with a callback, and deleting a working
+route because one page stopped calling it is a change nobody asked for.
+This is a PAGE change.
+
+**THE FIRST VERSION TINTED HER OWN NUMBERS AND WAS WRONG TWICE.** The
+original ask was randomised bits of her art glowing the accent colour.
+Her picture is a JPEG, so that needs a second masked copy of her -- and
+`mix-blend-mode: screen` **ADDS**, so purple over her green came out
+**CYAN**. Rendering said so in one look, which is the twenty-seventh
+time. Ghost then landed somewhere better on his own: *"Leave her colors
+alone actually. Sorry. Had a better idea."* **The rain is drawn by us,
+character by character, so its colour is simply ours to set** -- no
+filter, no mask, no second copy, three lines of CSS.
+
+**AND `circle 7%` IS INVALID CSS, which only rendering could say.** A
+radial gradient's `circle` takes a LENGTH and nothing else; a
+percentage throws the whole declaration away. The computed mask read
+`none` while the layer sat in plain sight unmasked, and every assertion
+about it would have passed. `ellipse` takes two percentages. Kept here
+because the next person reaching for a percentage-sized blob will reach
+for `circle` first.
+
+**The thinking blocks sit LAST in the stylesheet on purpose.**
+`body.thinking` and `body.red` have identical specificity, so source
+order is the whole mechanism; `body.purple.thinking` carries two
+classes and wins wherever it must. A test CASCADES the page's own rules
+rather than matching how any one of them is spelled.
+
+**AND THE CANVAS HAS TO BE TOLD.** The rain caches `--head` and
+`--tail` per change, because `getComputedStyle` per frame is the
+opposite of why that loop throttles at all. So `thinking()` repaints,
+and a test pins the PROPERTY -- every place that toggles the class goes
+through the one function that repaints. Forgetting it is the same fault
+as the page turning red around rain that stayed green.
+
+**The guard had to learn that `contains` is a READ.** Its first version
+flagged the rain's own speed check as an un-repainted toggle. Narrowed
+to add/remove/toggle. Five new tests, each verified by breaking it.
 
 ## SAYA BLEED IN FOUR — and the plumbing was innocent (Sept 15)
 

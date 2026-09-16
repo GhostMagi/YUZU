@@ -95,6 +95,41 @@ body.purple {
   --key:  #0d0414;
   --tint: url(#four-purple) brightness(1.22);
 }
+/* ---- SHE THINKS IN THE OTHER COLOUR ---------------------------------
+   Ghost, Sept 16: *"i dislike the words typing up as she says it thing
+   as im a speed reader. Can we just give her a thinking pose somehow
+   that only shows when shes thinking?"* and then, plainly: *"Just turn
+   the raining code neon purple when thinking. In general. (Except for
+   purple main should have green code) ... Only during thinking."*
+
+   He is right and it is the better trade. The word-by-word reveal
+   existed to answer "is it working or is it stuck" -- a real question
+   this deck keeps answering -- but it answers it by making a fast
+   reader wait for text he could already have read. The rain changing
+   colour says the same thing at a glance, across the whole screen,
+   and costs him nothing.
+
+   HER ART IS NOT TOUCHED. A first pass tinted patches of her numbers
+   and it was wrong twice over: her picture is a JPEG, so the accent
+   had to be a second masked copy of her, and `screen` ADDS -- purple
+   over her green came out cyan rather than purple. Rendering said so
+   in one look. The rain is drawn by us, character by character, so
+   its colour is simply ours to set.
+
+   These sit LAST on purpose. `body.thinking` and `body.red` have the
+   same specificity, so source order is what settles it; `body.purple
+   .thinking` carries two classes and wins over both wherever it has
+   to. Only `--head` and `--tail` move, and nothing but the rain reads
+   them, so this cannot reach anything else on the page. */
+body.thinking {
+  --head: #eecfff;                     /* the purple palette, exactly */
+  --tail: rgba(192, 77, 255, .55);
+}
+body.purple.thinking {
+  --head: #c8ffd4;                     /* and green when she IS purple */
+  --tail: rgba(57, 255, 94, .55);
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100vh; overflow: hidden; }
 body {
@@ -244,6 +279,7 @@ body.thinking #rain { opacity: .6; }
   73%   { opacity: .88 }
 }
 body.thinking #four { animation-duration: 1.6s; }
+
 
 /* ---- what she says --------------------------------------------------
    She stands right, her words go left -- the fix Cait's page paid for
@@ -562,6 +598,17 @@ function hear(words) {
     .catch(() => {});
 }
 
+// ONE PLACE TURNS THE THINKING STATE ON AND OFF, because two things
+// now hang off it: the class the stylesheet reads, and the canvas's own
+// cached copy of the two rain colours. The canvas has to be TOLD -- the
+// palette is read once per change rather than per frame, for the reason
+// the loop throttles at all. Forgetting the repaint is the same fault
+// as the page turning red around rain that stayed green.
+function thinking(on) {
+  document.body.classList.toggle('thinking', on);
+  repaint();
+}
+
 form.onsubmit = (event) => {
   event.preventDefault();
   const asked = input.value.trim();
@@ -569,28 +616,29 @@ form.onsubmit = (event) => {
   input.value = '';
   send.disabled = true;
   send.textContent = '...';
-  document.body.classList.add('thinking');
+  thinking(true);
 
   // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
   // and refuses anything that is not in the dict, so nothing typed here
   // can ever name a file.
   //
-  // /stream GIVES HER BACK A WORD AT A TIME. The old /say waited for the
-  // whole reply and then dropped it in, so the page was dead for ten to
-  // thirty seconds -- and a screen that shows nothing is a screen that
-  // looks broken, which is the one thing this deck keeps fixing.
+  // SHE ARRIVES WHOLE. The word-by-word reveal is gone, at his request:
+  // *"i dislike the words typing up as she says it thing as im a speed
+  // reader."* It existed to answer "is it working or is it stuck" on a
+  // page that sat dead for ten to thirty seconds -- and the thinking
+  // GLOW answers that better, because it says the same thing without
+  // making a fast reader wait for text he could already have read.
   //
-  // IT FALLS BACK TO /say. An older face server has no /stream route and
-  // answers 404, and a deck that goes silent because the PAGE arrived
-  // before the SERVER did is the stale-process fault wearing new
-  // clothes. She just stops arriving gradually.
-  stream(asked)
-    .catch(() => plain(asked))
+  // `/stream` is NOT removed from the server. Saya's face still uses
+  // it, it is the same `answer()` with a callback, and deleting a
+  // working route because one page stopped calling it is a change
+  // nobody asked for.
+  plain(asked)
     .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
     .then(() => {
       send.disabled = false;
       send.textContent = 'Speak';
-      document.body.classList.remove('thinking');
+      thinking(false);
       input.focus();
     });
 };
@@ -603,56 +651,6 @@ function plain(asked) {
   })
     .then(r => r.json())
     .then(r => said(r.said || 'She said nothing.'));
-}
-
-function stream(asked) {
-  return fetch('stream', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: asked, who: 'four' }),
-  }).then(response => {
-    if (!response.ok || !response.body) throw new Error('no stream');
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '', live = '', got = false;
-
-    // SHE STOPS `thinking` ON THE FIRST WORD, not at the end. That is
-    // the moment she starts talking, and it is what the rain's speed-up
-    // and her flicker are both keyed to.
-    function pump() {
-      return reader.read().then(({ done, value }) => {
-        if (done) {
-          if (!got) throw new Error('nothing arrived');
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();          // the tail may be half a line
-        lines.forEach(line => {
-          if (!line.trim()) return;
-          let msg;
-          try { msg = JSON.parse(line); } catch (e) { return; }
-          if (msg.piece) {
-            got = true;
-            live += msg.piece;
-            document.body.classList.remove('thinking');
-            // Stage directions are stripped as she goes, the same call
-            // the finished reply gets -- otherwise a half-written
-            // `[leans` sits on screen until its bracket closes.
-            says.textContent = spoken(live) || live;
-            says.classList.add('on');
-            says.scrollTop = says.scrollHeight;
-          }
-          if (msg.done) {
-            got = true;
-            said(msg.said || live || 'She said nothing.');
-          }
-        });
-        return pump();
-      });
-    }
-    return pump();
-  });
 }
 
 if (location.hash === '#say') input.focus();

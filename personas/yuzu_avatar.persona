@@ -4,7 +4,7 @@ hardware: avatar
 description: Yuzu with a drawn body she can be dressed in - her own tab, her own page, her own outfits. yuzu4's character on the `avatar` body. Ghost, Sept 11: "in case i wana paint her nails she wouldnt just be like 'ima computer'". UNMEASURED.
 temperature: 0.8
 piper_length_scale: 0.88
-num_predict: 200
+num_predict: 250
 # HERS, overriding the avatar world's default. What a character looks
 # like belongs to the character -- the world file only knows that a
 # drawn body can be restyled, dressed and have its nails painted.

@@ -5384,6 +5384,118 @@ class TestFour(unittest.TestCase):
             self.assertIn("body.%s {" % skin, page,
                           "%s has no palette to switch to" % skin)
 
+    def rain_palette(self, *classes):
+        """What --head and --tail resolve to for a given set of body
+        classes, by CASCADING the page's own rules rather than by
+        matching how any one of them is spelled.
+
+        Specificity then source order, which is what the browser does
+        and what the thinking blocks depend on -- they tie with the
+        theme blocks and win on position alone."""
+        want, found = set(classes), {}
+        for sel, body in re.findall(r"(body[^{}\n]*)\{([^{}]*)\}", self.code()):
+            sel = sel.strip()
+            if not re.fullmatch(r"body(\.[\w-]+)*", sel):
+                continue
+            need = set(re.findall(r"\.([\w-]+)", sel))
+            if not need <= want:
+                continue
+            for prop, value in re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", body):
+                found[(len(need), prop)] = value.strip()
+        out = {}
+        for (rank, prop), value in sorted(found.items()):
+            out[prop] = value
+        return out
+
+    def test_the_rain_changes_COLOUR_while_she_thinks(self):
+        """Ghost, Sept 16: *"i dislike the words typing up as she says
+        it thing as im a speed reader. Can we just give her a thinking
+        pose somehow that only shows when shes thinking?"* -- then,
+        settling it: *"Just turn the raining code neon purple when
+        thinking. In general. (Except for purple main should have green
+        code)"* and *"Only during thinking."*
+
+        The word-by-word reveal answered "is it working or is it stuck"
+        by making a fast reader wait for text he could already have
+        read. This answers the same question at a glance.
+
+        Verified by RENDERING all three themes idle and thinking at
+        1024x600, because no stdlib test can see a canvas."""
+        for theme in ("", "red", "purple"):
+            classes = [c for c in (theme,) if c]
+            idle = self.rain_palette(*classes)
+            busy = self.rain_palette(*classes, "thinking")
+            self.assertNotEqual(
+                idle.get("--head"), busy.get("--head"),
+                "%s has no thinking signal in the rain" % (theme or "green"))
+            self.assertNotEqual(idle.get("--tail"), busy.get("--tail"))
+
+    def test_the_thinking_rain_is_PURPLE_except_when_she_is(self):
+        """His rule exactly: purple in general, green when purple is
+        already the theme, so all three colours are used and the signal
+        can never be the colour it is signalling against."""
+        green = self.rain_palette()
+        purple = self.rain_palette("purple")
+        self.assertEqual(self.rain_palette("thinking")["--head"],
+                         purple["--head"], "green thinks in something else")
+        self.assertEqual(self.rain_palette("red", "thinking")["--head"],
+                         purple["--head"], "red thinks in something else")
+        self.assertEqual(self.rain_palette("purple", "thinking")["--head"],
+                         green["--head"], "purple thinks in its own colour")
+
+    def test_thinking_leaves_HER_alone(self):
+        """*"Leave her colors alone actually."* A first pass tinted
+        patches of her own numbers and was wrong twice over: her art is
+        a JPEG, so the accent had to be a second masked copy of her --
+        and `screen` ADDS, so purple over her green came out CYAN.
+        Rendering said so in one look.
+
+        The rain is drawn by us, character by character, so its colour
+        is ours to set. Nothing about her may move with it."""
+        for classes in ((), ("red",), ("purple",)):
+            idle = self.rain_palette(*classes)
+            busy = self.rain_palette(*classes, "thinking")
+            for prop in ("--ink", "--tint", "--dim", "--box", "--key"):
+                self.assertEqual(idle.get(prop), busy.get(prop),
+                                 "thinking moved %s on %s" % (prop, classes))
+
+    def test_the_canvas_is_TOLD_when_the_thinking_colour_changes(self):
+        """The rain keeps its own copy of the two colours -- read once
+        per change, because getComputedStyle per frame is the opposite
+        of why that loop throttles at all. So the toggle has to repaint
+        it, and forgetting that is the same fault as the page turning
+        red around rain that stayed green.
+
+        Pinned as a PROPERTY: every place that toggles the thinking
+        class goes through the one function that repaints."""
+        code = self.code()
+        body = re.search(r"function thinking\(on\)\s*\{(.*?)\n\}",
+                         code, re.S)
+        self.assertTrue(body, "the thinking toggle is not one function")
+        self.assertIn("repaint()", body.group(1),
+                      "the canvas is never told the colour changed")
+        # add/remove/toggle only -- `contains` is the rain reading the
+        # state to pick its speed, which is a READ and must not count.
+        loose = [m for m in re.findall(
+                     r"classList\.(?:add|remove|toggle)\([^)]*thinking[^)]*\)",
+                     code)
+                 if m not in body.group(1)]
+        self.assertEqual(loose, [],
+                         "something toggles thinking without repainting: %s"
+                         % loose)
+
+    def test_her_reply_arrives_WHOLE_and_not_a_word_at_a_time(self):
+        """*"i dislike the words typing up as she says it thing as im a
+        speed reader."* The page asks /say and paints once.
+
+        /stream is NOT removed from the server -- Saya's face still
+        uses it, and deleting a working route because one page stopped
+        calling it is a change nobody asked for. This pins the PAGE."""
+        code = self.code()
+        self.assertNotIn("'stream'", code, "four.html still streams")
+        self.assertNotIn("getReader", code, "the incremental reader is back")
+        self.assertIn("'say'", code, "she has no way to answer at all")
+
     def test_the_tap_is_on_the_STAGE_and_never_steals_the_way_out(self):
         """The top bar carries the rail and the ⌂, the ask bar carries
         the text box, and #says can scroll. A tap that lands on any of
@@ -8747,14 +8859,41 @@ class TestWikiBrevity(unittest.TestCase):
         # and it is still a USER turn, which is the load-bearing part
         self.assertIn("I looked up", turn)
 
-    def test_num_predict_was_NOT_raised(self):
-        """Already recorded: the truncation is a symptom of rambling and
-        a bigger ceiling just buys longer rambles."""
+    CEILING = 250
+
+    def test_num_predict_has_a_CEILING_and_every_character_shares_it(self):
+        """RAISED to 250, Sept 16, and this test used to forbid exactly
+        that -- so the reason is worth having next to the number.
+
+        The rule it replaces ("the truncation is a symptom of rambling
+        and a bigger ceiling just buys longer rambles") was written
+        about SHIRO, against a rule capping her at two or three
+        sentences, on replies nobody asked to be long. That is still
+        true of a character who rambles.
+
+        Ghost's case is the other one, and he was explicit: *"she cuts
+        off too much when im just getting into the paragraph."* He is
+        deliberately in a long exchange and the reply dies MID-WORD. An
+        unfinished sentence is worse than a shorter finished one either
+        way, so the ceiling is not what was protecting brevity -- her
+        prompt is.
+
+        It costs no memory: `num_predict` caps generated TOKENS, not
+        anything resident, and 250 sits far inside `num_ctx` 4096. It
+        costs a couple of seconds on the longest replies only.
+
+        The ceiling STAYS, because unbounded is how a 3B monologues
+        until the context fills. It is one number, shared, so nobody
+        raises it quietly on one character."""
         import re as _re
+        seen = set()
         for f in sorted((Path(__file__).parent / "personas").glob("*.persona")):
             for found in _re.findall(r"num_predict:\s*(\d+)", f.read_text()):
-                self.assertLessEqual(int(found), 200,
+                self.assertLessEqual(int(found), self.CEILING,
                                      f"{f.name} raised num_predict to {found}")
+                seen.add(int(found))
+        self.assertEqual(seen, {self.CEILING},
+                         "the characters disagree about the ceiling: %s" % seen)
 
 
 class TestVPet(unittest.TestCase):
