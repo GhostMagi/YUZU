@@ -539,13 +539,18 @@ form.onsubmit = (event) => {
   // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
   // and refuses anything that is not in the dict, so nothing typed here
   // can ever name a file.
-  fetch('say', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: asked, who: 'four' }),
-  })
-    .then(r => r.json())
-    .then(r => said(r.said || 'She said nothing.'))
+  //
+  // /stream GIVES HER BACK A WORD AT A TIME. The old /say waited for the
+  // whole reply and then dropped it in, so the page was dead for ten to
+  // thirty seconds -- and a screen that shows nothing is a screen that
+  // looks broken, which is the one thing this deck keeps fixing.
+  //
+  // IT FALLS BACK TO /say. An older face server has no /stream route and
+  // answers 404, and a deck that goes silent because the PAGE arrived
+  // before the SERVER did is the stale-process fault wearing new
+  // clothes. She just stops arriving gradually.
+  stream(asked)
+    .catch(() => plain(asked))
     .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
     .then(() => {
       send.disabled = false;
@@ -554,6 +559,66 @@ form.onsubmit = (event) => {
       input.focus();
     });
 };
+
+function plain(asked) {
+  return fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'four' }),
+  })
+    .then(r => r.json())
+    .then(r => said(r.said || 'She said nothing.'));
+}
+
+function stream(asked) {
+  return fetch('stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'four' }),
+  }).then(response => {
+    if (!response.ok || !response.body) throw new Error('no stream');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '', live = '', got = false;
+
+    // SHE STOPS `thinking` ON THE FIRST WORD, not at the end. That is
+    // the moment she starts talking, and it is what the rain's speed-up
+    // and her flicker are both keyed to.
+    function pump() {
+      return reader.read().then(({ done, value }) => {
+        if (done) {
+          if (!got) throw new Error('nothing arrived');
+          return;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();          // the tail may be half a line
+        lines.forEach(line => {
+          if (!line.trim()) return;
+          let msg;
+          try { msg = JSON.parse(line); } catch (e) { return; }
+          if (msg.piece) {
+            got = true;
+            live += msg.piece;
+            document.body.classList.remove('thinking');
+            // Stage directions are stripped as she goes, the same call
+            // the finished reply gets -- otherwise a half-written
+            // `[leans` sits on screen until its bracket closes.
+            says.textContent = spoken(live) || live;
+            says.classList.add('on');
+            says.scrollTop = says.scrollHeight;
+          }
+          if (msg.done) {
+            got = true;
+            said(msg.said || live || 'She said nothing.');
+          }
+        });
+        return pump();
+      });
+    }
+    return pump();
+  });
+}
 
 if (location.hash === '#say') input.focus();
 </script>

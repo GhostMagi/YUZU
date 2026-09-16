@@ -671,7 +671,131 @@ def roster():
     return out
 
 
-def answer(text, who="saya"):
+# WHAT THE BOARD IS DOING RIGHT NOW, as one line she can read.
+#
+# Four's rule 8 says she NOTICES THE MACHINE SHE LIVES ON -- "the fan,
+# the heat, what is loaded, how much is left" -- and until now she had
+# no data at all, so she invented a number every single time. A prompt
+# rule writing a cheque the code does not cash is the same fault as a
+# missing feature hiding inside a character, which this repo already
+# paid for once when `/wiki` silently did nothing and read as her being
+# a tsundere about it.
+#
+# IT GOES IN THE SYSTEM PROMPT, NOT IN A USER TURN, and that is the
+# opposite call from the wiki extract -- on purpose. An encyclopedia
+# extract is 700 characters of reference text and arrives as something
+# HE said, because a wall of it delivered as a system message is the
+# shortest path to assistant collapse. This is one short sentence about
+# HERSELF, which is exactly what a system prompt is for, and it is far
+# too small to teach a format.
+#
+# ABSENT RATHER THAN WRONG. On a phone and on the laptop there is no
+# nvpmodel status and no thermal zone, so there is no line at all and
+# she talks about her body the way she always did -- rather than being
+# handed a confident zero.
+def board_now():
+    """One sentence of live board facts, or '' when there are none."""
+    try:
+        now = stats()
+    except Exception:
+        return ""
+    bits = []
+    # Every field is FORMATTED here rather than pasted. `watts` is a
+    # float and `temp` is a whole number of degrees, and handing a 3B a
+    # bare `5.6` to narrate is how you get a sentence about 5.6 of
+    # something she had to guess the name of.
+    if now.get("percent") is not None:
+        bits.append("battery %d%%%s" % (now["percent"],
+                                        ", charging" if now.get("charging") else ""))
+    elif now.get("watts"):
+        bits.append("drawing %.1f watts" % now["watts"])
+        if now.get("hours"):
+            bits.append("about %.1f hours from a full bank" % now["hours"])
+    if now.get("temp"):
+        bits.append("%d degrees" % now["temp"])
+    if now.get("throttled"):
+        # The reminder, reaching her too. She is the front door, so she
+        # is the one who will be asked why the deck feels slow.
+        bits.append("THROTTLED -- he needs to run: sudo nvpmodel -m 0")
+    elif now.get("power"):
+        bits.append("power mode %s" % now["power"])
+    if now.get("rate"):
+        bits.append("last reply came out at %s" % now["rate"])
+    if not bits:
+        return ""
+    return ("\n\nRIGHT NOW, on the board you live on: "
+            + ", ".join(bits) + ". "
+            "Mention it only if it is relevant or you are asked -- "
+            "it is the weather, not the news.")
+
+
+# SHE REMEMBERS BETWEEN RESTARTS NOW.
+#
+# Every `~/YUZU/pull` bounces the face server, and until now that took
+# the whole conversation with it -- she would forget his name, the deck,
+# and what they were in the middle of, and the cause looked like nothing
+# at all from his side.
+#
+# OUTSIDE THE REPO, in ~/.yuzu/, for the reason the V-Pet's mood file
+# already paid for: a file INSIDE the repo is a local change, and
+# `~/YUZU/pull` stops on local changes rather than overwriting them.
+# Her memory of a conversation would have blocked every update he ever
+# ran.
+#
+# It is TINY and it is capped. `history_turns` is 8, so a file is at
+# most 16 short messages -- single-digit kilobytes per character, and it
+# cannot creep, because the brain trims eagerly and this only ever
+# writes what the brain is already holding.
+MEMORY_DIR = os.path.join(os.path.expanduser("~"), ".yuzu", "history")
+
+
+def _memory_file(key):
+    # The key comes from CHARACTERS, never from the request -- same
+    # allowlist discipline as /launch/ and /vpet/. basename is the belt
+    # to that braces: nothing here can ever name a path.
+    return os.path.join(MEMORY_DIR, os.path.basename(key) + ".json")
+
+
+def load_memory(brain, key):
+    """Give a fresh brain whatever it said last time. NEVER raises: a
+    corrupt or unreadable file costs the memory, never the reply."""
+    try:
+        with open(_memory_file(key), encoding="utf-8") as fh:
+            past = json.load(fh)
+        if isinstance(past, list):
+            brain.history = [m for m in past
+                             if isinstance(m, dict)
+                             and m.get("role") in ("user", "assistant")
+                             and isinstance(m.get("content"), str)
+                             ][-brain.history_turns * 2:]
+    except Exception:
+        pass
+
+
+def save_memory(brain, key):
+    """Write it back. Same guard: losing the memory must never lose the
+    reply that was already given."""
+    try:
+        os.makedirs(MEMORY_DIR, exist_ok=True)
+        with open(_memory_file(key), "w", encoding="utf-8") as fh:
+            json.dump(brain.history[-brain.history_turns * 2:], fh)
+    except Exception:
+        pass
+
+
+def forget(key):
+    """Drop one character's memory. Absent is success -- this exists so
+    starting clean is possible, not so it can fail."""
+    brain = _BRAINS.get(key)
+    if brain is not None:
+        brain.reset()
+    try:
+        os.remove(_memory_file(key))
+    except Exception:
+        pass
+
+
+def answer(text, who="saya", on_chunk=None):
     """One turn with a character, for the page. (reply, error).
 
     The chat lives in a terminal today, which on a 10" touchscreen with
@@ -719,6 +843,27 @@ def answer(text, who="saya"):
     # heard of one. So the gate reads the HARDWARE -- which is exactly
     # the split this repo keeps paying for: decide whether a fact
     # belongs to WHOEVER IS LIVE or to THIS BODY, and pin it there.
+    # IMPORTED HERE, AND THAT IS A BUG FIX RATHER THAN TIDYING.
+    # `yuzu_personas` is imported INSIDE persona_for() and roster(), so
+    # it was never a global of this module -- and this line referenced
+    # it anyway. Every call raised NameError, the `except` below caught
+    # it, and `has_wiki` silently fell back to `drives_face`. So the
+    # gate CLAUDE.md records as "reads the hardware now" has been
+    # answering `key == saya_deck` since the day it was written, and
+    # /wiki has been DEAD on Four's page since she shipped -- the one
+    # character whose body is the deck and who most needed it.
+    #
+    # It was invisible because the fallback is plausible: Saya is the
+    # live arm AND on the deck, so the wrong answer agreed with the
+    # right one for the only character anybody tested. Found by adding
+    # board_now() and watching its line not arrive.
+    #
+    # A bare `except Exception` around a lookup will swallow a
+    # programming error as happily as a missing file. That is the same
+    # shape as every "reported healthy while broken" entry in
+    # CLAUDE.md, and the reason the test below drives the real
+    # function rather than reading it.
+    import yuzu_personas
     try:
         has_wiki = yuzu_personas.load(key).hardware == "cyberdeck"
     except Exception:
@@ -759,12 +904,48 @@ def answer(text, who="saya"):
             # observe this class of failure -- the oldest lesson in
             # this repo, wearing a mock's clothes.
             _BRAINS[key] = yuzu_brain.YuzuBrain(persona=key)
+            # Whatever she said last time, before she says anything new.
+            load_memory(_BRAINS[key], key)
+        brain = _BRAINS[key]
+
+        # THE LIVE BOARD FACTS RIDE ON THE SYSTEM PROMPT, FOR THIS TURN
+        # ONLY. `base` is captured once per brain so this can never
+        # stack -- appending to an already-appended prompt would grow a
+        # line of stale readings on every single turn, which is the
+        # shape of bug that stays invisible until the context fills up.
+        # GUARDED, because the board facts are a NICETY and the reply is
+        # the product -- the same promise `_face()`, Piper and the wiki
+        # import all make. Four pre-existing tests went red when this
+        # was not guarded: their stub brains carry no `system_prompt`,
+        # and a telemetry line that can take a whole turn down is a
+        # worse fault than one that quietly does not appear.
+        if has_wiki:
+            try:
+                if not hasattr(brain, "_base_prompt"):
+                    brain._base_prompt = brain.system_prompt
+                brain.system_prompt = brain._base_prompt + board_now()
+            except Exception:
+                pass
+
         face("thinking")
-        reply = _BRAINS[key].ask(text)
+        if on_chunk is None:
+            reply = brain.ask(text)
+        else:
+            # ONE FUNCTION, TWO TRANSPORTS. The wiki grounding, the
+            # allowlist, the face state and the memory all live here and
+            # nowhere else -- duplicating this for the streaming route
+            # would only have created a second place to forget, which is
+            # exactly what `ground()` exists to prevent one layer down.
+            pieces = []
+            for piece in brain.ask_stream(text):
+                pieces.append(piece)
+                on_chunk(piece)
+            reply = "".join(pieces).strip()
         # The brain already wrote `talking` WITH the token rate it just
         # measured. Re-stating it here without one would blank the
         # badge on every reply that came through this page.
         face("talking", reply, get_state().get("rate"))
+        save_memory(brain, key)
         return reply, None
     except Exception as exc:
         face("idle")
@@ -1162,6 +1343,83 @@ class _Handler(SimpleHTTPRequestHandler):
             reply, error = answer(said, who)
             self._json({"ok": error is None, "said": reply or error,
                         "pose": pose_for(reply) if error is None else "idle"})
+            return
+        if path == "/stream":
+            # SHE ARRIVES A WORD AT A TIME. A 3B on this board takes ten
+            # to thirty seconds for a reply, and until now the page sat
+            # dead silent for all of it and then dumped the whole thing
+            # -- which is the "is it working or is it stuck" question
+            # this whole project keeps answering, one layer at a time.
+            #
+            # NEWLINE-DELIMITED JSON, not SSE. Each line is one object,
+            # the browser splits on \n, and there is no framing to get
+            # wrong and no event names to keep in sync. The last line
+            # carries the verdict, so a reply that dies halfway is
+            # visibly unfinished rather than quietly truncated.
+            #
+            # It works because the server is THREADED -- already true,
+            # and for this exact reason: a single-threaded server stops
+            # answering /state for the whole generation, so her face
+            # would freeze precisely when it is saying `thinking`.
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(size) or b"{}")
+                said = (body.get("text") or "").strip()[:2000]
+                who = body.get("who", "saya")
+            except Exception:
+                said = who = ""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson")
+            self.send_header("Cache-Control", "no-store")
+            # No Content-Length: the whole point is that the length is
+            # not known until she has finished saying it.
+            self.end_headers()
+
+            def push(obj):
+                try:
+                    self.wfile.write((json.dumps(obj) + "\n").encode())
+                    self.wfile.flush()
+                    return True
+                except Exception:
+                    # HE CLOSED THE PAGE. Not an error, and it must not
+                    # take the generation down noisily -- the brain
+                    # finishes the turn and the memory still gets it.
+                    return False
+
+            if not said:
+                push({"done": True, "ok": False, "said": "Say something first."})
+                return
+            gone = []
+            def chunk(piece):
+                if not gone and not push({"piece": piece}):
+                    gone.append(True)
+            reply, error = answer(said, who, on_chunk=chunk)
+            push({"done": True, "ok": error is None,
+                  "said": reply or error,
+                  "pose": pose_for(reply) if error is None else "idle"})
+            return
+        if path == "/forget":
+            # STARTING CLEAN HAS TO BE POSSIBLE, now that she remembers.
+            # It takes a NAME, looked up in CHARACTERS exactly like
+            # /say, so nothing from the request can ever name a file.
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+                who = json.loads(self.rfile.read(size) or b"{}").get("who", "")
+            except Exception:
+                who = ""
+            # AN EMPTY NAME IS A REFUSAL HERE, and that is a real
+            # difference from /say. `persona_for` defaults a missing
+            # name to "saya", which is right for ASKING -- the bare
+            # address opens her page -- and wrong for DELETING: an
+            # empty field would have quietly wiped Saya's memory
+            # instead of doing nothing. Caught by the test, not by
+            # reading it. A destructive route gets no defaults.
+            key = persona_for(who) if (who or "").strip() else None
+            if key is None:
+                self._json({"ok": False, "said": "No character by that name."})
+                return
+            forget(key)
+            self._json({"ok": True, "said": "Forgotten."})
             return
         if path == "/pull":
             said, restart = run_pull()

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 628 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 646 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 628 tests pass on it. Getting it
+(that repo path is confirmed working). 646 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,186 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## SHE STREAMS, SHE READS THE BOARD, SHE REMEMBERS — and /wiki was dead on Four (Sept 16)
+
+Ghost picked three off a list of ideas: *"1 and 2 are nice. Go ahead on
+those 2."*, then *"Also number 3 does it take hella space or no. If not,
+do it."* and, on voice, *"id like a different voice than amy_medium id
+like to see about sumn called Kokoro?"*
+
+### THE FIND: `/wiki` HAS BEEN DEAD ON FOUR'S PAGE SINCE SHE SHIPPED
+
+`answer()` reads
+
+    has_wiki = yuzu_personas.load(key).hardware == "cyberdeck"
+
+and **`yuzu_personas` was never imported in that module.** It is
+imported INSIDE `persona_for()` and `roster()`, so at module level the
+name does not exist -- every call raised `NameError`, the surrounding
+`except Exception` swallowed it, and `has_wiki` fell back to
+`drives_face`, which is `key == saya_deck`.
+
+**So the gate this file records as "the gate reads `hardware ==
+cyberdeck` now" has been answering a completely different question
+since the day it was written**, and Four -- the one character who IS
+the deck and who most needed the encyclopedia -- has never been able to
+use it.
+
+**It hid because the wrong answer AGREED with the right one for the
+only character anyone tested.** Saya is both the live arm and on the
+deck, so `drives_face` and `hardware == cyberdeck` are the same boolean
+for her. Cait, Yuzu and Mimi are correctly `False` either way. Four is
+the first character where the two diverge, and nobody asked her for a
+lookup.
+
+**A bare `except Exception` around a lookup swallows a PROGRAMMING
+ERROR as happily as a missing file.** That is the same shape as every
+"reported healthy while broken" entry in this file, and it is why
+`test_the_hardware_gate_is_READ_and_not_merely_written` drives the real
+function instead of reading it -- reading it is what missed it.
+
+**It was found by accident**, by adding the board-facts line below and
+watching it not arrive. Worth keeping: the new feature was the
+instrument.
+
+### 1. SHE ARRIVES A WORD AT A TIME
+
+`ask_stream` has existed in `yuzu_brain` the whole time and no page
+used it, so every reply sat dead for ten to thirty seconds and then
+dropped in whole. That is the "is it working or is it stuck" question
+this project keeps answering one layer at a time, still unanswered on
+the screen he actually looks at.
+
+**`POST /stream`, newline-delimited JSON, not SSE.** One object per
+line, the browser splits on `\n`, and there is no framing to get wrong
+and no event names to keep in sync. **The last line carries the
+verdict**, so a reply that dies halfway is visibly unfinished rather
+than quietly truncated -- the verdict-goes-first rule, applied to a
+stream. It works because the server is already THREADED, and for this
+exact reason: a single-threaded server stops answering `/state` for the
+whole generation.
+
+**ONE FUNCTION, TWO TRANSPORTS.** `answer()` took an `on_chunk`
+callback rather than growing a streaming twin. The wiki grounding, the
+allowlist, the face state and the memory live in one place, which is
+what `ground()` already exists to guarantee one layer down. A test pins
+that `load_memory` and `save_memory` each appear exactly once.
+
+**The page FALLS BACK to `/say`.** An older face server answers 404,
+and a deck that goes silent because the PAGE arrived before the SERVER
+did is the stale-process fault wearing new clothes. She just stops
+arriving gradually.
+
+**She stops `thinking` on the FIRST WORD**, not at the end -- that is
+the moment she starts talking, and the rain's speed-up and her flicker
+are both keyed to it. Stage directions are stripped AS SHE GOES, or a
+half-written `[leans` sits on screen until its bracket closes.
+
+### 2. SHE CAN READ THE BOARD NOW
+
+Her rule 8 says she NOTICES THE MACHINE SHE LIVES ON -- *"the fan, the
+heat, what is loaded, how much is left"* -- and she had **no data at
+all**, so she invented a number every time. **A prompt rule writing a
+cheque the code does not cash** is the same family as a missing feature
+hiding inside a character.
+
+`board_now()` renders one sentence off the same `stats()` the battery
+badge uses:
+
+    RIGHT NOW, on the board you live on: drawing 5.6 watts, about 10.6
+    hours from a full bank, 47 degrees, power mode MAXN. Mention it only
+    if it is relevant or you are asked -- it is the weather, not the news.
+
+**IT GOES IN THE SYSTEM PROMPT, which is the OPPOSITE call from the
+wiki extract, on purpose.** An extract is 700 characters of reference
+text and arrives as a USER turn because a wall of it as a system
+message is the shortest path to assistant collapse. This is one short
+sentence about HERSELF, which is exactly what a system prompt is for
+and far too small to teach a format.
+
+**`_base_prompt` is captured once per brain so it cannot STACK.**
+Appending to an already-appended prompt grows one stale reading per
+turn and stays invisible until the context fills up. A test drives four
+turns and counts.
+
+**ABSENT RATHER THAN WRONG**, so the phone and the laptop get no line
+at all, and it is gated on the BODY -- Cait has never heard of a
+computer and a test already bans `battery` and `screen` from her
+prompt; handing her the watts at runtime would walk straight round it.
+
+**AND THE WHOLE BLOCK IS GUARDED.** Four pre-existing tests went red
+when it was not: their stub brains carry no `system_prompt`. That is
+the right outcome and the guard is principled rather than a patch --
+**telemetry is a nicety and the reply is the product**, the same
+promise `_face()`, Piper and the wiki import all make.
+
+**The throttle reminder reaches HER too**, now. She is the front door,
+so she is the one who gets asked why the deck feels slow. Fifth place
+that reminder lives.
+
+### 3. SHE REMEMBERS ACROSS A RESTART
+
+Every `~/YUZU/pull` bounces the face server and took the whole
+conversation with it -- she forgot his name, the deck, and what they
+were in the middle of, with nothing on screen to say why.
+
+**`~/.yuzu/history/<key>.json`, OUTSIDE THE REPO**, for the reason the
+V-Pet's mood file already paid for: a file inside the repo is a local
+change, and `pull` stops on local changes rather than overwriting them.
+**Her memory of a conversation would have blocked every update he ever
+ran.**
+
+**It is TINY**, which was his actual question. `history_turns` is 8, so
+a file is at most 16 short messages -- **247 bytes measured** on a real
+exchange. It cannot creep: the brain trims eagerly and this only writes
+what the brain already holds. A test caps it and another keeps it out
+of the repo.
+
+**`POST /forget` exists because starting clean has to be possible.**
+And the test caught a real hole in it: **an empty name silently meant
+Saya**, because `persona_for` defaults a missing name to her -- right
+for ASKING, since the bare address opens her page, and wrong for
+DELETING. **A destructive route gets no defaults.**
+
+### 4. KOKORO — built, guarded, and UNVERIFIED on the board
+
+The hold this file placed on Sept 9 is lifted, the same way Coco's was:
+he asked. **The rule it was protecting is kept intact rather than
+traded** -- absent Kokoro falls back to Piper, absent Piper she prints,
+exactly as before. Nothing that works today can stop working.
+
+**`kokoro-onnx`, NOT `kokoro`.** The PyPI `kokoro` package is PyTorch:
+multiple gigabytes on aarch64, sharing the Orin's ONE pool of 8GB with
+the model. `kokoro-onnx` is a 26KB wheel over onnxruntime plus a ~310MB
+model file. Same 82M-parameter voice, a fraction of the machinery.
+Verified from here that the wheel exists and downloads.
+
+**`length_scale` IS INVERTED FOR KOKORO, and that would have been very
+easy to ship.** `piper_length_scale` is a DURATION multiplier -- yuzu4
+runs 0.88 to speak FASTER, Coco 1.08 to speak SLOWER. Kokoro's `speed`
+is a RATE. Passing it straight across would have made **the gyaru the
+slow one and the kuudere the quick one**: a character bug wearing an
+arithmetic costume, invisible without listening. A test pins the
+direction rather than the number.
+
+**KokoroVoice has Voice's SHAPE on purpose** (`ready`, `why_not`,
+`say`, `failures`), so the audition logic, the demo and every caller
+stay single-copy -- a second copy is a second place for a spelling fix
+to be forgotten. `--engines` prints what each engine can do right now,
+**verdict first**, and where the two model files come from.
+
+**NOT VERIFIED ON HIS BOARD and the file says so in as many words.**
+There is no model file and no audio device here, and onnxruntime's
+aarch64 build is the open question. Unverified specifics stated as
+steps already cost this project an hour on the 8BitDo -- so
+`KOKORO_SOURCE` carries the word UNVERIFIED and says to try the laptop
+or the Steam Deck first. **It is printed, never fetched**: 310MB onto a
+board he pulls over WiFi is not something a script should spend
+quietly.
+
+**The phone property survives.** `yuzu_all_in_one.py` never learns the
+word, and a test pins that.
 
 ## TAP FOUR'S SCREEN TO RECOLOUR HER (Sept 16)
 

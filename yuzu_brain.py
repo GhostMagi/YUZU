@@ -739,7 +739,7 @@ def _cli(argv):
     # choice from --use, and piper_length_scale, so every character
     # spoke at the same speed. It also only wrote a wav and never played
     # it. Voice.say() does all of that and never raises.
-    voice = yuzu_voice.Voice() if yuzu_voice else None
+    voice = yuzu_voice.pick_voice() if yuzu_voice else None
     if voice is not None:
         scale = brain.persona.settings.get("piper_length_scale") \
             if brain.persona else None

@@ -82,7 +82,7 @@ if legs:
         print(f"\n{exc}\n")
         raise SystemExit(1)
 
-voice = yuzu_voice.Voice() if yuzu_voice else None
+voice = yuzu_voice.pick_voice() if yuzu_voice else None
 
 
 # ============================================================================

@@ -4379,6 +4379,317 @@ class TestMimiPoses(unittest.TestCase):
         self.assertNotIn("/state", page)
 
 
+class TestSheStreamsAndRemembers(unittest.TestCase):
+    """Streaming, the live board facts, and memory across a restart.
+
+    Every one of these drives the REAL server through a real socket
+    with a fake brain that is at least as STRICT as YuzuBrain --
+    `TestEveryCharacterCanActuallyBeAsked` was green for two days over
+    a stub that accepted anything, and a permissive stub does not test
+    the caller, it excuses it."""
+
+    class Brain:
+        def __init__(self, persona=None, **kw):
+            if not isinstance(persona, str):
+                raise TypeError("persona= got %r" % (persona,))
+            import yuzu_personas
+            self.persona = yuzu_personas.load(persona)
+            self.system_prompt = self.persona.prompt
+            self.history, self.history_turns = [], 8
+
+        def ask_stream(self, text):
+            for piece in ("one ", "two ", "three"):
+                yield piece
+            self.history += [{"role": "user", "content": text},
+                             {"role": "assistant", "content": "one two three"}]
+
+        def ask(self, text):
+            return "".join(self.ask_stream(text))
+
+        def reset(self):
+            self.history = []
+
+    def setUp(self):
+        import json, tempfile, threading, sys
+        from http.server import ThreadingHTTPServer
+        import yuzu_face
+        self.face, self.json = yuzu_face, json
+
+        outer = self
+        class FakeBrainMod:
+            YuzuBrain = outer.Brain
+            @staticmethod
+            def ground(text):
+                return text, None
+        self._real_brain = sys.modules.get("yuzu_brain")
+        sys.modules["yuzu_brain"] = FakeBrainMod
+
+        self._home = tempfile.mkdtemp()
+        self._memory = yuzu_face.MEMORY_DIR
+        yuzu_face.MEMORY_DIR = os.path.join(self._home, "history")
+        self._stats = yuzu_face.stats
+        yuzu_face.stats = lambda: {"watts": 5.6, "temp": 47, "power": "MAXN"}
+        yuzu_face._BRAINS.clear()
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        import shutil, sys
+        self.server.shutdown()
+        self.face.MEMORY_DIR = self._memory
+        self.face.stats = self._stats
+        self.face._BRAINS.clear()
+        if self._real_brain is None:
+            sys.modules.pop("yuzu_brain", None)
+        else:
+            sys.modules["yuzu_brain"] = self._real_brain
+        shutil.rmtree(self._home, ignore_errors=True)
+
+    def post(self, path, payload):
+        import urllib.request
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d%s" % (self.port, path),
+            data=self.json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"})
+        return urllib.request.urlopen(req, timeout=20)
+
+    def lines(self, response):
+        return [self.json.loads(ln) for ln in response.read().decode().splitlines()
+                if ln.strip()]
+
+    def test_she_arrives_in_PIECES_and_not_in_one_lump(self):
+        """The whole point. /say waited for the entire reply and the
+        page was dead for ten to thirty seconds -- which is the "is it
+        working or is it stuck" question this project keeps answering
+        one layer at a time."""
+        got = self.lines(self.post("/stream", {"text": "hi", "who": "four"}))
+        pieces = [m["piece"] for m in got if "piece" in m]
+        self.assertEqual(pieces, ["one ", "two ", "three"],
+                         "it buffered instead of streaming")
+        self.assertTrue(got[-1].get("done"), "no verdict line")
+        self.assertEqual(got[-1]["said"], "one two three")
+
+    def test_the_last_line_carries_the_verdict_so_a_cut_reply_shows(self):
+        """A stream that dies halfway must be visibly unfinished rather
+        than quietly truncated -- the same reason `pull` and `wiki
+        --test` put the answer above the evidence."""
+        got = self.lines(self.post("/stream", {"text": "", "who": "four"}))
+        self.assertEqual(len(got), 1)
+        self.assertFalse(got[0]["ok"])
+        self.assertTrue(got[0]["done"])
+
+    def test_BOTH_ways_of_asking_reach_the_same_brain(self):
+        """One function, two transports. Duplicating the wiki
+        grounding, the allowlist and the memory for the streaming route
+        would only have made a second place to forget -- which is
+        exactly what `ground()` exists to prevent one layer down."""
+        import inspect
+        source = inspect.getsource(self.face.answer)
+        self.assertIn("on_chunk", source)
+        self.assertEqual(source.count("load_memory"), 1)
+        self.assertEqual(source.count("save_memory"), 1)
+        plain = self.json.loads(self.post("/say", {"text": "hi", "who": "four"}).read())
+        self.assertEqual(plain["said"], "one two three")
+
+    def test_the_board_facts_reach_a_DECK_character_and_never_stack(self):
+        """Four's rule 8 says she notices the fan, the heat and what is
+        loaded, and until now she had no data at all -- so she invented
+        a number every time. The stacking half is the real trap: a
+        prompt appended to an already-appended prompt grows a line of
+        stale readings per turn and stays invisible until the context
+        fills."""
+        self.post("/say", {"text": "how are you", "who": "four"}).read()
+        prompt = self.face._BRAINS["four"].system_prompt
+        self.assertIn("RIGHT NOW", prompt, "she was told nothing about the board")
+        self.assertIn("5.6 watts", prompt)
+        for _ in range(3):
+            self.post("/say", {"text": "again", "who": "four"}).read()
+        self.assertEqual(
+            self.face._BRAINS["four"].system_prompt.count("RIGHT NOW"), 1,
+            "the board line stacks, one stale copy per turn")
+
+    def test_a_character_who_is_NOT_on_the_deck_is_told_no_such_thing(self):
+        """Cait has never heard of a computer and a test already bans
+        `battery` and `screen` from her prompt. Handing her the watts
+        at runtime would walk straight around that."""
+        self.post("/say", {"text": "hello", "who": "cait"}).read()
+        key = self.face.persona_for("cait")
+        self.assertNotIn("RIGHT NOW", self.face._BRAINS[key].system_prompt)
+
+    def test_the_hardware_gate_is_READ_and_not_merely_written(self):
+        """THE BUG THIS ROUND FOUND. `answer()` referenced
+        `yuzu_personas` without importing it -- the module is imported
+        INSIDE persona_for() and roster(), never at module level -- so
+        every call raised NameError, the surrounding `except` swallowed
+        it, and `has_wiki` fell back to `key == saya_deck`.
+
+        So the gate CLAUDE.md records as "reads the hardware now" was
+        answering a different question entirely, and /wiki has been
+        DEAD on Four's page since she shipped. It hid because the wrong
+        answer agreed with the right one for Saya, who is both the live
+        arm and on the deck -- the only character anyone tested.
+
+        This drives the real function rather than reading it, because
+        reading it is what missed it."""
+        self.assertFalse(hasattr(self.face, "yuzu_personas"),
+                         "if this is now a module global, simplify the fix")
+        self.post("/say", {"text": "hello", "who": "four"}).read()
+        self.assertIn("RIGHT NOW", self.face._BRAINS["four"].system_prompt,
+                      "the deck gate is not reading the hardware")
+
+    def test_she_remembers_across_a_restart_and_the_file_stays_small(self):
+        """Every `~/YUZU/pull` bounces the face server, and that took
+        the whole conversation with it."""
+        self.post("/say", {"text": "my name is Ghost", "who": "four"}).read()
+        saved = os.path.join(self.face.MEMORY_DIR, "four.json")
+        self.assertTrue(os.path.exists(saved), "she wrote nothing down")
+        self.assertLess(os.path.getsize(saved), 8192, "the memory file is fat")
+        self.face._BRAINS.clear()                      # the server was bounced
+        self.post("/say", {"text": "still there?", "who": "four"}).read()
+        remembered = self.face._BRAINS["four"].history
+        self.assertTrue(any("Ghost" in m["content"] for m in remembered),
+                        "she forgot everything across the restart")
+
+    def test_the_memory_is_CAPPED_and_cannot_creep(self):
+        """`history_turns` is 8, so a file is at most 16 messages. A
+        memory that grows without bound is a `pull` that gets slower
+        every week for no visible reason."""
+        for n in range(14):
+            self.post("/say", {"text": "turn %d" % n, "who": "four"}).read()
+        with open(os.path.join(self.face.MEMORY_DIR, "four.json")) as fh:
+            self.assertLessEqual(len(json.load(fh)), 16)
+
+    def test_the_memory_lives_OUTSIDE_the_repo(self):
+        """The V-Pet already paid for this: a file inside the repo is a
+        local change, and `~/YUZU/pull` stops on local changes rather
+        than overwriting them. Her memory of a conversation would have
+        blocked every update he ever ran."""
+        here = os.path.dirname(os.path.abspath(self.face.__file__))
+        import yuzu_face
+        self.assertNotIn(here, yuzu_face.MEMORY_DIR.replace(self._home, ""),
+                         "her memory would block every git pull")
+        self.assertIn(".yuzu", self._memory)
+
+    def test_forgetting_takes_a_NAME_and_nothing_else(self):
+        """Same allowlist discipline as /launch/, /vpet/ and /say: a
+        NAME crosses the wire, never a path, on a server bound to
+        0.0.0.0."""
+        self.post("/say", {"text": "hi", "who": "four"}).read()
+        saved = os.path.join(self.face.MEMORY_DIR, "four.json")
+        self.assertTrue(os.path.exists(saved))
+        for junk in ("../../etc/passwd", "four/../../x", "", "nobody"):
+            got = self.json.loads(self.post("/forget", {"who": junk}).read())
+            self.assertFalse(got["ok"], "/forget accepted %r" % junk)
+        self.assertTrue(os.path.exists(saved), "junk deleted a real memory")
+        self.assertTrue(self.json.loads(
+            self.post("/forget", {"who": "four"}).read())["ok"])
+        self.assertFalse(os.path.exists(saved))
+
+
+class TestKokoro(unittest.TestCase):
+    """A SECOND ENGINE THAT CANNOT BREAK THE FIRST.
+
+    CLAUDE.md held Kokoro back since Sept 9 because "installs nothing"
+    is what lets the brain run in Pydroid on his phone. Ghost lifted
+    the hold; the rule it protected is kept intact rather than traded,
+    and that is what these pin.
+
+    NOT VERIFIED: that Kokoro actually speaks. There is no model file
+    and no audio device here, and onnxruntime's aarch64 build is the
+    open question. Same standing limit as every "tested in a sim" claim
+    in CLAUDE.md."""
+
+    def setUp(self):
+        import yuzu_voice
+        self.voice = yuzu_voice
+
+    def test_an_absent_kokoro_falls_back_to_piper_and_never_raises(self):
+        made = self.voice.KokoroVoice()
+        self.assertFalse(made.ready)
+        self.assertIn("kokoro-onnx", made.why_not())
+        self.assertIs(made.say("hello"), False, "it spoke without an engine")
+        self.assertIsInstance(self.voice.pick_voice(), self.voice.Voice)
+
+    def test_asking_for_kokoro_BY_NAME_returns_it_broken_rather_than_swapped(self):
+        """Being told why is the point of asking for it by name. A
+        silent swap is `face` reporting a live server as dead, pointing
+        the other way."""
+        self.assertIsInstance(self.voice.pick_voice(engine="kokoro"),
+                              self.voice.KokoroVoice)
+        self.assertIsInstance(self.voice.pick_voice(engine="piper"),
+                              self.voice.Voice)
+
+    def test_a_READY_kokoro_is_preferred_without_being_asked(self):
+        """The auto-pick cannot be observed on a machine where Kokoro
+        is genuinely absent -- which is every machine this suite runs
+        on today -- so `ready` is faked rather than assumed. A guard
+        that can only pass is not a guard, and this repo has shipped
+        that mistake in both directions already."""
+        real = self.voice.KokoroVoice.ready
+        try:
+            self.voice.KokoroVoice.ready = property(lambda self: True)
+            self.assertIsInstance(self.voice.pick_voice(),
+                                  self.voice.KokoroVoice,
+                                  "a working Kokoro was ignored")
+        finally:
+            self.voice.KokoroVoice.ready = real
+        # And restored, so the next test sees the real answer.
+        self.assertIsInstance(self.voice.pick_voice(), self.voice.Voice)
+
+    def test_length_scale_is_INVERTED_for_kokoro(self):
+        """Piper's `piper_length_scale` is a DURATION multiplier --
+        yuzu4 runs 0.88 to speak FASTER, Coco 1.08 to speak SLOWER.
+        Kokoro's `speed` is a RATE. Passing it straight across would
+        have made the gyaru the slow one and the kuudere the quick one:
+        a character bug wearing an arithmetic costume, very easy to
+        ship and impossible to notice without listening."""
+        fast = self.voice.KokoroVoice(length_scale=0.88).speed
+        slow = self.voice.KokoroVoice(length_scale=1.08).speed
+        self.assertGreater(fast, 1.0, "the gyaru got slower")
+        self.assertLess(slow, 1.0, "the kuudere got faster")
+        self.assertGreater(fast, slow)
+        self.assertEqual(self.voice.KokoroVoice().speed, 1.0)
+
+    def test_the_import_stays_GUARDED_like_pipers(self):
+        """One module, one try/except, prints if absent -- the exact
+        guard CLAUDE.md specified for this dependency a week before it
+        was written."""
+        import inspect
+        source = inspect.getsource(self.voice.KokoroVoice)
+        self.assertIn("except Exception", source)
+        top = inspect.getsource(self.voice).split("class KokoroVoice")[0]
+        self.assertNotIn("\nimport kokoro_onnx", top,
+                         "kokoro is imported at module level and would "
+                         "take the whole voice down when it is absent")
+
+    def test_the_phone_property_survives_a_second_engine(self):
+        """`yuzu_all_in_one.py` has to run in Pydroid with nothing
+        installed. It must not learn the word kokoro."""
+        with open("yuzu_all_in_one.py", encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertNotIn("kokoro", text.lower())
+
+    def test_both_engines_share_ONE_speaking_path(self):
+        """KokoroVoice was given Voice's shape rather than its own
+        interface so the audition logic, the demo and every caller stay
+        single-copy. A second copy is a second place for a spelling fix
+        to be forgotten."""
+        for name in ("ready", "why_not", "say", "failures"):
+            self.assertTrue(hasattr(self.voice.KokoroVoice(), name),
+                            "KokoroVoice is missing %s" % name)
+        import inspect
+        cli = inspect.getsource(self.voice._cli)
+        self.assertEqual(cli.count("voice.say(candidate"), 1,
+                         "the audition logic was duplicated per engine")
+
+    def test_it_says_plainly_that_the_board_has_not_answered_yet(self):
+        """Unverified specifics stated as steps already cost this
+        project an hour on the 8BitDo."""
+        self.assertIn("UNVERIFIED", self.voice.KOKORO_SOURCE)
+
+
 class TestFour(unittest.TestCase):
     """FOUR — the deck's own voice, and the character on the front door.
 

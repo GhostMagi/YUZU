@@ -562,6 +562,199 @@ class Voice:
 
 
 # ---------------------------------------------------------------------
+# KOKORO -- a second engine, because Piper sounds like a robot
+# ---------------------------------------------------------------------
+#
+# Ghost, Sept 16: "Voice out would be dope to hear in testing... id like
+# a different voice than amy_medium id like to see about sumn called
+# Kokoro?"
+#
+# CLAUDE.md has had Kokoro logged as "worth it, and NOT yet" since Sept
+# 9, for one reason: it is a real dependency, and "installs nothing" is
+# what lets the brain run in Pydroid on his phone. That hold is lifted
+# here the same way Coco's was -- he asked -- and the rule it was
+# protecting is kept INTACT rather than traded:
+#
+#   the import is guarded, exactly like Piper's and the wiki's
+#   absent Kokoro  -> falls back to Piper
+#   absent Piper   -> she prints, as she always did
+#
+# So nothing that works today can stop working, on any machine.
+#
+# `kokoro-onnx` AND NOT `kokoro`. The PyPI `kokoro` package is PyTorch,
+# which is a multi-gigabyte install on aarch64 and shares the Orin's
+# ONE pool of 8GB with the model. `kokoro-onnx` is a 26KB wheel over
+# onnxruntime and a ~310MB model file. Same 82M-parameter voice, a
+# fraction of the machinery.
+#
+# NOT VERIFIED ON HIS BOARD, and said plainly here because unverified
+# specifics stated as steps have already cost this project an hour on
+# the 8BitDo. What is verified from here: the wheel exists and
+# downloads, and every fallback path above. What only the Orin can
+# answer: whether onnxruntime has an aarch64 build that runs there, and
+# whether it is fast enough to be worth it over Piper.
+
+KOKORO_ENV = "YUZU_TTS"
+KOKORO_SPEAKER_ENV = "YUZU_KOKORO_VOICE"
+
+# The two files kokoro-onnx wants, looked for beside the Piper voices so
+# there is ONE place on the disk that means "voices".
+KOKORO_MODEL = "kokoro-v1.0.onnx"
+KOKORO_VOICES = "voices-v1.0.bin"
+
+# af_heart is the default because it is the one Kokoro's own samples
+# lead with and it is a warm, unremarkable American voice -- the right
+# default for a character nobody has tuned yet. One word to change.
+KOKORO_SPEAKER = os.environ.get(KOKORO_SPEAKER_ENV, "af_heart")
+
+
+def kokoro_files():
+    """(model, voices) if both are on the disk, else (None, None)."""
+    for folder in VOICE_DIRS:
+        model, voices = Path(folder) / KOKORO_MODEL, Path(folder) / KOKORO_VOICES
+        if model.is_file() and voices.is_file():
+            return model, voices
+    return None, None
+
+
+class KokoroVoice:
+    """Kokoro through kokoro-onnx. Same shape as Voice, same promise:
+
+    say() NEVER raises. A conversation that stops because the speaker
+    failed is worse than one that carries on silently.
+    """
+
+    name = "kokoro"
+
+    def __init__(self, length_scale=None, speaker=None):
+        self.length_scale = length_scale
+        self.speaker = speaker or KOKORO_SPEAKER
+        self.player, self.player_args = find_player()
+        self.failures = []
+        self.model, self.voices = kokoro_files()
+        self._engine = None
+        self._import_error = ""
+        try:
+            import kokoro_onnx            # noqa: F401
+        except Exception as exc:          # noqa: BLE001
+            self._import_error = str(exc)
+
+    @property
+    def speed(self):
+        """Piper's length_scale INVERTED, and that inversion is the whole
+        reason this is a property rather than a pass-through.
+
+        `piper_length_scale` is a DURATION multiplier -- yuzu4 runs 0.88
+        to speak FASTER, Coco 1.08 to speak SLOWER. Kokoro's `speed` is
+        a RATE. Handing 0.88 straight across would have made the gyaru
+        the slow one and the kuudere the quick one, which is a
+        character bug wearing an arithmetic costume, and it would have
+        been very easy to ship and never notice."""
+        if not self.length_scale:
+            return 1.0
+        return round(1.0 / self.length_scale, 3)
+
+    @property
+    def ready(self):
+        return bool(not self._import_error and self.model and self.player)
+
+    def why_not(self):
+        if self._import_error:
+            return ("kokoro-onnx isn't installed (%s). Try:  "
+                    "pip install kokoro-onnx soundfile" % self._import_error)
+        if not self.model:
+            return ("kokoro-onnx is installed but its two model files are "
+                    "not in %s -- it wants %s and %s. "
+                    "`python3 yuzu_voice.py --engines` prints where to get "
+                    "them." % (HERE / "voices", KOKORO_MODEL, KOKORO_VOICES))
+        if not self.player:
+            names = ", ".join(name for name, _ in PLAYERS)
+            return "no audio player found. Install one of: %s" % names
+        return ""
+
+    def engine(self):
+        """Built once and kept. Loading a 310MB model per line would
+        make her slower than Piper rather than nicer than it."""
+        if self._engine is None:
+            import kokoro_onnx
+            self._engine = kokoro_onnx.Kokoro(str(self.model), str(self.voices))
+        return self._engine
+
+    def say(self, text, clean=True):
+        spoken = for_speech(text) if clean else text.strip()
+        if not spoken or not self.ready:
+            return False
+        wav = None
+        try:
+            import soundfile
+            samples, rate = self.engine().create(
+                spoken, voice=self.speaker, speed=self.speed, lang="en-us")
+            handle, wav = tempfile.mkstemp(suffix=".wav", prefix="yuzu-")
+            os.close(handle)
+            soundfile.write(wav, samples, rate)
+            if not os.path.getsize(wav):
+                self.failures.append((0, ["kokoro produced an empty wav"]))
+                return False
+            subprocess.run([self.player, *self.player_args, wav],
+                           capture_output=True, timeout=TIMEOUT)
+            return True
+        except Exception as exc:          # noqa: BLE001
+            # Surface the engine's OWN message, same reasoning as Piper's
+            # stderr: it names a missing file or a bad speaker name far
+            # better than anything guessed from here.
+            self.failures.append((None, [str(exc)]))
+            return False
+        finally:
+            if wav:
+                try:
+                    os.unlink(wav)
+                except OSError:
+                    pass
+
+
+def pick_voice(engine=None, length_scale=None):
+    """The voice to use, best available first.
+
+    KOKORO ONLY WHEN IT IS ACTUALLY READY. "Installed" is not the
+    question -- a page that reports a working engine and then says
+    nothing is the same fault as `face` calling a serving server dead.
+    So it is asked whether it can speak RIGHT NOW, and if it cannot,
+    Piper answers and nothing about today changes.
+
+    engine='kokoro' or YUZU_TTS=kokoro forces it, and then a broken
+    Kokoro is returned BROKEN rather than silently swapped -- being
+    told why is the point of asking for it by name.
+    """
+    want = (engine or os.environ.get(KOKORO_ENV, "")).strip().lower()
+    if want in ("kokoro", "piper"):
+        return (KokoroVoice(length_scale=length_scale) if want == "kokoro"
+                else Voice(length_scale=length_scale))
+    kokoro = KokoroVoice(length_scale=length_scale)
+    return kokoro if kokoro.ready else Voice(length_scale=length_scale)
+
+
+# Where the two files come from. PRINTED, NEVER FETCHED: this is a
+# 310MB download onto a board he pulls over WiFi, and a script that
+# quietly spends that is a script that surprises him.
+KOKORO_SOURCE = """\
+Kokoro needs two files in {folder}:
+
+    pip install kokoro-onnx soundfile
+
+then fetch these from the kokoro-onnx releases page
+(github.com/thewh1teagle/kokoro-onnx/releases):
+
+    {model}        ~310MB
+    {voices}       ~27MB
+
+UNVERIFIED ON THE ORIN. onnxruntime's aarch64 build is the open
+question; if it will not install, Piper still works and nothing here
+changes. Try it on the laptop or the Steam Deck first -- it costs
+nothing to find out there.\
+"""
+
+
+# ---------------------------------------------------------------------
 # Demo -- the fastest way to find out how any of this actually sounds
 # ---------------------------------------------------------------------
 
@@ -647,7 +840,7 @@ def _cli(argv):
         print(f"Now using {chosen.name}")
         print("Hear it:  python3 yuzu_voice.py")
         return 0
-    say_text = raw_text = tryout = None
+    say_text = raw_text = tryout = engine = None
     for flag, target in (("--say", "say"), ("--raw", "raw"),
                          ("--tryout", "tryout")):
         if flag in argv:
@@ -657,12 +850,42 @@ def _cli(argv):
                 say_text = value
             elif target == "raw":
                 raw_text = value
+            elif target == "engine":
+                engine = value.strip().lower()
             else:
                 tryout = value.strip().lower()
-    voice = Voice()
 
-    print("PIPER   ", voice.piper or "NOT FOUND")
-    print("VOICE   ", voice.model or "NOT FOUND")
+    if "--engines" in argv:
+        # THE VERDICT GOES FIRST, which this project has had to relearn
+        # three times: `pad --status` on a working controller and `wiki
+        # --test` on a working archive both buried the answer under the
+        # evidence and both read as broken.
+        for made in (KokoroVoice(), Voice()):
+            label = getattr(made, "name", "piper")
+            print("%-8s %s" % (label.upper(),
+                               "READY" if made.ready else made.why_not()))
+        print()
+        print("Using:  %s" % type(pick_voice()).__name__)
+        print()
+        print(KOKORO_SOURCE.format(folder=HERE / "voices",
+                                   model=KOKORO_MODEL, voices=KOKORO_VOICES))
+        return 0
+
+    voice = pick_voice(engine=engine)
+    kokoro = isinstance(voice, KokoroVoice)
+
+    # ONE SPEAKING PATH FOR BOTH ENGINES. Only the banner differs --
+    # everything below (tryout, raw, say, the demo) calls `voice.say`,
+    # which is the whole reason KokoroVoice was given Voice's shape
+    # instead of its own interface. A second copy of the audition logic
+    # would be a second place for a spelling fix to be forgotten.
+    print("ENGINE  ", "kokoro" if kokoro else "piper")
+    if kokoro:
+        print("SPEAKER ", voice.speaker, " speed", voice.speed)
+        print("MODEL   ", voice.model or "NOT FOUND")
+    else:
+        print("PIPER   ", voice.piper or "NOT FOUND")
+        print("VOICE   ", voice.model or "NOT FOUND")
     print("PLAYER  ", voice.player or "NOT FOUND")
     if not voice.ready:
         print(f"\n  {voice.why_not()}\n")
@@ -670,8 +893,9 @@ def _cli(argv):
         print("which is exactly what she did before this file existed.")
         return 1
 
-    print("FLAGS   ", voice.flags())
-    print("COMMAND ", " ".join(voice.command("/tmp/example.wav")))
+    if not kokoro:
+        print("FLAGS   ", voice.flags())
+        print("COMMAND ", " ".join(voice.command("/tmp/example.wav")))
     if check_only:
         return 0
 
