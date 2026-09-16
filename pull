@@ -158,4 +158,117 @@ else
         fi
     fi
 fi
+
+# --- HER VOICE, ONCE, WITHOUT A SECOND COMMAND TO REMEMBER --------
+# OUTSIDE the up-to-date branch on purpose. He asked to type pull
+# and have her work -- so a pull that brings nothing new must still
+# fix a voice she does not have, or the one word does not do what
+# he was told it does.
+# Ghost, Sept 16: "Plz dont add new commands i cant actually
+# remember any except /wiki. Just help me simply get this goin".
+#
+# He is right and the first draft was wrong. A `~/YUZU/voice` script
+# was the tidy answer and it is a THIRD thing to remember on a board
+# whose only shell is a serial cable -- this file already records
+# that a new command needs its own line precisely because a new
+# command is a cost. The cheapest command is the one he already
+# types.
+#
+# THIS RUNS ONCE AND THEN NEVER AGAIN. It asks the same function the
+# page asks -- can she speak RIGHT NOW -- so there is no second copy
+# of "is the voice installed" to drift. Once she can, this block
+# costs one python call and prints nothing.
+#
+# IT SAYS THE SIZE BEFORE IT SPENDS IT. ~340MB onto a board he pulls
+# over WiFi is real, and a script that quietly spends it is the
+# surprise this project keeps refusing to ship. But he ASKED for
+# one word, so it is announced rather than withheld.
+#
+# AND IT CAN ONLY EVER COST THE VOICE. Every failure path below
+# leaves the pull successful and her talking exactly as before --
+# the promise the face, the wiki and Piper all make.
+if ! python3 -c "import yuzu_voice,sys; sys.exit(0 if yuzu_voice.pick_voice().ready else 1)" 2>/dev/null; then
+    echo
+    echo "    SHE HAS NO VOICE YET. Setting one up -- about 340MB,"
+    echo "    once, and never again. Piper still works if this fails."
+    echo
+    pip install --quiet kokoro-onnx soundfile 2>&1 | tail -2
+    if python3 -c "import kokoro_onnx" 2>/dev/null; then
+        mkdir -p voices
+        # The filenames come from the RELEASE, never from memory.
+        # Unverified specifics stated as steps already cost this
+        # project an hour on the 8BitDo, and a release renames its
+        # assets whenever it likes.
+        for url in $(python3 - <<'ASK'
+import json, urllib.request
+try:
+with urllib.request.urlopen(
+        "https://api.github.com/repos/thewh1teagle/kokoro-onnx/releases",
+        timeout=25) as r:
+    releases = json.load(r)
+except Exception:
+raise SystemExit
+for rel in releases:
+names = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
+model = [n for n in names if n.endswith(".onnx")]
+binp = [n for n in names if n.endswith(".bin")]
+# BOTH or neither: half a download reports success and then cannot
+# speak, which is worse than a clean failure.
+if model and binp:
+    print(names[sorted(model)[-1]])
+    print(names[sorted(binp)[-1]])
+    break
+ASK
+        ); do
+            name="voices/$(basename "$url")"
+            [ -s "$name" ] && continue
+            echo "    fetching $(basename "$url")"
+            # --fail so a 404 is a failure rather than an HTML error
+            # page saved as a model; .part so nothing half-written
+            # is ever kept.
+            curl -fL --progress-bar -o "$name.part" "$url" \
+                && mv "$name.part" "$name" || rm -f "$name.part"
+        done
+    fi
+    if python3 -c "import yuzu_voice,sys; sys.exit(0 if yuzu_voice.pick_voice().ready else 1)" 2>/dev/null; then
+        echo "    SHE TALKS NOW. Open her page and say something."
+    else
+        echo "    Could not set the new voice up here -- she still"
+        echo "    talks, just in the old one. Nothing is broken."
+    fi
+    echo
+fi
+# --- WHERE SHE IS, EVERY TIME ---------------------------------------
+# Ghost: "have it show the http://ghostnano.local:8081/ bit right under
+# that. Thats it tho. Just Welcome Ghost, (url here)".
+#
+# THE NAME IS READ, NEVER HARDCODED. `ghostnano` is what his board is
+# called TODAY -- he renamed it himself an hour after the deck shipped
+# -- and a hardcoded hostname goes stale the next time he renames it,
+# with the failure looking like the deck working. Same fault as the
+# hardcoded cast in home.html, one layer down.
+#
+# AND IT CARRIES THE SAME REFUSAL `face` LEARNED THE HARD WAY.
+# `localhost` is a perfectly legal hostname and means THE MACHINE
+# ASKING, so a board really named that told his phone to open ITSELF --
+# measured, DNS_PROBE_FINISHED_NXDOMAIN, on his screen. Refused here
+# too, and the LAN address answers instead: absent rather than wrong.
+name=$(hostname -s 2>/dev/null)
+case "$name" in
+    localhost|localhost.*|*[!A-Za-z0-9-]*|"") name="" ;;
+esac
+if [ -n "$name" ]; then
+    url="http://$name.local:8081/"
+else
+    # The routing-table address, never the first line of `hostname -I`
+    # -- docker's 172.17.0.1 and the USB-gadget link 192.168.55.1 both
+    # sort ahead of the real one, and picking the first has cost this
+    # project time four times.
+    ip=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+    [ -n "$ip" ] && url="http://$ip:8081/" || url=""
+fi
+
+echo
+echo "  Welcome Ghost,"
+[ -n "$url" ] && echo "  $url"
 echo

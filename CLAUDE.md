@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 655 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 668 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 655 tests pass on it. Getting it
+(that repo path is confirmed working). 668 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1013,39 +1013,92 @@ loud is the word "leans" in the middle of a sentence.
 the face, the wiki and Piper all make, driven here with the module
 absent rather than assumed.
 
-### `~/YUZU/voice`, and why it carries no URL
+### ONE WORD, AND IT IS THE ONE HE ALREADY TYPES
 
-    ~/YUZU/voice           what she can do now, and get what she needs
-    ~/YUZU/voice --check   say only, change nothing
+**Ghost killed my `~/YUZU/voice` script and he was right.** *"Plz dont
+add new commands i cant actually remember any except /wiki. Just help
+me simply get this goin brobro."*
 
-**IT ASKS GITHUB WHICH FILES THE RELEASE SHIPS.** I could not verify
-the asset names from here -- GitHub access in this session is scoped to
-his own repo -- and **unverified specifics stated as steps already cost
-this project an hour on the 8BitDo**. So nothing is typed from memory:
-the script reads the release list at runtime and takes the newest one
-carrying BOTH an `.onnx` and a `.bin`, because a half-download that
-reports success and then cannot speak is worse than a clean failure.
-Same reasoning as `tile` asking extensions.gnome.org which zip matches
-this GNOME.
+A separate setup script was the tidy answer and it was a THIRD thing to
+remember on a board whose only shell is a serial cable. **This file
+already records that a new command needs its own line in `pull`
+precisely BECAUSE a new command is a cost** -- and then I added one
+anyway, a day later, in the same session that quoted the rule. The
+cheapest command is the one he already types.
 
-**A partial download is never kept.** `curl --fail` into a `.part`,
-renamed only on success, so an HTML error page can never be saved as a
-model file.
+So the setup lives in `pull`, it runs ONCE, and it is deleted from
+everywhere else.
 
-**AND THE MODEL MUST NOT GO IN GIT — he was about to.** *"Ill het the
-file for the voice brb and ill upload to git"*. Three reasons, and the
-first one stops it dead: **GitHub rejects any single file over 100MB**
-and the model is ~310MB, so the push simply fails. `voices/` is already
-gitignored on purpose. And the whole repo is 35MB with a 0.8MB largest
-file -- he pulls it over WiFi onto a board whose clock breaks TLS on a
-cold boot, so a 310MB file makes every `pull` he ever runs worse,
-forever. Told him before he spent the time.
+**IT ASKS THE SAME QUESTION THE PAGE ASKS** -- `pick_voice().ready`,
+the one source of truth for "can she speak right now". A second check
+(is the file there, does the import work) is a thing that can drift
+from what actually decides it. Once she can speak, the block costs one
+python call and prints nothing.
 
-**UNVERIFIED, and the file says so:** whether onnxruntime has an
-aarch64 build that runs on the Orin. The script says that in its own
-failure message and names the Steam Deck and the laptop as the places
-it will certainly work -- **the fallback goes in the failure message,
-not in a doc he will not open**, which is the `tile` lesson verbatim.
+**IT RUNS OUTSIDE THE UP-TO-DATE BRANCH, on purpose.** He asked to type
+pull and have her work, so a pull that brings nothing new must still
+fix a voice she does not have -- otherwise the one word does not do
+what he was told it does. Caught by driving the real script with a stub
+git reporting the same commit before and after.
+
+**IT SAYS THE SIZE BEFORE IT SPENDS IT.** ~340MB onto a board he pulls
+over WiFi is real, and a script that spends it quietly is the surprise
+this project keeps refusing to ship. He asked for one word, so it is
+announced rather than withheld -- and every failure path leaves the
+pull successful and her talking exactly as before.
+
+**THE FILENAMES COME FROM THE RELEASE, never from memory.** GitHub
+access in that session was scoped to his own repo so the asset names
+could not be verified from here, and unverified specifics stated as
+steps already cost this project an hour on the 8BitDo. `pull` reads the
+release list at runtime and takes the newest one carrying BOTH an
+`.onnx` and a `.bin`: half a download reports success and then cannot
+speak. `curl --fail` into a `.part`, renamed only on success.
+
+**BELLA IS THE DEFAULT BECAUSE HE LISTENED TO THEM.** *"i wana use the
+Bella voice from kokoro. (I dont really but its the best sounding
+one)"*. The first draft defaulted to `af_heart` on the reasoning that
+Kokoro's own samples lead with it -- **a guess about taste wearing a
+default's clothes**, and the only standard this project accepts for a
+voice is that somebody heard it.
+
+**THERE IS NO PITCH KNOB and the file says so.** `kokoro-onnx`'s
+`create()` takes a voice, a speed and a language -- that is the whole
+surface. Timbre comes from WHICH VOICE, so changing voice IS the pitch
+control (`YUZU_KOKORO_VOICE=af_sarah`), and speed comes from her own
+`piper_length_scale`, inverted. Saying that here saves the next person
+hunting for a knob that does not exist.
+
+### AND `pull` ENDS WITH WHERE SHE IS
+
+Ghost: *"have it show the http://ghostnano.local:8081/ bit right under
+that. Thats it tho. Just Welcome Ghost, (url here)"*.
+
+Two lines, last, so the thing he opens is the thing still on screen
+when the pull stops scrolling.
+
+**THE NAME IS READ, NEVER HARDCODED.** `ghostnano` is what his board is
+called TODAY -- he renamed it himself an hour after the deck shipped --
+and a hardcoded hostname goes stale the next time, with the failure
+looking like the deck working. Same fault as the hardcoded cast in
+`home.html`, one layer down. A test asserts the string `ghostnano`
+appears nowhere in the script's code.
+
+**AND IT CARRIES THE REFUSAL `face` LEARNED THE HARD WAY.** `localhost`
+is a perfectly legal hostname and means THE MACHINE ASKING, so a board
+really named that told his phone to open ITSELF -- measured, on his
+screen, `DNS_PROBE_FINISHED_NXDOMAIN`. Refused here too, and the
+routing-table address answers instead.
+
+**AND THE FIRST TEST I WROTE FOR IT PASSED VACUOUSLY.** It claimed to
+check that the docker bridge and the USB-gadget link never appear --
+and with no `ip` there is no address line at all, so "no decoys" was
+trivially true. **A check that cannot observe its own failure is not a
+check**, which is the oldest line in this file, and I wrote one in the
+test written to guard an address. It pins the true property now: the
+welcome survives having no address and prints no wrong one. The decoy
+filtering stays in `face`, where its own test drives it with the decoys
+ahead of the real address on purpose -- one copy, one guard.
 
 ## SHE STREAMS, SHE READS THE BOARD, SHE REMEMBERS — and /wiki was dead on Four (Sept 16)
 

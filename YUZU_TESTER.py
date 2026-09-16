@@ -4884,10 +4884,216 @@ class TestKokoro(unittest.TestCase):
         made.render = lambda *a, **k: None
         self.assertIs(made.say("hello"), False)
 
+    def test_bella_is_the_default_because_he_LISTENED_to_them(self):
+        """Ghost: "i wana use the Bella voice from kokoro. (I dont
+        really but its the best sounding one)". That is the only
+        standard this project accepts for a voice -- somebody heard it.
+
+        The first draft defaulted to af_heart on the reasoning that
+        Kokoro's own samples lead with it, which is a guess about taste
+        wearing a default's clothes."""
+        self.assertEqual(self.voice.KokoroVoice().speaker, "af_bella")
+
+    def test_the_only_pitch_control_is_WHICH_VOICE_and_it_says_so(self):
+        """kokoro-onnx's create() takes a voice, a speed and a
+        language. There is no pitch argument, so a note saying where to
+        look saves the next person hunting for a knob that is not
+        there."""
+        import inspect
+        source = inspect.getsource(self.voice)
+        self.assertIn("NO PITCH KNOB", source)
+        self.assertIn(self.voice.KOKORO_SPEAKER_ENV, source)
+
+
     def test_it_says_plainly_that_the_board_has_not_answered_yet(self):
         """Unverified specifics stated as steps already cost this
         project an hour on the 8BitDo."""
         self.assertIn("UNVERIFIED", self.voice.KOKORO_SOURCE)
+
+
+class TestOneWordGetsHerTalking(unittest.TestCase):
+    """Ghost: "Plz dont add new commands i cant actually remember any
+    except /wiki. Just help me simply get this goin brobro."
+
+    HE IS RIGHT AND THE FIRST DRAFT WAS WRONG. A `~/YUZU/voice` script
+    was the tidy answer and it is a THIRD thing to remember on a board
+    whose only shell is a serial cable -- this repo already records
+    that a new command needs its own line in `pull` precisely BECAUSE a
+    new command is a cost. The cheapest command is the one he already
+    types.
+
+    These drive the REAL script with stub binaries."""
+
+    def setUp(self):
+        import shutil, tempfile
+        self.work = tempfile.mkdtemp()
+        for name in ("pull",):
+            shutil.copy(name, self.work)
+        self.stub = os.path.join(self.work, "stub")
+        os.makedirs(self.stub)
+        self.log = os.path.join(self.work, "log")
+        self.write("git", '#!/bin/sh\n'
+                   'case "$1 $2" in\n'
+                   '  "rev-parse HEAD") echo same ;;\n'
+                   '  *) exit 0 ;;\n'
+                   'esac\n')
+        self.write("pip", '#!/bin/sh\necho "pip $*" >> "$LOG"\n')
+        self.write("curl", '#!/bin/sh\necho "curl" >> "$LOG"\nexit 1\n')
+        self.write("pgrep", '#!/bin/sh\nexit 1\n')
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def write(self, name, body):
+        path = os.path.join(self.stub, name)
+        with open(path, "w") as fh:
+            fh.write(body)
+        os.chmod(path, 0o755)
+
+    def run_pull(self, ready):
+        """Drive it with a yuzu_voice whose pick_voice reports `ready`."""
+        import subprocess
+        with open(os.path.join(self.work, "yuzu_voice.py"), "w") as fh:
+            fh.write("class _V:\n    ready = %s\n"
+                     "def pick_voice(**kw): return _V()\n" % bool(ready))
+        open(self.log, "w").close()
+        env = dict(os.environ, PATH=self.stub + os.pathsep + os.environ["PATH"],
+                   LOG=self.log)
+        got = subprocess.run(["./pull"], cwd=self.work, env=env,
+                             capture_output=True, text=True, timeout=90)
+        with open(self.log) as fh:
+            called = fh.read()
+        return got.stdout + got.stderr, called
+
+    def test_a_voice_she_ALREADY_HAS_costs_nothing_and_says_nothing(self):
+        """It runs on every pull, so the no-op case has to be silent
+        and free -- otherwise the thing he runs most grows a paragraph
+        he learns to scroll past."""
+        out, called = self.run_pull(ready=True)
+        self.assertNotIn("NO VOICE", out.upper())
+        self.assertEqual(called.strip(), "", "it spent something for nothing")
+
+    def test_it_sets_one_up_when_she_has_none(self):
+        out, called = self.run_pull(ready=False)
+        self.assertIn("SHE HAS NO VOICE YET", out)
+        self.assertIn("pip", called, "it never tried to install anything")
+
+    def test_it_says_the_SIZE_before_it_spends_it(self):
+        """~340MB onto a board he pulls over WiFi is real. He asked for
+        one word, so it is announced rather than withheld -- but a
+        script that spends that silently is the surprise this project
+        keeps refusing to ship."""
+        out, _ = self.run_pull(ready=False)
+        self.assertRegex(out, r"\d+\s*MB")
+
+    def test_a_FAILED_setup_still_leaves_her_talking_and_the_pull_good(self):
+        """curl fails in this fixture. Every failure path has to leave
+        the pull successful and her voice exactly as it was -- the
+        promise the face, the wiki and Piper all make."""
+        out, _ = self.run_pull(ready=False)
+        self.assertIn("Nothing is broken", out)
+        self.assertNotIn("PULL FAILED", out)
+
+    def test_it_runs_even_when_the_pull_brought_NOTHING_NEW(self):
+        """The stub git reports the same commit before and after, so
+        this is the up-to-date path. He asked to type pull and have her
+        work; a pull with no changes must still fix a voice she does
+        not have, or the one word does not do what he was told."""
+        out, called = self.run_pull(ready=False)
+        self.assertIn("ALREADY UP TO DATE", out)
+        self.assertIn("SHE HAS NO VOICE YET", out)
+        self.assertIn("pip", called)
+
+    def welcome(self, hostname, routes=True):
+        """Drive the real script with `hostname` stubbed. `routes=False`
+        makes `ip route` fail, which is the no-address case."""
+        import subprocess
+        if hostname is None:
+            self.write("hostname", "#!/bin/sh\nexit 1\n")
+        else:
+            self.write("hostname", "#!/bin/sh\necho %s\n" % hostname)
+        self.write("ip", '#!/bin/sh\n'
+                   'echo "1.1.1.1 via x dev wlan0 src 192.168.4.138"\n'
+                   if routes else "#!/bin/sh\nexit 1\n")
+        with open(os.path.join(self.work, "yuzu_voice.py"), "w") as fh:
+            fh.write("class _V:\n    ready = True\n"
+                     "def pick_voice(**kw): return _V()\n")
+        env = dict(os.environ, PATH=self.stub + os.pathsep + os.environ["PATH"])
+        got = subprocess.run(["./pull"], cwd=self.work, env=env,
+                             capture_output=True, text=True, timeout=90)
+        return got.stdout
+
+    def test_it_ends_with_WELCOME_and_the_address(self):
+        """Ghost: "Just Welcome Ghost, (url here)". Two lines, last, so
+        the thing he opens is the thing still on screen when the pull
+        stops scrolling."""
+        out = self.welcome("ghostnano")
+        self.assertIn("Welcome Ghost,", out)
+        self.assertIn("http://ghostnano.local:8081/", out)
+        tail = [line for line in out.strip().splitlines() if line.strip()][-2:]
+        self.assertIn("Welcome Ghost,", tail[0])
+        self.assertIn("8081", tail[1])
+
+    def test_the_hostname_is_READ_never_hardcoded(self):
+        """`ghostnano` is what his board is called TODAY -- he renamed
+        it himself. A hardcoded name goes stale the next time, and the
+        failure looks like the deck working. Same fault as the
+        hardcoded cast in home.html."""
+        with open("pull", encoding="utf-8") as fh:
+            code = "\n".join(line for line in fh.read().splitlines()
+                             if not line.lstrip().startswith("#"))
+        self.assertNotIn("ghostnano", code, "pull hardcodes his board's name")
+        self.assertIn("http://ghostnano.local:8081/",
+                      self.welcome("ghostnano"))
+
+    def test_localhost_falls_back_to_the_NUMBERS(self):
+        """A name can be perfectly valid and still useless to him.
+        `localhost` means THE MACHINE ASKING, so a board really named
+        that told his phone to open ITSELF -- measured, on his screen,
+        DNS_PROBE_FINISHED_NXDOMAIN. Absent rather than wrong."""
+        for name in ("localhost", "localhost.local", "bad name!", None):
+            out = self.welcome(name)
+            self.assertNotIn(".local:8081", out,
+                             "it offered %r as an address" % name)
+            self.assertIn("http://192.168.4.138:8081/", out)
+
+    def test_no_address_prints_NO_ADDRESS_rather_than_a_wrong_one(self):
+        """The first version of this test claimed to check that the
+        docker bridge and the USB-gadget link never appear -- and it
+        PASSED VACUOUSLY, because with no `ip` there is no address line
+        at all, so "no decoys" was trivially true. A check that cannot
+        observe its own failure is not a check, which is the oldest
+        line in CLAUDE.md.
+
+        What is actually true, and worth pinning: the welcome survives
+        having no address and prints no wrong one. The decoy filtering
+        lives in `face`, where its own test drives it with the decoys
+        ahead of the real address on purpose -- one copy, one guard."""
+        out = self.welcome(None, routes=False)
+        self.assertIn("Welcome Ghost,", out, "the welcome vanished too")
+        self.assertNotIn("8081", out, "it printed an address it cannot know")
+        self.assertNotIn("http://", out)
+
+    def test_there_is_no_second_command_to_remember(self):
+        """The `voice` script was removed rather than kept alongside.
+        Two ways in is two things to remember, and he said plainly he
+        remembers one."""
+        self.assertFalse(os.path.exists("voice"),
+                         "a second command came back")
+
+    def test_it_asks_the_SAME_question_the_page_asks(self):
+        """`pick_voice().ready` is the one source of truth for "can she
+        speak right now". A second copy -- checking for a filename, or
+        for an import -- is a thing that can drift from what actually
+        decides it, which is the fault this repo records under every
+        two-copies heading."""
+        with open("pull", encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("pick_voice().ready", text)
+        self.assertNotIn(".onnx\"", text.split("ASK")[0],
+                         "pull hardcodes a model filename")
+
 
 
 class TestFour(unittest.TestCase):

@@ -635,10 +635,22 @@ KOKORO_SPEAKER_ENV = "YUZU_KOKORO_VOICE"
 KOKORO_MODEL = "kokoro-v1.0.onnx"
 KOKORO_VOICES = "voices-v1.0.bin"
 
-# af_heart is the default because it is the one Kokoro's own samples
-# lead with and it is a warm, unremarkable American voice -- the right
-# default for a character nobody has tuned yet. One word to change.
-KOKORO_SPEAKER = os.environ.get(KOKORO_SPEAKER_ENV, "af_heart")
+# af_bella, because Ghost listened to them and picked it: "i wana use
+# the Bella voice from kokoro. (I dont really but its the best sounding
+# one)". That is the only standard this project accepts for a voice --
+# somebody heard it. The first draft defaulted to af_heart on the
+# reasoning that Kokoro's own samples lead with it, which is a guess
+# about taste dressed up as a default.
+#
+# THERE IS NO PITCH KNOB, and it is worth saying here rather than
+# letting the next person hunt for one. kokoro-onnx's `create()` takes
+# a voice, a speed and a language -- that is the whole surface. Timbre
+# comes from WHICH VOICE, so changing voice IS the pitch control:
+#
+#     YUZU_KOKORO_VOICE=af_sarah ~/YUZU/voice
+#
+# and `speed` comes from her own `piper_length_scale`, inverted.
+KOKORO_SPEAKER = os.environ.get(KOKORO_SPEAKER_ENV, "af_bella")
 
 
 def kokoro_files():
@@ -784,20 +796,14 @@ def pick_voice(engine=None, length_scale=None):
 # 310MB download onto a board he pulls over WiFi, and a script that
 # quietly spends that is a script that surprises him.
 KOKORO_SOURCE = """\
-Kokoro needs two files in {folder}:
+`~/YUZU/pull` sets this up by itself, once, and says so while it does.
+There is nothing else to run and nothing to remember -- Ghost asked for
+one word and that word already existed.
 
-    pip install kokoro-onnx soundfile
-
-then fetch these from the kokoro-onnx releases page
-(github.com/thewh1teagle/kokoro-onnx/releases):
-
-    {model}        ~310MB
-    {voices}       ~27MB
-
-UNVERIFIED ON THE ORIN. onnxruntime's aarch64 build is the open
-question; if it will not install, Piper still works and nothing here
-changes. Try it on the laptop or the Steam Deck first -- it costs
-nothing to find out there.\
+It needs kokoro-onnx and two model files in {folder}. If it could not
+manage it here, NOTHING IS BROKEN: Piper still answers and she still
+talks. UNVERIFIED ON THE ORIN -- onnxruntime's aarch64 build is the
+open question, and the Steam Deck and the laptop will certainly work.\
 """
 
 
