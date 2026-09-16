@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 672 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 674 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 672 tests pass on it. Getting it
+(that repo path is confirmed working). 674 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -1118,6 +1118,21 @@ broken in the test written to guard the fix for it.
 A self-update lands from the run after the one that delivers it, so his
 next pull shows the Welcome line from the copy he already has, and this
 fix makes the pull after THAT one land immediately.
+
+**AND THE RESTART WAS SHOUTING OVER THE ANSWER.** The Welcome line
+landed exactly as asked -- and sat under twenty lines of `face`'s own
+startup banner, because bouncing the stale server dumps its address
+(twice), the HOME SCREEN paragraph and the sprite note into the pull.
+Ghost: *"All that is unnecessary... just a buncha changes i already
+know happened."*
+
+He asked for an update, not for a server, and the address is printed by
+the welcome two inches below. So the restart is CAPTURED and says one
+line -- **but printed in full when `face` exits non-zero**, because a
+server that did not come back is the one thing in that banner worth his
+attention, and swallowing it would be the silent-failure shape this
+file refuses everywhere else. Both halves pinned, verified by breaking
+each one.
 
 ### AND `pull` ENDS WITH WHERE SHE IS
 

@@ -200,11 +200,31 @@ else
         :
     elif printf '%s\n' "$files" | grep -q '^[^/]*\.py$'; then
         if pgrep -f "yuzu_face.py --serve" >/dev/null 2>&1; then
-            echo "    THE FACE SERVER WAS RUNNING THE OLD CODE. Restarting"
-            echo "    it, so what answers is what you just pulled."
-            echo
+            # QUIET WHEN IT WORKS, LOUD WHEN IT DOES NOT. Ghost, Sept
+            # 16, with the wall of face's own startup banner sitting
+            # between his pull and the Welcome line: "All that is
+            # unnecessary... just a buncha changes i already know
+            # happened." He asked for two lines at the end and got
+            # twenty, because a restart printed the address twice, the
+            # HOME SCREEN paragraph and the sprite note into a pull.
+            #
+            # None of that is news here -- he did not ask for a server,
+            # he asked for an update, and the address is printed by the
+            # welcome two inches below anyway. So it is CAPTURED, and
+            # printed only when `face` fails: a server that did not come
+            # back is the one thing in there worth his attention, and
+            # swallowing that would be the silent-failure shape this
+            # file refuses everywhere else.
             ./face --off >/dev/null 2>&1
-            ./face
+            if said=$(./face 2>&1); then
+                echo "    THE FACE SERVER WAS RUNNING THE OLD CODE."
+                echo "    Restarted it, so what answers is what you"
+                echo "    just pulled."
+            else
+                echo "    THE FACE SERVER WAS RUNNING THE OLD CODE and"
+                echo "    did not come back. Its own output:"
+                printf '%s\n' "$said" | tail -6 | sed 's/^/    /'
+            fi
         fi
     fi
 fi

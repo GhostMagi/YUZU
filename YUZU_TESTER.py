@@ -8027,7 +8027,7 @@ class TestPull(unittest.TestCase):
 
     # ---- a running server keeps serving the OLD code ------------------
 
-    def _restart_run(self, changed, server_up, added=()):
+    def _restart_run(self, changed, server_up, added=(), face_ok=True):
         """Drive the REAL pull script in a temp dir, with stubs beside it.
 
         A copy rather than the repo itself, because `pull` cds to its own
@@ -8040,10 +8040,16 @@ class TestPull(unittest.TestCase):
             shutil.copy(self.SCRIPT, here / "pull")
             (here / "pull").chmod(0o755)
 
-            # `face` records how it was called instead of doing anything.
+            # `face` records how it was called instead of doing anything
+            # -- and prints its real startup banner, because what that
+            # banner does to his pull is the thing under test.
             log = here / "face.log"
             (here / "face").write_text(
-                '#!/bin/bash\necho "face $*" >> %s\n' % log)
+                '#!/bin/bash\necho "face $*" >> %s\n'
+                '[ "$1" = "--off" ] || {\n'
+                '  echo "UP.  Open this on your phone:"\n'
+                '  echo "That is the HOME SCREEN, not her face."\n'
+                '  exit %d\n}\n' % (log, 0 if face_ok else 1))
             (here / "face").chmod(0o755)
 
             binv = here / "bin"
@@ -8143,6 +8149,33 @@ class TestPull(unittest.TestCase):
                       "it was stopped and never started again")
         self.assertIn("OLD CODE", done.stdout,
                       "it restarted silently; he cannot tell it happened")
+
+    def test_the_restart_does_not_DUMP_the_server_banner_into_his_pull(self):
+        """MEASURED, Sept 16, off his screen. The Welcome line WAS there
+        -- and above it sat twenty lines of `face`'s own startup banner:
+        the address twice, the HOME SCREEN paragraph, the sprite note.
+        Ghost: "All that is unnecessary... just a buncha changes i
+        already know happened."
+
+        He asked for an update, not for a server. The address is printed
+        by the welcome two inches below anyway, so the restart says it
+        restarted and nothing else."""
+        done, calls = self._restart_run(["yuzu_face.py"], server_up=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("face --off", calls, "it never restarted anything")
+        self.assertIn("OLD CODE", done.stdout, "he cannot tell it happened")
+        self.assertNotIn("HOME SCREEN", done.stdout, done.stdout)
+        self.assertNotIn("Open this on your phone", done.stdout, done.stdout)
+
+    def test_a_restart_that_FAILS_is_still_loud(self):
+        """Swallowing it would be the silent-failure shape this repo
+        refuses everywhere else. A server that did not come back is the
+        one thing in that banner worth his attention."""
+        done, _ = self._restart_run(
+            ["yuzu_face.py"], server_up=True, face_ok=False)
+        self.assertIn("did not come back", done.stdout, done.stdout)
+        self.assertIn("Open this on your phone", done.stdout,
+                      "it hid the server's own output on a real failure")
 
     def test_it_does_NOT_start_a_server_he_never_asked_for(self):
         """Starting one because a .py moved is its own surprise -- and on
