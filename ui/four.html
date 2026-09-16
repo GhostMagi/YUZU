@@ -46,12 +46,54 @@
   No network, no fonts, no libraries.
 -->
 <style>
-:root {
+/* ---- THE PALETTE LIVES ON `body`, NOT ON `:root`, AND THAT IS THE
+   WHOLE MECHANISM. Ghost, Sept 16: "Id like for Fours screen to be
+   tappable on touch. When tapped it changes the color of everything
+   about her to a neon red. Another tap makes her and the raining code
+   Neon Purple. Tap again to go back to the green. Only do this for
+   Four."
+
+   A custom property's `var()` is substituted when that property is
+   COMPUTED on an element. So `--edge` declared on `:root` would bake
+   in `:root`'s green ink and inherit it down already-resolved, and
+   every derived colour would stay green while `--ink` turned red.
+   Declared on `body` -- the element the theme class lands on -- every
+   one of them re-resolves against the winning `--ink`. One block per
+   colour, nothing hardcoded anywhere else, and a fourth colour is one
+   more block.
+
+   `--tint` is how her ART is recoloured, and it is a whole filter
+   rather than a colour because her picture is a JPEG rather than line
+   work on transparency. `none` on green, so her art is untouched in
+   the colour she ships in. See `#four`. */
+body {
   --bg:   #000000;
   --ink:  #39ff5e;            /* the deck's neon green, unchanged      */
   --dim:  #1f7a37;
   --box:  rgba(6, 14, 8, .88);
   --edge: color-mix(in srgb, var(--ink) 40%, transparent);
+  --head: #c8ffd4;            /* the bright leading character          */
+  --tail: rgba(57, 255, 94, .55);
+  --key:  #04120a;            /* text ON the Speak button              */
+  --tint: none;
+}
+body.red {
+  --ink:  #ff2b39;
+  --dim:  #8a1b24;
+  --box:  rgba(16, 5, 6, .88);
+  --head: #ffd0d4;
+  --tail: rgba(255, 43, 57, .55);
+  --key:  #120405;
+  --tint: url(#four-red) brightness(1.28);
+}
+body.purple {
+  --ink:  #c04dff;
+  --dim:  #5f2a85;
+  --box:  rgba(12, 6, 16, .88);
+  --head: #eecfff;
+  --tail: rgba(192, 77, 255, .55);
+  --key:  #0d0414;
+  --tint: url(#four-purple) brightness(1.22);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100vh; overflow: hidden; }
@@ -162,8 +204,33 @@ body.thinking #rain { opacity: .6; }
      black contributes nothing under `screen`, so it disappears exactly
      -- soft edges and all -- and the rain runs through her. */
   mix-blend-mode: screen;
+  /* HER ART IS A JPEG, so she cannot take a colour variable -- she is
+     a picture of green characters, not line work on transparency the
+     way Saya's sprites are. What she CAN take is a rotation, and
+     because the whole picture is one hue that is enough: the hue of
+     `#39ff5e` is 131deg -- but `hue-rotate` is NOT a hue rotation. It
+     is a fixed luminance-preserving matrix, and RENDERING IS WHAT SAID
+     SO: the arithmetically correct 225deg came out AMBER, and sweeping
+     twenty values of a sepia-based chain never landed on the red at
+     all, because saturating a one-hue picture clips its channels to
+     the primaries.
+
+     So she is tinted rather than turned. `#four-red` and `#four-purple`
+     are inline SVG colour matrices, at the foot of this file: they take
+     her LUMINANCE and multiply it into one exact colour, which is
+     deterministic and needs no sweeping. Inline, so there is still
+     nothing fetched.
+
+     A filter creates a stacking context, and a stacking context on her
+     PARENT is what silently switched this blend off once already. On
+     the element ITSELF it does not: the filter is applied first and the
+     result is then blended into the backdrop, which is the defined
+     order. Verified by rendering, not by reading the spec -- the rain
+     still runs through her dark side in all three colours. */
+  filter: var(--tint);
   animation: flicker 6s steps(1, end) infinite;
   position: relative;
+  cursor: pointer;
 }
 /* A SIGNAL, NOT A BREATH. Cait and Yuzu breathe because they are drawn
    people standing in a room. Four is a picture made of running
@@ -211,7 +278,7 @@ body.thinking #four { animation-duration: 1.6s; }
 #text:focus { outline: none; border-color: var(--ink); }
 #send {
   font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
-  color: #04120a; background: var(--ink); padding: 12px 22px;
+  color: var(--key); background: var(--ink); padding: 12px 22px;
   border: 0; border-radius: 2px;
 }
 #send:disabled { opacity: .5; cursor: default; }
@@ -240,6 +307,39 @@ body.thinking #four { animation-duration: 1.6s; }
   #stage { justify-items: center; padding-right: 0; }
 }
 </style>
+
+
+<!-- HER TINTS. Two colour matrices, inline, nothing fetched.
+     Each row is her LUMINANCE (0.2126 R, 0.7152 G, 0.0722 B) scaled
+     by one channel of the target colour, so a bright green pixel
+     becomes an equally bright pixel of that colour and a black one
+     stays black -- which is what keeps `mix-blend-mode: screen`
+     working and the rain running through her dark side.
+
+     THE TWO HEX VALUES HERE ARE THE SAME AS `--ink` ABOVE, and a
+     test pins that they still agree: a page that turns red around a
+     girl who turned some other red is the two-copies fault this deck
+     already guards in the battery renderer and the way out.
+
+     `color-interpolation-filters="sRGB"` is load-bearing. The SVG
+     default is linearRGB, which washes the result out badly enough
+     to read as the wrong colour. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <filter id="four-red" color-interpolation-filters="sRGB">
+    <!-- neon red   -- #ff2b39, matching --ink on body.red -->
+    <feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0
+              0.0359 0.1206 0.0122 0 0
+              0.0475 0.1599 0.0161 0 0
+              0 0 0 1 0"/>
+  </filter>
+  <filter id="four-purple" color-interpolation-filters="sRGB">
+    <!-- neon purple -- #c04dff, matching --ink on body.purple -->
+    <feColorMatrix type="matrix" values="0.1601 0.5385 0.0544 0 0
+              0.0642 0.2160 0.0218 0 0
+              0.2126 0.7152 0.0722 0 0
+              0 0 0 1 0"/>
+  </filter>
+</svg>
 
 <canvas id="rain"></canvas>
 <div id="sweep"></div>
@@ -293,6 +393,21 @@ function fit() {
 // a canvas loop at the panel's full refresh rate is heat and watts
 // spent on wallpaper. Fourteen frames a second is what falling text
 // wants anyway -- faster stops reading as discrete characters.
+// THE RAIN ASKS THE STYLESHEET WHAT COLOUR IT IS, and that is what
+// keeps one palette rather than two. The head and tail were hardcoded
+// here as '#c8ffd4' and 'rgba(57,255,94,.55)', so a theme could turn
+// every pixel of the page red and leave the falling code green --
+// exactly the kind of second list this deck keeps deleting. Read once
+// per theme and cached, because getComputedStyle every frame on a
+// battery-powered handheld is the opposite of why this loop throttles.
+let head = '#c8ffd4', tail = 'rgba(57, 255, 94, 0.55)';
+function repaint() {
+  const css = getComputedStyle(document.body);
+  head = css.getPropertyValue('--head').trim() || head;
+  tail = css.getPropertyValue('--tail').trim() || tail;
+}
+repaint();
+
 let last = 0;
 function draw(now) {
   requestAnimationFrame(draw);
@@ -312,9 +427,9 @@ function draw(now) {
     // The leading character is bright and the tail is dim. One bright
     // head per column is what makes it read as falling rather than as
     // static noise.
-    ctx.fillStyle = '#c8ffd4';
+    ctx.fillStyle = head;
     ctx.fillText(ch, i * CELL, y);
-    ctx.fillStyle = 'rgba(57, 255, 94, 0.55)';
+    ctx.fillStyle = tail;
     ctx.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], i * CELL, y - CELL);
 
     cols[i]++;
@@ -347,6 +462,33 @@ const send = document.getElementById('send');
 const says = document.getElementById('says');
 
 document.getElementById('home').onclick = () => { location.href = 'home.html'; };
+
+// ---- TAP HER SCREEN TO CHANGE HER COLOUR ------------------------------
+// Ghost, Sept 16: green -> neon red -> neon purple -> green. HER ONLY:
+// the other three characters have palettes sampled off their own art
+// and the deck's own green-on-black is locked everywhere else.
+//
+// IT IS THE STAGE, NOT THE WHOLE PAGE. The top bar and the ask bar carry
+// the way out, the rail and the text box, and a tap that lands on any of
+// those must do what it says rather than also recolouring the screen.
+// #says is excluded for the same reason: her reply can be long enough to
+// scroll, and a scroll that also changes colour reads as a bug.
+//
+// NOTHING IS REMEMBERED, deliberately. A reload is green, which is what
+// the deck is, and it is the state anyone else who picks her up meets --
+// she is the front door. One line of localStorage makes it sticky if he
+// would rather; this is the version with nothing to explain.
+const SKINS = ['', 'red', 'purple'];
+let skin = 0;
+document.getElementById('stage').addEventListener('click', (event) => {
+  if (event.target.closest('#says')) return;
+  document.body.classList.remove('red', 'purple');
+  skin = (skin + 1) % SKINS.length;
+  if (SKINS[skin]) document.body.classList.add(SKINS[skin]);
+  // The canvas keeps its own copy of the two colours, so it has to be
+  // told. Without this the page turns red around rain that stays green.
+  repaint();
+});
 
 // The roster comes from the server, so this page holds no list of the
 // cast and cannot drift from it. An unreachable rail is ABSENT -- her

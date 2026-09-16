@@ -4648,6 +4648,109 @@ class TestFour(unittest.TestCase):
                 self.assertIn("127.0.0.1", hit,
                               f"four.html reaches outside itself: {hit}")
 
+    def test_tapping_her_screen_cycles_green_red_purple_and_back(self):
+        """Ghost, Sept 16: "Id like for Fours screen to be tappable on
+        touch... neon red... Neon Purple. Tap again to go back to the
+        green."
+
+        GREEN IS FIRST AND IS THE EMPTY CLASS, which is what makes a
+        reload land on the deck's own colour with nothing stored and
+        nothing to explain -- and what anyone who is not Ghost meets,
+        since she is the front door."""
+        page = self.PAGE.read_text()
+        skins = re.search(r"const SKINS = \[([^\]]*)\]", page)
+        self.assertTrue(skins, "nothing cycles her colour")
+        names = [x.strip().strip("'\"") for x in skins.group(1).split(",")]
+        self.assertEqual(names, ["", "red", "purple"],
+                         "the cycle is not green -> red -> purple")
+        for skin in ("red", "purple"):
+            self.assertIn("body.%s {" % skin, page,
+                          "%s has no palette to switch to" % skin)
+
+    def test_the_tap_is_on_the_STAGE_and_never_steals_the_way_out(self):
+        """The top bar carries the rail and the ⌂, the ask bar carries
+        the text box, and #says can scroll. A tap that lands on any of
+        those must do what it says.
+
+        The exit is the one rule this deck will not trade, and a
+        recolour handler on `document` would have sat under it."""
+        page = self.PAGE.read_text()
+        self.assertIn("getElementById('stage').addEventListener('click'", page,
+                      "the tap is not scoped to her stage")
+        self.assertIn("closest('#says')", page,
+                      "scrolling her reply would also recolour the page")
+
+    def test_her_TINT_and_her_PALETTE_name_the_same_two_colours(self):
+        """TWO COPIES THAT MUST AGREE. Her art is a JPEG, so it cannot
+        take a CSS variable -- it is recoloured by an inline SVG colour
+        matrix, which carries the target colour as numbers. So the hex
+        lives in the stylesheet and the same colour lives, scaled by
+        luminance, in the matrix.
+
+        A page that turns red around a girl who turned some OTHER red
+        is exactly the drift `test_both_pages_draw_the_SAME_battery`
+        and the four copies of the way out already guard. Verified by
+        changing one and watching this go red."""
+        page = self.PAGE.read_text()
+        lum = (0.2126, 0.7152, 0.0722)
+        for skin, fid in (("red", "four-red"), ("purple", "four-purple")):
+            ink = re.search(r"body\.%s \{[^}]*?--ink:\s*(#[0-9a-fA-F]{6})"
+                            % skin, page, re.S)
+            self.assertTrue(ink, "body.%s declares no --ink" % skin)
+            want = [int(ink.group(1)[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+
+            block = re.search(r'id="%s".*?values="([^"]+)"' % fid, page, re.S)
+            self.assertTrue(block, "no SVG tint named %s" % fid)
+            nums = [float(n) for n in block.group(1).split()]
+            self.assertEqual(len(nums), 20, "%s is not a 4x5 matrix" % fid)
+            # Each row is luminance scaled by one channel of the target.
+            for row, channel in enumerate(want):
+                got = nums[row * 5:row * 5 + 3]
+                for weight, value in zip(lum, got):
+                    self.assertAlmostEqual(
+                        value, weight * channel, places=3,
+                        msg="%s row %d does not match --ink %s"
+                            % (fid, row, ink.group(1)))
+            self.assertIn('id="%s" color-interpolation-filters="sRGB"' % fid,
+                          page,
+                          "%s would filter in linearRGB and wash out" % fid)
+
+    def test_the_rain_takes_its_colour_from_the_palette_not_a_second_list(self):
+        """The head and tail were hardcoded in the canvas loop, so a
+        theme could turn every pixel of the page red and leave the
+        falling code green. One palette, and the loop asks it.
+
+        Cached rather than read per frame: this throttles to ~14fps on
+        purpose because it is wallpaper on a battery."""
+        page = self.PAGE.read_text()
+        # THE ASSERTION IS ABOUT THE CODE, NOT THE FILE'S SPELLING. The
+        # first version banned the literal '#c8ffd4' and went red on the
+        # COMMENT explaining that it used to be hardcoded -- eleventh
+        # instance of the grep-matches-prose trap this file records, in
+        # the test written for the round that quotes it.
+        paints = [ln.strip() for ln in page.splitlines()
+                  if "ctx.fillStyle" in ln and not ln.strip().startswith("//")]
+        glyphs = [ln for ln in paints if "rgba(0, 0, 0" not in ln]
+        self.assertEqual(len(glyphs), 2, "the rain paints something new")
+        for line in glyphs:
+            self.assertFalse(re.search(r"#[0-9a-fA-F]{3,6}|rgba?\(", line),
+                             "the rain still hardcodes a colour: %s" % line)
+        self.assertIn("getPropertyValue('--head')", page)
+        self.assertIn("getPropertyValue('--tail')", page)
+        self.assertIn("repaint();", page,
+                      "a theme change would leave the rain the old colour")
+
+    def test_only_FOUR_changes_colour(self):
+        """Ghost: "Only do this for Four." The other three have
+        palettes sampled off their own art, and the deck's green on
+        black is locked everywhere else -- the colour swap was REMOVED
+        from Saya's face for being a settings panel parked on it."""
+        for other in ("cait.html", "yuzu.html", "mimi.html", "face.html",
+                      "home.html"):
+            page = (self.PAGE.parent / other).read_text()
+            self.assertNotIn("const SKINS", page,
+                             "%s grew a colour cycle" % other)
+
     def test_the_blend_is_what_removes_her_backdrop(self):
         code = self.code()
         self.assertIn("mix-blend-mode: screen", code,

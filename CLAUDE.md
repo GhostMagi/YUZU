@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 623 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 628 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 623 tests pass on it. Getting it
+(that repo path is confirmed working). 628 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -955,6 +955,84 @@ is the character a stranger meets with no context:
   away under Stuff -> A.I. A front door is not a demotion, and
   `retired: yes` is a different mechanism nobody should reach for here.
 
+
+## TAP FOUR'S SCREEN TO RECOLOUR HER (Sept 16)
+
+Ghost: *"Id like for Fours screen to be tappable on touch. When tapped
+it changes the color of everything about her to a neon red. Another tap
+makes her and the raining code Neon Purple. Tap again to go back to the
+green. Only do this for Four."*
+
+    green (#39ff5e)  ->  neon red (#ff2b39)  ->  neon purple (#c04dff)
+
+**THE PALETTE MOVED FROM `:root` TO `body`, AND THAT IS THE WHOLE
+MECHANISM.** A custom property's `var()` is substituted when that
+property is COMPUTED on an element -- so `--edge`, declared on `:root`
+as `color-mix(... var(--ink) ...)`, bakes in `:root`'s green and
+inherits down already resolved. Every derived colour would have stayed
+green while `--ink` turned red. Declared on `body`, the element the
+theme class lands on, all of them re-resolve. One block per colour, and
+a fourth is one more block.
+
+**THE RAIN NOW ASKS THE STYLESHEET WHAT COLOUR IT IS.** Its head and
+tail were hardcoded in the canvas loop, so a theme could turn every
+pixel of the page red and leave the falling code green -- the second
+list this deck keeps deleting. Read once per theme and cached, because
+`getComputedStyle` per frame is the opposite of why that loop throttles
+to ~14fps on a battery.
+
+**`hue-rotate` IS NOT A HUE ROTATION, AND RENDERING IS WHAT SAID SO.**
+Her art is a JPEG, so she cannot take a colour variable the way Saya's
+line-art sprites can. The obvious answer is to turn her: her green is
+hue 131deg, so 225deg should land on red. **It came out AMBER.**
+`hue-rotate` is a fixed luminance-preserving matrix, not HSL, and the
+arithmetic simply does not apply. A sepia-based chain was swept across
+twenty values and never landed either -- saturating a one-hue picture
+clips its channels to the primaries, so the measured hue jumped 38 ->
+341 between two adjacent settings with nothing usable in between.
+
+**So she is TINTED rather than turned**, by two inline SVG colour
+matrices that multiply her LUMINANCE into one exact colour. It is
+deterministic, it needs no sweeping, black stays black -- which is what
+keeps `mix-blend-mode: screen` working and the rain running through her
+dark side -- and it is inline, so nothing is fetched.
+`color-interpolation-filters="sRGB"` is load-bearing: the SVG default is
+linearRGB and washes the result out.
+
+**A FILTER ON THE ELEMENT ITSELF DOES NOT KILL THE BLEND.** A stacking
+context on her PARENT did, once, and that is recorded above -- so this
+was verified by rendering rather than by reading the spec. The filter is
+applied first and the result is then blended, which is the defined
+order, and `blend=screen` holds in all three colours.
+
+**GREEN IS THE EMPTY CLASS AND `--tint: none`**, so the colour she ships
+in touches her art not at all and a reload lands on the deck's own
+colour. **Nothing is remembered, deliberately** -- she is the front
+door, so green is what anyone who is not Ghost meets, and there is no
+stored preference to explain. One line of `localStorage` makes it sticky
+if he would rather.
+
+**THE TAP IS ON `#stage`, NEVER ON THE DOCUMENT.** The top bar carries
+the rail and the ⌂, the ask bar carries the text box, and `#says` can
+scroll -- a tap on any of those must do what it says. **The exit is the
+one rule this deck will not trade**, and a handler on `document` would
+have sat under it. Verified live: tapping the text box leaves the theme
+alone.
+
+**AND THE GREP-MATCHES-PROSE TRAP FIRED AGAIN, ELEVENTH INSTANCE, in
+the test written for this round.** The first version banned the literal
+`'#c8ffd4'` from the page and went red on the COMMENT explaining that
+the rain used to hardcode it. It reads the `ctx.fillStyle` lines now and
+asserts none of them names a colour at all. Same fix as
+`TestCalculator.code()` and `TestMimiPoses.code()`.
+
+**Five new tests, each verified by breaking it**: the cycle order, the
+tap's scope, the rain's single palette, the other four pages never
+growing one -- and `test_her_TINT_and_her_PALETTE_name_the_same_two
+_colours`, which recomputes the matrices from `--ink` and is the
+two-copies guard the battery renderer and the way out already have. A
+page that turns red around a girl who turned some other red is exactly
+the drift those exist for.
 
 ## SAYA BLEED IN FOUR — and the plumbing was innocent (Sept 15)
 
