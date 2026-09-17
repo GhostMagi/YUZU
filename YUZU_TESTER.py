@@ -6058,6 +6058,158 @@ class TestUpdatingWithoutTheCable(unittest.TestCase):
                         "it reloads without waiting for her to come back")
 
 
+class TestTheDeckPutsItselfOnTheDesktop(unittest.TestCase):
+    """`POST /icons`, and the ⊞ Desktop button beside Update.
+
+    Ghost, Sept 17, told that plugging a monitor into the board gives
+    him an ordinary Ubuntu desktop with the deck sitting on top of it:
+    "i want a button on that gnome desktop that opens a window with
+    this part in it if possible? I just dislike using terminals
+    honestly", and then "Like fully a window not a browser tab."
+
+    THE WINDOW ALREADY EXISTED. `deckapps` has always written .desktop
+    files that open these pages with `--app= --start-fullscreen` -- no
+    tab strip, no url bar, no window edge -- and
+    test_her_pages_open_FULLSCREEN_but_never_as_a_kiosk pins that. What
+    needed a keyboard was INSTALLING them, and his one shell is a
+    serial cable. So the last setup step that needed typing became a
+    button he can tap from the phone."""
+
+    import yuzu_face as face
+
+    def _stub(self, body):
+        """A `deckapps` that records how it was called, or fails."""
+        tmp = tempfile.mkdtemp()
+        script = Path(tmp) / "deckapps"
+        script.write_text(body)
+        script.chmod(0o755)
+        return tmp, script
+
+    def _run(self, body):
+        tmp, script = self._stub(body)
+        try:
+            with unittest.mock.patch.object(self.face, "DECKAPPS_SCRIPT",
+                                            str(script)):
+                return self.face.run_deckapps()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_the_last_setup_step_that_needed_a_TERMINAL_is_a_button(self):
+        """It is in the BAR, for the reason Update and Back are: a tile
+        spends an app slot forever in the drawer he means to "pile up
+        our fancy future apps" in, and MOVES every time that drawer
+        grows -- and seven tiles across three columns orphans one onto
+        a row of its own, which is the layout bug this page has had
+        twice. Maintenance is not an app."""
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        self.assertIn('id="desktop"', page,
+                      "the icons still need a terminal to install")
+        start = page.index('<div id="bar">')
+        bar = page[start:page.index("</div>", start + 400)]
+        self.assertIn('id="desktop"', bar, "⊞ Desktop left the bottom bar")
+        for tile in re.findall(r'<div class="tile[ "][^>]*>', page):
+            self.assertNotIn("desktop", tile, "⊞ Desktop became a tile")
+        block = page[page.index("desktop.onclick"):]
+        block = block[:block.index("// ---- getting out")]
+        self.assertIn("fetch('icons'", block, "the button asks for nothing")
+        self.assertIn("method: 'POST'", block)
+
+    def test_the_route_takes_NOTHING_from_the_request(self):
+        """The whole reason this is safe on a server bound to 0.0.0.0,
+        and here it matters more than it does for /pull: `deckapps`
+        takes `--remove`, which is the destructive word. A route that
+        could be told WHICH word to pass would be a box on his WiFi
+        that can strip his desktop.
+
+        It takes no arguments at all, which is the strongest form of
+        the guarantee."""
+        sig = inspect.signature(self.face.run_deckapps)
+        self.assertEqual(list(sig.parameters), [],
+                         "run_deckapps grew a parameter; the request "
+                         "can reach it")
+        source = inspect.getsource(self.face.run_deckapps)
+        self.assertNotIn("shell=True", source)
+        handler = inspect.getsource(self.face._Handler.do_POST)
+        self.assertIn('path == "/icons"', handler,
+                      "the route matches by prefix; a subpath would differ")
+        # DRIVEN, NOT GREPPED, and the first version of this test was
+        # the twelfth instance of the trap: it banned the string
+        # "--remove" from the source and went red on the DOCSTRING
+        # saying --remove is unreachable. A comment explaining an
+        # absence must never read as that thing being present.
+        #
+        # A failing stub is what makes the argv observable -- its own
+        # output IS the message on a non-zero exit.
+        said, ok = self._run('#!/bin/bash\necho "ARGS=[$*]"\nexit 1\n')
+        self.assertFalse(ok)
+        self.assertIn("ARGS=[]", said,
+                      "deckapps was handed an argument, and one of the "
+                      "words it takes is --remove")
+
+    def test_a_FAILED_install_is_never_reported_as_DONE(self):
+        """`deckapps` refuses to leave a dead icon and exits non-zero
+        when it removes one -- an icon that looks installed and does
+        nothing when tapped reads as a broken deck. Throwing that away
+        for a cheerful sentence is the silent failure this project
+        refuses everywhere else.
+
+        Its own words are the message: they name which icon failed and
+        what to install."""
+        said, ok = self._run('#!/bin/bash\n'
+                             'echo "  BROKEN: Game Boy points at /nope"\n'
+                             'exit 1\n')
+        self.assertFalse(ok, "a failed install reported success")
+        self.assertIn("BROKEN", said,
+                      "deckapps said which icon failed and it was dropped")
+        said, ok = self._run('#!/bin/bash\necho "  installed: Deck"\n'
+                             'echo "Done."\n')
+        self.assertTrue(ok)
+        self.assertTrue(said.startswith("DONE."),
+                        "the verdict goes first: %r" % said[:40])
+        self.assertIn("Deck", said, "it never says what it put out")
+
+    def test_a_MISSING_script_says_so_rather_than_claiming_the_icons(self):
+        """Absent rather than wrong, same as every other route here."""
+        tmp = tempfile.mkdtemp()
+        try:
+            with unittest.mock.patch.object(
+                    self.face, "DECKAPPS_SCRIPT",
+                    str(Path(tmp) / "not-there")):
+                said, ok = self.face.run_deckapps()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertFalse(ok)
+        self.assertIn("deckapps", said)
+
+    def test_the_bar_can_GROW_without_shoving_a_button_off_the_screen(self):
+        """MEASURED by rendering, which is the only thing that can see
+        this: at 412px with a long verdict in it, the second button's
+        right edge landed at 414 -- two pixels past the viewport, with
+        the message column squeezed to one word wide and half the
+        screen tall.
+
+        `min-width: 0` is the load-bearing half. A flex item will not
+        shrink below its own longest word without it, so the message
+        pushed the row wider than the screen and the LAST thing in the
+        row paid for it. Exactly the fault that put the ⌂ 169px past
+        the viewport on four character pages, one bar down.
+
+        What a stdlib test can see is that the message is still the
+        item that yields and the buttons are still the ones that do
+        not."""
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        style = page[page.index("#note {"):]
+        style = style[:style.index("}")]
+        self.assertIn("min-width: 0", style,
+                      "the message cannot shrink, so a button leaves "
+                      "the screen")
+        self.assertIn("flex: 1", style)
+        buttons = page[page.index("#update, #desktop {"):]
+        buttons = buttons[:buttons.index("}")]
+        self.assertIn("flex: none", buttons,
+                      "the buttons shrink instead of the message")
+
+
 class TestTheWayOutSurvivesANarrowScreen(unittest.TestCase):
     """EVERY SCREEN ON THIS DECK HAS A WAY OFF IT. Two power cycles paid
     for that rule and it is the one thing this project will not trade.

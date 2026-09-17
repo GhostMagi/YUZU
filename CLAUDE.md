@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 681 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 686 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 681 tests pass on it. Getting it
+(that repo path is confirmed working). 686 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -45,6 +45,82 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ⊞ DESKTOP — the last setup step that needed a terminal (Sept 17)
+
+Ghost, told that plugging a monitor into the board gives him an
+ordinary Ubuntu desktop with the deck sitting on top of it: *"i want a
+button on that gnome desktop that opens a window with this part in it
+if possible? I just dislike using terminals honestly"*, then *"Like
+fully a window not a browser tab."*
+
+**THE WINDOW ALREADY EXISTED AND HE COULD NOT GET AT IT.** `deckapps`
+has written `.desktop` files since Sept 9 that open every page with
+`--app= --start-fullscreen` — no tab strip, no url bar, no window edge.
+That IS "fully a window not a browser tab", and it has been true the
+whole time. **What needed a keyboard was INSTALLING them**, and his one
+shell is a serial cable. So the feature was finished and unreachable,
+which is the same shape as `/wiki` being dead on Four's page: built,
+correct, and never wired to the screen he actually uses.
+
+**`POST /icons`, and a `⊞ Desktop` button next to Update.** He can tap
+it **from the phone** — the icons land on the board's desktop whether
+or not a monitor is plugged in, so the deck is already dressed the
+first time he looks at it.
+
+**IN THE BAR, NOT THE DRAWER**, and the reasoning is already written
+here twice, for Back and for Update: a tile spends an app slot forever
+in the drawer he means to *"pile up our fancy future apps"* in, and
+MOVES every time that drawer grows — and a seventh tile across three
+columns orphans one onto a row of its own, the layout bug this page has
+had twice. **Maintenance is not an app.**
+
+**IT IS DELIBERATELY NOT PART OF `/launch/`, and that is a real
+distinction rather than tidiness.** That route is fire-and-forget by
+design: it opens something on the deck's screen and nobody needs a
+report. This one **changes his desktop**, and `deckapps` already
+refuses to leave a dead icon and exits non-zero when it drops one.
+Throwing that away for a cheerful sentence is the silent-failure shape
+this file refuses everywhere else. So it captures the output, the
+verdict goes first, and a failure is `deckapps`' own words — they name
+which icon failed and what to install.
+
+**IT TAKES NO ARGUMENTS AND IT NEVER WILL, and here that matters more
+than it does for `/pull`.** `deckapps` also takes `--remove`, which is
+the destructive word. A route that could be told WHICH word to pass
+would be a box on his WiFi that can strip his desktop. `run_deckapps()`
+takes no parameters at all, which is the strongest form of that
+guarantee, and a test drives the argv rather than reading it.
+
+**RENDERING FOUND THE ONE THING THE ASSERTIONS COULD NOT.
+TWENTY-NINTH TIME.** A second button in that bar pushed the row wider
+than the screen: measured at 412px with a real verdict in it, the
+Update button's right edge landed at **414**, two pixels off the
+viewport, with the message column squeezed to one word wide and half
+the screen tall. **`min-width: 0` is the load-bearing half** — a flex
+item will not shrink below its own longest word without it — and it is
+**exactly the fault that put the ⌂ 169px past the viewport on four
+character pages**, one bar down. The message yields now and the buttons
+keep their corner; verified at 1024x600, 412 and 360.
+
+**AND THE GREP-MATCHES-PROSE TRAP FIRED AGAIN, TWELFTH INSTANCE, in
+the test written for this round.** The first version banned the literal
+`--remove` from `run_deckapps` and went red on the **docstring saying
+`--remove` is unreachable**. It drives a failing stub now and reads the
+argv out of its own output, which is the property rather than the
+spelling. Same fix as `TestCalculator.code()`, `TestMimiPoses.code()`
+and the rain's colour.
+
+**Five new tests, each verified by breaking it** — the button leaving
+the bar, an argument reaching the script, a failed install reporting
+success, the verdict not going first, the message losing `min-width`,
+and the fetch dropping its POST. All six go red.
+
+**NOT changed, and worth knowing:** `deckapps` still installs an icon
+called **Saya's Face** pointing at `face.html`. That is the hardcoded
+cast one layer out from the page — `FRONT` is Four now — but the Deck
+icon opens the home screen, which is built from the roster and is the
+right way in for every character. One variable at a time.
 
 ## THE BUILD IS A CYBERDECK NOW (Sept 8)
 

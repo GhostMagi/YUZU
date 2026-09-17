@@ -287,7 +287,15 @@ body {
   display: flex; align-items: center; gap: 14px;
   padding: 0 20px calc(16px + env(safe-area-inset-bottom));
 }
-#note { font-size: 13px; opacity: .75; min-height: 1.2em;
+/* `min-width: 0` is the load-bearing half, and rendering is what said
+   so: a flex item will not shrink below its own longest word without
+   it, so a long verdict here pushed the row wider than the screen and
+   clipped the LAST button off the right edge -- measured at 412px, the
+   Update button's right edge landed at 414. Exactly the fault that put
+   the ⌂ 169px past the viewport on four character pages. The bar's
+   buttons keep their corner; the message takes what is left. */
+#note { flex: 1; min-width: 0; overflow: hidden;
+         font-size: 13px; opacity: .75; min-height: 1.2em;
          white-space: pre-line; line-height: 1.45; }
 /* UPDATE LIVES IN THE BAR FOR THE REASON BACK DOES. He means to "pile
    up our fancy future apps" in the drawer, so a tile spends an app slot
@@ -295,13 +303,18 @@ body {
    three columns orphans one onto a row of its own, which is the layout
    bug this page has now had twice. In the bar it is in the same place
    whatever is on screen, and it is maintenance rather than an app. */
-#update {
-  margin-left: auto; flex: none;
+#update, #desktop {
+  flex: none;
   font: inherit; font-weight: 700; font-size: 13px;
   color: var(--ink); background: var(--tile); cursor: pointer;
   border: 2px solid var(--edge); border-radius: 4px; padding: 7px 14px;
 }
-#update:disabled { opacity: .5; cursor: default; }
+/* The margin is on the FIRST of the pair, not on each of them, or the
+   second one is shoved off the right edge on a narrow screen -- which
+   is the fault that put the ⌂ 169px past the viewport on four
+   character pages. */
+#desktop { margin-left: auto; }
+#update:disabled, #desktop:disabled { opacity: .5; cursor: default; }
 
 /* Pure #000 also kills glare on a panel and hides the bezel edge,
    which is the practical half of why green on black is worth having on
@@ -414,6 +427,9 @@ body {
 <div id="bar">
   <button id="back" type="button">⌂ Back</button>
   <div id="note"></div>
+  <button id="desktop" type="button"
+          title="put the deck's app icons on the board's own desktop"
+          >⊞ Desktop</button>
   <button id="update" type="button" title="git pull">↻ Update</button>
 </div>
 
@@ -874,6 +890,42 @@ update.onclick = () => {
     .catch(() => {
       update.disabled = false;
       update.textContent = '↻ Update';
+      say('No answer from the deck. Is ~/YUZU/face running?', 9000);
+    });
+};
+
+// ---- the deck, as an app on the board's own desktop -----------------
+// Ghost, Sept 17: "i want a button on that gnome desktop that opens a
+// window with this part in it if possible? I just dislike using
+// terminals honestly" -- and then "Like fully a window not a browser
+// tab."
+//
+// THE WINDOW ALREADY EXISTED. `deckapps` writes .desktop files that
+// open these pages with --app= --start-fullscreen: no tab strip, no
+// url bar, no window edge. The part that needed a keyboard was
+// INSTALLING them, and his one shell is a serial cable -- so this is
+// the same maintenance-not-an-app call Update already made, one seat
+// along in the same bar.
+//
+// He can tap it from the phone. The icons land on the board whether or
+// not a monitor is plugged in.
+const desktop = document.getElementById('desktop');
+desktop.onclick = () => {
+  desktop.disabled = true;
+  desktop.textContent = '...';
+  say('Putting the icons out.');
+  fetch('icons', { method: 'POST' })
+    .then(r => r.json())
+    .then(r => {
+      const text = (r.said || '').trim();
+      say(text.split('\n').filter(l => l.trim()).slice(0, 4).join('\n'),
+          r.ok ? 12000 : 20000);
+      desktop.disabled = false;
+      desktop.textContent = '⊞ Desktop';
+    })
+    .catch(() => {
+      desktop.disabled = false;
+      desktop.textContent = '⊞ Desktop';
       say('No answer from the deck. Is ~/YUZU/face running?', 9000);
     });
 };

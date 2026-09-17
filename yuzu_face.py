@@ -1531,6 +1531,10 @@ class _Handler(SimpleHTTPRequestHandler):
             forget(key)
             self._json({"ok": True, "said": "Forgotten."})
             return
+        if path == "/icons":
+            said, ok = run_deckapps()
+            self._json({"ok": ok, "said": said})
+            return
         if path == "/pull":
             said, restart = run_pull()
             self._json({"ok": True, "said": said})
@@ -1602,6 +1606,70 @@ def run_pull():
     # is how a fresh page ends up asking a stale process -- which is the
     # exact fault this whole route was written the day after.
     return text.strip(), "UPDATED." in text
+
+
+DECKAPPS_SCRIPT = None   # the suite points this at a stub
+
+
+def run_deckapps():
+    """Put the deck's app icons on the board's own desktop. (text, ok)
+
+    Ghost, Sept 17, having just been told that plugging a monitor in
+    gives him an ordinary Ubuntu desktop with his deck sitting on top
+    of it: "i want a button on that gnome desktop that opens a window
+    with this part in it if possible? I just dislike using terminals
+    honestly", then "Like fully a window not a browser tab."
+
+    THE WINDOW ALREADY EXISTED AND THE ONLY WAY TO GET IT WAS A
+    TERMINAL. `deckapps` writes .desktop files that open every page
+    with `--app= --start-fullscreen` -- no tab strip, no url bar, no
+    window edge, which is exactly the thing he is asking for. What he
+    could not do was install them without typing, and the one shell he
+    has is a serial cable. So the last setup step that needed a
+    keyboard becomes a button.
+
+    AND HE CAN TAP IT FROM HIS PHONE. The icons land on the board's
+    desktop whether or not anything is plugged into it, so the deck is
+    already dressed the first time he looks at the monitor.
+
+    IT TAKES NO ARGUMENTS AND IT NEVER WILL -- same discipline as
+    /pull, /launch/ and /vpet/: one fixed script in this repo, and
+    nothing from the request reaches it. `--autostart` and `--remove`
+    are deliberately NOT reachable from here; a route that could be
+    told WHICH word to pass is a box on his WiFi that runs what it is
+    told, and --remove is the destructive one.
+
+    IT IS ALSO DELIBERATELY NOT PART OF /launch/, which is
+    fire-and-forget by design. This one CHANGES HIS DESKTOP, and
+    `deckapps` already refuses to leave a dead icon and exits non-zero
+    when it does -- throwing that away would be the silent failure this
+    deck refuses everywhere else."""
+    import subprocess
+    script = DECKAPPS_SCRIPT or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "deckapps")
+    if not os.path.exists(script):
+        return "No deckapps script on this board.", False
+    try:
+        done = subprocess.run(["bash", script], capture_output=True,
+                              text=True, timeout=120)
+    except Exception as exc:
+        return "Could not put the icons out (%s)." % exc, False
+    text = ((done.stdout or "") + (done.stderr or "")).strip()
+    if done.returncode != 0:
+        # deckapps names which icon failed and what is missing. That IS
+        # the message -- it is more use than anything phrased here.
+        return text or "The icons did not install.", False
+    # VERDICT FIRST, and the verdict is not its last line. `deckapps`
+    # ends on "Done." with the useful part scrolled above it, and the
+    # bar he reads this in shows four lines.
+    named = [line.split(":", 1)[1].strip() for line in text.splitlines()
+             if line.strip().startswith("installed:")]
+    said = ("DONE. Look at the screen plugged into the deck: there is a "
+            "Deck icon on the desktop and in the app menu, and it opens "
+            "as a window rather than a browser tab.")
+    if named:
+        said += "\n" + ", ".join(named)
+    return said, True
 
 
 def restart_later(delay=2):
