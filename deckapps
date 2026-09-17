@@ -218,14 +218,34 @@ done
 exec ${BROWSER/URL/http://127.0.0.1:8081/\$1}
 APP
     chmod +x "$YUZU/.face-app"
-    write_app "Saya's Face" "Her face on the screen" \
-        "$YUZU/.face-app face.html" "face-smile" "yuzu-face"
+    # WHO THE FRONT DOOR IS COMES FROM THE ROSTER, NEVER FROM THIS
+    # FILE. This icon said "Saya's Face" and opened face.html long
+    # after FRONT moved to Four -- a hardcoded cast one layer out from
+    # the home screen, which already learned this twice (Mimi invisible
+    # from the front page, and `#saya { border-color }` glowing on a
+    # tile that had moved into a drawer). The failure looks like the
+    # deck working, which is what makes it expensive.
+    #
+    # ABSENT RATHER THAN WRONG: if the roster cannot be read, this one
+    # icon is skipped. Deck is built from the same roster and is the
+    # way in to everybody, so nothing is lost but a shortcut.
+    if FRONT=$(python3 "$YUZU/yuzu_face.py" --front 2>/dev/null) \
+       && [ -n "$FRONT" ]; then
+        FRONT_NAME=$(printf '%s' "$FRONT" | cut -f1)
+        FRONT_PAGE=$(printf '%s' "$FRONT" | cut -f2)
+        FRONT_BLURB=$(printf '%s' "$FRONT" | cut -f3)
+        write_app "$FRONT_NAME" "$FRONT_BLURB" \
+            "$YUZU/.face-app $FRONT_PAGE" "face-smile" "yuzu-face"
+    else
+        echo "  SKIPPED the front character: the roster did not answer."
+        echo "    Deck opens the home screen, which has everyone on it."
+    fi
     write_app "Deck" "Home screen" \
         "$YUZU/.face-app home.html" "go-home" "yuzu-home"
     write_app "Pet" "The creature on the deck" \
         "$YUZU/.face-app vpet.html" "applications-games" "yuzu-pet"
 else
-    echo "  SKIPPED Saya's Face, Deck and Pet: no browser found."
+    echo "  SKIPPED the character pages, Deck and Pet: no browser found."
     echo "    sudo apt install -y chromium-browser"
 fi
 

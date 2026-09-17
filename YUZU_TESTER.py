@@ -6210,6 +6210,127 @@ class TestTheDeckPutsItselfOnTheDesktop(unittest.TestCase):
                       "the buttons shrink instead of the message")
 
 
+class TestTheAppIconFollowsTheFrontDoor(unittest.TestCase):
+    """Ghost, Sept 17: "Change it to say Four instead of sayas face."
+
+    HE IS FIXING A HARDCODED CAST, one layer out from the page. The
+    icon `deckapps` installed said "Saya's Face" and opened
+    `face.html` -- true when it was written and stale from the moment
+    `FRONT` moved to Four, with the failure looking exactly like the
+    deck working. Third costume of the same fault, after Mimi being
+    invisible from the front page and `#saya { border-color }` glowing
+    on a tile that had moved into a drawer.
+
+    So it is not renamed to "Four". It is built from the ROSTER, which
+    is the only place this deck keeps its cast, and moving `FRONT` one
+    word renames the icon on the next install."""
+
+    import yuzu_face as face
+
+    def _install(self, front_line=None, front_fails=False):
+        """Run the REAL `deckapps` into a throwaway HOME, with a stub
+        browser so the icons are actually written, and return what
+        landed in the front character's .desktop file."""
+        home = tempfile.mkdtemp()
+        binder = Path(home) / "bin"
+        binder.mkdir()
+        for fake in ("chromium",):
+            (binder / fake).write_text("#!/bin/sh\nexit 0\n")
+            (binder / fake).chmod(0o755)
+        if front_line is not None or front_fails:
+            # Stand in for `python3 yuzu_face.py --front`, which is the
+            # ONE thing deckapps asks about the cast.
+            body = ("#!/bin/sh\nexit 1\n" if front_fails
+                    else "#!/bin/sh\nprintf '%s\\n'\n" % front_line)
+            (binder / "python3").write_text(body)
+            (binder / "python3").chmod(0o755)
+        import subprocess
+        env = dict(os.environ, HOME=home,
+                   PATH="%s:%s" % (binder, os.environ.get("PATH", "")))
+        done = subprocess.run(
+            ["bash", str(Path(__file__).parent / "deckapps")],
+            capture_output=True, text=True, env=env, timeout=120)
+        icon = Path(home) / ".local/share/applications/yuzu-face.desktop"
+        text = icon.read_text() if icon.exists() else None
+        shutil.rmtree(home, ignore_errors=True)
+        # `deckapps` writes its launcher wrappers BESIDE ITSELF, which
+        # is the repo when the suite drives it. Leaving them behind is
+        # test pollution, and it made TestDeckApps go red on this
+        # test's droppings -- the failure looked like a missing-browser
+        # bug in a script nobody had touched.
+        for junk in (".wiki-app", ".face-app"):
+            (Path(__file__).parent / junk).unlink(missing_ok=True)
+        return done.stdout + done.stderr, text
+
+    def _field(self, desktop, key):
+        for line in (desktop or "").splitlines():
+            if line.startswith(key + "="):
+                return line.split("=", 1)[1]
+        return None
+
+    def test_the_character_icon_IS_whoever_the_roster_puts_out_front(self):
+        """Driven, not read: the same script, two different front
+        characters, and the icon has to follow. A test that asserted
+        the literal "Four" would have to be edited the next time he
+        changes his main -- which is the thing that went wrong here in
+        the first place."""
+        for name, page, blurb in (("Mimi", "mimi.html", "a wisp"),
+                                  ("Cait", "cait.html", "king of cats")):
+            said, desktop = self._install("%s\t%s\t%s" % (name, page, blurb))
+            self.assertIsNotNone(desktop,
+                                 "no front icon was installed: %s" % said)
+            self.assertEqual(self._field(desktop, "Name"), name,
+                             "the icon is not named after the front door")
+            self.assertIn(page, self._field(desktop, "Exec"),
+                          "the icon opens somebody else's page")
+            self.assertEqual(self._field(desktop, "Comment"), blurb)
+            self.assertIn("installed: %s" % name, said)
+
+    def test_the_two_layers_AGREE_about_who_is_out_front(self):
+        """`--front` is what the installer asks; `roster()` is what the
+        home screen reads. A deck whose desktop icon and whose front
+        tile disagree is the same bug wearing two faces."""
+        line = self.face.front_app()
+        self.assertTrue(line, "nothing answers --front")
+        name, page, blurb = line.split("\t")
+        out = [c for c in self.face.roster() if c["front"]]
+        self.assertEqual(len(out), 1, "the roster has no single front door")
+        self.assertEqual((name, page, blurb),
+                         (out[0]["name"], out[0]["page"], out[0]["blurb"]))
+        # And the flag really is what a shell gets, not just a function.
+        import subprocess
+        done = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "yuzu_face.py"),
+             "--front"], capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.stdout.strip(), line)
+        self.assertEqual(done.returncode, 0)
+
+    def test_a_roster_that_does_not_answer_installs_NO_front_icon(self):
+        """Absent rather than wrong, same as every other route here. An
+        icon guessing at a character is worse than no icon: Deck is
+        built from the same roster and is the way in to everybody."""
+        said, desktop = self._install(front_fails=True)
+        self.assertIsNone(desktop, "it installed a guess")
+        self.assertIn("SKIPPED the front character", said)
+        self.assertIn("Deck opens the home screen", said,
+                      "it never says what to tap instead")
+        self.assertIn("installed: Deck", said,
+                      "one missing shortcut took the whole install down")
+
+    def test_the_installer_still_names_SAYA_where_saya_is_correct(self):
+        """The terminal-chat icon is genuinely hers: it runs
+        `yuzu_brain --chat`, which boots LIVE_PERSONA, and that is
+        `saya_deck`. Banning the string outright would be the
+        pink-elephant fix applied to the wrong half -- what was stale
+        was the PAGE icon, not every mention of a character."""
+        import yuzu_personas
+        self.assertEqual(yuzu_personas.LIVE_PERSONA, "saya_deck",
+                         "the chat icon is named after whoever is live; "
+                         "if that moved, the icon's name has to move too")
+        text = (Path(__file__).parent / "deckapps").read_text()
+        self.assertIn('write_app "Saya" "Talk to her"', text)
+
+
 class TestTheWayOutSurvivesANarrowScreen(unittest.TestCase):
     """EVERY SCREEN ON THIS DECK HAS A WAY OFF IT. Two power cycles paid
     for that rule and it is the one thing this project will not trade.
@@ -6362,8 +6483,15 @@ class TestDeckApps(unittest.TestCase):
             home, binv = tmp / "home", tmp / "bin"
             (home / "YUZU").mkdir(parents=True)
             binv.mkdir()
+            # `python3` is here because `deckapps` now ASKS who the
+            # front character is rather than naming one. That is a new
+            # dependency at install time for a script that used to need
+            # only coreutils -- trivially satisfied on a board whose
+            # whole deck is python, and worth having the fixture say so
+            # out loud rather than discovering it on the hardware.
             for tool in ("bash", "mkdir", "cat", "chmod", "cp", "rm",
-                         "ls", "grep", "sleep"):
+                         "ls", "grep", "sleep", "cut", "printf",
+                         "python3"):
                 found = shutil.which(tool)
                 if found:
                     (binv / tool).symlink_to(found)

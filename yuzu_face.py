@@ -671,6 +671,30 @@ def roster():
     return out
 
 
+def front_app():
+    """"<Name>\t<page>\t<blurb>" for whoever `FRONT` is, or "" when it
+    cannot be worked out.
+
+    `deckapps` asks this rather than naming a character, and that is
+    the whole point of it existing. Its app icon said "Saya's Face" and
+    opened `face.html` long after `FRONT` moved to Four -- a hardcoded
+    cast one layer out from the page, which is the Mimi bug in its
+    third costume after `#saya { border-color }` and the front tile
+    itself. The failure looks like the deck working.
+
+    ABSENT RATHER THAN WRONG. An empty string means the installer skips
+    that one icon; the Deck icon is built from the same roster and is
+    the way in to everybody."""
+    try:
+        for who in roster():
+            if who["front"]:
+                return "%s\t%s\t%s" % (who["name"], who["page"],
+                                        who["blurb"])
+    except Exception:
+        pass
+    return ""
+
+
 # WHAT THE BOARD IS DOING RIGHT NOW, as one line she can read.
 #
 # Four's rule 8 says she NOTICES THE MACHINE SHE LIVES ON -- "the fan,
@@ -1720,6 +1744,11 @@ def _report():
 
 
 if __name__ == "__main__":
+    if "--front" in sys.argv:
+        # `deckapps` asks this so its app icon is never a cast list.
+        said = front_app()
+        print(said)
+        sys.exit(0 if said else 1)
     if "--serve" in sys.argv:
         port = 8081
         for i, a in enumerate(sys.argv):

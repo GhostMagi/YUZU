@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 686 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 690 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 686 tests pass on it. Getting it
+(that repo path is confirmed working). 690 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -45,6 +45,73 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE APP ICON SAID "SAYA'S FACE" LONG AFTER FOUR TOOK THE FRONT DOOR
+
+Ghost, closing the night: *"Change it to say 'Four' instead of sayas
+face."*
+
+**HE IS FIXING A HARDCODED CAST, one layer out from the page, and it is
+the THIRD costume of the same fault** — after Mimi being invisible from
+the front page because the cast was typed into `home.html`, and
+`#saya { border-color }` glowing on a tile that had moved into a
+drawer. `deckapps` installed an icon called **Saya's Face** pointing at
+`face.html`: true the day it was written, stale the moment `FRONT`
+moved, and **the failure looks exactly like the deck working**.
+
+**SO IT IS NOT RENAMED TO "Four". It is BUILT FROM THE ROSTER**, which
+is the only place this deck keeps its cast. `yuzu_face.py --front`
+prints `name<TAB>page<TAB>blurb` for whoever `FRONT` is, `deckapps`
+asks it, and the icon carries her name, her page and her own blurb:
+
+    Name=Four
+    Comment=the deck's own voice
+    Exec=/home/ghost/YUZU/.face-app four.html
+
+Moving `FRONT` one word renames the icon on the next install. A test
+drives the installer twice with two different front characters and
+fails if the icon does not follow — **asserting the literal "Four"
+would be a test that has to be edited every time it works**, which is
+the fault that put the stale name there in the first place.
+
+**ABSENT RATHER THAN WRONG.** If the roster does not answer, that ONE
+icon is skipped and the output says what to tap instead — **Deck** is
+built from the same roster and is the way in to everybody. An icon
+guessing at a character is worse than no icon, same call as
+`write_app` deleting a dead one rather than leaving it.
+
+**AND THE TWO LAYERS ARE PINNED TO AGREE.** `--front` is what the
+installer asks; `roster()` is what the home screen reads. A deck whose
+desktop icon and whose front tile disagree is one bug wearing two
+faces, so a test asserts they name the same character, the same page
+and the same blurb — through the real shell flag, not just the
+function.
+
+**THE TERMINAL-CHAT ICON IS STILL CALLED "Saya", AND THAT IS
+CORRECT.** It runs `yuzu_brain --chat`, which boots `LIVE_PERSONA`, and
+that is `saya_deck`. Banning the string outright would be the
+pink-elephant fix aimed at the wrong half: what was stale was the PAGE
+icon, not every mention of a character. A test pins the two pointers to
+their own jobs — the same `FRONT` vs `LIVE_PERSONA` split that this
+round's own bug is an argument for.
+
+**`deckapps` NOW NEEDS `python3` AT INSTALL TIME**, where it used to
+need only coreutils. Trivially true on a board whose whole deck is
+python — and the fixture carries it explicitly rather than letting it
+be discovered on the hardware.
+
+**AND MY OWN TEST POLLUTED THE SUITE.** `deckapps` writes its launcher
+wrappers BESIDE ITSELF, which is the repo when the suite drives it, and
+the new helper left them there. `TestDeckApps` then went red on this
+test's droppings — and it read as a missing-browser bug in a script
+nobody had touched. It cleans up after itself now, exactly as
+`TestDeckApps._run` already did, and that older cleanup is the comment
+that explained what had happened.
+
+**Four new tests, each verified by breaking it**: the name hardcoded
+again, the page hardcoded again, a guess installed when the roster is
+silent, and the two layers drifting apart (two ways — a wrong page, and
+more than one front door).
 
 ## ⊞ DESKTOP — the last setup step that needed a terminal (Sept 17)
 
