@@ -753,6 +753,117 @@ def board_now():
             "it is the weather, not the news.")
 
 
+# AND SHE KNOWS WHAT SHE IS MADE OF.
+#
+# Asked for her specs on the board, Sept 18, Four answered with an
+# Intel XScale processor at 700MHz, 64MB of DDR, a 4GB flash card and
+# a 3.5-inch 320x240 screen running Windows CE. That is a palmtop from
+# about 2004, invented whole, on the character who IS the front door
+# and whose whole job is surviving a stranger.
+#
+# SECOND INSTANCE, AND THE FIRST ONE IS ALREADY WRITTEN DOWN. Shiro
+# hallucinated a custom PCB "with a little more RAM" and a dollhouse
+# case, and the note filed then names this exactly: the deck
+# self-concept holds for what she IS but not for what she is MADE OF,
+# and nothing in her prompt names a single part.
+#
+# `board_now()` closed the WEATHER and its own last line says so --
+# watts, degrees, power mode, "it is the weather, not the news". The ID
+# CARD was never handed to her at all, so "what are your specs" is a
+# turn shape she has no data for, and SIXTH INSTANCE of this repo's
+# most repeated finding: a turn shape she has never been given is one
+# the base model answers for her. Its prior for "specs of a small
+# handheld computer" is a Windows CE palmtop, and that is what came
+# out.
+#
+# READ, NEVER HARDCODED -- the `ghostnano` rule, one layer over. A spec
+# string typed in here is right until he swaps the NVMe, and it is
+# already wrong on the laptop and the phone, with the failure looking
+# exactly like the deck working.
+#
+# CACHED, because none of this can change while the server is up and it
+# rides on every single turn.
+_SPECS = None
+
+
+def board_specs():
+    """One sentence of what this machine IS, or '' when it will not say."""
+    global _SPECS
+    if _SPECS is not None:
+        return _SPECS
+    _SPECS = ""
+    bits = []
+
+    # The board's own name for itself. device-tree is the ARM answer and
+    # DMI is the x86 one; neither is assumed to be there.
+    for path in ("/proc/device-tree/model",
+                 "/sys/devices/virtual/dmi/id/product_name"):
+        try:
+            with open(path, "rb") as fh:
+                name = fh.read().decode("utf-8", "replace")
+            name = name.replace("\x00", "").strip()
+            if name:
+                bits.append(name)
+                break
+        except OSError:
+            continue
+
+    try:
+        cores = os.cpu_count()
+        if cores:
+            bits.append("%d cores" % cores)
+    except Exception:
+        pass
+
+    try:
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    gb = int(line.split()[1]) / (1024.0 * 1024.0)
+                    # SHARED is the Orin's defining trait -- it is the
+                    # whole `OLLAMA_KEEP_ALIVE` argument and the reason
+                    # PC mode competes with her. It is also flatly false
+                    # of the laptop's discrete card, so it rides on the
+                    # Jetson check that ALREADY EXISTS TWICE and is
+                    # pinned to agree, rather than becoming a third copy
+                    # for the pair to drift away from.
+                    shared = ""
+                    try:
+                        import yuzu_doctor
+                        if yuzu_doctor.on_a_jetson():
+                            shared = " shared between the processor and the graphics"
+                    except Exception:
+                        pass
+                    bits.append("%.1fGB of memory%s" % (gb, shared))
+                    break
+    except OSError:
+        pass
+
+    try:
+        st = os.statvfs("/")
+        total = st.f_blocks * st.f_frsize / (1000.0 ** 3)
+        free = st.f_bavail * st.f_frsize / (1000.0 ** 3)
+        if total:
+            bits.append("%dGB of storage with %dGB free" % (total, free))
+    except OSError:
+        pass
+
+    if not bits:
+        return _SPECS
+    # ONE SENTENCE OF PROSE, NEVER A SPEC SHEET, and that is the same
+    # call `board_now()` made for the same reason: a bulleted datasheet
+    # in a system prompt is a FORMAT, and the one failure this repo has
+    # a categorical fix for is her answering in markdown headings.
+    #
+    # And the restraint clause is positive. "Never invent different
+    # numbers" would name inventing, which is the pink-elephant shape
+    # measured three times here -- so it says what to DO with them.
+    _SPECS = ("\n\nWHAT YOU RUN ON, really: " + ", ".join(bits) + ". "
+              "Those are the true numbers for the machine you live on; "
+              "bring them up when your own hardware comes up.")
+    return _SPECS
+
+
 # SHE REMEMBERS BETWEEN RESTARTS NOW.
 #
 # Every `~/YUZU/pull` bounces the face server, and until now that took
@@ -1024,7 +1135,7 @@ def answer(text, who="saya", on_chunk=None):
             try:
                 if not hasattr(brain, "_base_prompt"):
                     brain._base_prompt = brain.system_prompt
-                brain.system_prompt = brain._base_prompt + board_now()
+                brain.system_prompt = brain._base_prompt + board_specs() + board_now()
             except Exception:
                 pass
 

@@ -4518,6 +4518,74 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         key = self.face.persona_for("cait")
         self.assertNotIn("RIGHT NOW", self.face._BRAINS[key].system_prompt)
 
+    def test_her_specs_are_READ_from_this_machine_and_never_typed_in(self):
+        """Asked for her specs, Four gave an Intel XScale palmtop with
+        64MB of DDR and Windows CE -- invented whole, on the front door.
+
+        The fix cannot be a spec string typed into the file: that is
+        right until he swaps the NVMe, it is already wrong on the
+        laptop and the phone, and the failure looks exactly like the
+        deck working. So this drives the REAL function and checks the
+        number against what this machine says about itself RIGHT NOW --
+        which a hardcoded answer cannot pass on two different boxes."""
+        self.face._SPECS = None
+        try:
+            said = self.face.board_specs()
+        finally:
+            self.face._SPECS = None
+        with open("/proc/meminfo") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    gb = int(line.split()[1]) / (1024.0 * 1024.0)
+                    break
+        self.assertIn("%.1fGB of memory" % gb, said,
+                      "her memory figure is not this machine's")
+        self.assertIn("cores", said)
+
+    def test_she_only_claims_SHARED_memory_where_the_memory_is_shared(self):
+        """Shared CPU/GPU memory is the Orin's defining trait -- it is
+        the whole keep_alive argument -- and it is flatly false of the
+        laptop's discrete card. A confident wrong fact about her own
+        body is worse than a missing one, so the clause rides on the
+        Jetson check that already exists twice and is pinned to agree,
+        rather than on a third copy."""
+        import yuzu_doctor
+        real = yuzu_doctor.on_a_jetson
+        try:
+            for jetson in (True, False):
+                yuzu_doctor.on_a_jetson = lambda j=jetson: j
+                self.face._SPECS = None
+                said = self.face.board_specs()
+                self.assertEqual(jetson, "shared between" in said,
+                                 "shared-memory claim ignores the board")
+        finally:
+            yuzu_doctor.on_a_jetson = real
+            self.face._SPECS = None
+
+    def test_the_specs_reach_a_deck_character_and_never_stack(self):
+        """Same trap as the live board line one function up: a prompt
+        appended to an already-appended prompt grows a stale copy per
+        turn and stays invisible until the context fills."""
+        self.post("/say", {"text": "what are your specs", "who": "four"}).read()
+        prompt = self.face._BRAINS["four"].system_prompt
+        self.assertIn("WHAT YOU RUN ON", prompt,
+                      "she was never told what she is made of")
+        for _ in range(3):
+            self.post("/say", {"text": "again", "who": "four"}).read()
+        self.assertEqual(
+            self.face._BRAINS["four"].system_prompt.count("WHAT YOU RUN ON"), 1,
+            "the specs line stacks, one stale copy per turn")
+
+    def test_a_character_off_the_deck_is_never_told_what_she_runs_on(self):
+        """Cait has never heard of a computer and a test bans the words
+        from her prompt. Handing her a processor and a storage figure at
+        runtime would walk straight around it -- the same way the watts
+        would have."""
+        self.post("/say", {"text": "hello", "who": "cait"}).read()
+        key = self.face.persona_for("cait")
+        self.assertNotIn("WHAT YOU RUN ON",
+                         self.face._BRAINS[key].system_prompt)
+
     def test_the_hardware_gate_is_READ_and_not_merely_written(self):
         """THE BUG THIS ROUND FOUND. `answer()` referenced
         `yuzu_personas` without importing it -- the module is imported

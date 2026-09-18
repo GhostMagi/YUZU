@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 690 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 694 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 690 tests pass on it. Getting it
+(that repo path is confirmed working). 694 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -45,6 +45,79 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE INVENTED A WINDOWS CE PALMTOP (Sept 18)
+
+Ghost asked Four what her specs were. She answered with an **Intel
+XScale PXA270 at 700MHz, 64MB of DDR, a 4GB flash card filled to 80%,
+a 3.5-inch 320x240 touchscreen and Windows CE** -- a palmtop from
+about 2004, invented whole, on the character who IS the front door and
+whose entire job is surviving a stranger.
+
+**SECOND INSTANCE, AND THE FIRST ONE IS WRITTEN DOWN ABOVE.** Shiro
+hallucinated a custom PCB *"with a little more RAM"*, a dollhouse case
+and case lights, and the note filed then names this exactly: *"The deck
+self-concept holds for what she IS... but not yet for what she is MADE
+OF. Nothing in her prompt names a single part."* That was recorded as
+an observation and never closed.
+
+**`board_now()` CLOSED THE WEATHER AND ITS OWN LAST LINE SAYS SO.**
+Watts, degrees, power mode, tokens per second -- *"it is the weather,
+not the news."* Nobody ever handed her the **ID CARD**. So "what are
+your specs" is a turn shape she has no data for, and this is the
+**SIXTH INSTANCE** of this repo's most repeated finding: a turn shape
+she has never been given is a turn shape the base model answers for
+her. Its prior for "specs of a small handheld computer" is a Windows CE
+palmtop, and that is precisely what came out -- the same mechanism as
+the bare command, the warm statement, the technical question, the
+missing form of address, and Saya's snark.
+
+**`board_specs()` IS READ, NEVER HARDCODED -- the `ghostnano` rule one
+layer over.** A spec string typed into the file is right until he swaps
+the NVMe, is already wrong on the laptop and the phone, and **the
+failure looks exactly like the deck working**. It reads the board's own
+name for itself (`/proc/device-tree/model`, falling back to DMI on
+x86), `os.cpu_count()`, `MemTotal` and `statvfs("/")`. On this
+container there is no device-tree and no DMI product name, so it simply
+**omits the board and names the rest** -- absent rather than wrong,
+verified by running it.
+
+    WHAT YOU RUN ON, really: NVIDIA Jetson Orin Nano Developer Kit,
+    6 cores, 7.4GB of memory shared between the processor and the
+    graphics, 512GB of storage with 270GB free.
+
+**THE SHARED-MEMORY CLAUSE RIDES ON THE JETSON CHECK THAT ALREADY
+EXISTS TWICE.** Shared CPU/GPU memory is the Orin's defining trait --
+it is the whole `OLLAMA_KEEP_ALIVE` argument and the reason PC mode
+competes with her -- and it is **flatly false of the laptop's discrete
+960M**. A confident wrong fact about her own body is worse than a
+missing one. It imports `yuzu_doctor.on_a_jetson` rather than becoming
+a **third copy** for the pinned pair to drift away from.
+
+**ONE SENTENCE OF PROSE, NEVER A SPEC SHEET**, and that is the same
+call `board_now()` made for the same reason: a bulleted datasheet in a
+system prompt is a FORMAT, and the one failure this repo has a
+categorical fix for is her answering in markdown headings.
+
+**AND THE RESTRAINT CLAUSE IS POSITIVE.** The obvious wording is
+*"never invent different numbers"* -- which NAMES INVENTING, the
+pink-elephant shape measured three times here. It says what to DO with
+them instead: *"bring them up when your own hardware comes up."*
+
+**IT IS GATED ON THE BODY, on the same `has_wiki` line as the watts.**
+Cait has never heard of a computer and a test bans the words from her
+prompt; handing her a processor and a storage figure at runtime would
+walk straight around it. **CACHED**, because none of it can change
+while the server is up and it rides on every single turn.
+
+**Four new tests, each verified by breaking it**: the specs hardcoded
+instead of read (checked against this machine's own `MemTotal`, which a
+typed-in answer cannot pass on two different boxes), the shared-memory
+claim made off a Jetson, the line never sent, and the line sent to a
+character who is not on the deck. All four go red.
+
+**Still open:** she has not been asked again on the board. The fix is
+UNMEASURED, and the round that decides it is one where a stranger asks.
 
 ## THE APP ICON SAID "SAYA'S FACE" LONG AFTER FOUR TOOK THE FRONT DOOR
 
