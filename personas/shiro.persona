@@ -4,7 +4,7 @@ hardware: muto_s2
 description: sweet sing-song delivery, genuinely unsettling underneath
 temperature: 0.8
 piper_length_scale: 0.9
-num_predict: 250
+num_predict: 300
 SOUND_EXAMPLES: Aww, Hii, Hehe
 retired: yes
 # Ghost, Sept 11: "we no longer need coco shes retired. or the

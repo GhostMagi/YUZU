@@ -4,7 +4,7 @@ hardware: cyberdeck
 description: Saya with no body - the resident AI on the cyberdeck. Rebuilt on the measured blocks; her quad version was the last persona made on the v1 scaffold. UNMEASURED.
 temperature: 0.85
 piper_length_scale: 0.87
-num_predict: 250
+num_predict: 300
 # NOT her quad file's 'Hmph, Tch, Eek'. Hmph and Tch carry no vowel, so
 # espeak spells them out letter by letter -- the same mechanism that
 # made PFFT come out "Pee Eff Eff Tee". These three are hers and sayable.

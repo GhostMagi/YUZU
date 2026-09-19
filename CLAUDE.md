@@ -1719,6 +1719,18 @@ _CEILING_and_every_character_shares_it` asserts one number across every
 character rather than a maximum, so nobody raises it quietly on one.
 Unbounded is how a 3B monologues until the context fills.
 
+**RAISED AGAIN, 250 -> 300, Sept 19.** Ghost: *"Increase Fours token
+output kinda deal by another 50."* Same complaint, same shape, same
+reasoning -- and **he asked about FOUR and the number moved on all
+eleven characters**, because that is exactly what the shared-ceiling
+test is for. A per-character ceiling is a thing that drifts silently;
+if one ever genuinely needs her own, it is a deliberate change to that
+test rather than a quiet edit to one file. Still in the SETTINGS block
+above the `---`, so **every composed prompt is byte-identical --
+verified across all 19, Four still 4034 chars** -- and 300 is still
+far inside `num_ctx` 4096, so it costs seconds on the longest replies
+and no memory at all.
+
 ### The word-by-word reveal is gone, and the RAIN is the spinner
 
 Ghost: *"i dislike the words typing up as she says it thing as im a

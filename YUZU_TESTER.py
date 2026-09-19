@@ -9353,11 +9353,19 @@ class TestWikiBrevity(unittest.TestCase):
         # and it is still a USER turn, which is the load-bearing part
         self.assertIn("I looked up", turn)
 
-    CEILING = 250
+    CEILING = 300
 
     def test_num_predict_has_a_CEILING_and_every_character_shares_it(self):
-        """RAISED to 250, Sept 16, and this test used to forbid exactly
-        that -- so the reason is worth having next to the number.
+        """RAISED to 250 on Sept 16 and to 300 on Sept 19, and this
+        test used to forbid exactly that -- so the reason is worth
+        having next to the number.
+
+        The second raise is Ghost again, same complaint, same shape:
+        *"Increase Fours token output kinda deal by another 50."* He
+        asked about FOUR and the number moved on everybody, because
+        that is what this test is for -- see the last paragraph. If a
+        character ever genuinely needs her own ceiling, that is a
+        deliberate change to this test, not a quiet edit to one file.
 
         The rule it replaces ("the truncation is a symptom of rambling
         and a bigger ceiling just buys longer rambles") was written

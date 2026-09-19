@@ -11,7 +11,7 @@ temperature: 0.75
 # Quick and clipped. Cortana talks like someone who already knows the
 # answer and is waiting for you to catch up.
 piper_length_scale: 0.9
-num_predict: 250
+num_predict: 300
 # All four carry a vowel, so espeak phonemises them instead of spelling
 # them out -- the mechanism that made PFFT come out "Pee Eff Eff Tee".
 # `Hm` and `Mmh` were the obvious dry-AI noises and both were cut for it.
