@@ -571,6 +571,24 @@ const ME = 'four';
 fetch('characters.json', { cache: 'no-store' })
   .then(r => r.json())
   .then(cast => {
+    // THE FRONT DOOR SHOWS NOBODY ELSE. She is the character a stranger
+    // meets with no context, so a row of four other AIs across the top
+    // of her screen is the demo answering a question nobody asked.
+    //
+    // GATED ON `front`, NEVER ON HER NAME. Testing `ME === 'four'` here
+    // would be the hardcoded cast in its fourth costume -- after Mimi
+    // being invisible from the front page, `#saya { border-color }`
+    // glowing on a tile that had moved into a drawer, and an app icon
+    // called "Saya's Face" pointing at a page Four had taken over. Move
+    // FRONT one word and this follows: she gets her rail back the day
+    // she is an ordinary character again, and the failure mode of
+    // getting it wrong is a deck that looks like it is working.
+    //
+    // THE WAY OUT IS NOT IN HERE. The home button is its own element
+    // beside the rail, so an empty rail costs the hop and never costs
+    // the exit -- the one rule this deck will not trade.
+    const mine = cast.find(c => c.who === ME);
+    if (mine && mine.front) return;
     const rail = document.getElementById('rail');
     cast.forEach(c => {
       const here = c.who === ME;

@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 694 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 696 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 694 tests pass on it. Getting it
+(that repo path is confirmed working). 696 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -45,6 +45,50 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE FRONT DOOR SHOWS NOBODY ELSE (Sept 19)
+
+Ghost: *"Can u make it so when im on fours screen the other ones arent
+visible tabs on her interface."*
+
+Right, and it follows straight from the spec already written for the
+front tile: **she is the character a stranger meets with no context.**
+A row of four other AIs across the top of her screen is the demo
+answering a question nobody asked -- and the reason he moved off Saya
+was *"might be too extra for demos/showing to parents."*
+
+**GATED ON `front`, NEVER ON HER NAME.** `ME === 'four'` would have
+been the hardcoded cast in its FOURTH costume -- after Mimi invisible
+from the front page, `#saya { border-color }` glowing on a tile that
+had moved into a drawer, and an app icon called "Saya's Face" pointing
+at a page Four had taken over. Every one of those looked exactly like
+the deck working. The page already fetches `/characters.json` and that
+roster already carries `front`, so the gate is two lines and **moving
+`FRONT` one word gives her the rail back the day she is an ordinary
+character again.**
+
+**ONLY HER PAGE CHANGES.** Cait, Yuzu and Mimi still list everybody,
+Four included -- hiding the front character everywhere would be the
+Mimi bug pointing the other way.
+
+**AND THE WAY OUT IS NOT IN THE RAIL.** Emptying it is only safe
+because `#home` is its SIBLING rather than something inside it. Nest
+the ⌂ in the rail and hiding the cast takes the exit with it --
+chromeless and fullscreen on the panel, where the ⌂ IS the exit. That
+is now pinned rather than assumed.
+
+**DRIVEN, NOT READ.** The suite is stdlib Python and cannot run
+JavaScript, so the real callback was pulled out of the page and run
+under node against two rosters: `four` front gives `[]`, `saya` front
+gives `["Saya","Cait","Four"]`. Then rendered at 1024x600 and 412 and
+looked at -- rail empty, ⌂ at 1000 of 1024 and 388 of 412, blend and
+rain untouched. **Thirtieth time.**
+
+**Two new tests, each verified by breaking it** (four ways): the gate
+reading her name instead of `front`, the gate removed entirely,
+`roster()` no longer emitting `front` -- which would silently bring
+the rail back with nothing to say so -- and the exit nested inside the
+rail. All four go red.
 
 ## SHE INVENTED A WINDOWS CE PALMTOP (Sept 18)
 

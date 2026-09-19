@@ -5800,6 +5800,63 @@ class TestFour(unittest.TestCase):
                              f"{name} is hardcoded into her rail")
         self.assertIn("four", yuzu_face.CHARACTERS)
 
+    def rail_builder(self):
+        """The rail-building block, comments stripped.
+
+        Its own comment names Mimi, Saya and the app icon while
+        explaining why none of them is hardcoded -- the grep-matches-
+        prose trap this page has already sprung once."""
+        code = self.code()
+        start = code.index("characters.json")
+        return code[start:code.index(".catch(", start)]
+
+    def test_the_front_door_shows_nobody_else_and_it_FOLLOWS_front(self):
+        """Ghost, Sept 19: "when im on fours screen the other ones arent
+        visible tabs on her interface."
+
+        She is the character a stranger meets with no context, so four
+        other AIs across the top of her screen is the demo answering a
+        question nobody asked.
+
+        THE GATE READS `front`, NEVER HER NAME. Testing `ME === 'four'`
+        would be the hardcoded cast in its fourth costume -- after Mimi
+        invisible from the front page, `#saya { border-color }` glowing
+        on a tile that had moved into a drawer, and an app icon called
+        "Saya's Face" pointing at a page Four had taken over. Every one
+        of those looked exactly like the deck working.
+
+        BOTH ENDS ARE PINNED, because the gate is only as alive as the
+        key it reads: if `roster()` ever stops emitting `front`, the
+        page silently starts showing the rail again and nothing says
+        so."""
+        self.assertIn("front", self.rail_builder(),
+                      "her rail does not consult `front` -- so it is "
+                      "either always on, or gated on a hardcoded name")
+        import yuzu_face
+        mine = [c for c in yuzu_face.roster() if c["who"] == "four"]
+        self.assertEqual([c["front"] for c in mine], [True],
+                         "the roster no longer tells her page she is "
+                         "the front door")
+
+    def test_an_empty_rail_can_never_cost_the_way_out(self):
+        """EVERY SCREEN ON THIS DECK HAS A WAY OFF IT -- two power
+        cycles paid for that sentence, and it is the one rule this
+        project will not trade.
+
+        Emptying the rail is only safe because the ⌂ is its SIBLING
+        rather than something inside it. Nest the exit in the rail and
+        hiding the cast takes the way out with it, chromeless and
+        fullscreen on the panel where the ⌂ IS the exit."""
+        bar = self.code()
+        bar = bar[bar.index('id="top"'):bar.index('id="stage"')]
+        rail, home = bar.index('id="rail"'), bar.index('id="home"')
+        self.assertLess(rail, home, "the exit moved above the rail")
+        # Between the rail's id and the home button there is exactly one
+        # closing tag -- the rail's own. More than one, and the exit is
+        # nested inside the thing that is now empty.
+        self.assertEqual(bar[rail:home].count("</div>"), 1,
+                         "the way out is nested inside the rail")
+
     def test_she_is_the_front_door_and_still_in_the_drawer(self):
         import yuzu_face
         self.assertEqual(yuzu_face.FRONT, "four")
