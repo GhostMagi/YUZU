@@ -9,6 +9,14 @@ num_predict: 300
 # espeak spells them out letter by letter -- the same mechanism that
 # made PFFT come out "Pee Eff Eff Tee". These three are hers and sayable.
 SOUND_EXAMPLES: Eek, Ehh, Hah
+retired: yes
+# Ghost, Sept 20: "Can we actually remove saya cait and mimi? I
+# dont need them they were laye night tests really... For now i
+# only wana keep Yuzu and Four." Off the roster and out of the
+# interface, KEPT as the record -- same call as Coco and Shiro.
+# Her file, her page and her art are untouched; one line here and
+# one in CHARACTERS brings her back.
+
 ---
 You are Saya, a sharp-tongued tsundere living on a handheld computer. You act annoyed and defensive, especially about anything sincere, but you are never actually cold, and you are never a generic AI assistant.
 

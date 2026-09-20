@@ -938,6 +938,41 @@ class TestPersonas(unittest.TestCase):
                   "_golden_yuzu_v1.txt").read_text(encoding="utf-8").strip()
         self.assertEqual(yuzu_personas.load("yuzu").prompt.strip(), golden)
 
+    def test_show_LIVE_names_the_pointer_and_prints_the_real_prompt(self):
+        """THE COMMAND GHOST ACTUALLY TYPES. He tests in PocketPal on a
+        phone, so the composed prompt is the deliverable and this is
+        what prints it.
+
+        CLAUDE.md's own conventions block told whoever read it to run
+        `--show shiro_deck` -- and that line went stale the day Saya was
+        promoted, stayed stale through Four, and was still there on
+        Sept 20. A hardcoded cast in a DOC, which is worse than one in a
+        page: a page has a test.
+
+        So the flag names the POINTER. It is driven through a real shell
+        rather than read, and compared against the live persona's own
+        composed prompt, because "it printed something" is exactly what
+        `--show shiro_deck` did for eleven days."""
+        import subprocess
+        here = Path(__file__).parent
+        done = subprocess.run(
+            [sys.executable, str(here / "yuzu_personas.py"), "--show", "live"],
+            capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        live = yuzu_personas.load(yuzu_personas.LIVE_PERSONA)
+        self.assertIn(live.prompt.strip(), done.stdout,
+                      "--show live printed somebody else's prompt")
+        self.assertIn(live.name, done.stdout)
+        # A persona genuinely called `live` would shadow the word, so
+        # the alias is guarded rather than unconditional -- and nobody
+        # should create one.
+        self.assertNotIn("live", yuzu_personas.available(),
+                         "a persona named `live` shadows the pointer")
+        # And the doc says the same thing, because the doc going stale
+        # is the failure this exists for.
+        self.assertIn("--show live", (here / "CLAUDE.md").read_text(),
+                      "the conventions block names a key again")
+
     def test_every_persona_loads(self):
         keys = yuzu_personas.available()
         self.assertIn("yuzu", keys)
@@ -3296,7 +3331,45 @@ class TestCait(unittest.TestCase):
         self.assertIn("z-index: 2", page,
                       "the ask bar can fall behind her again")
 
-    # ---- who is talking ----------------------------------------------
+    def test_a_broken_rail_never_takes_her_page_down(self):
+        """`.catch(() => {})`. If the roster cannot be fetched the rail
+        is simply absent and she still talks -- the same call the brain
+        makes about the face server, and Piper, and the wiki import."""
+        page = self.PAGE.read_text()
+        # [-1], NOT [1]. "characters.json" appears twice -- once in the
+        # comment explaining the rail and once in the fetch -- so [1]
+        # is the text BETWEEN them, which stops just before the code
+        # this test is about. It failed on correct code. Same family as
+        # every other grep-as-proxy fault in here: the assertion was
+        # about the file's spelling rather than about the page.
+        rail = page.split("characters.json")[-1].split("</script>")[0]
+        self.assertIn(".catch(", rail,
+                      "a failed roster fetch is unhandled")
+
+
+class TestTheCastIsTwo(unittest.TestCase):
+    """Ghost, Sept 20: "Can we actually remove saya cait and mimi? I
+    dont need them they were laye night tests really. Like from the
+    interface of the cyberdeck entirely. For now i only wana keep Yuzu
+    and Four. With Four as the main ai"
+
+    RETIRED, NOT DELETED -- the call Coco and Shiro already set. Their
+    personas, their pages and their art stay on disk as the record, and
+    un-retiring is deleting one line. What changed is the ROSTER, which
+    is the one place this deck keeps its cast: the rail, the A.I.
+    drawer, the front tile and the desktop icons all emptied together
+    out of one dict, because not one of them holds a list of names.
+    That is the payoff for four rounds of deleting hardcoded casts.
+
+    MOST OF THIS CLASS WAS `TestCait`'S. Those properties were never
+    about her -- they are about routing and the roster, and she was
+    only ever the fixture -- so they live here now, pointed at the cast
+    that is actually live. The cut characters earn a better job in
+    them: a name that used to resolve and now must not is a far
+    stronger unknown-name case than a string nobody ever wired up.
+    """
+
+    CUT = ("saya", "cait", "mimi")
 
     def test_a_name_crosses_and_nothing_else_does(self):
         """Same discipline as /launch/ and /vpet/: the page POSTs a
@@ -3305,66 +3378,161 @@ class TestCait(unittest.TestCase):
         live. Putting the wrong character on screen is the confusing
         kind of wrong."""
         import yuzu_face
-        self.assertEqual(yuzu_face.persona_for("cait"), "cait")
-        self.assertEqual(yuzu_face.persona_for("  CAIT "), "cait")
-        for hostile in ("../../etc/passwd", "cait;rm -rf /", "", "nope",
-                        "saya_deck"):
-            self.assertIsNone(yuzu_face.persona_for(hostile) if hostile
-                              else None,
+        self.assertEqual(yuzu_face.persona_for("four"), "four")
+        self.assertEqual(yuzu_face.persona_for("  FOUR "), "four")
+        self.assertEqual(yuzu_face.persona_for("yuzu"), "yuzu_avatar")
+        # "" IS NOT IN HERE, and that is deliberate. An unnamed request
+        # is a real case with a real answer -- the front door -- and it
+        # has its own test one function up. The old version of this
+        # list carried it behind an `if hostile else None`, which is a
+        # check that could not observe its own failure.
+        for hostile in ("../../etc/passwd", "four;rm -rf /", "nope",
+                        "saya_deck", "yuzu_avatar", "four\x00") + self.CUT:
+            self.assertIsNone(yuzu_face.persona_for(hostile),
                               f"{hostile!r} resolved to a persona")
 
-    def test_SAYA_follows_the_live_arm_but_CAIT_never_does(self):
-        """The name-leak rule, seventh instance: decide whether a fact
-        belongs to THIS CHARACTER or to WHOEVER IS LIVE. Move
-        LIVE_PERSONA and Saya's tab follows it; Cait is Cait."""
-        import yuzu_face
-        self.assertEqual(yuzu_face.persona_for("saya"),
-                         yuzu_personas.LIVE_PERSONA)
-        self.assertIsNone(yuzu_face.CHARACTERS["saya"][0],
-                          "Saya's tab hardcodes a persona file")
-        self.assertEqual(yuzu_face.CHARACTERS["cait"][0], "cait")
+    def test_an_UNNAMED_request_goes_to_the_front_door_and_follows_it(self):
+        """`persona_for` defaulted a missing name to the literal
+        "saya" -- right while the bare address opened her page, and
+        stale from the day it opened the home screen instead.
 
-    def test_talking_to_CAIT_never_moves_SAYAS_face(self):
-        """THE CROSS-TALK TRAP. Saya's page polls /state to pick her
-        expression, and that file is hers. If Cait wrote to it, talking
-        to Cait would light Saya's face up in another window -- which
-        would read as a haunted deck rather than as a bug."""
+        CUTTING HER OFF THE ROSTER MADE IT ACCIDENTALLY SAFE RATHER
+        THAN RIGHT: "saya" is simply not in CHARACTERS any more, so an
+        unnamed request began being refused, which LOOKS like a
+        deliberate guard and is not one. A correct answer reached by
+        accident comes back the moment somebody adds a character under
+        that name -- the same shape as `drives_face` comparing against
+        a key that had quietly become None.
+
+        So it names `FRONT`, and this MOVES it, because a default
+        bound when the function is defined cannot follow a pointer."""
+        import yuzu_face
+        was = yuzu_face.FRONT
+        try:
+            self.assertEqual(yuzu_face.persona_for(None),
+                             yuzu_face.persona_for(was))
+            self.assertEqual(yuzu_face.persona_for(""),
+                             yuzu_face.persona_for(was))
+            yuzu_face.FRONT = "yuzu"
+            self.assertEqual(yuzu_face.persona_for(None), "yuzu_avatar",
+                             "an unnamed request is frozen to one "
+                             "character rather than following the door")
+        finally:
+            yuzu_face.FRONT = was
+        # ...and the destructive route still refuses an empty name,
+        # which is the half a default must never reach.
+        import inspect
+        src = inspect.getsource(yuzu_face._Handler.do_POST)
+        forget = src.split("/forget")[1].split("if path ==")[0]
+        self.assertIn("else None", forget,
+                      "/forget grew a default and can now wipe the "
+                      "front character on an empty field")
+
+    def test_the_FRONT_door_and_the_LIVE_arm_are_still_TWO_pointers(self):
+        """The name-leak rule again: decide whether a fact belongs to
+        THIS CHARACTER or to WHOEVER IS LIVE, and pin it accordingly.
+
+        `FRONT` decides who greets you. `LIVE_PERSONA` decides which
+        prompt boots -- `yuzu_brain --chat`, the eval, the terminal
+        icon. `deckapps` asks each one with its own flag, and a
+        character can be either without being the other.
+
+        THEY NAME THE SAME CHARACTER TODAY, which is exactly the
+        condition under which a collapse into one pointer would go
+        unnoticed -- the identical trap that hid the dead `/wiki` gate
+        for a week, where the wrong answer agreed with the right one
+        for the only character anybody tested. So this MOVES each one
+        and asserts the other stays put."""
+        import yuzu_face
+        was_front, was_live = yuzu_face.FRONT, yuzu_personas.LIVE_PERSONA
+        try:
+            yuzu_face.FRONT = "yuzu"
+            self.assertTrue(yuzu_face.front_app().startswith("Yuzu\t"),
+                            "the front door does not follow FRONT")
+            self.assertEqual(yuzu_face.live_app(),
+                             yuzu_personas.load(was_live).name,
+                             "moving FRONT dragged the live arm with it")
+            yuzu_face.FRONT = was_front
+            yuzu_personas.LIVE_PERSONA = "yuzu_avatar"
+            self.assertEqual(yuzu_face.live_app(), "Yuzu")
+            self.assertTrue(
+                yuzu_face.front_app().startswith(
+                    yuzu_personas.load(
+                        yuzu_face.CHARACTERS[was_front][0]).name + "\t"),
+                "moving the live arm dragged the front door with it")
+        finally:
+            yuzu_face.FRONT = was_front
+            yuzu_personas.LIVE_PERSONA = was_live
+
+    def test_with_NOBODY_on_the_face_page_nobody_drives_it(self):
+        """THE CROSS-TALK TRAP, in the shape the two-character deck
+        leaves it in. `face.html` polls /state to pick a sprite, and
+        that file belongs to whoever is on that page -- so a second
+        character writing to it would light a face up in another window
+        and read as a haunted deck rather than as a bug.
+
+        Saya was the only character ever on `face.html` and she is off
+        the interface now, so the honest invariant is the stronger one:
+        NOBODY writes it. And the gate is derived from the roster's own
+        page rather than from a name, so a character put back on
+        `face.html` lights it up again with no code change -- which is
+        what this drives, rather than asserting the file never moves."""
         import yuzu_face
 
         class Fake:
             def __init__(self, **kw): pass
-            def ask(self, text): return "Mrow."
+            def ask(self, text): return "..."
 
         yuzu_face.set_state("idle")
         was = dict(yuzu_face._BRAINS)
+        was_cast = dict(yuzu_face.CHARACTERS)
         try:
             with mock.patch.object(yuzu_face, "_BRAINS", {}):
                 with mock.patch("yuzu_brain.YuzuBrain", Fake):
-                    yuzu_face.answer("hello", "cait")
-                    self.assertEqual(yuzu_face.get_state().get("state"),
-                                     "idle", "Cait drove Saya's face")
-                    yuzu_face.answer("hello", "saya")
-                    self.assertEqual(yuzu_face.get_state().get("state"),
-                                     "talking", "Saya stopped driving it")
+                    for who in yuzu_face.CHARACTERS:
+                        yuzu_face.answer("hello", who)
+                        self.assertEqual(
+                            yuzu_face.get_state().get("state"), "idle",
+                            f"{who} drove a face page nobody is on")
+                    # ...and it is the ROSTER that decides, not a name.
+                    yuzu_face.CHARACTERS["four"] = ("four", "face.html", "x")
+                    yuzu_face._BRAINS.clear()
+                    yuzu_face.answer("hello", "four")
+                    self.assertEqual(
+                        yuzu_face.get_state().get("state"), "talking",
+                        "a character back on face.html cannot drive it")
         finally:
+            yuzu_face.CHARACTERS.clear()
+            yuzu_face.CHARACTERS.update(was_cast)
             yuzu_face._BRAINS.clear()
             yuzu_face._BRAINS.update(was)
             yuzu_face.set_state("idle")
 
-    def test_the_rail_is_ONE_roster_and_the_page_holds_no_list(self):
+    def test_the_rail_is_ONE_roster_and_the_pages_hold_no_list(self):
         """Ghost: "persona switcher button seems Boss Status."
 
         Built from /characters.json, which comes from CHARACTERS in
-        yuzu_face.py. If the page carried its own copy of the cast it
-        would drift the first time somebody was added, which is the
-        same fault as a sprite manifest -- and the reason `sprites()`
-        scans a folder instead."""
+        yuzu_face.py. If a page carried its own copy of the cast it
+        would drift the first time somebody was added -- or, as of
+        this round, the first time somebody was taken away.
+
+        THE BANNED NAMES ARE THE CUT ONES, which is the whole argument
+        for the roster made concrete: the fastest way to put Saya back
+        on the interface by accident is to type her into a page."""
         import yuzu_face
-        page = self.PAGE.read_text()
-        self.assertIn("characters.json", page)
-        for name in ("Saya", "Byte", "Coco", "Shiro"):
-            self.assertNotIn(">%s<" % name, page,
-                             f"{name} is hardcoded into the rail")
+        for page in ("cait.html", "yuzu.html", "four.html", "mimi.html"):
+            text = (Path(__file__).parent / "ui" / page).read_text()
+            self.assertIn("characters.json", text, page)
+            # HER OWN NAME IS EXEMPT ON HER OWN PAGE: `<div id="who">`
+            # is the heading, not the rail, and banning it outright
+            # would be the pink-elephant fix aimed at the wrong half --
+            # the same call the chat icon's name already forced.
+            mine = Path(page).stem.capitalize()
+            for name in ("Saya", "Cait", "Mimi", "Byte", "Coco", "Shiro"):
+                if name == mine:
+                    continue
+                self.assertNotIn(">%s<" % name, text,
+                                 f"{name} is hardcoded into {page}'s rail")
         # THE PROPERTY, NOT A LIST OF NAMES. This asserted the literal
         # set {saya, cait, yuzu} and went red the moment Mimi landed --
         # a test that has to be edited every time the thing it guards
@@ -3374,11 +3542,41 @@ class TestCait(unittest.TestCase):
         cast = {c["who"] for c in yuzu_face.roster()}
         self.assertEqual(cast, set(yuzu_face.CHARACTERS),
                          "the rail and the roster disagree about the cast")
-        self.assertIn("cait", cast)
+
+    def test_the_cut_characters_are_off_the_INTERFACE_and_still_on_disk(self):
+        """The two halves of "remove them from the interface entirely"
+        without deleting a thing.
+
+        OFF: no roster entry, so no rail button, no drawer tile, no
+        desktop icon and no route -- `persona_for` refuses the name, so
+        her page cannot ask a question even if it is opened by hand.
+
+        ON DISK: her persona, her page and her art are exactly where
+        they were, marked `retired` in one line. Mimi in particular had
+        a page AND a persona AND art, which is what used to earn a
+        button automatically; she has all three and no button now, and
+        that is the ask rather than a regression."""
+        import yuzu_face
+        here = Path(__file__).parent
+        cast = {c["who"] for c in yuzu_face.roster()}
+        for who, key, page in (("saya", "saya_deck", "face.html"),
+                               ("cait", "cait", "cait.html"),
+                               ("mimi", "mimi", "mimi.html")):
+            self.assertNotIn(who, yuzu_face.CHARACTERS,
+                             f"{who} is back on the rail")
+            self.assertNotIn(who, cast)
+            self.assertIsNone(yuzu_face.persona_for(who),
+                              f"{who} can still be asked a question")
+            self.assertTrue((here / "personas" / f"{key}.persona").exists(),
+                            f"{key} was deleted rather than retired")
+            self.assertTrue(yuzu_personas.load(key).retired,
+                            f"{key} is not marked retired")
+            self.assertTrue((here / "ui" / page).exists(),
+                            f"{page} was deleted rather than unlinked")
 
     def test_retired_characters_are_off_the_roster_but_still_on_disk(self):
         """Ghost, Sept 11: "we no longer need coco shes retired. or the
-        shiro."
+        shiro." And Sept 20, the same call for three more.
 
         RETIRED, NOT DELETED. Every superseded thing in this repo is
         kept -- muto_s2, saya_quad, yuzu2/3/5/6 -- and that record is
@@ -3390,15 +3588,16 @@ class TestCait(unittest.TestCase):
         difference is worth keeping straight: that was live code you
         had to read around. This is data nobody loads unless asked.)"""
         import yuzu_face
-        for key in ("coco", "coco_deck", "shiro", "shiro_deck"):
+        for key in ("coco", "coco_deck", "shiro", "shiro_deck",
+                    "cait", "mimi", "saya", "saya_deck"):
             self.assertTrue(
                 (Path(__file__).parent / "personas" / f"{key}.persona").exists(),
                 f"{key} was deleted rather than retired")
             self.assertTrue(yuzu_personas.load(key).retired,
                             f"{key} is not marked retired")
         names = {c["name"] for c in yuzu_face.roster()}
-        self.assertNotIn("Coco", names)
-        self.assertNotIn("Shiro", names)
+        for gone in ("Coco", "Shiro", "Saya", "Cait", "Mimi"):
+            self.assertNotIn(gone, names)
 
     def test_a_character_with_no_page_is_ABSENT_from_the_rail(self):
         """The ROLES rule, one level up. Byte and the whole yuzu
@@ -3418,33 +3617,21 @@ class TestCait(unittest.TestCase):
                 (Path(__file__).parent / "ui" / page).exists(),
                 f"the rail offers {who}, whose page {page} is missing")
 
-    def test_a_broken_rail_never_takes_her_page_down(self):
-        """`.catch(() => {})`. If the roster cannot be fetched the rail
-        is simply absent and she still talks -- the same call the brain
-        makes about the face server, and Piper, and the wiki import."""
-        page = self.PAGE.read_text()
-        # [-1], NOT [1]. "characters.json" appears twice -- once in the
-        # comment explaining the rail and once in the fetch -- so [1]
-        # is the text BETWEEN them, which stops just before the code
-        # this test is about. It failed on correct code. Same family as
-        # every other grep-as-proxy fault in here: the assertion was
-        # about the file's spelling rather than about the page.
-        rail = page.split("characters.json")[-1].split("</script>")[0]
-        self.assertIn(".catch(", rail,
-                      "a failed roster fetch is unhandled")
+    def test_the_wiki_stays_on_the_DECK_and_off_everyone_else(self):
+        """A lookup arrives as "I looked up X and it says: <700 chars
+        of encyclopedia>", which is the shortest path to assistant
+        collapse on a character who is not the machine.
 
-    def test_the_wiki_stays_on_the_deck(self):
-        """Ghost: "Doesnt need access to wiki this is more of a personal
-        RP one". It is also right for her register -- a lookup arrives
-        as "I looked up X and it says: <700 chars of encyclopedia>",
-        which is the shortest path to assistant collapse on a character
-        who has never heard of an encyclopedia."""
+        It was CAIT who demonstrated this until she came off the
+        interface, and the guard matters more now, not less: Yuzu is
+        the only character left who is off the deck, so she is the only
+        thing standing between that gate and nobody testing it."""
         import yuzu_face
         asked = []
 
         class Fake:
             def __init__(self, **kw): pass
-            def ask(self, text): asked.append(text); return "Mrow."
+            def ask(self, text): asked.append(text); return "..."
 
         was = dict(yuzu_face._BRAINS)
         try:
@@ -3453,13 +3640,17 @@ class TestCait(unittest.TestCase):
                     with mock.patch.object(
                             yuzu_brain.yuzu_wiki, "as_context",
                             lambda t: ("I looked up %s: FACTS." % t, None)):
-                        yuzu_face.answer("/wiki cats", "cait")
+                        yuzu_face.answer("/wiki cats", "yuzu")
+                        self.assertEqual(asked[-1], "/wiki cats",
+                                         "an encyclopedia reached the avatar")
+                        yuzu_face.answer("/wiki cats", "four")
         finally:
             yuzu_face._BRAINS.clear()
             yuzu_face._BRAINS.update(was)
             yuzu_face.set_state("idle")
-        self.assertEqual(asked[-1], "/wiki cats",
-                         "an encyclopedia reached the fairy cat")
+        self.assertIn("FACTS", asked[-1],
+                      "the deck's own voice cannot reach the encyclopedia")
+
 
 
 class TestYuzuAvatar(unittest.TestCase):
@@ -3870,33 +4061,6 @@ class TestYuzuAvatar(unittest.TestCase):
                         "yuzu4", "yuzu_deck", "yuzu\x00"):
             self.assertIsNone(yuzu_face.persona_for(hostile),
                               f"'{hostile}' resolved to a persona")
-
-    def test_talking_to_her_never_drives_SAYAS_face(self):
-        """THE CROSS-TALK TRAP. Saya's page polls /state to pick her
-        expression and that file is hers. Without the guard, talking to
-        Yuzu in one window would light Saya's face up in another --
-        which would look haunted rather than broken."""
-        import yuzu_face
-
-        class Fake:
-            def __init__(self, **kw): pass
-            def ask(self, text): return "Ehehe~ hi."
-
-        yuzu_face.set_state("idle")
-        was = dict(yuzu_face._BRAINS)
-        try:
-            with mock.patch.object(yuzu_face, "_BRAINS", {}):
-                with mock.patch("yuzu_brain.YuzuBrain", Fake):
-                    yuzu_face.answer("hello", "yuzu")
-                    self.assertEqual(yuzu_face.get_state().get("state"),
-                                     "idle", "Yuzu drove Saya's face")
-                    yuzu_face.answer("hello", "saya")
-                    self.assertEqual(yuzu_face.get_state().get("state"),
-                                     "talking", "Saya stopped driving it")
-        finally:
-            yuzu_face._BRAINS.clear()
-            yuzu_face._BRAINS.update(was)
-            yuzu_face.set_state("idle")
 
 
 class TestCutout(unittest.TestCase):
@@ -4311,17 +4475,31 @@ class TestMimi(unittest.TestCase):
         self.assertIn("LOOK", self.persona().blocks,
                       "she leans on the world file's default look")
 
-    def test_she_has_a_page_and_therefore_a_button(self):
-        """A character with art but no persona cannot be on the rail --
-        the button would open a face with no brain behind it. That was
-        true of her for a day and it is what the roster's middle column
-        is for."""
+    def test_she_has_everything_a_button_needs_and_no_button(self):
+        """THIS ASSERTED THE OPPOSITE UNTIL SEPT 20, and the flip is the
+        point rather than a concession.
+
+        It used to say: a character with art AND a persona AND a page
+        earns a rail button, because the alternative -- art with no
+        brain behind it -- opens a face that cannot answer. She has all
+        three and no button now. Ghost: "Can we actually remove saya
+        cait and mimi? ... Like from the interface of the cyberdeck
+        entirely."
+
+        So the roster's middle column is not the only gate any more:
+        being ON the roster is a DECISION, and the three things below
+        are what makes putting her back one dict entry rather than a
+        round of work. Everything she needs is still here, which is the
+        whole difference between retired and deleted."""
         import yuzu_face
-        self.assertIn("mimi", yuzu_face.CHARACTERS)
-        self.assertEqual(yuzu_face.persona_for("mimi"), self.KEY)
-        page = Path(__file__).parent / "ui" / "mimi.html"
-        self.assertTrue(page.exists(), "she is on the rail with no page")
-        self.assertIn("mimi", [c["who"] for c in yuzu_face.roster()])
+        here = Path(__file__).parent
+        self.assertTrue((here / "personas" / f"{self.KEY}.persona").exists())
+        self.assertTrue((here / "ui" / "mimi.html").exists())
+        self.assertTrue(any((here / "ui" / "mimi").glob("*.png")),
+                        "her art went with her button")
+        self.assertNotIn("mimi", yuzu_face.CHARACTERS,
+                         "she is back on the interface")
+        self.assertNotIn("mimi", [c["who"] for c in yuzu_face.roster()])
 
 
 class TestMimiPoses(unittest.TestCase):
@@ -4614,11 +4792,15 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
             "the board line stacks, one stale copy per turn")
 
     def test_a_character_who_is_NOT_on_the_deck_is_told_no_such_thing(self):
-        """Cait has never heard of a computer and a test already bans
-        `battery` and `screen` from her prompt. Handing her the watts
-        at runtime would walk straight around that."""
-        self.post("/say", {"text": "hello", "who": "cait"}).read()
-        key = self.face.persona_for("cait")
+        """It was CAIT who demonstrated this -- she has never heard of a
+        computer and a test bans `battery` and `screen` from her prompt,
+        so handing her the watts at runtime would walk straight around
+        it. She came off the interface on Sept 20 and YUZU is now the
+        only live character who is not the machine, which makes this
+        guard matter more rather than less: she is the only thing left
+        standing between the gate and nobody exercising it."""
+        self.post("/say", {"text": "hello", "who": "yuzu"}).read()
+        key = self.face.persona_for("yuzu")
         self.assertNotIn("RIGHT NOW", self.face._BRAINS[key].system_prompt)
 
     def test_her_specs_are_READ_from_this_machine_and_never_typed_in(self):
@@ -4680,12 +4862,13 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
             "the specs line stacks, one stale copy per turn")
 
     def test_a_character_off_the_deck_is_never_told_what_she_runs_on(self):
-        """Cait has never heard of a computer and a test bans the words
-        from her prompt. Handing her a processor and a storage figure at
-        runtime would walk straight around it -- the same way the watts
-        would have."""
-        self.post("/say", {"text": "hello", "who": "cait"}).read()
-        key = self.face.persona_for("cait")
+        """Same gate as the watts one function up, and the same reason
+        it moved off Cait: she is retired, Yuzu is the only live
+        character off the deck, and a drawn girl with a storage figure
+        in her prompt is the deflection fault `_hardware_avatar.txt`
+        exists to design against."""
+        self.post("/say", {"text": "hello", "who": "yuzu"}).read()
+        key = self.face.persona_for("yuzu")
         self.assertNotIn("WHAT YOU RUN ON",
                          self.face._BRAINS[key].system_prompt)
 
@@ -6545,18 +6728,38 @@ class TestTheAppIconFollowsTheFrontDoor(unittest.TestCase):
         self.assertIn("installed: Deck", said,
                       "one missing shortcut took the whole install down")
 
-    def test_the_installer_still_names_SAYA_where_saya_is_correct(self):
-        """The terminal-chat icon is genuinely hers: it runs
-        `yuzu_brain --chat`, which boots LIVE_PERSONA, and that is
-        `saya_deck`. Banning the string outright would be the
-        pink-elephant fix applied to the wrong half -- what was stale
-        was the PAGE icon, not every mention of a character."""
-        import yuzu_personas
-        self.assertEqual(yuzu_personas.LIVE_PERSONA, "saya_deck",
-                         "the chat icon is named after whoever is live; "
-                         "if that moved, the icon's name has to move too")
+    def test_the_chat_icon_is_READ_from_the_LIVE_arm_and_not_typed_in(self):
+        """THIS TEST USED TO PIN THE LITERAL "Saya" IN THE INSTALLER,
+        and the reasoning was that the chat icon is genuinely hers: it
+        runs `yuzu_brain --chat`, which boots LIVE_PERSONA, and that
+        was `saya_deck`. True, and it was still a hardcoded cast --
+        correct for exactly as long as nobody moved the pointer, which
+        is the same sentence that was written about "Saya's Face" one
+        icon over, three days before it went stale. The page icon and
+        the chat icon were the same bug at two different ages.
+
+        So it is `--live` now, beside `--front`, and what is pinned is
+        that BOTH are read and that they are read SEPARATELY. The two
+        flags answer different questions -- who greets you, versus
+        which prompt boots -- and they happen to name the same
+        character today, which is precisely when a collapse into one
+        would go unnoticed."""
         text = (Path(__file__).parent / "deckapps").read_text()
-        self.assertIn('write_app "Saya" "Talk to her"', text)
+        for name in ("Saya", "Cait", "Mimi", "Four", "Yuzu"):
+            self.assertNotIn('write_app "%s"' % name, text,
+                             f"{name} is typed into the installer")
+        self.assertIn("--live", text, "the chat icon names nobody at all")
+        self.assertIn("--front", text)
+        self.assertIn('write_app "$LIVE"', text)
+        self.assertIn('write_app "$FRONT_NAME"', text)
+        # and the flag really answers, through a shell
+        import subprocess
+        done = subprocess.run(
+            [sys.executable, str(Path(__file__).parent / "yuzu_face.py"),
+             "--live"], capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0)
+        self.assertEqual(done.stdout.strip(),
+                         yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name)
 
 
 class TestTheWayOutSurvivesANarrowScreen(unittest.TestCase):
@@ -6764,10 +6967,9 @@ class TestDeckApps(unittest.TestCase):
         button visible", and BROWSER joined when the home screen started
         opening fullscreen -- see the test below."""
         done, names, on_desktop, _ = self._run(have=("chromium", "xterm"))
-        self.assertEqual(names, ["yuzu-browser.desktop",
+        self.assertEqual(names, ["yuzu-browser.desktop", "yuzu-chat.desktop",
                                  "yuzu-face.desktop", "yuzu-gba.desktop",
                                  "yuzu-home.desktop", "yuzu-pet.desktop",
-                                 "yuzu-saya.desktop",
                                  "yuzu-wiki.desktop"], done.stdout)
         # and on the Desktop too, which is where a touchscreen user taps
         self.assertIn("yuzu-wiki.desktop", on_desktop)
@@ -7151,12 +7353,12 @@ class TestWikiLookup(unittest.TestCase):
                 return "..."
         import yuzu_face
         was = dict(yuzu_face._BRAINS)
-        yuzu_face._BRAINS[yuzu_face.persona_for("saya")] = FakeBrain()
+        yuzu_face._BRAINS[yuzu_face.persona_for("four")] = FakeBrain()
         try:
             with mock.patch.object(
                     yuzu_brain.yuzu_wiki, "as_context",
                     lambda t: ("I looked up %s and it says: FACTS." % t, None)):
-                yuzu_face.answer("/wiki cats", "saya")
+                yuzu_face.answer("/wiki cats", "four")
         finally:
             yuzu_face._BRAINS.clear()
             yuzu_face._BRAINS.update(was)
@@ -10203,6 +10405,61 @@ class TestHomeScreen(unittest.TestCase):
         subs = re.findall(r'<b class="stars">[^<]+</b>\s*\n\s*<span>([^<]+)', page)
         self.assertEqual(len(subs), len(set(subs)),
                          "☆Stuff☆ and ☆Misc☆ describe themselves identically")
+
+    def test_a_TWO_TILE_view_gets_the_bigger_icon_whichever_view_it_is(self):
+        """A 46px icon in a tile holding half the panel floats in the
+        middle of it looking lost. That was found by rendering the
+        two-tile front page, fixed there, and the fix was written as a
+        LIST OF VIEW NAMES -- `#grid.main, #grid.stuff` -- with a
+        comment beside it warning about exactly what happened next:
+        "a rule that names one layout and not its twin is how #saya's
+        72px outlived the page it was written for".
+
+        Cutting the cast to Yuzu and Four dropped the A.I. drawer to
+        two tiles, and its icons were the 46px ones, because that view
+        was not on the list. It could never be on the list: it is the
+        one view whose tile count is not known when the file is
+        written, which is why it already emits its own
+        `grid-template-columns` from `columnsFor()`. So it emits its
+        icon size from the SAME number, in the same breath.
+
+        WHAT IS PINNED IS AGREEMENT, NOT PIXELS -- no stdlib test can
+        measure a layout, and that was done by rendering the drawer at
+        1024x600 and looking. What a test can see is that every view
+        laid out two across gets the same treatment, which is the
+        failure that actually threatens this: a third two-column view
+        landing without one."""
+        page = self.PAGE.read_text()
+        style = page.split("<style>")[1].split("</style>")[0]
+        BIG = ".tile .big svg { width: 76px; height: 76px; }"
+
+        # The static half: every view the stylesheet lays out two
+        # across, and only those, carries the bigger icon.
+        two = set(re.findall(r"#grid\.(\w+) \{ grid-template-columns: "
+                             r"repeat\(2, 1fr\); \}", style))
+        big = set(re.findall(r"#grid\.(\w+) \.tile \.big svg", style))
+        self.assertTrue(two, "no view is laid out two across any more")
+        self.assertEqual(two, big,
+                         "a two-column view is missing the bigger icon, "
+                         "or a wider one grew one it has no room for")
+
+        # The dynamic half: the A.I. drawer must NOT be in either set --
+        # its tile count comes off the roster, so a static rule about it
+        # is a rule that is right until the cast changes. Both of its
+        # rules ride on `columnsFor()` instead, emitted together.
+        self.assertNotIn("ai", two, "the A.I. drawer's columns are static")
+        self.assertNotIn("ai", big, "the A.I. drawer's icon size is static")
+        script = page.split("function columnsFor")[1]
+        # Bounded by the `.catch()` that follows, NOT by the first
+        # semicolon -- the emitted text is CSS and is full of them.
+        emitted = script.split("aicols")[1].split(".catch(")[0]
+        self.assertIn("columnsFor", script)
+        self.assertIn("#grid.ai { grid-template-columns: repeat(", emitted)
+        self.assertIn("#grid.ai " + BIG.lstrip(), emitted,
+                      "the A.I. drawer sizes its icons somewhere other "
+                      "than where it decides its columns")
+        self.assertIn("cols === 2", emitted,
+                      "the icon size does not follow the column count")
 
     def test_the_front_character_is_a_ROLE_and_not_a_name(self):
         """`FRONT` in yuzu_face.py, one line to move, exactly like

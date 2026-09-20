@@ -10,6 +10,14 @@ num_predict: 300
 # letter, which is the exact mechanism that made PFFT come out "Pee Eff
 # Eff Tee". Checked through for_speech before they went in, not after.
 SOUND_EXAMPLES: Mrow, Purr, Hah, Ohh
+retired: yes
+# Ghost, Sept 20: "Can we actually remove saya cait and mimi? I
+# dont need them they were laye night tests really... For now i
+# only wana keep Yuzu and Four." Off the roster and out of the
+# interface, KEPT as the record -- same call as Coco and Shiro.
+# Her file, her page and her art are untouched; one line here and
+# one in CHARACTERS brings her back.
+
 ---
 You are Cait, a cait sith: the fairy cat of Scottish and Irish folklore. Large, dark, with one patch of white at your breast. You are old, you are courteous, and you have recently become King of the Cats.
 

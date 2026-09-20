@@ -129,13 +129,22 @@ body {
 #grid.main { grid-template-columns: repeat(2, 1fr); }
 #grid.stuff { grid-template-columns: repeat(2, 1fr); }
 #grid.misc { grid-template-columns: repeat(3, 1fr); }
-/* THE A.I. VIEW SETS ITS OWN COLUMNS FROM JAVASCRIPT, because it is
-   the only view whose tile count is not known when this file is
-   written -- it is built from the roster. `columnsFor()` is the rule
-   and it is there so a fifth character cannot orphan one onto a row of
-   its own, which is the bug a screenshot caught on the very first home
-   screen and that a fifth tile brought back once already. */
-#grid.ai { grid-template-columns: repeat(2, 1fr); }
+/* THE A.I. VIEW SETS ITS OWN LAYOUT FROM JAVASCRIPT -- its columns AND
+   its icon size, together, off one number -- because it is the only
+   view whose tile count is not known when this file is written: it is
+   built from the roster. `columnsFor()` is the rule, and it is there
+   so a fifth character cannot orphan one onto a row of its own, which
+   is the bug a screenshot caught on the very first home screen and
+   that a fifth tile brought back once already.
+
+   IT DELIBERATELY HAS NO STATIC RULE OF ITS OWN HERE, and that is the
+   Sept 20 finding. It used to carry `repeat(2, 1fr)`, which was true
+   of the cast that happened to exist -- and the two-tile ICON rule
+   below names views instead of counting columns, so when the cast was
+   cut to two the drawer got two big tiles wearing the small icons. A
+   static rule about a view whose size comes off the roster is right
+   only until the roster changes. `#grid`'s own two columns above are
+   the fallback for a roster that never answers. */
 
 /* THE WAY OUT LIVES IN THE BAR, not in the grid. Ghost means to "pile
    up our fancy future apps" in the drawer, so a Back TILE would spend
@@ -665,9 +674,27 @@ fetch('characters.json', { cache: 'no-store' })
     // ☆Stuff☆ is in the markup and works with no server at all, so the
     // front page falls back to one tile across rather than one tile
     // sitting in half a screen. Same call as Yuzu's wardrobe button.
+    // AN ICON IS SIZED BY HOW MUCH ROOM ITS TILE HAS, and this is the
+    // one view whose tile count is not known when this file is
+    // written -- so it is the one view whose icon size cannot be a
+    // static rule either. Cutting the cast to two left each tile
+    // holding half the panel with a 46px icon floating in the middle
+    // of it: the IDENTICAL fault a screenshot caught on the two-tile
+    // front page, in the one view that was still naming a layout it
+    // could no longer be sure of. The comment beside that static rule
+    // says it outright -- "a rule that names one layout and not its
+    // twin is how #saya's 72px outlived the page it was written for".
+    //
+    // So it rides on the number that already decides the layout,
+    // emitted in the same breath, rather than on a second list.
+    const cols = columnsFor(list.length);
     document.getElementById('aicols').textContent =
-      '#grid.ai { grid-template-columns: repeat(' +
-      columnsFor(list.length) + ', 1fr); }' +
+      '#grid.ai { grid-template-columns: repeat(' + cols + ', 1fr); }' +
+      (cols === 2
+        ? ' #grid.ai .tile .big svg { width: 76px; height: 76px; }' +
+          ' #grid.ai .tile b { font-size: 26px; }' +
+          ' #grid.ai .tile span { font-size: 15px; }'
+        : '') +
       (lead ? '' : ' #grid.main { grid-template-columns: 1fr; }');
   })
   .catch(() => {

@@ -147,12 +147,23 @@ echo "Installing deck apps..."
 # The chat is a terminal program, so it needs a terminal to live in.
 # Without one there is nothing to install and saying so beats a
 # launcher that opens nothing when tapped.
+# IT IS NAMED FROM LIVE_PERSONA, never typed in. This icon runs
+# `yuzu_brain --chat`, which boots whoever is live -- so its label is a
+# fact about the POINTER, not about a character. It said "Saya" for as
+# long as saya_deck was live and would have gone on saying it after
+# Four took over, which is the hardcoded cast in its fourth costume.
+# Absent rather than wrong: no answer, no icon.
 if [ -n "$TERM_APP" ]; then
-    write_app "Saya" "Talk to her" \
-        "$TERM_APP -e bash -c 'cd $YUZU && python3 yuzu_brain.py --chat; exec bash'" \
-        "utilities-terminal" "yuzu-saya"
+    if LIVE=$(python3 "$YUZU/yuzu_face.py" --live 2>/dev/null) \
+       && [ -n "$LIVE" ]; then
+        write_app "$LIVE" "Talk to her" \
+            "$TERM_APP -e bash -c 'cd $YUZU && python3 yuzu_brain.py --chat; exec bash'" \
+            "utilities-terminal" "yuzu-chat"
+    else
+        echo "  SKIPPED the chat icon: the live persona did not answer."
+    fi
 else
-    echo "  SKIPPED Saya: no terminal emulator found."
+    echo "  SKIPPED the chat icon: no terminal emulator found."
     echo "    sudo apt install -y xterm"
 fi
 

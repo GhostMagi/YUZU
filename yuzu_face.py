@@ -559,12 +559,26 @@ def get_state():
 # -- the deck version is the record of her bodiless era, the same way
 # saya_quad is of the robot one, and the whole point of the new arm is
 # that she HAS a body now.
+# CUT TO TWO, Sept 20. Ghost: "Can we actually remove saya cait and
+# mimi? I dont need them they were laye night tests really. Like from
+# the interface of the cyberdeck entirely. For now i only wana keep
+# Yuzu and Four. With Four as the main ai."
+#
+# THIS DICT IS THE WHOLE REMOVAL, which is the roster rule finally
+# being spent rather than just maintained. The rail, the A.I. drawer,
+# the front tile and the desktop icon are all built from here, so three
+# names leaving this dict takes them off every surface at once -- no
+# page edited, no menu to hunt through, nothing left naming them.
+#
+# RETIRED, NOT DELETED, exactly as Coco and Shiro were. Their persona
+# files, pages and art are untouched on disk; `retired: yes` keeps them
+# out of the checks that would otherwise force a choice between editing
+# the evidence and a red suite. Putting one back is a line here and a
+# line there -- and the record is what stopped yuzu5 being re-attempted
+# from scratch.
 CHARACTERS = {
     # name      persona key            page          what she is
-    "saya": (None,                     "face.html",  "the deck"),
-    "cait": ("cait",                   "cait.html",  "king of the cats"),
     "yuzu": ("yuzu_avatar",            "yuzu.html",  "gyaru, fully dressed"),
-    "mimi": ("mimi",                   "mimi.html",  "five hundred years here"),
     "four": ("four",                   "four.html",  "the deck's own voice"),
 }
 
@@ -642,7 +656,16 @@ _BRAINS = {}
 def persona_for(who):
     """The persona key behind a character NAME, or None if it is not a
     name this deck knows."""
-    who = (who or "saya").strip().lower()
+    # AN UNNAMED REQUEST MEANS WHOEVER GREETS YOU. This defaulted to
+    # the literal "saya" -- right while the bare address opened her
+    # page, and stale from the day it opened the home screen. Cutting
+    # her off the roster made it accidentally SAFE rather than right:
+    # "saya" is simply not in CHARACTERS any more, so it refused. A
+    # correct answer reached by accident is the `drives_face` fault one
+    # function over, and it comes back the moment a character is added
+    # under that name. `FRONT` is the honest reading of a request that
+    # names nobody, and it moves when he moves it.
+    who = (who or FRONT).strip().lower()
     if who not in CHARACTERS:
         return None
     import yuzu_personas
@@ -669,6 +692,31 @@ def roster():
                     # rule that stopped Mimi being invisible.
                     "front": who == FRONT})
     return out
+
+
+def live_app():
+    """The NAME of whoever `LIVE_PERSONA` currently is, or "".
+
+    The terminal-chat icon runs `yuzu_brain --chat`, which boots
+    LIVE_PERSONA -- so its label is a fact about WHOEVER IS LIVE, not
+    about a character. It was the literal string "Saya" until Sept 20,
+    which was correct for exactly as long as `saya_deck` was live and
+    became a lie the moment Four took over. Fourth costume of the
+    hardcoded cast, after Mimi off the front page, `#saya` glowing on a
+    tile in a drawer, and an icon called "Saya's Face".
+
+    `--front` and this answer DIFFERENT questions and must not be
+    collapsed: one is who greets you, the other is which prompt boots.
+    A character can be either without being the other, which is the
+    whole reason those two pointers were split.
+
+    ABSENT RATHER THAN WRONG: "" means the installer skips that icon
+    rather than guessing a name."""
+    try:
+        import yuzu_personas
+        return yuzu_personas.load(yuzu_personas.LIVE_PERSONA).name or ""
+    except Exception:
+        return ""
 
 
 def front_app():
@@ -1003,7 +1051,7 @@ def voice_for(key):
     return _VOICES[key]
 
 
-def voice_wav(text, who="saya"):
+def voice_wav(text, who=None):
     """(wav_bytes, error). The caller gets audio or a sentence, never
     an exception -- a speaker that fails must not take the page with
     it, which is the promise every nicety on this deck makes."""
@@ -1034,7 +1082,7 @@ def voice_wav(text, who="saya"):
         return None, str(exc)
 
 
-def answer(text, who="saya", on_chunk=None):
+def answer(text, who=None, on_chunk=None):
     """One turn with a character, for the page. (reply, error).
 
     The chat lives in a terminal today, which on a 10" touchscreen with
@@ -1068,7 +1116,15 @@ def answer(text, who="saya", on_chunk=None):
     # it, talking to Cait would make Saya's face light up in another
     # window. Cait's page needs no state at all: its own fetch is in
     # flight while she thinks, so it already knows.
-    drives_face = (key == persona_for("saya"))
+    # DERIVED FROM THE ROSTER, NEVER FROM A NAME. This read
+    # `key == persona_for("saya")` until Sept 20, and the day Saya left
+    # the roster that became a comparison against None -- true of
+    # nothing, which is the right ANSWER reached by an accident rather
+    # than by the code meaning it. The sprite face belongs to whoever's
+    # page IS face.html; with nobody on it the state file is simply
+    # never written, and if she is ever put back this follows her.
+    drives_face = any(entry[1] == "face.html" and persona_for(name) == key
+                      for name, entry in CHARACTERS.items())
 
     # AND `/wiki` IS A SEPARATE QUESTION FROM THAT, which it was not
     # until Four landed. Both used to hang off `drives_face`, and the
@@ -1574,7 +1630,7 @@ class _Handler(SimpleHTTPRequestHandler):
                 size = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(size) or b"{}")
                 said = body.get("text", "")
-                who = body.get("who", "saya")
+                who = body.get("who", FRONT)
             except Exception:
                 said = who = ""
             said = said.strip()[:2000]
@@ -1608,7 +1664,7 @@ class _Handler(SimpleHTTPRequestHandler):
                 size = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(size) or b"{}")
                 said = (body.get("text") or "").strip()[:2000]
-                who = body.get("who", "saya")
+                who = body.get("who", FRONT)
             except Exception:
                 said = who = ""
             self.send_response(200)
@@ -1649,7 +1705,7 @@ class _Handler(SimpleHTTPRequestHandler):
                 size = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(size) or b"{}")
                 said = (body.get("text") or "").strip()[:2000]
-                who = body.get("who", "saya")
+                who = body.get("who", FRONT)
             except Exception:
                 said = who = ""
             wav, problem = (None, "Say something first.") if not said \
@@ -1681,9 +1737,9 @@ class _Handler(SimpleHTTPRequestHandler):
                 who = ""
             # AN EMPTY NAME IS A REFUSAL HERE, and that is a real
             # difference from /say. `persona_for` defaults a missing
-            # name to "saya", which is right for ASKING -- the bare
-            # address opens her page -- and wrong for DELETING: an
-            # empty field would have quietly wiped Saya's memory
+            # name to the FRONT character, which is the honest reading
+            # of a request that names nobody -- and wrong for DELETING:
+            # an empty field would quietly wipe the front door's memory
             # instead of doing nothing. Caught by the test, not by
             # reading it. A destructive route gets no defaults.
             key = persona_for(who) if (who or "").strip() else None
@@ -1882,6 +1938,12 @@ def _report():
 
 
 if __name__ == "__main__":
+    if "--live" in sys.argv:
+        # `deckapps` asks this so the chat icon never names a character
+        # who stopped being live.
+        said = live_app()
+        print(said)
+        sys.exit(0 if said else 1)
     if "--front" in sys.argv:
         # `deckapps` asks this so its app icon is never a cast list.
         said = front_app()

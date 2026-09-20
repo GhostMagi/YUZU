@@ -60,7 +60,7 @@ DEFAULT_PERSONA = "yuzu"
 # It is separate from DEFAULT_PERSONA on purpose: booting the frozen 20%
 # archive because it happens to own the short name is how the lineage
 # quietly regresses.
-LIVE_PERSONA = "saya_deck"
+LIVE_PERSONA = "four"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",
@@ -400,7 +400,8 @@ def scaffold(key):
 def _cli(argv):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--show", metavar="KEY",
-                        help="print a persona's composed system prompt")
+                        help="print a persona's composed system prompt "
+                             "('live' means whoever LIVE_PERSONA is)")
     parser.add_argument("--check", action="store_true",
                         help="validate every persona file")
     parser.add_argument("--new", metavar="KEY", help="scaffold a new persona")
@@ -417,6 +418,16 @@ def _cli(argv):
         return 0
 
     if args.show:
+        # `--show live` NAMES THE POINTER, NEVER A KEY. CLAUDE.md's own
+        # conventions block told whoever read it to run
+        # `--show shiro_deck`, and that line went stale the day Saya was
+        # promoted and stayed stale through Four -- a hardcoded cast in
+        # a doc, which is the same fault as one in a page and is worse,
+        # because a doc has no test. The composed prompt is the thing
+        # Ghost pastes into PocketPal, so the command that prints it has
+        # to be one line that survives the next promotion.
+        if args.show.lower() == "live" and "live" not in available():
+            args.show = LIVE_PERSONA
         try:
             persona = load(args.show.lower())
         except PersonaError as exc:

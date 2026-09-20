@@ -7,13 +7,16 @@
   the chat as a copy-paste block**, without being asked. Ghost tests in
   PocketPal on a phone, so a file path or a command is useless to him —
   he needs the text itself. Get it with:
-      python yuzu_personas.py --show shiro_deck
-  (that key is `yuzu_personas.LIVE_PERSONA`; `python yuzu_personas.py`
-  on its own marks which one is live.)
+      python yuzu_personas.py --show live
+  (`live` NAMES THE POINTER `yuzu_personas.LIVE_PERSONA`, never a key.
+  This line said `--show shiro_deck` and had been stale since Saya was
+  promoted on Sept 9 — a hardcoded cast in a doc, which is worse than
+  one in a page because a doc has no test. `python yuzu_personas.py`
+  on its own still marks which one is live.)
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 699 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 702 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 699 tests pass on it. Getting it
+(that repo path is confirmed working). 702 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -123,6 +126,157 @@ truncating write restored. All three go red. Clean under `--shuffle`.
 **STILL SILENT, and he has not asked:** Cait, Mimi and Saya's face.
 Each is the same four lines with her own name, and the agreement test
 gets stronger the moment there is a third.
+
+## THE CAST IS TWO NOW, AND ONE DICT DID ALL OF IT (Sept 20)
+
+Ghost: *"Can we actually remove saya cait and mimi? I dont need them
+they were laye night tests really. Like from the interface of the
+cyberdeck entirely. For now i only wana keep Yuzu and Four. With Four
+as the main ai"*
+
+    home      Four   ☆Stuff☆
+    A.I.      Yuzu   Four
+    the rail  Yuzu   Four
+
+**THE WHOLE CUT IS THREE LINES OF `CHARACTERS`, and that is four
+rounds of deleting hardcoded casts being paid back at once.** The
+rail, the A.I. drawer, the front tile, `/characters.json`, the desktop
+icons and the `/say` allowlist all emptied together, because not one
+of them holds a list of names -- every single one asks the roster.
+Nothing in any page needed touching. **The four costumes that fault
+wore** -- Mimi invisible from `home.html`, `#saya { border-color }` on
+a tile that had moved into a drawer, an app icon called "Saya's Face",
+and `write_app "Saya"` -- each cost a round when they went stale, and
+this is the round where having killed all four costs nothing.
+
+**RETIRED, NOT DELETED, the call Coco and Shiro already set.** Her
+persona, her page and her art are exactly where they were and
+un-retiring is deleting one line. `retired: yes` is above the `---`,
+so **not one composed prompt shifted by a byte** and no A/B was
+invalidated. The LEDs went the other way and the difference still
+holds: that was live code you had to read around, this is data nobody
+loads unless they ask for it by name.
+
+**`LIVE_PERSONA` MOVED TO `four` AND THAT IS THE SECOND HALF OF THE
+ASK.** *"With Four as the main ai"* names both pointers at once -- she
+was already `FRONT`, and now the terminal chat, the eval and
+`yuzu_brain --chat` boot her too. **The two are still separate and the
+test got STRONGER rather than weaker**: they name the same character
+today, which is exactly the condition under which a collapse into one
+would go unnoticed -- the identical trap that hid the dead `/wiki`
+gate for a week, where the wrong answer agreed with the right one for
+the only character anybody tested. So the test MOVES each pointer and
+asserts the other stays put.
+
+**SEVENTH NAME-LEAK, AND IT WAS TWELVE TESTS.** Every one was
+fixture-coupled: the property was about ROUTING or the ROSTER and Cait
+or Saya was only ever the demonstration. So they were repointed at the
+live cast rather than deleted, and **the cut characters earn a better
+job in them -- a name that used to resolve and now must not is a far
+stronger unknown-name case than a string nobody ever wired up.** They
+live in `TestTheCastIsTwo` now; a class about a retired character is
+the wrong home for the tests that guard the live one.
+
+**Three properties genuinely changed shape rather than fixture:**
+
+- **The cross-talk trap has nobody left to cross to.** Saya was the
+  only character ever on `face.html`, so the honest invariant is the
+  stronger one: NOBODY writes `/state`. And `drives_face` is derived
+  from the roster's own PAGE rather than from a name, so a character
+  put back on `face.html` lights it up again with no code change --
+  which the test drives, rather than asserting the file never moves.
+- **`/wiki` is gated on being the deck, and Yuzu is now the only live
+  character who is not.** That guard matters MORE, not less: she is
+  the only thing left standing between it and nobody exercising it.
+- **Mimi's test asserted the opposite and the flip is the point.** It
+  said a character with art AND a persona AND a page earns a button.
+  She has all three and no button. Being on the roster is a DECISION
+  now, and those three things are what make putting her back one dict
+  entry rather than a round of work.
+
+### AND THE A.I. DRAWER'S ICONS WERE LOST, exactly where the comment said
+
+**Cutting the cast to two gave that drawer two tiles holding half the
+panel each, wearing the 46px icons meant for six.** That is the
+identical fault a screenshot caught on the two-tile front page in
+September -- and the fix made THEN was written as a list of view
+names, `#grid.main, #grid.stuff`, with a comment beside it warning in
+as many words: *"a rule that names one layout and not its twin is how
+`#saya`'s 72px outlived the page it was written for."*
+
+**A STATIC RULE ABOUT THE A.I. VIEW IS ALWAYS WRONG EVENTUALLY**,
+because it is the one view whose tile count comes off the roster --
+which is why it already emitted its own `grid-template-columns` from
+`columnsFor()`. It emits its icon size from the SAME number now, in
+the same breath, and its static two-column line is **deleted** rather
+than fixed: `#grid`'s own columns are the fallback for a roster that
+never answers, so nothing was lost.
+
+**THIRTY-FIRST TIME RENDERING FOUND WHAT THE ASSERTIONS COULD NOT.**
+Every test was green with those icons floating. Rendered at 1024x600,
+and the exit re-checked at 412 and 360 on both character pages
+(386/412 and 388/412, no horizontal scroll) because the rail changing
+length is what pushed it off four pages once already.
+
+**What is pinned is AGREEMENT, not pixels**: every view the stylesheet
+lays out two across, and only those, carries the bigger icon -- so a
+third two-column view has to answer for it. **Eleven new or rewritten
+tests, each verified by breaking it**: the pointers collapsing into
+one, `drives_face` hardcoding a name again, a cut character back on
+the roster, Saya typed into a rail, Mimi's button returning, the chat
+icon typed in again, `persona_for` falling back to whoever is live,
+the unnamed default frozen to a name, `/forget` growing a default, the
+drawer losing its emitted icon size, the icon size no longer following
+the column count, a static A.I. rule coming back, a two-column view
+losing its big icon, and `--show live` pointing at a key. All of them
+go red.
+
+### TWO MORE DEFAULTS THAT WENT RIGHT BY ACCIDENT
+
+Both were found by reading the diff adversarially rather than by a red
+test, and both are the same class: **a value that had quietly become
+correct for a reason the code does not know about.**
+
+**`drives_face` read `key == persona_for("saya")`.** With Saya off the
+roster that is a comparison against `None` -- true of nothing, which
+is the right ANSWER arrived at by accident. It is derived from the
+roster's own PAGE now, so a character put back on `face.html` gets the
+sprite face again with no code change.
+
+**`persona_for` defaulted a missing name to the literal `"saya"`.**
+That was right while the bare address opened her page and stale from
+the day it opened the home screen instead -- and cutting her made it
+accidentally SAFE, because `"saya"` is no longer in `CHARACTERS`, so
+an unnamed request started being refused. **That looks exactly like a
+deliberate guard and is not one**; it comes back the moment somebody
+adds a character under that name. It names `FRONT` now, which is the
+honest reading of a request that names nobody. `/forget` keeps its
+explicit refusal, because a destructive route gets no defaults.
+
+**And the default is resolved at CALL time, not bound at def time.**
+`def answer(text, who=FRONT)` would freeze the front door into the
+function signature -- the hardcoded cast one layer smaller. The test
+moves `FRONT` and fails if the default does not follow.
+
+### AND CLAUDE.md'S OWN CONVENTIONS BLOCK WAS STALE
+
+It told whoever read it to run `python yuzu_personas.py --show
+shiro_deck`. **That went stale on Sept 9 when Saya was promoted, and
+was still there on Sept 20 through Four.** A hardcoded cast in a DOC,
+which is worse than one in a page, because a page has a test.
+
+And it is not a trivial line: it is how the composed prompt gets
+pasted into PocketPal, which is the deliverable every prompt change in
+this file is measured on. So `--show live` names the POINTER, and the
+test drives it through a real shell, compares against the live
+persona's own composed prompt, **and asserts the doc still says
+`live`** -- because the doc going stale is the failure it exists for.
+
+**Still open, and deliberately not done in this pass:** `ui/cait/`,
+`ui/mimi/` and `ui/sprites/` are still in the repo, ~6MB he pulls over
+WiFi. Deleting art is not reversible with one line the way `retired:
+yes` is, and he asked to remove them from the INTERFACE. One variable
+at a time; the offer stands.
 
 ## THE FRONT DOOR SHOWS NOBODY ELSE (Sept 19)
 
