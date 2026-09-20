@@ -3475,6 +3475,68 @@ class TestYuzuAvatar(unittest.TestCase):
     PAGE = Path(__file__).parent / "ui" / "yuzu.html"
     ART = Path(__file__).parent / "ui" / "yuzu"
 
+    def voice_block(self, page):
+        """The `hear()` function with comments stripped.
+
+        THIRTEENTH INSTANCE OF THE GREP-MATCHES-PROSE TRAP WAITING TO
+        HAPPEN: this block's own comment explains why `who` must be her
+        own name, and names the failure. A test reading the prose would
+        find whatever the comment discusses."""
+        text = (Path(__file__).parent / "ui" / page).read_text()
+        text = re.sub(r"^\s*//.*$", "", text, flags=re.M)
+        start = text.index("function hear(words)")
+        return text[start:text.index("\n}", start) + 2]
+
+    def test_her_page_asks_for_HER_voice_and_not_somebody_elses(self):
+        """Ghost, Sept 20: "Can we give Yuzus page the voice like Four
+        has?"
+
+        The server builds one voice PER CHARACTER and reaches her own
+        `piper_length_scale` to do it, so a `who` copied along with the
+        rest of the block does not merely mislabel the request -- it
+        hands her ANOTHER CHARACTER'S SPEAKING RATE. Yuzu runs 0.88 and
+        Four runs 0.9, so the mistake is real, and it is inaudible in
+        the code and only barely audible out of the speaker: a character
+        bug wearing a plumbing costume, which is the shape this repo
+        already paid for when Kokoro's `speed` was nearly passed a
+        duration multiplier.
+
+        Both ends are pinned: the name the page sends, and the fact that
+        the two characters really do differ, because if they ever
+        converge this test stops meaning anything and should be re-read
+        rather than trusted."""
+        import yuzu_personas, yuzu_face
+        self.assertIn("who: 'yuzu'", self.voice_block("yuzu.html"),
+                      "her page asks for somebody else's voice")
+        scales = {}
+        for who in ("yuzu", "four"):
+            key = yuzu_face.persona_for(who)
+            found = re.search(r"piper_length_scale:\s*([\d.]+)",
+                              (Path(__file__).parent / "personas"
+                               / ("%s.persona" % key)).read_text())
+            scales[who] = found and found.group(1)
+        self.assertNotEqual(scales["yuzu"], scales["four"],
+                            "the two rates converged, so a copied `who` "
+                            "would no longer be audible: re-read this")
+
+    def test_both_speaking_pages_hear_the_SAME_way(self):
+        """TWO COPIES, PINNED TO AGREE -- the guard the battery renderer
+        and the way out already carry, and for the same reason: there is
+        no build step on this deck, so a page that speaks is a page with
+        its own copy of the fetch.
+
+        What actually threatens this is a third character page copied
+        from whichever one somebody happened to open, drifting on the
+        revoke, the `r.ok` check or the silent catch. Only the NAME may
+        differ, so that is the one thing normalised away before the
+        comparison."""
+        mine = self.voice_block("yuzu.html").replace("who: 'yuzu'", "WHO")
+        hers = self.voice_block("four.html").replace("who: 'four'", "WHO")
+        self.assertEqual(mine, hers,
+                         "the two speaking pages have drifted apart")
+        self.assertIn("WHO", mine, "the name was not where it was expected")
+
+
     def test_she_loads_and_is_the_gyaru_on_a_new_body(self):
         yuzu = yuzu_personas.load("yuzu_avatar")
         self.assertEqual(yuzu.name, "Yuzu")
@@ -4492,6 +4554,47 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         self.assertEqual(source.count("save_memory"), 1)
         plain = self.json.loads(self.post("/say", {"text": "hi", "who": "four"}).read())
         self.assertEqual(plain["said"], "one two three")
+
+    def test_a_failed_save_keeps_the_memory_it_was_ALREADY_holding(self):
+        """FOUND BY RUNNING THE SUITE AND LOOKING AT THE REAL `~/.yuzu`,
+        Sept 20: five ZERO-BYTE memory files, created by the run.
+
+        `open(path, "w")` truncates immediately, so the old memory was
+        gone before the new one existed -- and when the dump then raised
+        part way, the `except Exception: pass` swallowed it and left a
+        half-written fragment behind. Measured on the real function: 58
+        bytes of conversation became 29 bytes of
+        `[{"role": "user", "content": ` and nothing anywhere said so.
+
+        `load_memory` is guarded too, so the corrupt file parses as
+        nothing and she boots having forgotten -- indistinguishable, on
+        his screen, from her never having remembered. Two guards, each
+        correct alone, together shredding the thing they protect.
+
+        Writing beside it and renaming is what `pull` already does for
+        a download, and `os.replace` is atomic: the file is entirely the
+        old memory or entirely the new one, never a fragment."""
+        import json as _json
+
+        class WillNotSerialise:
+            history_turns = 8
+            history = [{"role": "user", "content": object()}]
+
+        os.makedirs(self.face.MEMORY_DIR, exist_ok=True)
+        path = self.face._memory_file("four")
+        real = [{"role": "user", "content": "months of this"}]
+        with open(path, "w", encoding="utf-8") as fh:
+            _json.dump(real, fh)
+        before = open(path, encoding="utf-8").read()
+
+        self.face.save_memory(WillNotSerialise(), "four")   # must not raise
+
+        self.assertEqual(before, open(path, encoding="utf-8").read(),
+                         "a failed save destroyed the memory it held")
+        self.assertEqual(real, _json.loads(open(path, encoding="utf-8").read()),
+                         "what survived is no longer valid JSON")
+        self.assertFalse(os.path.exists(path + ".part"),
+                         "a scrap was left to be mistaken for a memory")
 
     def test_the_board_facts_reach_a_DECK_character_and_never_stack(self):
         """Four's rule 8 says she notices the fan, the heat and what is

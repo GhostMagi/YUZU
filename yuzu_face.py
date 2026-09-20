@@ -909,13 +909,40 @@ def load_memory(brain, key):
 
 def save_memory(brain, key):
     """Write it back. Same guard: losing the memory must never lose the
-    reply that was already given."""
+    reply that was already given.
+
+    IT WRITES BESIDE THE FILE AND RENAMES, and that is the whole point
+    rather than tidiness. `open(path, "w")` TRUNCATES THE MOMENT IT IS
+    CALLED, so the old version is gone before the new one exists -- and
+    if the dump then raises anywhere in the middle, the `except` below
+    swallows it and leaves a HALF-WRITTEN FRAGMENT where her
+    conversation used to be. Measured, on the real function: 58 bytes
+    of memory became 29 bytes of `[{"role": "user", "content": ` and
+    nothing said a word.
+
+    `load_memory` then fails to parse it, catches that too, and she
+    simply boots having forgotten -- which is indistinguishable from
+    her never having remembered. A guard that protects the reply by
+    destroying the thing it was writing is the silent-failure shape
+    this deck refuses everywhere else, and `pull` already writes its
+    downloads to a `.part` for exactly this reason.
+
+    `os.replace` is atomic on the same filesystem, so the file is
+    either entirely the old memory or entirely the new one. A failure
+    now costs the TURN, never the months before it."""
+    part = _memory_file(key) + ".part"
     try:
         os.makedirs(MEMORY_DIR, exist_ok=True)
-        with open(_memory_file(key), "w", encoding="utf-8") as fh:
+        with open(part, "w", encoding="utf-8") as fh:
             json.dump(brain.history[-brain.history_turns * 2:], fh)
+        os.replace(part, _memory_file(key))
     except Exception:
-        pass
+        # The old file is still whole. Take the scrap with us rather
+        # than leaving a `.part` to be mistaken for a memory later.
+        try:
+            os.remove(part)
+        except OSError:
+            pass
 
 
 def forget(key):

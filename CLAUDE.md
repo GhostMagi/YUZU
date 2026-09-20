@@ -13,7 +13,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 696 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 699 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -26,7 +26,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 696 tests pass on it. Getting it
+(that repo path is confirmed working). 699 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -45,6 +45,84 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## YUZU SPEAKS, AND THE MEMORY HAD A SHREDDER IN IT (Sept 20)
+
+Ghost: *"Can we give Yuzus page the voice like Four has?"* and then
+*"Give yuzu a seperate 'memory' as well like four does."*
+
+**ONE OF THOSE WAS ALREADY BUILT, AND SAYING SO CAME FIRST.** Memory
+has been per-character since the day it shipped: `save_memory(brain,
+key)` runs unconditionally at the end of `answer()`, and the key is
+hers. Driven rather than read -- `four.json` and `yuzu_avatar.json`,
+two files, each remembering its own sentence. **She has had her own
+memory the whole time.** Nothing was built for that half.
+
+**THE VOICE WAS A REAL GAP AND IT WAS ONLY EVER ON ONE PAGE.** The
+Sept 16 round closed *"nothing on a page has ever spoken"* -- for
+Four. Measured this round: `four.html` is the ONLY page that calls
+`/voice.wav`. Yuzu, Cait, Mimi and Saya's face were all still silent.
+**The server side needed nothing**: `voice_wav(text, who)` has always
+gone through `persona_for(who)`, so Yuzu worked the moment her page
+asked.
+
+**SHE SENDS HER OWN NAME, AND A COPIED ONE WOULD HAVE BEEN INAUDIBLE
+IN THE CODE.** The server builds one voice PER CHARACTER off her own
+`piper_length_scale` -- **Yuzu 0.88, Four 0.9** -- so `who: 'four'`
+left in the copied block would not mislabel a request, it would hand
+her another character's speaking rate. Same family as Kokoro's `speed`
+nearly being passed a duration multiplier: a character bug wearing a
+plumbing costume. The test pins BOTH ends, including that the two
+rates still differ, because if they ever converge the test stops
+meaning anything.
+
+**TWO COPIES, PINNED TO AGREE** -- the guard the battery renderer and
+the way out already carry, for the same reason: no build step, so a
+page that speaks is a page with its own copy of the fetch. Only the
+NAME may differ, so that is what is normalised away before comparing.
+
+### AND THE SUITE WAS SHREDDING HIS REAL MEMORY FILES
+
+**FOUND BY EMPTYING `~/.yuzu/history/` AND RUNNING THE SUITE:** five
+**zero-byte** memory files, created by the run, in the REAL directory
+rather than a temp one.
+
+**The zero bytes were the finding, not the pollution.** `save_memory`
+opened the file with `"w"`, **which truncates the instant it is
+called** -- so the old memory was gone before the new one existed. When
+the dump then raised part way, `except Exception: pass` swallowed it
+and left a **half-written fragment**. Measured on the real function:
+
+    before   58 bytes   [{"role": "user", "content": "REAL MEMORY...
+    after    29 bytes   [{"role": "user", "content":
+
+**`load_memory` IS GUARDED TOO, WHICH IS WHAT MADE IT SILENT.** The
+corrupt file fails to parse, that exception is caught as well, and she
+boots having forgotten -- **indistinguishable, on his screen, from her
+never having remembered.** Two guards, each correct alone, together
+destroying the exact thing they were written to protect. The docstring
+said *"losing the memory must never lose the reply"* while the code
+lost the memory.
+
+**IT WRITES BESIDE THE FILE AND RENAMES NOW**, which is what `pull`
+already does for a download. `os.replace` is atomic on one filesystem,
+so the file is entirely the old memory or entirely the new one, never
+a fragment; a failure costs the TURN and never the months before it.
+The `.part` is removed rather than left to be mistaken for a memory.
+
+**AND THAT CLOSED THE POLLUTION AS A SIDE EFFECT** -- the real
+directory is EMPTY after a full run now, because a failed save no
+longer creates anything. Worth keeping: the pollution was the symptom
+that led to the bug, and the bug is the one that would have eaten a
+real conversation on his board.
+
+**Three new tests, each verified by breaking it**: her page asking for
+somebody else's voice, the two speaking pages drifting apart, and the
+truncating write restored. All three go red. Clean under `--shuffle`.
+
+**STILL SILENT, and he has not asked:** Cait, Mimi and Saya's face.
+Each is the same four lines with her own name, and the agreement test
+gets stronger the moment there is a third.
 
 ## THE FRONT DOOR SHOWS NOBODY ELSE (Sept 19)
 
