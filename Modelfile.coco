@@ -10,7 +10,7 @@ PARAMETER top_k 40
 PARAMETER min_p 0.05
 PARAMETER repeat_penalty 1.1
 PARAMETER num_predict 150
-PARAMETER num_ctx 4096
+PARAMETER num_ctx 8192
 
 # Stop before the model starts writing the user's turn for her.
 # Directive 4 (NO PUPPETEERING) is a prompt rule; this enforces it

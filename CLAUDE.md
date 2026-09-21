@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 702 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 703 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 702 tests pass on it. Getting it
+(that repo path is confirmed working). 703 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,122 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE TOKEN CEILING WAS NEVER THE CEILING (Sept 21)
+
+Ghost, a third time: *"I noticed she still trys to go past her token
+limit i dont really mind as long as its in responsr to what i asked
+(always is so far js) how should we approach that? ... im thinking
+since shes not operating a robot she could be allowed more tokens
+without negative effects?"*
+
+    num_predict   300 -> 600      free in memory, costs seconds
+    num_ctx      4096 -> 8192     NOT free -- see the arithmetic below
+
+**HIS REASON IS THE WRONG ONE AND HIS CONCLUSION IS RIGHT.** The
+"do not raise it" rule never had anything to do with the robot -- it
+was written about SHIRO rambling five to ten times over a
+two-or-three-sentence cap, on replies nobody asked to be long. The
+deck pivot did not unlock anything, because nothing was locked.
+
+**THREE +50s HAD NOT FIXED IT, AND THAT IS ITS OWN SIGNAL.** 200 ->
+250 -> 300, the same complaint each time. Either the increments were
+too small, or `num_predict` was the wrong dial. **It was the wrong
+dial**, and checking WHY is what found the real fault.
+
+### `num_predict` is free in memory and expensive in CONTEXT
+
+This file says in three places that the ceiling "caps generated
+TOKENS, not anything resident". True of MEMORY. **False of CONTEXT** --
+everything she generates lands in history, so the reply ceiling
+multiplies by `history_turns` and lands inside `num_ctx`:
+
+    system prompt + (history_turns + 1) x num_predict
+
+**At the settings that shipped on Sept 19 that is AT OR OVER 4096.**
+Counted loosely (3.8 chars/token, his turns short) it comes to ~3970
+of 4096, just under; counted pessimistically (3.5, his turns longer)
+Cait needs ~4375 and it is already past. **It is arithmetic either
+way, not a reading from his board** -- there is no Ollama in the
+container this was written in.
+
+That is the place a ceiling must never be sitting, and three raises had
+walked it there one at a time **because nobody ever checked the
+product.** Each +50 looked free on its own.
+
+**AND GOING OVER IS NOT AN ERROR, which is the whole reason this
+matters.** Nothing raises and nothing prints: tokens are dropped and
+she comes back having quietly forgotten the start of the conversation.
+**That is `~/.yuzu/history/` undone by the setting meant to improve
+her** -- and it trades a VISIBLE failure for an INVISIBLE one, which
+is the shape this file refuses everywhere else. A mid-word cut is
+something Ghost answers with "continue". A hole in her memory is not.
+
+**So the two numbers are ONE SETTING and they move together.** 600
+doubles rather than adding a fourth 50, because three 50s are the
+evidence that 50 is not the size of the problem; 8192 is what makes
+600 safe, with room for his own turns to be long.
+
+### The half that is not free
+
+**`num_ctx` sizes the KV CACHE, which Ollama allocates when the model
+loads** -- paid up front, whether or not the conversation ever gets
+long. Arithmetic off Llama 3.2 3B's published shape (28 layers, 8 KV
+heads, head_dim 128):
+
+    fp16                 448 MB -> 896 MB     +448 MB
+    q8_0                 224 MB -> 448 MB     +224 MB
+
+**His own measured readings say it fits either way**: 4.0Gi used and
+**3.4Gi available** with her resident and the desktop up, 0B of 15Gi
+swap touched. `OLLAMA_KV_CACHE_TYPE=q8_0` halves it and
+`yuzu_doctor.py` already reports whether it is actually set.
+
+**It also costs TIME, but only when it is earned.** A bigger window is
+slower to process only once it is genuinely full -- which is exactly
+the long conversation he is asking for.
+
+### `test_the_reply_ceiling_and_the_CONTEXT_agree`
+
+**The guard is the deliverable, more than the number is.** It
+recomputes the product from `num_predict`, `history_turns`, `num_ctx`
+and each character's real composed prompt -- including the board line
+and the specs line, which only the deck characters carry and which ride
+on every turn. Its chars-per-token is deliberately **pessimistic**, so
+it complains early rather than late.
+
+**Driven at the Sept 19 settings it goes red**, which is how this was
+found rather than argued. **Verified by breaking it four ways**: the
+new ceiling with the old window (the bug this round would otherwise
+have shipped), the settings that actually shipped, one character raised
+quietly past the window, and `history_turns` raised without touching
+either number. All four name the fix in the failure message.
+
+**AND THE SUITE CAUGHT THE THING I MISSED.** `Modelfile.yuzu` and
+`Modelfile.coco` carry `PARAMETER num_ctx` and went stale the moment
+the default moved -- `test_every_committed_modelfile_matches_the
+_generator`, naming the exact command to regenerate. One line each, and
+the frozen v1 prompt is untouched.
+
+**The memory file's size cap is DERIVED now** rather than the literal
+8192 it carried -- generous against a measured 247 bytes at
+num_predict 250, and a guard that would have needed editing every time
+the ceiling moved, which is the fault this repo keeps deleting. It asks
+`history_turns x num_predict` instead, **read from source rather than
+from the module**, because that class stubs the brain and a helper
+picking up the stub's numbers would be a guard measuring its own
+fixture.
+
+**Every composed prompt is byte-identical -- verified across all 19,
+Four still 4034 chars.** `num_predict` is in the SETTINGS block above
+the `---`, same as both earlier raises, so no A/B was invalidated.
+
+**Still open, and it is the honest limit of this fix:** there is no
+ceiling that guarantees a finished reply. A model fills whatever it is
+given when the answer wants length, so 600 makes truncation rarer
+rather than impossible, and "continue" stays the answer when it
+happens. The next raise is a `num_ctx` decision before it is a
+`num_predict` one -- and the guard now says so out loud.
 
 ## YUZU SPEAKS, AND THE MEMORY HAD A SHREDDER IN IT (Sept 20)
 

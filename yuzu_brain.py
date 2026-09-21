@@ -104,9 +104,25 @@ def _keep_alive(raw):
 #                    genuinely bad tokens without flattening her voice
 #   repeat_penalty   1.1, she loops catchphrases without it
 #   num_predict 150  her prompt asks for short replies; this is a hard
-#                    ceiling so one rambling turn can't stall the robot
-#   num_ctx 4096     ~8 turns of history on a 3B without eating the
-#                    8GB Jetson's memory pool
+#                    ceiling so one rambling turn can't stall the robot.
+#                    A persona's own SETTINGS block overrides it and
+#                    every deck character sets 600 -- see below.
+#   num_ctx 8192     RAISED FROM 4096, Sept 21, and it is the ceiling
+#                    that actually binds. num_predict is free in memory
+#                    and this is not: it sizes the KV cache, which
+#                    Ollama allocates when the model loads.
+#
+#                    THE TWO NUMBERS ARE ONE SETTING. History is
+#                    `history_turns` REPLIES plus the turn being
+#                    generated, so the worst case is roughly
+#                        system prompt + (history_turns + 1) * num_predict
+#                    and at num_predict 300 that already came to ~3970
+#                    of 4096 -- one long conversation from the edge.
+#                    Going past it does not error: tokens get dropped
+#                    with nothing on screen to say so, which trades a
+#                    VISIBLE mid-word cut for an INVISIBLE hole in what
+#                    she remembers. That is the worse failure, so the
+#                    two move together and a test pins that they agree.
 DEFAULT_OPTIONS = {
     "temperature": 0.8,
     "top_p": 0.9,
@@ -114,7 +130,7 @@ DEFAULT_OPTIONS = {
     "min_p": 0.05,
     "repeat_penalty": 1.1,
     "num_predict": 150,
-    "num_ctx": 4096,
+    "num_ctx": 8192,
 }
 
 

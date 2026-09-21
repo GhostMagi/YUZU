@@ -4893,13 +4893,37 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         self.assertIn("RIGHT NOW", self.face._BRAINS["four"].system_prompt,
                       "the deck gate is not reading the hardware")
 
+    def memory_ceiling(self):
+        """How big her memory file can honestly get, off the two
+        settings that bound it rather than off a number somebody typed.
+
+        `history_turns` exchanges is 2x that many messages, each of her
+        own capped at `num_predict` tokens; 4 bytes per token is a
+        loose upper bound for English, and the JSON wrapper is small
+        beside it. Doubling it is the headroom."""
+        # Read from SOURCE, not from the module: this class stubs the
+        # brain, and a helper that quietly picked up the stub's numbers
+        # would be a guard measuring its own fixture.
+        import re as _re, yuzu_personas
+        brain = (Path(__file__).parent / "yuzu_brain.py").read_text()
+        turns = int(_re.search(r"history_turns=(\d+)", brain).group(1))
+        cap = int(yuzu_personas.load("four").settings["num_predict"])
+        return 2 * (2 * turns * cap * 4)
+
     def test_she_remembers_across_a_restart_and_the_file_stays_small(self):
         """Every `~/YUZU/pull` bounces the face server, and that took
         the whole conversation with it."""
         self.post("/say", {"text": "my name is Ghost", "who": "four"}).read()
         saved = os.path.join(self.face.MEMORY_DIR, "four.json")
         self.assertTrue(os.path.exists(saved), "she wrote nothing down")
-        self.assertLess(os.path.getsize(saved), 8192, "the memory file is fat")
+        # THE CAP IS DERIVED, not a number typed in. It was a literal
+        # 8192 -- generous against a measured 247 bytes at num_predict
+        # 250, and a guard that would have to be edited every time the
+        # ceiling moved, which is the fault this repo keeps deleting.
+        # What bounds the file is history_turns x num_predict, so that
+        # is what it asks.
+        self.assertLess(os.path.getsize(saved), self.memory_ceiling(),
+                        "the memory file is fat")
         self.face._BRAINS.clear()                      # the server was bounced
         self.post("/say", {"text": "still there?", "who": "four"}).read()
         remembered = self.face._BRAINS["four"].history
@@ -9658,7 +9682,80 @@ class TestWikiBrevity(unittest.TestCase):
         # and it is still a USER turn, which is the load-bearing part
         self.assertIn("I looked up", turn)
 
-    CEILING = 300
+    CEILING = 600
+
+    def test_the_reply_ceiling_and_the_CONTEXT_agree(self):
+        """THE GUARD THIS ROUND EXISTS FOR, and it is the one that
+        would have said how close 300 already was.
+
+        `num_predict` is described everywhere in this repo as free --
+        "it caps generated TOKENS, not anything resident" -- and that
+        is true of MEMORY and false of CONTEXT. Everything she
+        generates lands in history, so the reply ceiling multiplies by
+        `history_turns` and lands squarely inside `num_ctx`:
+
+            system prompt + (history_turns + 1) x num_predict
+
+        AT THE SETTINGS THAT SHIPPED ON SEPT 19 THIS GOES RED, which
+        is how the round found it. Driven, with every character back on
+        300 and `num_ctx` 4096: `cait needs ~4375 tokens and num_ctx is
+        4096`. Three +50 raises had walked the window to its edge one
+        at a time, nobody checked the product, and the fourth was the
+        one asked for.
+
+        IT IS ARITHMETIC, NOT A READING FROM HIS BOARD -- there is no
+        model and no Ollama in this container, and chars-per-token is
+        an estimate. Counted loosely (3.8 chars/token, his turns short)
+        the same settings come to ~3970 of 4096, just under. So the
+        honest claim is AT OR OVER depending on how you count, which is
+        exactly the place a ceiling should never be sitting -- and it
+        is why the constant below is deliberately the pessimistic one.
+
+        AND OVER IS NOT AN ERROR, which is why this matters more than
+        the arithmetic suggests. Nothing raises, nothing prints;
+        tokens are dropped and she comes back having quietly forgotten
+        the start of the conversation -- the exact thing `~/.yuzu/
+        history/` was built to stop, undone by the setting meant to
+        make her better. A mid-word cut is VISIBLE and he answers it
+        with "continue". A hole in her memory is not.
+
+        So the two are ONE SETTING and this pins that they agree.
+        Chars-per-token is deliberately PESSIMISTIC (3.5, where English
+        on a Llama tokenizer runs nearer 3.8-4.0) so the guard errs
+        toward complaining early."""
+        import re as _re
+        brain = (Path(__file__).parent / "yuzu_brain.py").read_text()
+        num_ctx = int(_re.search(r'"num_ctx":\s*(\d+)', brain).group(1))
+        turns = int(_re.search(r"history_turns=(\d+)", brain).group(1))
+
+        CHARS_PER_TOKEN = 3.5
+        HIS_TURN = 60          # tokens; what he types is short beside her
+
+        worst = None
+        for key in sorted(yuzu_personas.available()):
+            persona = yuzu_personas.load(key)
+            cap = persona.settings.get("num_predict")
+            if not cap:
+                continue                      # the archives inherit 150
+            system = len(persona.prompt) / CHARS_PER_TOKEN
+            # The deck characters also carry the live board line and
+            # the specs line on every single turn.
+            if persona.hardware == "cyberdeck":
+                import yuzu_face
+                yuzu_face._SPECS = None
+                system += len(yuzu_face.board_specs()
+                              + yuzu_face.board_now()) / CHARS_PER_TOKEN
+                yuzu_face._SPECS = None
+            need = system + turns * (int(cap) + HIS_TURN) + int(cap)
+            if worst is None or need > worst[1]:
+                worst = (key, need)
+            self.assertLessEqual(
+                need, num_ctx,
+                "%s needs ~%d tokens of context in a long conversation "
+                "and num_ctx is %d -- she will silently forget the "
+                "start of it. Raise num_ctx with num_predict, or lower "
+                "one of them." % (key, need, num_ctx))
+        self.assertIsNotNone(worst, "nobody sets num_predict any more")
 
     def test_num_predict_has_a_CEILING_and_every_character_shares_it(self):
         """RAISED to 250 on Sept 16 and to 300 on Sept 19, and this
@@ -9685,9 +9782,21 @@ class TestWikiBrevity(unittest.TestCase):
         way, so the ceiling is not what was protecting brevity -- her
         prompt is.
 
-        It costs no memory: `num_predict` caps generated TOKENS, not
-        anything resident, and 250 sits far inside `num_ctx` 4096. It
-        costs a couple of seconds on the longest replies only.
+        RAISED AGAIN TO 600 ON SEPT 21, and that round found the
+        thing the first two missed. Ghost, a third time: *"she still
+        trys to go past her token limit i dont really mind as long as
+        its in responsr to what i asked (always is so far js)"*. Three
+        +50s had not fixed it, which is its own signal -- so this one
+        DOUBLES, and it moves `num_ctx` with it.
+
+        `num_predict` costs no memory on its own. What it costs is
+        CONTEXT, because everything she generates lands in history --
+        and at 300 the worst case was already ~3970 of `num_ctx` 4096.
+        Going over does not error; tokens are dropped with nothing on
+        screen to say so, which trades a VISIBLE mid-word cut for an
+        INVISIBLE hole in what she remembers. `test_the_reply_ceiling
+        _and_the_CONTEXT_agree` is the guard, and it is the one that
+        would have caught how close 300 already was.
 
         The ceiling STAYS, because unbounded is how a 3B monologues
         until the context fills. It is one number, shared, so nobody

@@ -4,7 +4,7 @@ hardware: faerie
 description: A cait sith - the fairy cat of Scottish and Irish folklore, newly crowned King of the Cats. Ghost's RP tab, her own page, her own colours. First character on the `faerie` body. UNMEASURED.
 temperature: 0.88
 piper_length_scale: 1.0
-num_predict: 300
+num_predict: 600
 # Vowel-carrying, every one. `Mrrp` and `Mm` were the first draft and
 # both were cut: no vowel means espeak spells them out letter by
 # letter, which is the exact mechanism that made PFFT come out "Pee Eff

@@ -4,7 +4,7 @@ hardware: wisp
 description: A small spirit who came to this world five hundred years ago and attached herself to Ghost. Little-sister energy on something much older than the building. Second RP character, first on the `wisp` body. UNMEASURED.
 temperature: 0.9
 piper_length_scale: 0.95
-num_predict: 300
+num_predict: 600
 # Vowel-carrying, every one, checked through for_speech BEFORE they
 # went in rather than after. `Mmn` and `Nn` were the obvious clingy
 # little noises and both were cut: no vowel means espeak spells them
