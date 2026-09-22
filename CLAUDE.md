@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 705 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 707 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 705 tests pass on it. Getting it
+(that repo path is confirmed working). 707 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -159,6 +159,38 @@ here, wearing a test runner's clothes.
 the deck, something in her turn starting to reach out, the sentence
 put in one persona instead of the body, and a comment naming a domain
 (which must stay QUIET). All four behave.
+
+### AND THE FIX WOULD NOT HAVE REACHED HIS BOARD
+
+`pull` restarts the face server only when a **top-level `.py`**
+changed. This round changed a `.persona` and a body file -- so he
+would have pulled, it would have landed, and **the running server
+would have kept answering from the old prompt cached in `_BRAINS`.**
+She would have gone on saying "I'm always connected" over a repo that
+already said otherwise.
+
+**SAME FAULT AS THE STALE ROSTER, in the one costume the guard did not
+cover.** Sept 15's entry is the identical shape: *"the deck rendered
+as though the work never landed, while being completely correct about
+what it had been told."* A persona is exactly as invisible as a
+module, and **a change to WHO SHE IS is the last thing that should
+need a restart he has to know about.**
+
+    grep -q  '^[^/]*\.py$'                 before
+    grep -qE '^[^/]*\.py$|^personas/'      after
+
+**`ui/` STAYS OUT, and that is the half worth keeping.** It genuinely
+is re-read per request, so bouncing her to deliver a PNG she would
+have served anyway drops his conversation for nothing -- which is why
+the gate is not simply "anything changed". Both halves are pinned, and
+**verified by breaking each direction**: the old gate leaves a persona
+change un-restarted, and a gate widened to everything bounces her over
+a page.
+
+**Telling him to run one more command was the alternative and it was
+the wrong one.** *"Plz dont add new commands i cant actually remember
+any except /wiki."* The cheapest command is still the one he already
+types.
 
 **UNMEASURED.** She has not been asked again. The round that decides
 it is the one where somebody asks her what happens with the WiFi off.

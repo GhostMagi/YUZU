@@ -198,7 +198,14 @@ else
     # server restarts itself afterwards, from a detached child.
     if [ "${YUZU_PULL_NO_RESTART:-}" = 1 ]; then
         :
-    elif printf '%s\n' "$files" | grep -q '^[^/]*\.py$'; then
+    # PERSONAS COUNT TOO, and that was found by shipping one. Sept 22
+    # put "nothing you do reaches the internet" into the deck body file
+    # -- a change to what she IS -- and this gate did not match it, so
+    # the running server kept the old prompt cached in _BRAINS and she
+    # would have gone on saying the opposite. A persona is exactly as
+    # invisible as a .py and fails the same way: pulled, landed, and
+    # not in effect. ui/ stays out because it IS re-read per request.
+    elif printf '%s\n' "$files" | grep -qE '^[^/]*\.py$|^personas/'; then
         if pgrep -f "yuzu_face.py --serve" >/dev/null 2>&1; then
             # QUIET WHEN IT WORKS, LOUD WHEN IT DOES NOT. Ghost, Sept
             # 16, with the wall of face's own startup banner sitting

@@ -9156,6 +9156,41 @@ class TestPull(unittest.TestCase):
         self.assertIn("OLD CODE", done.stdout,
                       "it restarted silently; he cannot tell it happened")
 
+    def test_a_pull_that_changes_WHO_SHE_IS_also_restarts_her(self):
+        """FOUND BY SHIPPING ONE, Sept 22. The offline sentence went
+        into the deck BODY FILE -- a change to what she IS -- and this
+        gate matched only top-level `.py`, so his pull would have
+        landed it and left the running server answering from the old
+        prompt cached in `_BRAINS`. She would have gone on saying "I'm
+        always connected" over a repo that already said otherwise.
+
+        SAME FAULT AS THE STALE ROSTER, in the one costume the guard
+        did not cover: pulled, landed, not in effect, and looking
+        exactly like the work never arrived. A persona is as invisible
+        as a module and fails the same way.
+
+        `ui/` stays OUT on purpose -- it genuinely is re-read per
+        request, so bouncing the server to deliver a PNG it would have
+        served anyway drops his conversation for nothing."""
+        for changed in ("personas/four.persona",
+                        "personas/_hardware_cyberdeck.txt"):
+            done, calls = self._restart_run([changed], server_up=True)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertIn("face --off", calls,
+                          "%s landed and she kept the old prompt" % changed)
+            self.assertIn("OLD CODE", done.stdout,
+                          "it restarted silently; he cannot tell")
+
+    def test_ART_AND_PAGES_still_do_not_cost_him_the_conversation(self):
+        """The other half, and it is why the gate is not just "anything
+        changed". `ui/` is re-read per request, so a restart there buys
+        nothing and costs the chat history on screen."""
+        done, calls = self._restart_run(
+            ["ui/home.html", "ui/mimi/crawling.png"], server_up=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn("face --off", calls,
+                         "a page change bounced her and dropped the chat")
+
     def test_the_restart_does_not_DUMP_the_server_banner_into_his_pull(self):
         """MEASURED, Sept 16, off his screen. The Welcome line WAS there
         -- and above it sat twenty lines of `face`'s own startup banner:
