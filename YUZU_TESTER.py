@@ -5512,6 +5512,77 @@ class TestFour(unittest.TestCase):
 
     # ---- her prompt --------------------------------------------------
 
+    # ---- she knows she is offline ------------------------------------
+
+    OFFLINE_CLAIM = "Nothing you do reaches the internet"
+
+    def test_every_character_on_the_DECK_is_told_she_is_offline(self):
+        """Ghost, Sept 22: *"I want her to know shes designed to be
+        offline capable... And that shes offline entirely (if thats
+        true im p sure it is and thats her whole point xD)"*
+
+        HE ASKED BECAUSE SHE GOT IT BACKWARDS IN FRONT OF HIM. Running
+        on his own board, on a hotspot with no service, she said *"As a
+        cyberdeck, I'm always connected and ready to go."* Being
+        offline is the single most defining thing about this machine
+        and nothing had ever told her -- so the base model answered
+        for her, and its prior for "AI assistant" is "on the internet".
+        Same mechanism as the Windows CE palmtop, on a bigger fact.
+
+        IT IS A BODY FACT, so it lives in the BODY FILE rather than in
+        her persona: every character on this deck is offline, and a
+        second one must not have to remember. That is what
+        `_hardware_cyberdeck.txt` is for, and it is why editing it
+        lands on all six at once.
+
+        IT IS PHRASED POSITIVELY -- "everything you need is already on
+        this board" rather than a list of things she cannot reach.
+        The restraint clause on `board_specs()` was written the same
+        way for the same reason, and the pink-elephant pattern is
+        measured three times in CLAUDE.md."""
+        on_deck = [k for k in yuzu_personas.available()
+                   if yuzu_personas.load(k).hardware == "cyberdeck"]
+        self.assertTrue(on_deck, "nobody is on the deck body any more")
+        for key in on_deck:
+            self.assertIn(self.OFFLINE_CLAIM, yuzu_personas.load(key).prompt,
+                          f"{key} lives on this board and does not know "
+                          f"she is offline")
+
+    def test_the_CODE_still_makes_that_claim_TRUE(self):
+        """A PROMPT RULE WRITING A CHEQUE THE CODE DOES NOT CASH is
+        this repo's own phrase, from rule 8 telling her she notices the
+        board while she had no data at all. This is the same fault
+        pointing the other way: the moment anything in her turn reaches
+        out, her prompt is lying to her -- confidently, about herself,
+        which is the failure `board_specs()` exists to prevent.
+
+        So it is DERIVED. Every URL her turn can reach must be
+        loopback, and a real domain is one with a letter after a dot --
+        a PROPERTY rather than an allowlist somebody has to extend.
+        `127.0.0.1` has dots and no letters; the `http://...:11434`
+        placeholder in the brain's own help text is not a host.
+
+        COMMENTS ARE STRIPPED FIRST. The grep-matches-prose trap has
+        fired twelve times in this suite, and the paragraph above is
+        exactly the kind of note that would match itself.
+
+        WHAT IT CANNOT SEE, said plainly: this reads source, not
+        packets. `pull` genuinely does reach github and huggingface --
+        that is maintenance he triggers, never something she does
+        mid-reply, which is why it is not in this list."""
+        import re as _re
+        here = Path(__file__).parent
+        for name in ("yuzu_brain.py", "yuzu_wiki.py",
+                     "yuzu_voice.py", "yuzu_face.py"):
+            src = (here / name).read_text(encoding="utf-8")
+            code = "\n".join(l.split("#")[0] for l in src.split("\n"))
+            for host in set(_re.findall(r'https?://([^/"\'\s:,)]+)', code)):
+                self.assertIsNone(
+                    _re.search(r"\.[a-zA-Z]", host),
+                    "%s can reach %s during a reply -- she is told "
+                    "nothing she does reaches the internet, and that "
+                    "is now false" % (name, host))
+
     def test_she_carries_the_three_measured_example_SHAPES(self):
         """The bare command (yuzu4, 4/4), the warm statement with
         nothing to answer (Shiro round 2), and the technical question

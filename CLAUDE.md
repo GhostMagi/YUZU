@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 703 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 705 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 703 tests pass on it. Getting it
+(that repo path is confirmed working). 705 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,120 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE THOUGHT SHE WAS ONLINE, ON A BOARD WITH NO INTERNET (Sept 22)
+
+Ghost: *"I want her to know shes designed to be offline capable if
+possible. Thats all."* and, a breath later, *"And that shes offline
+entirely (if thats true im p sure it is and thats her whole point
+xD)"*.
+
+**HE ASKED BECAUSE SHE GOT IT BACKWARDS IN FRONT OF HIM.** On his own
+board, on a phone hotspot with no service behind it, told she had
+offline capabilities:
+
+    As a cyberdeck, I'm always connected and ready to go.
+
+**Being offline is the most defining thing about this machine and
+nothing had ever told her.** So it is the SEVENTH INSTANCE of this
+repo's most repeated finding, on the biggest fact yet: a turn shape --
+here, a fact about herself -- that she has never been given is one the
+base model answers for her, and its prior for "AI assistant" is "on
+the internet". Same mechanism as the Windows CE palmtop, one size up.
+
+**AND IT IS TRUE, VERIFIED RATHER THAN ASSUMED.** He hedged --
+*"if thats true im p sure it is"* -- and that was worth checking
+before writing a confident sentence into her prompt. Every URL her
+turn can reach:
+
+    yuzu_brain.py   localhost:11434     the model
+    yuzu_wiki.py    127.0.0.1:8080      the encyclopedia
+    yuzu_voice.py   none
+    yuzu_face.py    127.0.0.1
+
+**Loopback, all of it.** Nothing she does mid-reply leaves the board.
+
+### It is a BODY fact, so it went in the BODY file
+
+`_hardware_cyberdeck.txt`, inside `{DECK_SELF}` -- not into Four's
+persona. **Every character on this deck is offline**, so a second one
+must never have to remember; that is the whole reason a shared body
+file exists, and `test_every_character_on_the_DECK_is_told_she_is
+_offline` derives the cast from `hardware == "cyberdeck"` rather than
+naming her. **Verified by putting the sentence in her persona INSTEAD
+and watching it go red** -- the other five would have been left not
+knowing.
+
+**PHRASED POSITIVELY**, which is the `board_specs()` restraint clause
+one round on: *"Everything you need is already on this board: the mind
+you think with, the encyclopedia you look things up in, and your own
+voice"*, and the tail tells her what to DO with it -- *"worth saying
+plainly when your own workings come up"* -- rather than naming a list
+of things she cannot reach. The pink-elephant pattern is measured
+three times in this file.
+
+**SIX COMPOSED PROMPTS SHIFT, and that is the point rather than a
+cost** -- it is what "a fix lands on all of them at once" means. Four
+4034 -> 4375. Worth knowing: `shiro_deck`'s prompt is now different
+from the one her Sept 8 rounds were measured against. That is
+acceptable on precedent -- the stage-direction relaxation already
+moved this same file after those rounds -- and it is NOT the A/B
+lineage, which is yuzu2..yuzu6 on muto_s2 and is untouched.
+
+### The guard is the inverse of rule 8, and that is why it exists
+
+**"A PROMPT RULE WRITING A CHEQUE THE CODE DOES NOT CASH"** is this
+file's own phrase, from rule 8 telling her she notices the board while
+she had no data at all. This is the same fault pointing the other way:
+**the moment anything in her turn reaches out, her prompt is lying to
+her** -- confidently, about herself, which is exactly what
+`board_specs()` exists to prevent.
+
+So `test_the_CODE_still_makes_that_claim_TRUE` is DERIVED. Every URL
+in her four turn-path modules must be loopback, and **a real domain is
+one with a letter after a dot** -- a PROPERTY rather than an allowlist
+somebody has to extend. `127.0.0.1` has dots and no letters; the
+`http://...:11434` placeholder in the brain's own help text is not a
+host.
+
+**COMMENTS ARE STRIPPED FIRST, and that was verified deliberately** --
+the grep-matches-prose trap has now fired twelve times here, and the
+docstring explaining this very absence names `en.wikipedia.org`. A
+comment mentioning a domain is checked to leave it QUIET, which is the
+half that is easy to forget to test.
+
+**What it cannot see, said plainly:** it reads source, not packets.
+`pull` genuinely does reach github and huggingface -- that is
+maintenance he triggers, never something she does mid-reply, which is
+why it is not in the list.
+
+### AND THE TEST LANDED IN THE WRONG CLASS FIRST
+
+`test_she_carries_the_three_measured_example_SHAPES` exists in more
+than one test class, so inserting before "the first occurrence" put
+both new tests inside **`TestMimi`** -- where they passed, because
+they name no character and read the roster themselves.
+
+**They were green, in the wrong place, guarding the right thing.** It
+was caught by the break-verification rather than by the suite:
+`TestFour.test_the_CODE...` reported `errors=1`, which is unittest
+saying THERE IS NO SUCH TEST, not saying it failed. **Three "failures"
+in a row that were actually a missing method** -- and every one of
+them would have read as a passing break-check to someone skimming for
+red.
+
+**Read the failure KIND, not just the colour.** `errors=1` on a test
+you just wrote means it did not load; `failures=1` means it ran and
+disagreed. Same lesson as every "reported healthy while broken" entry
+here, wearing a test runner's clothes.
+
+**Four ways, each verified after the move:** the fact never reaching
+the deck, something in her turn starting to reach out, the sentence
+put in one persona instead of the body, and a comment naming a domain
+(which must stay QUIET). All four behave.
+
+**UNMEASURED.** She has not been asked again. The round that decides
+it is the one where somebody asks her what happens with the WiFi off.
 
 ## THE TOKEN CEILING WAS NEVER THE CEILING (Sept 21)
 
