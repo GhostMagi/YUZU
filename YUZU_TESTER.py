@@ -6272,6 +6272,64 @@ class TestFour(unittest.TestCase):
         self.assertLessEqual(len(re.findall(r"[.!?]", answer)), 3,
                              "her technical answer is already a lecture")
 
+    def test_she_has_a_shape_for_answering_from_a_LOOKUP(self):
+        """MEASURED, live, on `/wiki`: handed 700 characters of
+        encyclopedia she came back with *"I'm not going to try to
+        summarize this information again; I've already 'learned' it
+        from you."*
+
+        A lookup reaches her as a USER turn -- "I looked up X and it
+        says: ... Tell me about X in your own words" -- which is a turn
+        SHAPE she had never been shown. Sixth instance of this repo's
+        most repeated finding, and the lever is the one that has now
+        worked five times.
+
+        PINNED BY THE ANSWER'S BEHAVIOUR, not the ask's spelling. The
+        first version of the sibling test below counted keywords and
+        passed with both examples deleted, which is grep-as-proxy in
+        the test written about examples."""
+        prompt = self.persona()
+        lookups = [(q, a) for q, a in self.turns()
+                   if "looked up" in q.lower() and "own words" in q.lower()]
+        self.assertTrue(
+            lookups,
+            "she has no example of answering from a lookup, so she has "
+            "no shape for one and invents a reaction to being handed facts")
+        ask, answer = lookups[0]
+
+        # SHORT. The measured fault beside the snark was length: handed
+        # an encyclopedia she summarised at encyclopedia length, and a
+        # reply that long does not fit a 1024x600 panel either.
+        self.assertLessEqual(len(re.findall(r"[.!?]", answer)), 3,
+                             "her own lookup example is already a lecture")
+        for markup in ("```", "**", "#"):
+            self.assertNotIn(markup, answer,
+                             "her lookup answer teaches markdown")
+
+        # AND SHE ANSWERS FROM THE MATERIAL. Derived rather than
+        # hardcoded: the answer has to carry a real word out of the
+        # article, or the example teaches her to be handed facts and
+        # then talk about something else.
+        stop = set("a an the and or of is are it its in on to from that "
+                   "this with for no not so you your i me my what when "
+                   "where up about words own sentence two tell looked "
+                   "says like have has can".split())
+        article = {w for w in re.findall(r"[a-z]{4,}", ask.lower())
+                   if w not in stop}
+        used = article & set(re.findall(r"[a-z]{4,}", answer.lower()))
+        self.assertTrue(
+            used,
+            "her lookup answer shares nothing with the article she was "
+            "handed, so the example teaches her to ignore it: %r" % answer)
+
+        # AND SHE IS NOT SULKY ABOUT IT, which is the actual reported
+        # fault rather than a proxy for it.
+        for sulk in ("i'm not going to", "i am not going to", "again",
+                     "already", "as i said"):
+            self.assertNotIn(sulk, answer.lower(),
+                             "her own example grumbles about being "
+                             "handed facts, which is the fault")
+
     def test_she_has_a_shape_for_a_subject_that_is_not_HERSELF(self):
         """SAYA BLEED, reported live by Ghost on the board, Sept 15.
 

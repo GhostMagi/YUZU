@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 735 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 736 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 735 tests pass on it. Getting it
+(that repo path is confirmed working). 736 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,52 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE HAS A SHAPE FOR A LOOKUP NOW (Sept 22)
+
+Measured live on his board, handed 700 characters of encyclopedia:
+
+    I'm not going to try to summarize this information again; I've
+    already "learned" it from you.
+
+**A LOOKUP IS A TURN SHAPE SHE HAD NEVER BEEN SHOWN.** It reaches her
+as a USER turn -- *"I looked up X and it says: ... Tell me about X in
+your own words, in a sentence or two"* -- and nine of her examples were
+ordinary conversation. Handed a shape with no demonstration, a 3B fills
+it from its own prior, and the prior for "character handed facts it did
+not ask for" is mild irritation. **Sixth instance of this file's most
+repeated finding**, and the lever is the one that has now worked five
+times.
+
+One example, in the exact shape `as_context()` actually produces -- the
+article text, then the ask, on one line like every other example in the
+file. Her answer compresses rather than recites, lands in two
+sentences, and ends on a real opinion (*"it isn't a surface -- it's
+just the last place you could have turned around"*), which demonstrates
+rule 7 in the same breath.
+
+**PINNED BY THE ANSWER'S BEHAVIOUR, and one assertion is genuinely
+derived**: the answer must share a real word with the article it was
+handed, computed from the ask rather than hardcoded, **or the example
+teaches her to be given facts and then talk about something else.**
+Verified by breaking it four ways -- the example deleted, an answer
+that uses nothing from the article, an answer that grumbles, and an
+answer that runs to a lecture. All four go red.
+
+**5011 -> 5447 chars, AND THE HEADROOM IS THE HEADLINE.** With the
+facts store full and the deck inventory at its cap, **200 tokens of
+`num_ctx` remain**, down from 451 two commits ago. The guard is green
+and that is the honest number.
+
+**THE NEXT THING THAT RIDES ON EVERY TURN NEEDS THE ARITHMETIC FIRST.**
+Three features in one session each took a slice -- the facts line, the
+inventory, and now an example -- and not one of them was large on its
+own. That is exactly how three +50s walked `num_predict` to the edge of
+a 4096 window without anybody checking the product. The next raise is a
+`num_ctx` decision before it is anything else, and `test_the_reply
+_ceiling_and_the_CONTEXT_agree` will say so out loud.
+
+**UNMEASURED.** Nobody has asked her for a lookup since.
 
 ## SHE OFFERS, HE PICKS (Sept 22)
 
