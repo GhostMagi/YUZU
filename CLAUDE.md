@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 721 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 729 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 721 tests pass on it. Getting it
+(that repo path is confirmed working). 729 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,92 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE KNOWS WHAT IS ON THE BOARD WITH HER (Sept 22)
+
+Ghost, off the upgrade list: *"16 definitely yes."*
+
+`board_specs()` is the ID CARD -- what she RUNS ON -- and `board_now()`
+is the weather. Neither can answer **"what can this thing actually
+do"**, which is the question a stranger asks at a demo and the one he
+asks himself when he cannot remember what he put on it. Asked today she
+invents an answer: same mechanism, same file, as the Windows CE palmtop.
+
+    WHAT IS ON THE BOARD WITH YOU: wikipedia en simple all, ifixit en
+    all and wikimed en all to look things up in, and 12 NES games,
+    7 Mega Drive games, 4 Nintendo 64 games... That is what you
+    actually have to hand, so say so when somebody asks what this
+    thing can do.
+
+**READ, NEVER HARDCODED**, which is the `ghostnano` rule for the third
+time. It globs the same three roots `wiki` searches for `.zim`, with
+the same 1MB floor, and counts `~/ROMs/<system>/`. A library typed into
+the file is right until he copies an archive over WiFi, and the failure
+looks exactly like the deck working.
+
+**A SAVE IS NOT A GAME.** `.sav`, `.srm`, `.state` -- he WILL have
+them, because the whole point of the emulator is that he plays the
+things, and counting them tells him he has twice the library he has.
+
+**`_SYSTEMS` IS A POLITENESS LAYER, NOT AN ALLOWLIST.** A folder it has
+never heard of keeps its own name and still gets counted -- a library
+that silently omits a shelf is worse than one that says `dreamcast` in
+lower case.
+
+**CACHED FOR TWO MINUTES, AND THAT IS THE ONE REAL DIFFERENCE FROM THE
+SPECS.** A processor does not change while the server is up; a ROM
+folder does, precisely because `drop.py` exists to put things in it
+from his phone. Needing a restart to notice a file he just sent would
+be the stale-process fault wearing a helpful hat.
+
+**AND IT IS BOUNDED**, for the reason the facts store is: it rides on
+the system prompt on every turn, so an inventory that grows with the
+NVMe is one the context guard cannot see the worst case of. Shelves are
+sorted biggest first and a trim drops the ones he has one game in --
+**the sentence itself is never cut**, because half a clause is worse
+than a shorter list, the same call the wiki extract made at 700
+characters. The ceiling guard counts `HAS_MAX`, not what this container
+happens to have. **451 tokens still spare with the facts store full AND
+the inventory at its cap**, on the worst character, counted
+pessimistically.
+
+### TWO OF MY OWN TESTS MEASURED AGAINST THE CONSTANT THEY WERE TESTING
+
+Both passed their break-check, which is how they were caught:
+
+    HAS_MAX 400 -> 100000      "the inventory is unbounded"   still GREEN
+    _HAS_TTL 120 -> 1e9        "it notices a new ROM"         still GREEN
+
+The bounded test asserted `len(line) <= HAS_MAX`, so **raising the cap
+moved the goalpost with it**. The refresh test expired the cache with
+`_HAS_AT -= _HAS_TTL + 1`, which expires it however enormous the TTL
+is. Neither could observe its own failure.
+
+**A CHECK THAT DERIVES ITS THRESHOLD FROM THE CONSTANT UNDER TEST IS
+NOT A CHECK.** That is the oldest line in this file wearing a new
+costume, and it is the same family as the memory helper that read the
+stub's own numbers -- a guard measuring its own fixture. The bounded
+test counts how many shelves SURVIVED now (derived from the board it
+built), and the refresh test expires the cache absolutely and pins the
+TTL under ten minutes.
+
+**Eight new tests, each verified by breaking it**: the inventory
+hardcoded instead of read, saves counted as games, an unknown system
+dropped instead of named, the cap raised past the window, the cache
+never refreshing, and the inventory sent to a character off the deck.
+All go red.
+
+### AND A BACKGROUND SHUFFLE RUN WENT RED FOR A REASON THAT WAS MINE
+
+`--shuffle 47` failed while `--shuffle 11` passed, which is the exact
+signature of test pollution. It was not: **I edited `yuzu_face.py` while
+that background job was running**, so the second seed imported a
+half-written module. Re-run on a settled tree, seed 47 is clean.
+
+**Same shape as reading a stale screenshot as evidence** -- the layer
+below was answering about a file that no longer existed. Shuffle runs
+go LAST now, on a tree nobody is touching, and a red seed is worth
+reproducing before it is believed.
 
 ## SHE KEEPS WHAT HE TELLS HER TO, AND IT CANNOT FILL UP (Sept 22)
 

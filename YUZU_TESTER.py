@@ -4942,6 +4942,159 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         self.assertNotIn("WHAT YOU RUN ON",
                          self.face._BRAINS[key].system_prompt)
 
+    # ---- and what is ON the board with her -------------------------
+
+    def fake_board(self, roms=(), zims=()):
+        """A board with a known library on it, so the inventory can be
+        checked against something rather than against whatever this
+        container happens to have. Returns the rendered line."""
+        home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, home, True)
+        for system, names in roms:
+            folder = os.path.join(home, "ROMs", system)
+            os.makedirs(folder)
+            for name in names:
+                open(os.path.join(folder, name), "w").close()
+        for zim in zims:
+            with open(os.path.join(home, zim), "wb") as fh:
+                fh.write(b"\0" * (2 << 20))   # over `wiki`'s 1MB floor
+        real = os.path.expanduser
+
+        def fake(path):
+            return path.replace("~", home, 1) if path.startswith("~") else path
+        patch = mock.patch.object(os.path, "expanduser", fake)
+        patch.start()
+        self.addCleanup(patch.stop)
+        # The cache is a module global; leaving it set would hand the
+        # next test this test's board.
+        self.addCleanup(setattr, self.face, "_HAS", None)
+        self.face._HAS, self.face._HAS_AT = None, 0
+        return self.face.board_has()
+
+    def test_what_is_ON_the_board_is_READ_and_never_typed_in(self):
+        """The `ghostnano` rule and the `board_specs()` rule for the
+        third time. A library typed into the file is right until he
+        copies a ZIM across over WiFi or drops a ROM in from his phone
+        -- and the failure looks exactly like the deck working.
+
+        Checked against a board built for the purpose: a hardcoded
+        answer cannot pass this AND pass on his Orin."""
+        line = self.fake_board(
+            roms=[("gba", ["a.gba", "b.gba", "c.gba"]),
+                  ("snes", ["x.sfc"])],
+            zims=["wikipedia_en_simple_all.zim"])
+        self.assertIn("3 Game Boy Advance games", line)
+        self.assertIn("1 SNES game", line,
+                      "one game is pluralised as if it were several")
+        self.assertIn("wikipedia en simple all", line)
+
+    def test_a_SAVE_is_not_a_game(self):
+        """Counting them tells him he has twice the library he has --
+        and he WILL have them, because the whole point of the emulator
+        is that he plays the things."""
+        line = self.fake_board(roms=[("gba", [
+            "pokemon.gba", "pokemon.sav", "pokemon.srm", "pokemon.state"])])
+        self.assertIn("1 Game Boy Advance game", line)
+
+    def test_a_system_nobody_thought_of_keeps_its_OWN_name(self):
+        """`_SYSTEMS` is a politeness layer, not an allowlist. A folder
+        it has never heard of still gets counted, because a library
+        that silently omits things is worse than one that says
+        `dreamcast` in lower case."""
+        line = self.fake_board(roms=[("dreamcast", ["shenmue.gdi"])])
+        self.assertIn("1 dreamcast game", line)
+
+    def test_an_EMPTY_board_says_NOTHING_at_all(self):
+        """ABSENT RATHER THAN WRONG, and here it matters more than on
+        the specs line: "no games and no archives" would have her
+        volunteering that the deck is empty to the first stranger who
+        picks it up."""
+        self.assertEqual(self.fake_board(), "")
+
+    def test_the_inventory_is_BOUNDED(self):
+        """It rides on the system prompt on EVERY turn, so an inventory
+        that grows with the NVMe is one the context guard cannot see
+        the worst case of -- forty ROM folders would quietly do what a
+        full facts store is stopped from doing.
+
+        The shelves are sorted biggest first, so a trim drops the ones
+        he has a single game in, and the SENTENCE is never cut: half a
+        clause is worse than a shorter list."""
+        line = self.fake_board(
+            roms=[("sys%02d" % i, ["g%d.rom" % n for n in range(i + 1)])
+                  for i in range(40)],
+            zims=["archive_number_%d.zim" % i for i in range(6)])
+        # IT MUST NOT MEASURE AGAINST THE CONSTANT IT IS CHECKING.
+        # The first version asserted `len(line) <= HAS_MAX` and passed
+        # happily with HAS_MAX raised to 100000 -- the threshold moved
+        # with the thing under test, so the check could not observe its
+        # own failure. What it actually has to see is that shelves got
+        # DROPPED, which is derived from the board it built.
+        shown = sum(1 for i in range(40) if "sys%02d" % i in line)
+        self.assertLess(shown, 40,
+                        "every shelf survived, so nothing was trimmed "
+                        "and the inventory is unbounded")
+        self.assertLessEqual(len(line), self.face.HAS_MAX,
+                             "it trimmed and still overran its own cap")
+        self.assertTrue(line.rstrip().endswith("."),
+                        "it cut the sentence in half rather than the list")
+
+    def test_it_notices_a_ROM_he_just_sent_WITHOUT_a_restart(self):
+        """The one real difference from the specs line. A processor
+        does not change while the server is up; a ROM folder does,
+        precisely because `drop.py` exists to put things in it from his
+        phone. Needing a restart to see a file he just sent would be
+        the stale-process fault wearing a helpful hat."""
+        line = self.fake_board(roms=[("gba", ["a.gba"])])
+        self.assertIn("1 Game Boy Advance game", line)
+        roms = os.path.join(os.path.expanduser("~"), "ROMs", "gba")
+        open(os.path.join(roms, "b.gba"), "w").close()
+        # Still inside the cache window: she does not see it yet.
+        self.assertIn("1 Game Boy Advance game", self.face.board_has())
+        # EXPIRED ABSOLUTELY, NOT RELATIVE TO THE TTL. This read
+        # `_HAS_AT -= _HAS_TTL + 1`, which expires the cache however
+        # enormous the TTL is -- so it passed with the TTL set to a
+        # billion seconds. Same fault as the bounded test one method
+        # down: a check that derives its threshold from the constant
+        # under test cannot see that constant change.
+        self.face._HAS_AT = 0
+        self.assertLessEqual(
+            self.face._HAS_TTL, 600,
+            "the inventory is cached for more than ten minutes, so a "
+            "ROM he sends from his phone is not on the deck as far as "
+            "she is concerned")
+        self.assertIn("2 Game Boy Advance games", self.face.board_has(),
+                      "the inventory never refreshes, so a ROM he sends "
+                      "needs a server restart to exist")
+
+    def test_the_inventory_reaches_a_deck_character_and_never_stacks(self):
+        """Same trap as the board line and the specs line: a prompt
+        appended to an already-appended prompt grows a stale copy per
+        turn and stays invisible until the context fills."""
+        with mock.patch.object(self.face, "board_has",
+                               return_value="\n\nWHAT IS ON THE BOARD WITH YOU: x."):
+            self.post("/say", {"text": "what have you got", "who": "four"}).read()
+            prompt = self.face._BRAINS["four"].system_prompt
+            self.assertIn("WHAT IS ON THE BOARD", prompt,
+                          "she was never told what is on the board")
+            for _ in range(3):
+                self.post("/say", {"text": "again", "who": "four"}).read()
+            self.assertEqual(
+                self.face._BRAINS["four"].system_prompt.count(
+                    "WHAT IS ON THE BOARD"), 1,
+                "the inventory stacks, one stale copy per turn")
+
+    def test_a_character_off_the_deck_never_hears_the_INVENTORY(self):
+        """The same gate as the watts and the specs, and for the same
+        reason: the archives and the ROMs are facts about the MACHINE,
+        and Yuzu is a drawn girl who does not live on one."""
+        with mock.patch.object(self.face, "board_has",
+                               return_value="\n\nWHAT IS ON THE BOARD WITH YOU: x."):
+            self.post("/say", {"text": "hello", "who": "yuzu"}).read()
+        key = self.face.persona_for("yuzu")
+        self.assertNotIn("WHAT IS ON THE BOARD",
+                         self.face._BRAINS[key].system_prompt)
+
     def test_the_hardware_gate_is_READ_and_not_merely_written(self):
         """THE BUG THIS ROUND FOUND. `answer()` referenced
         `yuzu_personas` without importing it -- the module is imported
@@ -10229,6 +10382,11 @@ class TestWikiBrevity(unittest.TestCase):
                 yuzu_face._SPECS = None
                 system += len(yuzu_face.board_specs()
                               + yuzu_face.board_now()) / CHARS_PER_TOKEN
+                # AND THE INVENTORY AT ITS CAP. It is empty in this
+                # container and ~350 characters on his board, so
+                # counting what it happens to say HERE is a guard that
+                # only holds where nobody has any games.
+                system += yuzu_face.HAS_MAX / CHARS_PER_TOKEN
                 yuzu_face._SPECS = None
             # AND THE FACTS BUDGET IS SPENT AS IF FULL.
             #

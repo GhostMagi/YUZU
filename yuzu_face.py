@@ -1005,6 +1005,164 @@ def forget(key):
         pass
 
 
+# AND SHE KNOWS WHAT IS ON THE BOARD WITH HER.
+#
+# Ghost, off the upgrade list: *"16 definitely yes."*
+#
+# `board_specs()` is the ID CARD -- what she RUNS ON -- and `board_now()`
+# is the weather. Neither of them can answer "what can this thing
+# actually do", which is the question a stranger asks at a demo and the
+# one he asks himself when he cannot remember what he put on it. Asked
+# today she invents an answer, which is the sixth instance of this
+# repo's most repeated finding and the exact mechanism that produced a
+# Windows CE palmtop.
+#
+# READ, NEVER HARDCODED -- the `ghostnano` rule and the `board_specs()`
+# rule, for the third time. A list of archives typed into this file is
+# right until he copies a ZIM over WiFi, and the failure looks exactly
+# like the deck working.
+#
+# CACHED WITH A SHORT LIFE rather than forever, and that is the one real
+# difference from the specs. A processor does not change while the
+# server is up; a ROM folder does, precisely because `drop.py` exists to
+# put things in it from his phone. A restart to notice a file he just
+# sent would be the stale-process fault wearing a helpful hat.
+_HAS = None
+_HAS_AT = 0.0
+_HAS_TTL = 120.0
+
+# AND IT IS BOUNDED, for the reason the facts store is. This rides on
+# the system prompt on every turn, and an inventory that grows with the
+# NVMe is one the context guard cannot see the worst case of -- forty
+# ROM folders would quietly do what a full facts store is stopped from
+# doing. The shelves are already sorted biggest first, so a trim drops
+# the ones he has one game in.
+HAS_MAX = 400
+
+# Folder name -> what a person calls it. UNKNOWN FOLDERS KEEP THEIR OWN
+# NAME rather than being dropped: this is a politeness layer, not an
+# allowlist, so a system nobody thought of still gets counted.
+_SYSTEMS = {
+    "gba": "Game Boy Advance", "gbc": "Game Boy Color", "gb": "Game Boy",
+    "snes": "SNES", "nes": "NES", "psx": "PlayStation", "ps1": "PlayStation",
+    "genesis": "Mega Drive", "megadrive": "Mega Drive", "n64": "Nintendo 64",
+}
+
+# Saves and states are not games, and counting them would tell him he
+# has twice the library he has.
+_NOT_A_GAME = (".sav", ".srm", ".state", ".ss0", ".ss1", ".png", ".txt")
+
+
+def _archives():
+    """Every .zim on the board, by name. The same three roots `wiki`
+    searches, so the two cannot disagree about where they live."""
+    import glob
+    found = []
+    for root in (os.path.expanduser("~"), "/media", "/mnt"):
+        for depth in range(1, 5):
+            pattern = os.path.join(root, *(["*"] * (depth - 1)), "*.zim")
+            try:
+                found.extend(glob.glob(pattern))
+            except Exception:
+                pass
+    names = []
+    for path in found:
+        try:
+            if os.path.getsize(path) < 1 << 20:
+                continue          # `wiki` skips anything under 1MB too
+        except OSError:
+            continue
+        name = os.path.basename(path)[:-4].replace("_", " ")
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def _games():
+    """(system, count) for whatever is in ~/ROMs, biggest shelf first."""
+    roms = os.path.join(os.path.expanduser("~"), "ROMs")
+    shelves = []
+    try:
+        systems = sorted(os.listdir(roms))
+    except OSError:
+        return shelves
+    for system in systems:
+        folder = os.path.join(roms, system)
+        if not os.path.isdir(folder):
+            continue
+        try:
+            count = len([f for f in os.listdir(folder)
+                         if not f.startswith(".")
+                         and not f.lower().endswith(_NOT_A_GAME)
+                         and os.path.isfile(os.path.join(folder, f))])
+        except OSError:
+            continue
+        if count:
+            shelves.append((_SYSTEMS.get(system.lower(), system), count))
+    shelves.sort(key=lambda s: -s[1])
+    return shelves
+
+
+def _and_list(items):
+    """a, b and c -- because " and " between three reads as a mistake."""
+    items = list(items)
+    if len(items) < 3:
+        return " and ".join(items)
+    return ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def board_has():
+    """One sentence of what is ON this board, or '' when there is
+    nothing to say.
+
+    ABSENT RATHER THAN WRONG, which on this one matters more than on
+    the specs line: an empty ROMs folder must not become "no games",
+    because she would then volunteer that the deck is empty to the
+    first person who picks it up."""
+    global _HAS, _HAS_AT
+    now = time.time()
+    if _HAS is not None and now - _HAS_AT < _HAS_TTL:
+        return _HAS
+    _HAS, _HAS_AT = "", now
+
+    archives = _archives()
+    shelves = _games()
+
+    def render():
+        bits = []
+        if archives:
+            bits.append(_and_list(archives) + " to look things up in")
+        if shelves:
+            bits.append(_and_list([
+                "%d %s game%s" % (n, system, "" if n == 1 else "s")
+                for system, n in shelves]))
+        if not bits:
+            return ""
+        # ONE SENTENCE OF PROSE, the same call the specs and the weather
+        # both made: a bulleted inventory in a system prompt is a
+        # FORMAT, and markdown headings are this deck's one categorical
+        # failure. And the tail is POSITIVE -- what to DO with it --
+        # rather than naming what she must not do, which is the
+        # pink-elephant shape measured three times here.
+        return ("\n\nWHAT IS ON THE BOARD WITH YOU: " + ", and ".join(bits)
+                + ". That is what you actually have to hand, so say so "
+                  "when somebody asks what this thing can do.")
+
+    # Drop the SMALLEST shelf, then the last archive, until it fits.
+    # Never cut the sentence itself: half a clause is worse than a
+    # shorter list, because she would answer from a thought that stops
+    # mid-way -- the same call the wiki extract made at 700 characters.
+    line = render()
+    while len(line) > HAS_MAX and (shelves or len(archives) > 1):
+        if shelves:
+            shelves.pop()
+        else:
+            archives.pop()
+        line = render()
+    _HAS = line
+    return _HAS
+
+
 # SHE REMEMBERS WHAT HE TELLS HER TO, AND THAT IS NOT THE HISTORY.
 #
 # Ghost, Sept 22: *"14 sounds amazing as long as she never fills the
@@ -1413,7 +1571,7 @@ def answer(text, who=None, on_chunk=None):
         try:
             if not hasattr(brain, "_base_prompt"):
                 brain._base_prompt = brain.system_prompt
-            board = (board_specs() + board_now()) if has_wiki else ""
+            board = (board_specs() + board_now() + board_has()) if has_wiki else ""
             brain.system_prompt = brain._base_prompt + board + facts_line(key)
         except Exception:
             pass
