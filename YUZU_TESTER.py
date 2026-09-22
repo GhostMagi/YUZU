@@ -10189,6 +10189,100 @@ class TestDeckSetup(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    # ---- the systems he asked for ----------------------------------
+
+    SYSTEMS = ("gb", "gbc", "gba", "nes", "snes", "psx")
+
+    def test_every_system_he_asked_for_is_INVENTORIED(self):
+        """Ghost, Sept 22: *"Snes ps1 nes and gameboy color please add
+        those to ES-DE"*.
+
+        He is not going to remember which package plays what, and a
+        list typed into a doc is a list that goes stale against his
+        actual Ubuntu. `--check` asks HIS board and names the fix."""
+        done, home, tmp = self._stub_run(self.SCRIPT, extra=["--check"])
+        try:
+            out = done.stdout.lower()
+            for system in ("gbc", "nes", "snes", "ps1"):
+                self.assertIn(system, out,
+                              "%s is not in the inventory, so he has no "
+                              "way to find out what plays it" % system)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_GAME_BOY_COLOR_needs_no_new_package_at_all(self):
+        """THE FIRST ANSWER IS THAT ONE OF THE FOUR IS ALREADY DONE.
+        mGBA plays Game Boy and Game Boy COLOR as well as Advance, so
+        `gbc` needs a folder and nothing else -- and telling him to
+        install something he already has is the kind of wrong step this
+        project has paid for."""
+        done, home, tmp = self._stub_run(
+            self.SCRIPT, have=("mgba-qt",), extra=["--check"])
+        try:
+            line = [l for l in done.stdout.splitlines() if "gbc" in l.lower()]
+            self.assertTrue(line, "no row covers Game Boy Color")
+            self.assertNotIn("MISSING", line[0],
+                             "it asks him to install something for GBC "
+                             "while mGBA is right there: %r" % line[0])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_the_PLAYSTATION_BIOS_is_named_BEFORE_it_fails(self):
+        """Every other system here runs a ROM straight off. PS1 needs a
+        console BIOS that no package ships, and without it a game dies
+        with an error about the machine rather than about the file --
+        which reads as a broken emulator.
+
+        Same rule as writing the Forge fallback into the failure
+        message rather than into a doc he will not open."""
+        import subprocess
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        home = Path(tmp) / "home"
+        (home / "ROMs" / "psx").mkdir(parents=True)
+        done = subprocess.run(
+            ["bash", str(self.SCRIPT), "--check"],
+            capture_output=True, text=True, timeout=60,
+            env={"PATH": "/usr/bin:/bin", "HOME": str(home)})
+        self.assertIn("BIOS", done.stdout,
+                      "he finds out PS1 needs a BIOS by a game failing "
+                      "at the panel")
+        # AND IT STAYS QUIET WHEN THERE IS NO PS1 FOLDER. A caveat that
+        # fires whatever is on the board is the same noise as a notice
+        # that fires every time -- the rule `pull`'s NEW COMMAND line
+        # already pays.
+        bare = Path(tmp) / "bare"
+        bare.mkdir()
+        quiet = subprocess.run(
+            ["bash", str(self.SCRIPT), "--check"],
+            capture_output=True, text=True, timeout=60,
+            env={"PATH": "/usr/bin:/bin", "HOME": str(bare)})
+        self.assertNotIn("BIOS", quiet.stdout,
+                         "the PS1 caveat fires on a board with no PS1 "
+                         "folder on it")
+
+    def test_every_folder_it_makes_is_one_SHE_can_name(self):
+        """TWO LAYERS, PINNED TO AGREE. `deck` creates the ROM folders
+        and `board_has()` counts what lands in them -- and a folder she
+        has no readable name for comes out as "1 psx game" in her
+        prompt. Both ends are ours here, so there is no excuse for them
+        disagreeing.
+
+        `_SYSTEMS` stays a politeness layer rather than an allowlist --
+        an unknown folder is still COUNTED -- so this is about the ones
+        the deck itself creates, not about every folder that can
+        exist."""
+        import yuzu_face
+        body = self.SCRIPT.read_text()
+        made = re.search(r"for system in ([^;]+); do", body)
+        self.assertIsNotNone(made, "deck no longer creates the rom folders")
+        for system in made.group(1).split():
+            self.assertIn(
+                system, yuzu_face._SYSTEMS,
+                "deck makes a ~/ROMs/%s folder that she has no name "
+                "for, so she will call it '%s' in her own prompt"
+                % (system, system))
+
     def test_it_refuses_to_install_icons_with_no_browser(self):
         """An icon that opens nothing reads as a broken deck rather than
         as a missing package -- so stop, and say which package."""

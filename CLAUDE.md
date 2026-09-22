@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 736 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 740 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 736 tests pass on it. Getting it
+(that repo path is confirmed working). 740 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,57 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## FOUR MORE SYSTEMS, AND `deck --check` ASKS RATHER THAN TELLS (Sept 22)
+
+Ghost: *"Snes ps1 nes and gameboy color please add those to ES-DE."*
+
+**THE APT INSTALLS HAPPEN ON HIS BOARD AND I CANNOT VERIFY HIS REPOS
+FROM HERE**, which is the whole design of this change. A package list
+written into a doc is right until his Ubuntu disagrees, and **an
+unverified specific stated as a step sends a person debugging their own
+hands** -- an hour of the 8BitDo evening is the receipt.
+
+`deck --check` already had exactly the right shape: a `row` helper that
+prints `MISSING -- sudo apt install -y <pkg>` only when the thing is
+genuinely absent, and gathers them into one line. So the systems are
+rows now, and **the deliverable is one word he already knows** rather
+than a paste from here.
+
+**ONE OF THE FOUR WAS ALREADY DONE, and saying so came first.** mGBA
+plays Game Boy and Game Boy **Color** as well as Advance, so `gbc`
+needs no package at all -- only a folder. Telling him to install
+something he already has is its own kind of wrong step.
+
+**PLAYSTATION NEEDS A BIOS AND NOTHING SAYS SO UNTIL IT FAILS.** Every
+other system here runs a ROM straight off; PS1 dies with an error about
+the MACHINE rather than about the file, which reads as a broken
+emulator. `deck --check` says it the moment a `~/ROMs/psx` folder
+exists -- and **stays quiet when there is none**, because a caveat that
+fires whatever is on the board is the same noise as a notice that fires
+every time. Both halves pinned.
+
+**A FOLDER PER SYSTEM, BECAUSE THAT IS THE WHOLE INTERFACE.** ES-DE
+finds systems by folder name under `~/ROMs`, `drop.py` lands a file in
+the folder you start it from, and `board_has()` counts what is there --
+so the folders existing is what turns "I sent a ROM over" into "she
+knows I have it", with nothing else to configure. Empty ones cost
+nothing: they are skipped everywhere until a file lands.
+
+**AND THE TWO LAYERS ARE PINNED TO AGREE.** `deck` creates the folders
+and `board_has()` names them; a folder she has no name for comes out as
+*"1 psx game"* in her own prompt. Both ends are ours, so there is no
+excuse for them drifting -- `test_every_folder_it_makes_is_one_SHE_can
+_name` reads the list out of `deck` and checks it against `_SYSTEMS`.
+**`_SYSTEMS` stays a politeness layer rather than an allowlist**: a
+folder nobody thought of is still COUNTED, it just keeps its own name.
+
+**Four new tests, each verified by breaking it**: the systems dropped
+from the inventory, GBC told to install something anyway, the BIOS
+caveat removed, and a folder created that she cannot name. All go red.
+
+**STILL HIS TO RUN.** Nothing here installs anything -- `--check` is
+read-only by design and a test pins that.
 
 ## SHE HAS A SHAPE FOR A LOOKUP NOW (Sept 22)
 
@@ -484,8 +535,37 @@ a chat reminder dies with the session.**
   carefully while the server binds 0.0.0.0 -- a fixed pair of modes, no
   argument from the request, same discipline as `/launch/` and
   `run_deckapps()`.
-- **ES-DE cores he asked for: SNES, PS1, NES, Game Boy Color.** Not yet
-  added. All ARM-native and ES-DE is already installed.
+- **ES-DE cores: SNES, PS1, NES, Game Boy Color. HE ASKED TO BE
+  REMINDED WHEN HE IS BACK** -- *"we will do the apt installs when i
+  wake just pls remind me about it when i come back"*. Same standing
+  request as the right-angle adapters: **bring it up rather than
+  waiting to be asked.**
+
+  **THE REPO SIDE IS DONE; ONLY THE `apt` IS LEFT.** `~/YUZU/deck
+  --check` now asks HIS board which of them it can play and prints the
+  exact package beside anything missing -- so the first thing to do is
+  run that one word and read it, NOT to paste a package list from here.
+  A list typed into this file is a list that goes stale against his
+  actual Ubuntu, and an unverified specific stated as a step is what
+  cost an hour on the 8BitDo.
+
+  Two things already settled, so they do not get re-litigated at 9am:
+  **Game Boy Color needs NOTHING** -- mGBA plays GB and GBC as well as
+  GBA, so it is a folder and no package -- and **PlayStation needs a
+  console BIOS image that no package ships**, which `deck --check` says
+  out loud the moment a `~/ROMs/psx` folder exists, because otherwise
+  he finds out by a game failing in a way that reads like a broken
+  emulator.
+
+- **The D&D DM persona: PARKED, his call** -- *"The DM thing can be put
+  aside for now."* The thinking done so far is worth keeping for
+  whenever it comes back: **a 3B cannot hold rules**, so the dice, the
+  HP and the inventory live in CODE and she only ever narrates what she
+  is handed -- the `/wiki` shape, and the same "prompt REDUCES, code
+  GUARANTEES" split this file is built on. The fair d20 already exists.
+  Solo-oracle rather than a party DM, since he plays alone. And the
+  register risk is assistant collapse in a cloak: a 3B told "fantasy
+  narrator" writes purple prose and `**The Tavern**` headings.
 
 ### CORRECTION, from him: the 8BitDo never actually worked
 
