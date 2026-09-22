@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 709 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 721 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 709 tests pass on it. Getting it
+(that repo path is confirmed working). 721 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,213 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE KEEPS WHAT HE TELLS HER TO, AND IT CANNOT FILL UP (Sept 22)
+
+Ghost, off a list of twenty upgrades: *"14 sounds amazing as long as
+she never fills the memory."*
+
+`~/.yuzu/history/` is the last 8 turns and is bounded by CONSTRUCTION
+-- the brain trims eagerly, so it cannot creep. It is also gone the
+moment the conversation moves past it, which is the whole gap: tell
+her your cousin's name and nine turns later it is not anywhere on the
+board.
+
+**THE WORRY HE NAMED IS THE RIGHT ONE AND IT IS NOT ABOUT DISK.** A
+facts file is a few kilobytes forever against a 512GB NVMe. What fills
+up is **CONTEXT**: every fact rides on the system prompt on EVERY turn,
+inside the same `num_ctx` that `(history_turns + 1) x num_predict`
+already mostly fills -- and **going over is SILENT.** Nothing raises
+and nothing prints; tokens are dropped and she comes back having
+forgotten the START of the conversation. That is precisely the fault
+the Sept 21 round measured, so the cap IS the feature.
+
+**THE BUDGET IS MEASURED, NOT PICKED.** At the shipped settings the
+worst character in the repo leaves **879 tokens of slack** -- about
+3000 characters counted pessimistically. `FACTS_BUDGET` takes 1200 of
+it, and `test_the_reply_ceiling_and_the_CONTEXT_agree` now **spends it
+AS IF FULL**, with the frame text measured rather than estimated. A
+guard that counts the store at its CURRENT size is one that only holds
+on a board nobody has used yet. **491 tokens still spare with it
+brimming**, on the worst character, at pessimistic counting.
+
+**FIFO, NEVER A REFUSAL, and the count is on screen every turn.** A
+store that stops accepting is a feature that quietly stopped working.
+Oldest out, newest in -- and `she knows 4 things about you` sits under
+the ask bar on every single turn, so he can watch it fill rather than
+discover it.
+
+**TWO CAPS, BECAUSE ONE PASTE WOULD OTHERWISE BE THE WHOLE STORE.**
+`FACT_MAX` is 200; without it he taps Remember on a wall of text and
+silently evicts everything she knew.
+
+### It is a BUTTON, and that is a scope call he caught me on
+
+The list said *"a file she adds to herself"* and what got built is
+**you tap "remember that"**. He spotted the gap on the screenshot:
+*"i thought the facts thing was a background kinda deal."* **He was
+right and the wording was mine.**
+
+The reason it went manual is worth keeping, because it is this file's
+most-measured pattern pointing at the new feature: **for her to decide,
+she has to be TAUGHT a remember-verb in her prompt** -- and naming a
+token in her prompt is how she learns to spam it. `[winks]` in 3 of 4
+replies, the asterisk ban that printed an asterisk, rule 5 recited back
+at him verbatim. A 3B handed a remember move will use it every turn,
+and then `he said hi` evicts his cousin's name **out of the very budget
+he asked to be protected.**
+
+The other automatic route is a second model call per turn to extract
+facts: that doubles a 10-30 second reply, and **a wrong fact is worse
+than no fact because it persists.**
+
+**The honest middle is SHE PROPOSES, HE CONFIRMS** -- one tap to
+accept, reusing all of this, with the prompt marker added as its own
+separate measurable variable. Offered, not built. **His call, and the
+button is the floor under every version of it.**
+
+### The things that would have gone wrong quietly
+
+**A LOADED BRAIN KEEPS ITS CACHED PROMPT.** `answer()` captures
+`_base_prompt` ONCE per brain so the board line cannot stack -- correct,
+and it also means a brain already in `_BRAINS` goes on answering from
+the prompt it was built with. Without dropping that cache the fact
+lands on disk and **she does not know it until the next `~/YUZU/pull`
+restarts the server**: he taps Remember, she says Got it, and then has
+never heard of it. Same shape as the roster that rendered as though the
+work never landed. `_drop_prompt_cache` deletes the flag; the next turn
+re-captures it.
+
+**IT QUOTES HIM, and that is not decoration.** Stored verbatim, *"my
+cousin's name is Dave"* injected bare leaves `my` pointing at HER. The
+pronoun belongs to whoever the sentence is attributed to, so the line
+reads *in his own words: "..."*. Rewriting into the third person would
+need the model on every save.
+
+**PROSE, NEVER A BULLETED LIST** -- the same call `board_now()` and
+`board_specs()` both made. A list in a system prompt is a FORMAT, and
+markdown headings are this deck's one categorical failure.
+
+**AND IT IS NOT GATED ON `has_wiki`.** The board line is, because Cait
+has never heard of a computer and a test bans the words from her
+prompt. What Ghost asked her to remember is about HIM, so it belongs to
+every character on every body.
+
+**ATOMIC WRITE FROM THE START**, rather than after: `.part` then
+`os.replace`, the lesson the memory file paid for when `open(path,"w")`
+turned 58 bytes of memory into 29 bytes of nothing.
+
+### Three test faults, and the second one is the finding
+
+**TWO EXISTING TESTS WERE MATCHING SPELLING, NOT BEHAVIOUR.** The tap
+guard pinned the literal `closest('#says')` and went red the day a
+second control on the stage had to be excluded. And the destructive-
+route check split `do_POST`'s source on the literal `/forget` -- which
+landed in a **neighbouring route's COMMENT** quoting that rule, then,
+rewritten, stopped at a neighbour's `if path ==` before reaching the
+branch. Both read prose and reported on a guard they never saw.
+`drive_route()` builds a request and runs the real branch now.
+
+**AND A BREAK-CHECK CAME BACK `errors=1`, WHICH IS NOT `failures=1`.**
+Breaking `FACT_MAX` made the test raise `ValueError` on an empty list
+rather than fail with a message -- and **that crash is a real hole in
+the CODE**: a fact bigger than the whole budget makes `_within_budget`
+pop until the store is EMPTY, so it wipes months of facts, stores
+nothing, and still says "Got it." It cannot happen at 200 against 1200;
+it happens the day somebody raises one number without looking at the
+other. `test_one_fact_can_ALWAYS_fit_the_budget` pins the pair.
+
+**AND ONE OF MY OWN NEW TESTS COULD NOT SEE ITS OWN FAILURE.** The
+no-bulleted-list check stored **ONE** fact and then looked for a join
+separator -- with one item there IS none, so it passed happily with the
+join rewritten to `"\n- "` on purpose. Two facts now. Oldest rule in
+this file, broken in the round that quotes it, again.
+
+**Twelve new tests, each verified by breaking it**: the budget not
+enforced, the per-fact cap gone, a loaded brain keeping its stale
+prompt, the facts gated on the deck body, the budget outgrowing the
+window, the x recolouring the page instead of dropping the fact, a
+destructive route growing a default, the line becoming a list, and a
+failed save eating the store. All go red.
+
+**RENDERED AND DRIVEN, thirty-second time.** 1024x600 and 412: Speak
+at 1000/1024 and 388/412, the exit still in its corner, no horizontal
+scroll. **Two things the assertions could not see:** the x was
+`--dim` at about 12x20px -- on the panel there is no hover, so the only
+control in that list would have stayed the faintest thing on screen at
+half a thumb; it is 28x28 and bright now. And `#facts` had not
+inherited the narrow-screen rule `#says` already carries. Then the
+whole loop was driven in a real browser: add, delete, the count
+updating, the note clearing back to the count.
+
+**`#text` GAINED `min-width: 0`**, which is the exact fault that put
+the home button 169px past the viewport on four pages and the Update
+button 2px off at 412 -- an `<input>` carries an intrinsic width and
+will not shrink below it, so the second row would have shoved Speak off
+a phone.
+
+**YUZU GETS IT FOR FREE THE MOMENT HER PAGE ASKS.** The routes take a
+NAME and go through `persona_for`, exactly like `voice_wav` did -- the
+server side needed nothing for her. Four's page is the only one that
+asks today.
+
+**UNMEASURED.** Nobody has told her anything on the real board yet.
+
+## STILL OPEN, in his own words (Sept 22)
+
+From the twenty-upgrade list, with his answers. **Recorded here because
+a chat reminder dies with the session.**
+
+- **Multi-ZIM `/wiki` (#1). LATER, and he asked to keep it in mind:**
+  *"i was wondering if she could use those other files later im just
+  scatterbrained."* iFixit, WikiMed, WikiHow, Wikivoyage, Appropedia,
+  Gutenberg. The rank-and-extract code already exists and is scoped to
+  one book; making it search every loaded archive adds **no new
+  command**, which is what makes it the cheapest big win on the list.
+- **Offline maps (#3). LATER, and HE ASKED TO BE REMINDED** -- *"the
+  maps thing is a later thing as well remind me sometime"*, the same
+  standing request as the right-angle adapters and `nvpmodel -m 0`.
+  Bring it up rather than waiting to be asked.
+- **Her answering from HIS files (#13): someday.** Same machinery as #1
+  pointed at a folder.
+- **Whisper (#15): waiting, AND HE HAS SPECIFIED THE SHAPE.** *"Id like
+  to make that a 'certain button to start the recording' vibe like a
+  walkie talkie."* **Push-to-talk, never a wake word** -- that is a
+  design decision already made, and it is the right one on a battery:
+  no always-on listening, no hot mic, and the button is the gesture
+  browsers already require for audio.
+- **She knows what is ON the deck (#16): YES, next.** Which archives,
+  which games, how much disk. Same shape as `board_specs()`.
+- **One example of her answering from a `/wiki` lookup (#17): explained
+  and not yet built.** She has no demonstrated shape for being handed
+  700 characters of encyclopedia, so she invents one -- and what a 3B
+  reaches for is mild irritation at being given facts it did not ask
+  for. Measured live: *"I'm not going to try to summarize this
+  information again; I've already 'learned' it from you."* Same lever
+  that has now worked five times, ~200 characters of prompt.
+- **A power-mode tile (#20): HE CALLED IT IMPORTANT.** MAXN and quiet
+  from a button instead of remembering `nvpmodel`. **It needs a sudo
+  rule**, which is the one thing on this board that must be written
+  carefully while the server binds 0.0.0.0 -- a fixed pair of modes, no
+  argument from the request, same discipline as `/launch/` and
+  `run_deckapps()`.
+- **ES-DE cores he asked for: SNES, PS1, NES, Game Boy Color.** Not yet
+  added. All ARM-native and ES-DE is already installed.
+
+### CORRECTION, from him: the 8BitDo never actually worked
+
+Ghost: *"Never got 8bitdo working actually. I just never corrected my
+bad."*
+
+**This file has been wrong about that since Sept 9.** The `pad` entry
+records `N: Name="8BitDo 8BitDo Micro gamepad"` appearing over USB and
+concludes *"the last known state is 'pad works, emulator never
+looked'"*. The kernel seeing it was real; **a working controller in a
+game was never confirmed**, and the note read as though it had been.
+
+That matters for more than tidiness: **gamepad navigation of the deck's
+own pages (#12) was costed as free on the assumption that the pad
+works.** It is not free until the pad is.
 
 ## SHE CALLED HIM "USER", AND THE PROMPT TAUGHT HER THAT (Sept 22)
 
@@ -5777,8 +5984,13 @@ stated as instructions.
 - **The pad sleeps and then only charges.** Red LED = charging, not
   connected. Wake it BEFORE plugging in.
 - **mGBA was never restarted after the pad appeared**, so the last
-  known state is "pad works, emulator never looked". That is the very
-  next thing to try, and it may simply be done.
+  known state is "the kernel sees it, the emulator never looked". That
+  is the very next thing to try.
+
+  **CORRECTED Sept 22, by Ghost: it never worked.** *"Never got 8bitdo
+  working actually. I just never corrected my bad."* This entry read
+  as though a working controller had been confirmed and one never was
+  -- the `N: Name=` line proves the KERNEL saw it and nothing more.
 - **Bluetooth is unresolved** and the real error is in
   `/tmp/pad-pair.log` on the board, never read. `Bonded: no` with
   BlueZ logging `Success` on its own rejection is as far as it got.

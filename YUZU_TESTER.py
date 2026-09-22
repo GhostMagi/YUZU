@@ -3388,6 +3388,28 @@ class TestCait(unittest.TestCase):
                       "a failed roster fetch is unhandled")
 
 
+def drive_route(path, body):
+    """Call the REAL `do_POST` for one route and return what it answered.
+
+    READING THE SOURCE IS WHAT KEPT MISSING THIS. Two versions of the
+    empty-name check split `do_POST`'s text on a literal route name:
+    the first landed in a NEIGHBOUR'S COMMENT that happened to quote
+    `/forget`, and the second stopped at a neighbour's `if path ==`
+    before reaching the branch it was aiming at. Both read a paragraph
+    and reported on a guard they never saw. Build a request, run the
+    branch, read the verdict."""
+    import io, json as _json, yuzu_face
+    raw = _json.dumps(body).encode()
+    handler = object.__new__(yuzu_face._Handler)
+    handler.path = path
+    handler.headers = {"Content-Length": str(len(raw))}
+    handler.rfile = io.BytesIO(raw)
+    answered = {}
+    handler._json = lambda obj, code=200: answered.update(obj, _code=code)
+    handler.do_POST()
+    return answered
+
+
 class TestTheCastIsTwo(unittest.TestCase):
     """Ghost, Sept 20: "Can we actually remove saya cait and mimi? I
     dont need them they were laye night tests really. Like from the
@@ -3460,14 +3482,21 @@ class TestTheCastIsTwo(unittest.TestCase):
                              "character rather than following the door")
         finally:
             yuzu_face.FRONT = was
-        # ...and the destructive route still refuses an empty name,
-        # which is the half a default must never reach.
-        import inspect
-        src = inspect.getsource(yuzu_face._Handler.do_POST)
-        forget = src.split("/forget")[1].split("if path ==")[0]
-        self.assertIn("else None", forget,
-                      "/forget grew a default and can now wipe the "
-                      "front character on an empty field")
+        # ...and EVERY destructive route still refuses an empty name,
+        # which is the half a default must never reach. DRIVEN: the
+        # branch runs and the verdict is read, because two attempts at
+        # reading this out of the source both reported on prose.
+        for route in ("/forget", "/unremember"):
+            answered = drive_route(route, {"who": ""})
+            self.assertFalse(
+                answered.get("ok"),
+                "%s accepted an empty name, so a blank field now wipes "
+                "the front character" % route)
+        # and the ADDITIVE ones still take the honest default, which is
+        # the other half -- a guard that refuses everything is not a
+        # guard, it is an outage.
+        self.assertTrue(drive_route("/facts", {}).get("ok"),
+                        "/facts refuses a request that names nobody")
 
     def test_the_FRONT_door_and_the_LIVE_arm_are_still_TWO_pointers(self):
         """The name-leak rule again: decide whether a fact belongs to
@@ -5007,6 +5036,243 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         self.assertFalse(os.path.exists(saved))
 
 
+class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
+    """SHE KEEPS WHAT HE ASKS HER TO, AND IT IS NOT THE HISTORY.
+
+    Ghost, Sept 22: *"14 sounds amazing as long as she never fills the
+    memory."*
+
+    `~/.yuzu/history/` is the last 8 turns and is bounded by
+    CONSTRUCTION -- the brain trims eagerly. It is also gone the moment
+    the conversation moves past it, so his cousin's name lasts nine
+    turns and then is nowhere on the board.
+
+    THE WORRY HE NAMED IS THE RIGHT ONE AND IT IS NOT DISK. Every fact
+    rides on the system prompt on every single turn, inside the same
+    `num_ctx` that `(history_turns + 1) x num_predict` already mostly
+    fills -- and going over is SILENT: tokens are dropped and she comes
+    back having forgotten the START of the conversation. So the cap is
+    the feature, and `test_the_reply_ceiling_and_the_CONTEXT_agree`
+    spends this budget as if full."""
+
+    def store(self):
+        """A temp facts directory. THE SUITE MUST NEVER WRITE TO HIS
+        REAL ONE -- emptying `~/.yuzu/history/` and running the suite is
+        exactly how the truncating-save bug was found, and the droppings
+        were the symptom that led to it."""
+        import yuzu_face
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        patch = mock.patch.object(yuzu_face, "FACTS_DIR", tmp)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return yuzu_face
+
+    def test_the_store_can_NEVER_outgrow_its_budget(self):
+        """HIS ACTUAL ASK, and the only one that matters.
+
+        Driven rather than reasoned: a hundred facts go in, far past
+        the cap, and the store is measured afterwards. Oldest out,
+        newest in -- a FIFO rather than a refusal, because a store that
+        stops accepting is a feature that quietly stopped working, and
+        the count on her page is visible on every turn so he can see it
+        coming."""
+        face = self.store()
+        for i in range(100):
+            face.remember("four", "fact number %d about something" % i)
+        facts = face.load_facts("four")
+        used = sum(len(f) for f in facts)
+        self.assertLessEqual(
+            used, face.FACTS_BUDGET,
+            "the store grew to %d characters against a budget of %d -- "
+            "every one of them rides on her prompt every turn, and "
+            "going over num_ctx is silent" % (used, face.FACTS_BUDGET))
+        self.assertTrue(facts, "it evicted everything rather than the oldest")
+        # NEWEST SURVIVES. A cap that drops what he just said would be
+        # a button that reports success and does nothing.
+        self.assertIn("fact number 99 about something", facts)
+
+    def test_one_paste_can_never_BE_the_whole_store(self):
+        """Without a per-fact cap a single paste IS the budget: he taps
+        Remember on a wall of text and silently evicts everything she
+        knew. It is trimmed, and the reply SAYS it trimmed."""
+        face = self.store()
+        face.remember("four", "his name is Ghost")
+        facts, _dropped, note = face.remember("four", "x" * 5000)
+        # NOT `max(len(f) for f in facts)`: the first version of this
+        # line raised ValueError on an empty list when the cap was
+        # broken, so it reported `errors=1` -- unittest saying the test
+        # did not RUN -- where a skimmer reading for red would have
+        # ticked it off as caught. Read the failure KIND, not the
+        # colour. It says what went wrong now.
+        self.assertTrue(facts, "one paste emptied the entire store")
+        self.assertLessEqual(max(len(f) for f in facts), face.FACT_MAX,
+                             "a single paste is bigger than the per-fact cap")
+        self.assertIn("rimmed", note, "it trimmed his text and said nothing")
+        self.assertIn("his name is Ghost", facts,
+                      "one paste evicted everything she already knew")
+
+    def test_one_fact_can_ALWAYS_fit_the_budget(self):
+        """TWO CONSTANTS THAT HAVE TO AGREE, AND NOTHING CHECKED IT.
+
+        Found by breaking the per-fact cap and watching the test ERROR
+        rather than fail: with a fact larger than the whole budget,
+        `_within_budget` pops until the list is EMPTY -- so the store is
+        wiped, nothing is stored, and the page still says "Got it."
+        Wiping months of facts and reporting success is the exact
+        silent-failure shape this deck refuses everywhere else.
+
+        It cannot happen at 200 against 1200. It happens the day
+        somebody raises one number without looking at the other, which
+        is the fault this repo keeps deleting."""
+        import yuzu_face
+        self.assertLess(
+            yuzu_face.FACT_MAX, yuzu_face.FACTS_BUDGET,
+            "one fact can be bigger than the whole store, so saving it "
+            "empties the store and reports success")
+
+    def test_being_told_the_same_thing_twice_costs_the_budget_once(self):
+        """Tapping the button twice is the single most likely thing to
+        happen to it on a touchscreen."""
+        face = self.store()
+        face.remember("four", "I work nights")
+        facts, _d, note = face.remember("four", "i WORK nights")
+        self.assertEqual(len(facts), 1, "a second tap spent the budget again")
+        self.assertIn("already", note)
+
+    def test_there_is_a_way_to_UNTELL_her(self):
+        """A thing she can be told and never untold is a screen with no
+        way off it, in data -- the one rule this deck will not trade."""
+        face = self.store()
+        face.remember("four", "one")
+        face.remember("four", "two")
+        self.assertEqual(face.unremember("four", 0), ["two"])
+        # Out of range is SUCCESS. This exists so the store has an exit,
+        # not so it can fail.
+        self.assertEqual(face.unremember("four", 99), ["two"])
+        self.assertEqual(face.unremember("four", "nonsense"), ["two"])
+
+    def test_a_fact_reaches_a_brain_that_is_ALREADY_LOADED(self):
+        """THE STALE-PROCESS FAULT, one layer in, and it would have
+        looked exactly like the feature not working.
+
+        `answer()` captures `_base_prompt` ONCE per brain so the board
+        line cannot stack -- correct, and it also means a brain already
+        in `_BRAINS` keeps answering from the prompt it was built with.
+        Without dropping that cache the fact lands on disk and she does
+        not know it until the next `~/YUZU/pull` restarts the server:
+        he taps Remember, she says Got it, and then she has never heard
+        of it. Same shape as the roster that rendered as though the
+        work never landed."""
+        face = self.store()
+
+        class Loaded:
+            system_prompt = "BASE"
+        brain = Loaded()
+        brain._base_prompt = "BASE"
+        brain.system_prompt = "BASE and the old appendix"
+        with mock.patch.dict(face._BRAINS, {"four": brain}, clear=False):
+            face.remember("four", "his name is Ghost")
+            self.assertFalse(
+                hasattr(brain, "_base_prompt"),
+                "the loaded brain kept its cached prompt, so she will "
+                "not know this until the server restarts")
+            self.assertEqual(brain.system_prompt, "BASE")
+
+    def test_the_line_QUOTES_him_so_the_pronouns_still_point_at_him(self):
+        """Stored verbatim, "my cousin's name is Dave" injected bare
+        leaves `my` pointing at HER. Quoting them and naming the speaker
+        costs four words and removes the ambiguity; rewriting them into
+        the third person would need the model on every save."""
+        face = self.store()
+        face.remember("four", "my cousin's name is Dave")
+        # TWO, NOT ONE. The first version stored a single fact and then
+        # checked the joined text for list markup -- with one item
+        # there IS no separator, so the check passed with the join
+        # rewritten to "\n- " on purpose. A check that cannot observe
+        # its own failure is not a check, and this one was written in
+        # the round that quotes that rule.
+        face.remember("four", "i work nights")
+        line = face.facts_line("four")
+        self.assertIn('"my cousin\'s name is Dave"', line,
+                      "the fact is not quoted, so `my` is hers now")
+        self.assertIn("his own words", line)
+        # PROSE, NEVER A BULLETED LIST -- the same call board_now() and
+        # board_specs() both made. A list in a system prompt is a
+        # FORMAT, and markdown headings are this deck's one categorical
+        # failure.
+        for markup in ("\n-", "\n*", "\n1.", "##"):
+            self.assertNotIn(markup, line.lstrip("\n"),
+                             "her facts line teaches her to answer in lists")
+
+    def test_an_empty_store_says_NOTHING_at_all(self):
+        """Absent rather than wrong, and it is worth a test because the
+        alternative is a sentence saying she knows nothing about him
+        riding on every turn of a fresh board -- which is both a waste
+        of context and a thing she would then volunteer."""
+        face = self.store()
+        self.assertEqual(face.facts_line("four"), "")
+
+    def test_losing_the_facts_never_loses_the_REPLY(self):
+        """The promise the face, the wiki, Piper and the memory all
+        make. Driven with the file corrupt, not assumed."""
+        face = self.store()
+        os.makedirs(face.FACTS_DIR, exist_ok=True)
+        with open(face._facts_file("four"), "w") as fh:
+            fh.write("{ this is not json")
+        self.assertEqual(face.load_facts("four"), [])
+        self.assertEqual(face.facts_line("four"), "")
+
+    def test_it_writes_BESIDE_the_file_and_renames(self):
+        """`open(path, "w")` TRUNCATES the instant it is called, so a
+        dump that raises part way leaves a fragment where months of
+        facts used to be -- and the `except` that protects the reply is
+        what makes that silent. Measured on the memory file when it had
+        this bug: 58 bytes of memory became 29 bytes of nothing.
+
+        Driven by making the dump fail and checking the old store is
+        still whole."""
+        face = self.store()
+        face.remember("four", "his name is Ghost")
+        with mock.patch.object(json, "dump", side_effect=OSError("disk full")):
+            self.assertFalse(face.save_facts("four", ["something new"]))
+        self.assertEqual(face.load_facts("four"), ["his name is Ghost"],
+                         "a failed save ate the store it was rewriting")
+        self.assertFalse(
+            os.path.exists(face._facts_file("four") + ".part"),
+            "it left a .part to be mistaken for a store later")
+
+    def test_the_facts_are_NOT_gated_on_the_deck_body(self):
+        """The board line IS gated: Cait has never heard of a computer
+        and a test bans the words from her prompt, so handing her the
+        watts at runtime would walk straight around it.
+
+        What Ghost asked her to remember is about HIM, so it belongs to
+        every character on every body. Read off the real source, with
+        comments stripped -- the prose here explains the gate it is
+        deliberately outside of."""
+        import inspect, yuzu_face
+        src = inspect.getsource(yuzu_face.answer)
+        code = "\n".join(l.split("#")[0] for l in src.split("\n"))
+        line = [l for l in code.split("\n") if "facts_line(" in l]
+        self.assertTrue(line, "answer() never sends her the facts at all")
+        self.assertNotIn("if has_wiki", line[0],
+                         "the facts got gated on the deck body, so only "
+                         "Four ever hears them")
+
+    def test_his_REAL_facts_directory_is_never_touched_by_the_suite(self):
+        """The memory round found five zero-byte files in the REAL
+        `~/.yuzu/history/` after a run, and the pollution was the
+        symptom that led to the truncating-write bug. This store gets
+        the guard from the start rather than after."""
+        import yuzu_face
+        self.assertIn(".yuzu", yuzu_face.FACTS_DIR)
+        real = os.path.join(os.path.expanduser("~"), ".yuzu", "facts")
+        self.assertEqual(yuzu_face.FACTS_DIR, real,
+                         "the module's own default moved, so every test "
+                         "here is patching the wrong name")
+
+
 class TestSheSpeaksOutOfThePage(unittest.TestCase):
     """AUDIO HAS TO TRAVEL. `yuzu_voice.say()` plays on the machine
     running the module -- the ORIN -- and the Orin has no speaker on it
@@ -6140,8 +6406,20 @@ class TestFour(unittest.TestCase):
         page = self.PAGE.read_text()
         self.assertIn("getElementById('stage').addEventListener('click'", page,
                       "the tap is not scoped to her stage")
-        self.assertIn("closest('#says')", page,
+        # WHICH SELECTORS IT LETS THROUGH, not how they are spelled.
+        # This matched the literal `closest('#says')` and went red the
+        # day a second control on the stage had to be excluded too --
+        # a check about the file's spelling rather than about the page,
+        # which is the grep-as-proxy fault this repo has now recorded
+        # more than a dozen times.
+        guards = set()
+        for sel in re.findall(r"closest\(\s*'([^']*)'\s*\)", page):
+            guards.update(part.strip() for part in sel.split(","))
+        self.assertIn("#says", guards,
                       "scrolling her reply would also recolour the page")
+        self.assertIn("#facts", guards,
+                      "the x that drops a fact would recolour the page "
+                      "instead of dropping it")
 
     def test_her_TINT_and_her_PALETTE_name_the_same_two_colours(self):
         """TWO COPIES THAT MUST AGREE. Her art is a JPEG, so it cannot
@@ -9952,6 +10230,19 @@ class TestWikiBrevity(unittest.TestCase):
                 system += len(yuzu_face.board_specs()
                               + yuzu_face.board_now()) / CHARS_PER_TOKEN
                 yuzu_face._SPECS = None
+            # AND THE FACTS BUDGET IS SPENT AS IF FULL.
+            #
+            # What Ghost asked her to remember rides on the system
+            # prompt on EVERY turn, exactly like the board line -- so a
+            # guard that counts the store at its CURRENT size is a
+            # guard that only holds on a board nobody has used yet. It
+            # is counted at its cap, with the real frame text measured
+            # rather than estimated, because the number that matters is
+            # the worst case he can actually reach by tapping a button.
+            import yuzu_face
+            with mock.patch.object(yuzu_face, "load_facts",
+                                   lambda k: ["x" * yuzu_face.FACTS_BUDGET]):
+                system += len(yuzu_face.facts_line(key)) / CHARS_PER_TOKEN
             need = system + turns * (int(cap) + HIS_TURN) + int(cap)
             if worst is None or need > worst[1]:
                 worst = (key, need)

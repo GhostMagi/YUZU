@@ -327,11 +327,17 @@ body.thinking #four { animation-duration: 1.6s; }
 #ask {
   position: relative; z-index: 5;
   background: linear-gradient(to top, #000 62%, transparent);
-  display: flex; gap: 10px; align-items: center;
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   padding: 10px 24px calc(18px + env(safe-area-inset-bottom));
 }
+/* `min-width: 0` is the load-bearing half, and it is the exact fault
+   that put the ⌂ 169px past the viewport on four character pages and
+   the Update button 2px off at 412. A flex item -- an <input> most of
+   all, which carries an intrinsic width from its own `size` -- will
+   not shrink below its content without it, so the second control in
+   this row would shove Speak off the screen on a phone. */
 #text {
-  flex: 1; font: inherit; font-size: 15px; color: var(--ink);
+  flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--ink);
   background: rgba(0,0,0,.55); padding: 12px 15px; border-radius: 2px;
   border: 1px solid var(--edge);
 }
@@ -343,6 +349,47 @@ body.thinking #four { animation-duration: 1.6s; }
   border: 0; border-radius: 2px;
 }
 #send:disabled { opacity: .5; cursor: default; }
+
+/* ---- what she has been told to keep -----------------------------------
+   A SECOND ROW RATHER THAN A THIRD CONTROL. Three things across one bar
+   is how this page's own Update button landed 2px off the viewport at
+   412px, and "remember that" is a phrase rather than an icon on purpose
+   -- her home icon rendering as `!!!!` is the recorded cost of trusting
+   a glyph to explain itself at thumb size. */
+#knows {
+  flex: 0 0 100%; display: flex; gap: 16px; align-items: baseline;
+  font-size: 12.5px; letter-spacing: .02em; margin-top: -2px;
+}
+#knows button {
+  font: inherit; color: var(--dim); background: none; border: 0;
+  padding: 0; cursor: pointer; text-align: left;
+}
+#knows button:hover { color: var(--ink); }
+#keep { color: var(--ink); opacity: .8; }
+#keep[hidden] { display: none; }
+
+#facts {
+  position: absolute; left: 3.5%; bottom: 6%; width: 44%; max-height: 74%;
+  overflow-y: auto; display: none; z-index: 3;
+  background: var(--box);
+  border: 1px solid var(--edge); border-left: 3px solid var(--ink);
+  border-radius: 2px; padding: 12px 15px;
+  font-size: 14px; line-height: 1.5;
+}
+#facts.on { display: block; }
+#facts .row { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; }
+/* A THUMB TARGET, AND BRIGHT ENOUGH TO READ WITHOUT A MOUSE. The first
+   version was `--dim` with 3px of padding: on the panel there is no
+   hover, so it would have stayed the faintest thing on screen forever,
+   at about 12x20px. A tap he cannot see is the same dead end as a tap
+   that does nothing. */
+#facts .drop {
+  font: inherit; font-size: 16px; line-height: 1; color: var(--ink);
+  opacity: .65; background: none; border: 0; cursor: pointer;
+  padding: 6px 9px; margin: -4px 0 -4px -6px;
+}
+#facts .drop:hover { opacity: 1; }
+#facts .none { color: var(--dim); }
 
 @media (max-width: 760px) {
   /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
@@ -363,7 +410,7 @@ body.thinking #four { animation-duration: 1.6s; }
      designed. The subtitle is what wraps through her name first. */
   #title { display: none; }
   #four { max-width: 84%; height: 108%; }
-  #says { position: static; width: auto; margin: 0 16px 10px;
+  #says, #facts { position: static; width: auto; margin: 0 16px 10px;
           max-height: 34vh; }
   #stage { justify-items: center; padding-right: 0; }
 }
@@ -423,11 +470,16 @@ body.thinking #four { animation-duration: 1.6s; }
 <div id="stage">
   <img id="four" src="four/four.jpg" alt="Four">
   <div id="says"></div>
+  <div id="facts"></div>
 </div>
 
 <form id="ask" autocomplete="off">
   <input id="text" placeholder="Say something, or /wiki black holes" maxlength="2000">
   <button id="send" type="submit">Speak</button>
+  <div id="knows">
+    <button id="count" type="button"></button>
+    <button id="keep" type="button" hidden>remember that</button>
+  </div>
 </form>
 
 <script>
@@ -549,7 +601,10 @@ document.getElementById('home').onclick = () => { location.href = 'home.html'; }
 const SKINS = ['', 'red', 'purple', 'pink'];
 let skin = 0;
 document.getElementById('stage').addEventListener('click', (event) => {
-  if (event.target.closest('#says')) return;
+  // #facts is excluded for the same reason #says is: it carries
+  // its own taps -- an x that recolours the whole screen instead
+  // of dropping the fact is a control that does the wrong thing.
+  if (event.target.closest('#says, #facts')) return;
   // EVERY skin comes off, from SKINS itself. It read
   // `remove('red', 'purple')` -- a SECOND hardcoded list of the
   // colours, one layer under the one this page already deletes -- so
@@ -669,6 +724,10 @@ form.onsubmit = (event) => {
   event.preventDefault();
   const asked = input.value.trim();
   if (!asked) return;
+  // HIS words, never hers. Storing her own output as a fact about him
+  // is how a model ends up quoting itself back as evidence.
+  lastSaid = asked;
+  keep.hidden = false;
   input.value = '';
   send.disabled = true;
   send.textContent = '...';
@@ -698,6 +757,85 @@ form.onsubmit = (event) => {
       input.focus();
     });
 };
+
+
+// ---- what she has been told to keep -----------------------------------
+// Ghost: *"14 sounds amazing as long as she never fills the memory."*
+//
+// THE COUNT IS ON SCREEN ON EVERY TURN, and that is the answer to his
+// worry rather than the budget is. A store that silently evicts is the
+// silent-failure shape this deck refuses everywhere; a number he can
+// see fill up is one he can prune before it bites.
+const count = document.getElementById('count');
+const keep = document.getElementById('keep');
+const factsBox = document.getElementById('facts');
+let lastSaid = '';
+
+function drawFacts(data) {
+  const facts = (data && data.facts) || [];
+  count.textContent = facts.length
+    ? 'she knows ' + facts.length + (facts.length === 1 ? ' thing' : ' things') + ' about you'
+    : 'she knows nothing about you yet';
+  factsBox.innerHTML = '';
+  if (!facts.length) {
+    const none = document.createElement('div');
+    none.className = 'none';
+    none.textContent = 'Say something, then tap "remember that".';
+    factsBox.appendChild(none);
+    return;
+  }
+  facts.forEach((fact, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const drop = document.createElement('button');
+    drop.type = 'button';
+    drop.className = 'drop';
+    drop.textContent = '\u00d7';
+    drop.title = 'she forgets this';
+    // THE WAY OUT OF THE STORE. A thing she can be told and never
+    // untold is a screen with no exit, in data.
+    drop.onclick = () => post('unremember', { at: i });
+    const text = document.createElement('span');
+    text.textContent = fact;
+    row.appendChild(drop);
+    row.appendChild(text);
+    factsBox.appendChild(row);
+  });
+}
+
+// ONE FETCH SHAPE FOR ALL THREE, and every one of them answers with the
+// WHOLE list -- so there is no second request to forget to make and no
+// count that can drift from what she actually carries.
+function post(route, extra) {
+  return fetch(route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ who: ME }, extra || {})),
+  })
+    .then(r => r.json())
+    .then(data => {
+      drawFacts(data);
+      if (data && data.said) {
+        // The verdict goes where he is already looking, and it never
+        // lands in #says -- overwriting her reply to report on a
+        // bookkeeping tap would cost him the thing he asked for.
+        const was = count.textContent;
+        count.textContent = data.said;
+        setTimeout(() => { if (count.textContent === data.said) count.textContent = was; }, 2600);
+      }
+      return data;
+    })
+    // A DEAD SERVER COSTS THE COUNT AND NEVER COSTS HER. Same promise
+    // the wardrobe button and the voice both make.
+    .catch(() => { count.textContent = ''; });
+}
+
+count.onclick = () => factsBox.classList.toggle('on');
+keep.onclick = () => {
+  if (!lastSaid) return;
+  post('remember', { text: lastSaid });
+};
+post('facts');
 
 function plain(asked) {
   return fetch('say', {

@@ -1005,6 +1005,195 @@ def forget(key):
         pass
 
 
+# SHE REMEMBERS WHAT HE TELLS HER TO, AND THAT IS NOT THE HISTORY.
+#
+# Ghost, Sept 22: *"14 sounds amazing as long as she never fills the
+# memory."*
+#
+# `~/.yuzu/history/` holds the last 8 turns and is bounded by
+# CONSTRUCTION -- the brain trims eagerly, so it cannot creep. It is
+# also gone the moment the conversation moves past it, which is the
+# whole gap: tell her your cousin's name and nine turns later it is not
+# anywhere on this board.
+#
+# THE WORRY HE NAMED IS THE RIGHT ONE AND IT IS NOT ABOUT DISK. A facts
+# file is a few kilobytes forever and the NVMe is 512GB. What fills up
+# is CONTEXT: every fact rides on the system prompt on EVERY turn,
+# inside the same `num_ctx` that `(history_turns + 1) x num_predict`
+# already mostly fills -- and going over is SILENT. Nothing raises and
+# nothing prints; tokens are dropped and she comes back having
+# forgotten the START of the conversation. That is the exact fault the
+# Sept 21 round measured, and it is the reason this has a BUDGET rather
+# than a reassurance.
+#
+# MEASURED, not guessed: at num_ctx 8192, num_predict 600 and
+# history_turns 8, the worst character in the repo leaves 879 tokens of
+# slack -- about 3000 characters counted pessimistically. The budget
+# below takes under half of that and `test_the_reply_ceiling_and_the
+# _CONTEXT_agree` spends it AS IF FULL, so the guard stays honest on a
+# box where he has actually used it.
+FACTS_DIR = os.path.join(os.path.expanduser("~"), ".yuzu", "facts")
+
+# The whole store, across every fact, in characters. Roughly 340 tokens
+# at the pessimistic 3.5 chars/token the guard counts with.
+FACTS_BUDGET = 1200
+
+# And one fact on its own. Without this a single paste IS the budget --
+# he would tap Remember on a wall of text and silently evict everything
+# she knew. The reply says when it trims rather than doing it quietly.
+FACT_MAX = 200
+
+
+def _facts_file(key):
+    # Same allowlist discipline as the memory file: the key comes from
+    # CHARACTERS, never from the request, and basename is the belt to
+    # that braces.
+    return os.path.join(FACTS_DIR, os.path.basename(key) + ".json")
+
+
+def load_facts(key):
+    """Everything she has been told to keep, oldest first. NEVER
+    raises -- a corrupt file costs the facts, never the reply."""
+    try:
+        with open(_facts_file(key), encoding="utf-8") as fh:
+            kept = json.load(fh)
+        if isinstance(kept, list):
+            return [f for f in kept if isinstance(f, str) and f.strip()]
+    except Exception:
+        pass
+    return []
+
+
+def save_facts(key, facts):
+    """Write beside the file and rename, exactly as `save_memory` had to
+    learn. `open(path, "w")` truncates the instant it is called, so a
+    dump that raises part way leaves a fragment where months of facts
+    used to be -- and the `except` that protects the reply is what makes
+    that silent. `os.replace` is atomic on one filesystem."""
+    part = _facts_file(key) + ".part"
+    try:
+        os.makedirs(FACTS_DIR, exist_ok=True)
+        with open(part, "w", encoding="utf-8") as fh:
+            json.dump(facts, fh)
+        os.replace(part, _facts_file(key))
+        return True
+    except Exception:
+        try:
+            os.remove(part)
+        except OSError:
+            pass
+        return False
+
+
+def _within_budget(facts):
+    """Oldest out until the whole store fits.
+
+    FIFO rather than a refusal, because a store that stops accepting is
+    a feature that quietly stopped working -- and the count on her page
+    is visible on every single turn, so he can see it coming and prune
+    before it bites."""
+    dropped = []
+    while facts and sum(len(f) for f in facts) > FACTS_BUDGET:
+        dropped.append(facts.pop(0))
+    return facts, dropped
+
+
+def remember(key, text):
+    """Keep one thing. Returns (facts, dropped, note).
+
+    `note` is a sentence for the page, and it is never silent about a
+    trim or an eviction: those are the two ways this can do something
+    he did not ask for."""
+    said = " ".join((text or "").split())
+    if not said:
+        return load_facts(key), [], "Say something first, then tap it."
+
+    note = ""
+    if len(said) > FACT_MAX:
+        said = said[:FACT_MAX].rstrip()
+        note = "Trimmed it to %d characters. " % FACT_MAX
+
+    facts = load_facts(key)
+    # Tapping twice must not cost the budget twice.
+    if any(f.lower() == said.lower() for f in facts):
+        return facts, [], "She already had that one."
+
+    facts.append(said)
+    facts, dropped = _within_budget(facts)
+    if not save_facts(key, facts):
+        return load_facts(key), [], "Couldn't write it down."
+
+    # She is already loaded and holding the OLD prompt. Drop the cached
+    # base so the next turn rebuilds it -- otherwise the fact lands on
+    # disk and she does not know it until the server restarts, which is
+    # the stale-process fault one layer in.
+    _drop_prompt_cache(key)
+
+    if dropped:
+        note += ("Full, so she let go of %d older one%s."
+                 % (len(dropped), "" if len(dropped) == 1 else "s"))
+    return facts, dropped, note or "Got it."
+
+
+def unremember(key, at):
+    """Drop fact number `at`. Out of range is success -- this exists so
+    the store has a way out, not so it can fail."""
+    facts = load_facts(key)
+    try:
+        at = int(at)
+    except (TypeError, ValueError):
+        return facts
+    if 0 <= at < len(facts):
+        facts.pop(at)
+        save_facts(key, facts)
+        _drop_prompt_cache(key)
+    return facts
+
+
+def _drop_prompt_cache(key):
+    """Make the next turn recompose her system prompt.
+
+    `answer()` captures `_base_prompt` ONCE per brain so the board line
+    cannot stack -- which is correct, and it also means a brain that is
+    already loaded keeps answering from the prompt it was built with.
+    The base itself never changes, so deleting the flag is enough: the
+    next turn re-captures it and appends the new facts."""
+    brain = _BRAINS.get(key)
+    if brain is not None and hasattr(brain, "_base_prompt"):
+        try:
+            brain.system_prompt = brain._base_prompt
+            del brain._base_prompt
+        except Exception:
+            pass
+
+
+def facts_line(key):
+    """The one sentence her prompt carries, or nothing at all.
+
+    IN HIS OWN WORDS, QUOTED, and that is not decoration. Stored
+    verbatim, "my cousin's name is Dave" injected bare leaves `my`
+    pointing at HER -- the pronoun belongs to whoever the sentence is
+    attributed to. Quoting them and naming the speaker costs four words
+    and removes the ambiguity entirely. Rewriting them into the third
+    person would need the model, which means latency on every save and
+    a 3B's guess about what he meant.
+
+    PROSE, NEVER A BULLETED LIST -- the same call `board_now()` and
+    `board_specs()` both made, for the same reason: a list in a system
+    prompt is a FORMAT, and the one failure this repo has a categorical
+    fix for is her answering in markdown headings.
+
+    And the tail says what to DO with them rather than what not to do,
+    which is the pink-elephant shape measured three times here."""
+    facts = load_facts(key)
+    if not facts:
+        return ""
+    return ("\n\nTHINGS HE ASKED YOU TO REMEMBER, in his own words: "
+            + "; ".join('"%s"' % f for f in facts)
+            + ". Use them the way you would use anything you know about "
+              "someone -- when they matter, and in passing.")
+
+
 # HER VOICE, SENT TO WHATEVER IS LOOKING AT HER.
 #
 # Ghost: "Finish the page audio so i can hear on steam deck."
@@ -1214,13 +1403,20 @@ def answer(text, who=None, on_chunk=None):
         # was not guarded: their stub brains carry no `system_prompt`,
         # and a telemetry line that can take a whole turn down is a
         # worse fault than one that quietly does not appear.
-        if has_wiki:
-            try:
-                if not hasattr(brain, "_base_prompt"):
-                    brain._base_prompt = brain.system_prompt
-                brain.system_prompt = brain._base_prompt + board_specs() + board_now()
-            except Exception:
-                pass
+        #
+        # AND THE FACTS ARE NOT GATED ON `has_wiki`, deliberately. The
+        # board line is, because Cait has never heard of a computer and
+        # a test bans the words from her prompt -- handing her the watts
+        # at runtime would walk straight around it. What Ghost asked her
+        # to remember is about HIM, so it belongs to every character on
+        # every body, and it goes on outside the gate.
+        try:
+            if not hasattr(brain, "_base_prompt"):
+                brain._base_prompt = brain.system_prompt
+            board = (board_specs() + board_now()) if has_wiki else ""
+            brain.system_prompt = brain._base_prompt + board + facts_line(key)
+        except Exception:
+            pass
 
         face("thinking")
         if on_chunk is None:
@@ -1725,6 +1921,42 @@ class _Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(wav)
             except Exception:
                 pass          # he closed the page mid-download
+            return
+        if path in ("/remember", "/facts", "/unremember"):
+            # WHAT HE ASKED HER TO KEEP. Three routes rather than one
+            # doing three jobs, because one of them DELETES and this
+            # deck has already paid for that distinction: `/forget`
+            # defaulted an empty name to the front character and would
+            # have wiped her memory on a blank field.
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(size) or b"{}")
+            except Exception:
+                body = {}
+            who = body.get("who", "")
+            # ADDITIVE ROUTES MAY DEFAULT TO THE FRONT DOOR, exactly as
+            # /say does -- a request naming nobody honestly means her.
+            # A DESTRUCTIVE ONE GETS NO DEFAULTS.
+            if path == "/unremember":
+                key = persona_for(who) if (who or "").strip() else None
+            else:
+                key = persona_for(who)
+            if key is None:
+                self._json({"ok": False, "said": "No character by that name."})
+                return
+            note = ""
+            if path == "/remember":
+                facts, _dropped, note = remember(key, body.get("text", ""))
+            elif path == "/unremember":
+                facts = unremember(key, body.get("at"))
+            else:
+                facts = load_facts(key)
+            # The page draws the count off this, so it ships the whole
+            # list on every one of the three -- there is no second
+            # request to forget to make, and no count to drift.
+            self._json({"ok": True, "facts": facts, "said": note,
+                        "budget": FACTS_BUDGET,
+                        "used": sum(len(f) for f in facts)})
             return
         if path == "/forget":
             # STARTING CLEAN HAS TO BE POSSIBLE, now that she remembers.
