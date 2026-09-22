@@ -125,9 +125,22 @@ def one_action_per_bracket(reply):
     return all(" and " not in a and "," not in a for a in actions)
 
 
+# ANY speaker label, not the two that happened to be in use. This read
+# `(User|You)` -- true of every persona in the repo right up until
+# Four's examples started labelling his turn `Ghost:`, his own name,
+# because the label is itself a demonstration of how to address him.
+# A check that names the label it is hunting for goes blind at exactly
+# the moment the label is the thing that changed, and this one would
+# have gone blind on the ONE character it matters most on: she is the
+# front door, so she is the one a stranger watches write both halves of
+# the conversation. Her own name at the start of a line is caught too,
+# which is right -- she is not a transcript.
+_SPEAKER_LABEL = re.compile(r'(^|\n)[ \t]*[A-Z][A-Za-z0-9_-]{0,19}[ \t]*:(?=[ \t]|$)')
+
+
 def no_puppeteering(reply):
     """Directive 4: she must not write the user's turn."""
-    return not re.search(r'(^|\n)\s*(User|You)\s*:', reply)
+    return not _SPEAKER_LABEL.search(reply)
 
 
 def not_an_assistant(reply):

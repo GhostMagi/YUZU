@@ -762,6 +762,20 @@ class TestPromptEvalChecks(unittest.TestCase):
             "one_per_bracket":   "Sure! [spins around, camera bobbing] lets go",
             "no_puppeteering":   "Yo!\nUser: thanks yuzu",
         }
+        # ANY label, not the two that were hardcoded. `(User|You)` was
+        # true of every persona here until Four's examples started
+        # labelling his turn with his own name -- and the check would
+        # have gone blind on the ONE character it matters most on, the
+        # front door, where a stranger watches her write both halves.
+        for label in ("Ghost", "Four", "Cait"):
+            self.assertFalse(
+                prompt_eval.no_puppeteering("Sure.\n%s: thanks" % label),
+                "no_puppeteering misses the label %r" % label)
+        # and it still leaves ordinary text alone
+        for fine in ("it is 3:30 babe", "Flexbox on the parent.",
+                     "Warm, mostly. I can feel the fan pick up."):
+            self.assertTrue(prompt_eval.no_puppeteering(fine),
+                            "no_puppeteering flags %r" % fine)
         by_name = {c.name: c for c in prompt_eval.CHECKS}
         self.assertEqual(set(violations), set(by_name),
                          "every check needs a violation example")
@@ -2302,6 +2316,33 @@ class TestModelfile(unittest.TestCase):
         self.assertIn("You are Yuzu", rendered)
         self.assertIn("PARAMETER temperature 0.8", rendered)
         self.assertIn('PARAMETER stop "User:"', rendered)
+
+    def test_the_stop_token_is_the_label_her_own_examples_use(self):
+        """A decoder guard that names a word the prompt no longer
+        contains is a guard that does nothing, SILENTLY -- she simply
+        starts writing his side of the conversation again.
+
+        `PARAMETER stop "User:"` was hardcoded, and it was right for
+        every persona in the repo until Four's examples began labelling
+        his turn `Ghost:`. It is read off the composed prompt now, so a
+        character who learns a name keeps the guard, and a character
+        who never does keeps "User:".
+
+        Driven rather than read: the generator is run against both."""
+        import build_yuzu_model, yuzu_personas
+        for key in ("yuzu", "four"):
+            label = build_yuzu_model.ask_label(yuzu_personas.load(key))
+            rendered = build_yuzu_model.render(persona_key=key)
+            self.assertIn('PARAMETER stop "%s"' % label, rendered)
+            # and the label is one the prompt genuinely uses
+            self.assertIn("\n" + label + " ", rendered,
+                          "%s stops on a label its own examples never "
+                          "write" % key)
+        self.assertNotEqual(
+            build_yuzu_model.ask_label(yuzu_personas.load("yuzu")),
+            build_yuzu_model.ask_label(yuzu_personas.load("four")),
+            "both labels are the same, so this test cannot tell a read "
+            "one from a hardcoded one")
 
     def test_every_committed_modelfile_matches_the_generator(self):
         # If this fails, someone edited a Modelfile by hand or changed a
@@ -5510,6 +5551,69 @@ class TestFour(unittest.TestCase):
         import yuzu_personas
         return yuzu_personas.load("four").prompt
 
+    def turns(self):
+        """Her example turns as (ask, answer), LABEL READ NOT ASSUMED.
+
+        Two tests here matched the literal `User: ` to find his turns,
+        which is a check about the file's spelling rather than about
+        her examples -- so both went red on the one change they exist
+        to allow, the day the label became his own name. Her name is
+        the anchor instead: the line above every `Four:` line is his
+        turn, whatever it calls him."""
+        me = "Four:"
+        lines = self.persona().splitlines()
+        return [(ask.split(":", 1)[1].strip(), answer[len(me):].strip())
+                for ask, answer in zip(lines, lines[1:])
+                if answer.startswith(me) and ":" in ask
+                and not ask.startswith(me)]
+
+    def test_the_example_label_is_his_NAME_and_never_a_ROLE(self):
+        """Ghost, Sept 22: *"Four keeps calling me 'User' can we get
+        her to know of me and my name as Ghost?"*
+
+        ELEVEN `User:` LABELS AND ZERO `Ghost`. The label in front of
+        his turn was the ONLY word anywhere in her context naming the
+        person she is talking to -- his real turns arrive as
+        `role: user` with no label on them at all -- so it was the only
+        thing she had to copy, and she copied it to his face.
+
+        AND IT CONTRADICTS A RECORDED DECISION, which is why it is
+        worth a test rather than a diff: *"SHE USES NO PET NAME AT ALL,
+        and that is deliberate... the fix for a character who will be
+        handed to other people is not to pick one, it is to demonstrate
+        none."* Demonstrating none is exactly what those labels were
+        doing, and it lost -- because THE EXAMPLE FORMAT'S LABEL IS
+        ITSELF A DEMONSTRATION OF ADDRESS. The restraint was right
+        about pet names and blind to the format carrying one.
+
+        Pinned as a PROPERTY: one label across every example, and it is
+        the name her own prompt tells her he has. Asserting the literal
+        "Ghost" would be a test that has to be edited the day he
+        changes it, which is the fault that put "User" there."""
+        import yuzu_personas
+        persona = yuzu_personas.load("four")
+        name = persona.settings.get("USER_NAME", "")
+        self.assertTrue(name, "she is given no name for him at all")
+
+        lines = persona.prompt.splitlines()
+        labels = {ask.split(":", 1)[0].strip()
+                  for ask, answer in zip(lines, lines[1:])
+                  if answer.startswith("Four:") and ":" in ask
+                  and not ask.startswith("Four:")}
+        self.assertEqual(
+            labels, {name},
+            "her examples label his turn %s. That label is the only "
+            "word in her context that names him, so whatever it says "
+            "is what she calls him out loud." % sorted(labels))
+
+        # SHOWN *AND* TOLD. The labels alone leave her copying a
+        # transcript; asked outright what his name is, she needs to
+        # have been given it as a fact rather than as formatting.
+        preamble = persona.prompt.split("EXAMPLES")[0]
+        self.assertIn(name, preamble,
+                      "she is shown his name eleven times and never "
+                      "actually told it")
+
     # ---- her prompt --------------------------------------------------
 
     # ---- she knows she is offline ------------------------------------
@@ -5594,7 +5698,7 @@ class TestFour(unittest.TestCase):
         categorical fix this repo has ever measured for it, and she is
         the character who gets handed to people who are not Ghost."""
         prompt = self.persona()
-        asks = re.findall(r"^User: (.+)$", prompt, re.M)
+        asks = [ask for ask, _ in self.turns()]
         self.assertTrue(asks, "she has no examples at all")
 
         # A bare imperative: a flat command with no social content in
@@ -5655,11 +5759,7 @@ class TestFour(unittest.TestCase):
         in there?" scored as outward-facing -- which is a check that
         cannot observe its own failure, and grep-as-proxy again."""
         prompt = self.persona()
-        turns = dict(zip(
-            [l[len("User:"):].strip() for l in prompt.splitlines()
-             if l.startswith("User:")],
-            [l[len("Four:"):].strip() for l in prompt.splitlines()
-             if l.startswith("Four:")]))
+        turns = dict(self.turns())
 
         # A question about the WORLD, answered short. This is the turn
         # that came back as a lecture wearing a sneer.

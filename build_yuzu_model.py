@@ -67,6 +67,28 @@ def modelfile_path(persona_key):
     return HERE / f"Modelfile.{persona_key}"
 
 
+def ask_label(persona):
+    """The label her own EXAMPLES put in front of his turn.
+
+    READ, NEVER HARDCODED -- and it was hardcoded to "User:" until a
+    character learned his name. Four's examples label his turn `Ghost:`
+    now, because the label IS a demonstration of how to address him and
+    eleven lines of `User:` taught her to call him that out loud. A stop
+    token naming a word the prompt no longer contains is a decoder guard
+    that does nothing, and it fails SILENTLY: she just starts writing
+    his side of the conversation again.
+
+    Her own name is the anchor, so this finds the pair rather than
+    trusting a setting somebody might forget to keep in step with the
+    examples underneath it."""
+    me = persona.name + ":"
+    lines = persona.prompt.splitlines()
+    for ask, answer in zip(lines, lines[1:]):
+        if answer.startswith(me) and ":" in ask and not ask.startswith(me):
+            return ask.split(":", 1)[0].strip() + ":"
+    return "User:"
+
+
 def render(base=DEFAULT_BASE, options=None, persona_key=yuzu_personas.DEFAULT_PERSONA):
     persona = yuzu_personas.load(persona_key)
     # Precedence: explicit options > persona settings > defaults.
@@ -93,7 +115,7 @@ def render(base=DEFAULT_BASE, options=None, persona_key=yuzu_personas.DEFAULT_PE
         '# Stop before the model starts writing the user\'s turn for her.',
         '# Directive 4 (NO PUPPETEERING) is a prompt rule; this enforces it',
         '# at the decoder, which a 3B respects a lot more reliably.',
-        'PARAMETER stop "User:"',
+        f'PARAMETER stop "{ask_label(persona)}"',
         'PARAMETER stop "\\nYou:"',
         "",
         'SYSTEM """',

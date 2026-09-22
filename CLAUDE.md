@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 707 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 709 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 707 tests pass on it. Getting it
+(that repo path is confirmed working). 709 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,99 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE CALLED HIM "USER", AND THE PROMPT TAUGHT HER THAT (Sept 22)
+
+Ghost: *"Four keeps calling me 'User' can we get her to know of me and
+my name as Ghost?"*
+
+    User: in her composed prompt      11 occurrences
+    Ghost anywhere in it               0
+
+**THE EXAMPLE LABEL IS THE ONLY WORD IN HER ENTIRE CONTEXT THAT NAMES
+THE PERSON SHE IS TALKING TO.** His real turns arrive over the chat API
+as `role: user` with no label on them at all, so nothing else in front
+of her says who he is. Eleven lines of `User:` is eleven lessons, and
+she learned it exactly as taught and said it to his face.
+
+**AND IT CONTRADICTS A RECORDED DECISION, which is the finding rather
+than the fix.** Four's own entry above says: *"SHE USES NO PET NAME AT
+ALL, and that is deliberate. The Mimi finding is that an unstated form
+of address gets invented; the fix for a character who will be handed to
+other people is not to pick one, it is to demonstrate none."*
+
+**Demonstrating none is precisely what those labels were doing, and it
+lost, because THE EXAMPLE FORMAT'S LABEL IS ITSELF A DEMONSTRATION OF
+ADDRESS.** The restraint was right about pet names and blind to the
+fact that the transcript format carries one whether anybody chose it or
+not. So it is the **EIGHTH INSTANCE** of this repo's most repeated
+finding wearing its least visible costume yet: not a turn shape she was
+never given, but one she was given eleven times by accident.
+
+**THE LABEL IS THE FIX, AND A RULE WOULD HAVE LOST.** Examples beat
+rules is measured five times in this file. One sentence saying "he is
+called Ghost" against eleven labels saying otherwise is that bet taken
+from the losing side. So the labels are his name, she is TOLD it as a
+fact as well (*"The person holding this deck is called Ghost"*), and
+exactly ONE example answers him by name — the greeting, the natural
+slot. **One, not eleven**: the no-pet-name restraint was about
+FREQUENCY and that half of it still holds.
+
+**`USER_NAME: Ghost` IS A SETTING, so his name is in ONE place and not
+twelve.** Same mechanism as `SOUND_EXAMPLES` and `{LOOK}`: token it
+out, and a persona that never sets it is unchanged to the byte. Four
+4375 -> 4570 chars; **no other prompt moved**, verified across all 19.
+
+**THE STRANGER CASE IS HANDLED IN THE SENTENCE, NOT IN A RULE.** She is
+the demo face, so she will be held by people who are not Ghost — and
+*"unless someone tells you otherwise"* costs four words and lets her be
+corrected, which is what actually happens. A guess about who is holding
+her would have been the confident-wrong shape this file refuses.
+
+### The stop token was naming a word that is no longer in her prompt
+
+`build_yuzu_model.py` hardcoded `PARAMETER stop "User:"` — the decoder
+half of the NO PUPPETEERING rule, and *"a 3B respects it a lot more
+reliably"* than the rule. Correct for every persona in the repo right
+up until this round, and **the failure is silent**: she simply starts
+writing his side of the conversation again, with nothing anywhere
+saying the guard stopped applying.
+
+`ask_label()` reads it off the composed prompt — her own name is the
+anchor, so it finds the line above each `Four:` line rather than
+trusting the setting to have been kept in step with the examples
+underneath it. `yuzu` and `coco` still render `User:` and both
+committed Modelfiles are byte-identical.
+
+**AND THE EVAL'S OWN CHECK WOULD HAVE GONE BLIND ON THE SAME CHANGE.**
+`no_puppeteering` matched `(User|You)\s*:` — a check that NAMES the
+label it is hunting for, which stops working at exactly the moment the
+label is the thing that changed. It catches any speaker label now, her
+own included, and it would have gone blind on the one character it
+matters most for: the front door is where a stranger watches her write
+both halves of the conversation.
+
+### And two tests were matching the spelling rather than the property
+
+`TestFour` found his turns with `^User: ` in two places, so both went
+red on the one change they exist to allow. `turns()` reads the label
+instead — **grep-as-proxy, thirteenth instance**, and the same fix as
+`TestCalculator.code()` and the rain's colour.
+
+**Five new or rewritten tests, each verified by breaking it**: the
+label back to `User:` (which is also the mixed-label case), the name
+shown eleven times and never actually told, the stop token hardcoded
+again, the puppeteering regex back to the two names, and an example
+deleted out from under the rewritten parser. All five go red.
+
+**UNMEASURED.** She has not been asked again. The round that decides it
+is the next time he says hello to her.
+
+**NOT changed, and it is one line when he wants it:** `yuzu_avatar`
+carries the identical eleven `User:` labels. She has never shown the
+fault in a live round, which is the same call this file already made
+for the pronoun leak — *"Watch for it; do not pre-emptively rewrite
+them."* Four is the one he was using and the one he asked about.
 
 ## SHE THOUGHT SHE WAS ONLINE, ON A BOARD WITH NO INTERNET (Sept 22)
 
