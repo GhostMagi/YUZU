@@ -1325,6 +1325,86 @@ def _drop_prompt_cache(key):
             pass
 
 
+# AND SHE CAN OFFER, WHICH IS HIS OWN DESIGN.
+#
+# Ghost: *"Make it so when facts come up she can ask which one she
+# remembers yes? Then i just pick em."*
+#
+# THE CONFIRM STEP IS WHAT MAKES THIS SAFE, and it is the whole reason
+# the automatic version was refused. Teaching her a remember-move means
+# NAMING A TOKEN IN HER PROMPT, which is measured three times in this
+# repo as how she learns to spam it: `[winks]` in 3 of 4 replies while
+# named as forbidden, the asterisk ban that printed an asterisk, rule 5
+# recited back at him word for word.
+#
+# So assume she over-offers. **An offer he ignores costs nothing** --
+# not a byte of the budget, not a line of her prompt, not a word on
+# screen. She only ever spends the store when he taps. That turns the
+# pink elephant from a fault into noise, which is the one thing that
+# makes her participating affordable at all.
+#
+# TWO AT MOST PER REPLY. If she emits five, he sees the first two: the
+# row under the ask bar has room for two chips and a wall of offers is
+# its own kind of nagging.
+SUGGEST_MAX = 2
+
+# NOT A BRACKET, and the suite is what said so.
+#
+# `[remember: ...]` was the first draft, chosen because the bracket is
+# already load-bearing: `strip_stage_directions` drops it before Piper
+# says it out loud and the page's `spoken()` drops it before the bubble
+# shows it. Three tests went red at once and every one of them was
+# right -- **on this project a bracket means an ACTION.**
+# `extract_actions` parsed the marker as one, and
+# `_hardware_cyberdeck.txt` goes out of its way to never tell a deck
+# character that brackets exist at all, because on a body with nothing
+# wired up every one of them is a movement emitted into a void.
+#
+# Borrowing the one syntax this repo has spent months making mean
+# exactly one thing, to mean a second thing, on the body where it means
+# nothing. A plain end-of-line marker collides with none of it.
+#
+# The convenience that made the bracket attractive is not lost: the
+# marker is stripped in `suggestions()`, which `answer()` calls on
+# every reply before the bubble, the speaker or the history see it.
+# That is one path rather than two, which is also one place to forget
+# rather than two to keep in step.
+# ANCHORED TO THE START OF A LINE. Unanchored it matched "You should
+# remember: flexbox centres it" mid-sentence -- and that does not just
+# add a spurious offer, it CUTS HER REPLY IN HALF, leaving "You
+# should" on screen. An offer he ignores is free; eating her words is
+# not.
+_SUGGEST_RE = re.compile(r"^[ \t]*remember[ \t]*:[ \t]*(.{3,%d}?)[ \t]*$" % FACT_MAX,
+                         re.I | re.M)
+
+
+def suggestions(reply, key=None):
+    """(reply without the markers, what she offered to keep).
+
+    STRIPPED FROM THE REPLY, not just hidden. It has to come out before
+    the bubble, before Piper, and before it lands in HISTORY -- that
+    last one is the drift finding: her own replies outweigh the system
+    prompt within a few turns, so a marker left in the transcript is
+    her teaching herself to emit more of them."""
+    offers = []
+    for raw in _SUGGEST_RE.findall(reply or ""):
+        said = " ".join(raw.split())[:FACT_MAX]
+        if said and said.lower() not in [o.lower() for o in offers]:
+            offers.append(said)
+    if key is not None:
+        # Never offer something she already has -- he would tap it and
+        # watch nothing happen, which reads as a broken button.
+        known = [f.lower() for f in load_facts(key)]
+        offers = [o for o in offers if o.lower() not in known]
+    clean = _SUGGEST_RE.sub("", reply or "")
+    clean = re.sub(r"\n{2,}", "\n", clean)
+    # Two spaces where the marker was, and a stranded space before a
+    # full stop, are what a naive strip leaves behind.
+    clean = re.sub(r"[ \t]{2,}", " ", clean)
+    clean = re.sub(r"\s+([.,!?])", r"\1", clean).strip()
+    return clean, offers[:SUGGEST_MAX]
+
+
 def facts_line(key):
     """The one sentence her prompt carries, or nothing at all.
 
@@ -1429,7 +1509,7 @@ def voice_wav(text, who=None):
         return None, str(exc)
 
 
-def answer(text, who=None, on_chunk=None):
+def answer(text, who=None, on_chunk=None, on_suggest=None):
     """One turn with a character, for the page. (reply, error).
 
     The chat lives in a terminal today, which on a 10" touchscreen with
@@ -1590,6 +1670,29 @@ def answer(text, who=None, on_chunk=None):
                 pieces.append(piece)
                 on_chunk(piece)
             reply = "".join(pieces).strip()
+        # WHAT SHE OFFERED TO KEEP, out of the reply before anything
+        # downstream sees it. `on_suggest` rather than a third return
+        # value for the same reason `on_chunk` is a callback: two
+        # routes and a dozen tests already unpack `(reply, error)`, and
+        # a signature change would be a dozen places to get right for
+        # something only the page cares about.
+        reply, offers = suggestions(reply, key)
+        if offers and on_suggest is not None:
+            try:
+                on_suggest(offers)
+            except Exception:
+                pass
+        # AND OUT OF HER HISTORY TOO, before it is written to disk.
+        # Her own replies outweigh the system prompt within a few turns
+        # -- measured, on a real 7-turn chat, which is the whole reason
+        # `_canonicalise` exists -- so a marker left in the transcript
+        # is her teaching herself to emit more of them.
+        try:
+            if brain.history and brain.history[-1].get("role") == "assistant":
+                brain.history[-1]["content"] = suggestions(
+                    brain.history[-1]["content"])[0]
+        except Exception:
+            pass
         # The brain already wrote `talking` WITH the token rate it just
         # measured. Re-stating it here without one would blank the
         # badge on every reply that came through this page.
@@ -1993,8 +2096,10 @@ class _Handler(SimpleHTTPRequestHandler):
                 return
             # `who` is a NAME and gets looked up in CHARACTERS. Nothing
             # from the request reaches a path or a command.
-            reply, error = answer(said, who)
+            offered = []
+            reply, error = answer(said, who, on_suggest=offered.extend)
             self._json({"ok": error is None, "said": reply or error,
+                        "suggests": offered,
                         "pose": pose_for(reply) if error is None else "idle"})
             return
         if path == "/stream":
@@ -2046,9 +2151,11 @@ class _Handler(SimpleHTTPRequestHandler):
             def chunk(piece):
                 if not gone and not push({"piece": piece}):
                     gone.append(True)
-            reply, error = answer(said, who, on_chunk=chunk)
+            offered = []
+            reply, error = answer(said, who, on_chunk=chunk,
+                                  on_suggest=offered.extend)
             push({"done": True, "ok": error is None,
-                  "said": reply or error,
+                  "said": reply or error, "suggests": offered,
                   "pose": pose_for(reply) if error is None else "idle"})
             return
         if path == "/voice.wav":

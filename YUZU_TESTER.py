@@ -5413,6 +5413,132 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
                          "the facts got gated on the deck body, so only "
                          "Four ever hears them")
 
+    # ---- she offers, he picks --------------------------------------
+
+    def test_her_PROMPT_teaches_the_marker_the_CODE_actually_catches(self):
+        """THE TWO-COPIES GUARD, and the one that would break silently.
+
+        Her prompt teaches `[remember: ...]` in a rule and shows it in
+        an example; `_SUGGEST_RE` is what finds it again. Change either
+        spelling and she goes on writing a marker nothing catches --
+        which reads as her ignoring the feature, with the marker then
+        appearing raw in her bubble.
+
+        DRIVEN: her own example is pulled out of the composed prompt
+        and run through the real extractor."""
+        import yuzu_personas, yuzu_face
+        prompt = yuzu_personas.load("four").prompt
+        # THE MARKER, NOT THE WORD. This filtered on "remember" and
+        # picked her CSS example, which says "only ever REMEMBERING
+        # which one does which axis" -- grep-matches-prose, in the test
+        # written to stop two spellings drifting apart.
+        # HER WHOLE PROMPT THROUGH THE REAL EXTRACTOR. Anything else is
+        # a second opinion about the spelling; this is the property.
+        clean, offers = yuzu_face.suggestions(prompt)
+        self.assertTrue(
+            offers,
+            "her prompt demonstrates a marker the code cannot find, so "
+            "she will write it and nothing will catch it -- and it will "
+            "then show up raw in her bubble")
+        # and she is SHOWN it, not merely told: examples beat rules,
+        # measured five times in this repo.
+        self.assertIn(offers[0].lower(), prompt.lower())
+        self.assertNotIn("\nremember:", clean.lower(),
+                         "the marker survives into what she says out loud")
+
+    def test_an_offer_costs_NOTHING_until_he_taps_it(self):
+        """THE WHOLE REASON THIS DESIGN IS SAFE.
+
+        Naming a token in her prompt is measured three times here as
+        how she learns to spam it -- `[winks]` in 3 of 4 replies while
+        named as forbidden, the asterisk ban that printed an asterisk,
+        rule 5 recited back word for word. So assume she over-offers.
+
+        An offer he ignores must cost nothing: not a byte of the
+        budget, not a word on screen. That is what turns the pink
+        elephant from a fault into noise."""
+        face = self.store()
+        before = face.load_facts("four")
+        clean, offers = face.suggestions(
+            "Sure.\nREMEMBER: he hates the cold\nREMEMBER: he has a truck",
+            "four")
+        self.assertEqual(len(offers), 2)
+        self.assertEqual(face.load_facts("four"), before,
+                         "merely offering spent the budget, so she can "
+                         "fill her own memory by being chatty")
+
+    def test_she_can_offer_at_most_TWO(self):
+        """A wall of offers is its own kind of nagging, and the row
+        under the ask bar has room for two."""
+        face = self.store()
+        _clean, offers = face.suggestions(
+            "\n".join("REMEMBER: thing number %d" % i for i in range(9)))
+        self.assertEqual(len(offers), face.SUGGEST_MAX)
+
+    def test_she_never_offers_something_she_ALREADY_knows(self):
+        """He would tap it and watch nothing happen, which reads as a
+        button that stopped working."""
+        face = self.store()
+        face.remember("four", "he hates the cold")
+        _clean, offers = face.suggestions(
+            "Right.\nREMEMBER: HE HATES THE COLD\nREMEMBER: he has a truck",
+            "four")
+        self.assertEqual(offers, ["he has a truck"])
+
+    def test_the_marker_never_lands_in_her_HISTORY(self):
+        """Her own replies outweigh the system prompt within a few
+        turns -- measured on a real 7-turn chat, and the entire reason
+        `_canonicalise` exists. A marker left in the transcript is her
+        teaching herself to emit more of them, every turn, for as long
+        as the conversation lasts.
+
+        Driven through the real `answer()` with a brain that emits
+        one."""
+        face = self.store()
+        marked = "Noted.\nREMEMBER: he has a truck"
+
+        class Emitting:
+            system_prompt = "BASE"
+            history_turns = 8
+
+            def __init__(self, **kw):
+                self.history = []
+
+            def ask(self, text):
+                self.history += [{"role": "user", "content": text},
+                                 {"role": "assistant", "content": marked}]
+                return marked
+
+        import yuzu_brain
+        with mock.patch.object(yuzu_brain, "YuzuBrain", Emitting), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, error = face.answer("hi", "four")
+            self.assertIsNone(error)
+            self.assertNotIn("remember:", reply.lower(),
+                             "the marker reaches the bubble and the speaker")
+            # READ INSIDE THE PATCH. `patch.dict` restores the dict on
+            # exit, so reading _BRAINS afterwards is reading the state
+            # this test deliberately replaced -- a fixture asserting
+            # about its own teardown.
+            stored = face._BRAINS["four"].history[-1]["content"]
+            self.assertNotIn("remember:", stored.lower(),
+                             "the marker is in her transcript, so she is "
+                             "teaching herself to write more of them")
+
+    def test_BOTH_routes_ship_what_she_offered(self):
+        """`/say` and `/stream` are one `answer()` with a callback, and
+        that is exactly the shape that grew a second copy to forget
+        last time. A third way in has to carry it too."""
+        import inspect, yuzu_face
+        src = inspect.getsource(yuzu_face._Handler.do_POST)
+        code = "\n".join(l.split("#")[0] for l in src.split("\n"))
+        self.assertEqual(
+            code.count("on_suggest="), 2,
+            "one of the two reply routes does not pass on_suggest, so "
+            "she offers into the void on that one")
+        self.assertEqual(code.count('"suggests"'), 2,
+                         "one of the two reply routes drops the offers")
+
     def test_his_REAL_facts_directory_is_never_touched_by_the_suite(self):
         """The memory round found five zero-byte files in the REAL
         `~/.yuzu/history/` after a run, and the pollution was the
@@ -7653,8 +7779,23 @@ class TestDeckApps(unittest.TestCase):
         waits for the port."""
         done, _, _, wrapper = self._run(have=("chromium", "xterm"))
         self.assertIsNotNone(wrapper, done.stdout)
-        self.assertIn("YUZU/wiki", wrapper)
-        self.assertLess(wrapper.index("YUZU/wiki"), wrapper.index("exec "),
+        # THE PATH IS DERIVED, NOT SPELLED. This asserted the wrapper
+        # contained the literal "YUZU/wiki" -- which `deckapps` only
+        # ever produces because it finds ITSELF with `dirname "$0"`, so
+        # the string is really the CHECKOUT'S FOLDER NAME. It passed
+        # here for one reason: this clone happens to be called YUZU.
+        # Cloned to ~/deck, or to any temp directory, the suite went
+        # red on a script that was working perfectly.
+        #
+        # Found under --shuffle, and the banner said "a test is leaving
+        # something behind" -- which it was not. That message prints on
+        # ANY shuffle failure, and it is a hint rather than a diagnosis.
+        # Same rule as the Jetson round: a test that can only pass on
+        # the machine you wrote it on is not passing, it is untested.
+        wiki = str(Path(__file__).parent / "wiki")
+        self.assertIn(wiki, wrapper,
+                      "the wrapper does not start this repo's own wiki")
+        self.assertLess(wrapper.index(wiki), wrapper.index("exec "),
                         "it opens the browser before starting the server")
 
     def test_a_missing_browser_SKIPS_rather_than_installing_a_dead_icon(self):

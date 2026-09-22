@@ -357,16 +357,38 @@ body.thinking #four { animation-duration: 1.6s; }
    -- her home icon rendering as `!!!!` is the recorded cost of trusting
    a glyph to explain itself at thumb size. */
 #knows {
-  flex: 0 0 100%; display: flex; gap: 16px; align-items: baseline;
+  /* `flex-wrap` IS LOAD-BEARING, and rendering is what said so. The
+     offers row is `flex: 0 0 100%` so it gets a line of its own -- and
+     without wrapping here it simply TOOK that width inside the same
+     row, squeezing "she knows 2 things about you" into a column one
+     word wide down the left of the screen. Every assertion passed.
+     Same family as the `min-width: 0` faults: a flex row shrinking its
+     items below their own content. */
+  flex: 0 0 100%; display: flex; flex-wrap: wrap;
+  gap: 6px 16px; align-items: baseline;
   font-size: 12.5px; letter-spacing: .02em; margin-top: -2px;
 }
 #knows button {
   font: inherit; color: var(--dim); background: none; border: 0;
-  padding: 0; cursor: pointer; text-align: left;
+  padding: 0; cursor: pointer; text-align: left; white-space: nowrap;
 }
 #knows button:hover { color: var(--ink); }
 #keep { color: var(--ink); opacity: .8; }
 #keep[hidden] { display: none; }
+
+/* WHAT SHE OFFERED TO KEEP. Their own row rather than three things
+   across one bar: at 412px "she knows 3 things about you" plus
+   "remember that" plus a chip is exactly the crowding that put the
+   Update button 2px off the viewport. */
+#offers { flex: 0 0 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+#offers:empty { display: none; }
+#offers button {
+  font: inherit; font-size: 12.5px; color: var(--key); background: var(--ink);
+  border: 0; border-radius: 2px; cursor: pointer; padding: 4px 9px;
+  max-width: 46%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; opacity: .85;
+}
+#offers button:hover { opacity: 1; }
 
 #facts {
   position: absolute; left: 3.5%; bottom: 6%; width: 44%; max-height: 74%;
@@ -479,6 +501,7 @@ body.thinking #four { animation-duration: 1.6s; }
   <div id="knows">
     <button id="count" type="button"></button>
     <button id="keep" type="button" hidden>remember that</button>
+    <span id="offers"></span>
   </div>
 </form>
 
@@ -728,6 +751,7 @@ form.onsubmit = (event) => {
   // is how a model ends up quoting itself back as evidence.
   lastSaid = asked;
   keep.hidden = false;
+  offer([]);
   input.value = '';
   send.disabled = true;
   send.textContent = '...';
@@ -830,6 +854,34 @@ function post(route, extra) {
     .catch(() => { count.textContent = ''; });
 }
 
+// SHE OFFERS, HE PICKS. Ghost: *"when facts come up she can ask which
+// one she remembers yes? Then i just pick em."*
+//
+// AN OFFER HE IGNORES COSTS NOTHING -- not a byte of the budget, not a
+// word on screen, and the marker is already stripped server-side before
+// the bubble or Piper ever see it. That is what makes her participating
+// affordable: the prompt rule WILL make her over-offer (measured three
+// times in this repo), and over-offering is just a chip he does not tap.
+const offers = document.getElementById('offers');
+
+function offer(list) {
+  offers.innerHTML = '';
+  (list || []).forEach(text => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.textContent = '+ ' + text;
+    chip.title = text;       // the chip truncates; the tooltip does not
+    chip.onclick = () => {
+      // Gone the moment he taps: leaving it there invites a second tap
+      // that answers "she already had that one", which reads as a
+      // button that stopped working.
+      chip.remove();
+      post('remember', { text: text });
+    };
+    offers.appendChild(chip);
+  });
+}
+
 count.onclick = () => factsBox.classList.toggle('on');
 keep.onclick = () => {
   if (!lastSaid) return;
@@ -844,7 +896,13 @@ function plain(asked) {
     body: JSON.stringify({ text: asked, who: 'four' }),
   })
     .then(r => r.json())
-    .then(r => said(r.said || 'She said nothing.'));
+    .then(r => {
+      said(r.said || 'She said nothing.');
+      // HER OFFERS ARE FOR THIS TURN. They clear on the next one
+      // rather than piling up: a chip from four replies ago is a
+      // question he has already moved past.
+      offer(r.suggests);
+    });
 }
 
 if (location.hash === '#say') input.focus();

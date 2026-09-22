@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 729 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 735 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 729 tests pass on it. Getting it
+(that repo path is confirmed working). 735 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,118 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE OFFERS, HE PICKS (Sept 22)
+
+Ghost: *"Make it so when facts come up she can ask which one she
+remembers yes? Then i just pick em."* And, on the two options I gave
+him sounding alike: *"Sorry about all that they both sounded very
+similar."* **They did -- that was my phrasing, not his reading.**
+
+She finishes a reply with `REMEMBER: the thing`, the code lifts it out
+before anything sees it, and the page offers it as a chip under the ask
+bar. **Tap it and she keeps it; ignore it and nothing happened.**
+
+**THE CONFIRM STEP IS WHAT MAKES THIS SAFE, and it is the whole reason
+the automatic version was refused.** Teaching her a remember-move means
+NAMING A TOKEN IN HER PROMPT, which is measured three times here as how
+she learns to spam it: `[winks]` in 3 of 4 replies while named as
+forbidden, the asterisk ban that printed an asterisk, rule 5 recited
+back word for word. **So assume she over-offers.** An offer he ignores
+costs nothing -- not a byte of the budget, not a word on screen -- so
+the pink elephant stops being a fault and becomes noise. That is the
+only thing that makes her participating affordable at all, and a test
+drives it: a reply full of markers must not change the store.
+
+**TWO AT MOST PER REPLY.** A wall of offers is its own kind of nagging,
+and the row under the ask bar has room for two.
+
+### THE MARKER WAS A BRACKET AND THE SUITE WAS RIGHT TO REFUSE IT
+
+`[remember: ...]` was the first draft, chosen because the bracket is
+already load-bearing: `strip_stage_directions` drops it before Piper
+says it aloud and the page's `spoken()` drops it before the bubble
+shows it. **Three tests went red at once and every one was correct.**
+
+**ON THIS PROJECT A BRACKET MEANS AN ACTION.** `extract_actions` parsed
+the marker as one, and `_hardware_cyberdeck.txt` goes out of its way to
+never tell a deck character that brackets exist -- because on a body
+with nothing wired up, every bracket is a movement emitted into a void.
+I was borrowing the one syntax this repo has spent months making mean
+exactly one thing, to mean a second thing, on the body where it means
+nothing.
+
+It is a plain `REMEMBER:` at the start of a line now, **anchored**,
+because unanchored it matched *"You should remember: flexbox centres
+it"* mid-sentence -- and that does not merely add a spurious offer, it
+**CUTS HER REPLY IN HALF** and leaves "You should" on screen.
+
+**AND IT COMES OUT OF HER HISTORY, not just the bubble.** Her own
+replies outweigh the system prompt within a few turns -- measured on a
+real 7-turn chat, which is the entire reason `_canonicalise` exists --
+so a marker left in the transcript is her teaching herself to write
+more of them, every turn, for as long as the conversation lasts.
+
+**`test_her_PROMPT_teaches_the_marker_the_CODE_actually_catches` is the
+guard that matters.** It runs her whole composed prompt through the
+real extractor. Change either spelling and she goes on writing a marker
+nothing catches -- which reads as the feature being ignored, with the
+raw marker then showing up in her bubble. **Seen for real** while
+re-rendering with a stale stub: `"suggests": []` and
+`[remember: ...]` sitting in her reply on screen.
+
+### THE SHUFFLE BANNER IS A HINT, NOT A DIAGNOSIS
+
+Two seeds went red. The suite prints *"FAILED IN THIS ORDER BUT NOT THE
+NORMAL ONE? Then a test is leaving something behind"* on **any**
+shuffle failure, and I read it as a finding twice: first as pollution,
+then as my own edit-race. **It was neither.**
+
+Reproduced in a CLONE at `/tmp/shufcheck`, which is the step both
+earlier readings skipped:
+
+    AssertionError: 'YUZU/wiki' not found in
+      '#!/bin/bash\n"/tmp/shufcheck/wiki" ...'
+
+**A TEST THAT ONLY PASSED BECAUSE THE CHECKOUT IS CALLED `YUZU`.**
+`deckapps` finds itself with `dirname "$0"`, so that string is really
+the FOLDER NAME -- and it fails in normal order too, in any directory
+with another name. Cloned to `~/deck`, or run from a temp dir, the
+suite goes red on a script working perfectly. Same rule as the Jetson
+round: **a test that can only pass on the machine you wrote it on is
+not passing, it is untested.** The path is derived from
+`Path(__file__).parent` now, verified in a clone that is not named
+YUZU.
+
+**The lesson is about me rather than the test.** I gave a confident
+wrong cause, wrote it into this file, and told Ghost the deck was fine
+-- on evidence that was one `git clone` away from being checked. The
+race is real and shuffles do belong last on an untouched tree. **A red
+seed still gets reproduced before it gets explained.**
+
+### Her prompt
+
+Rule 10 and one example, 5003 -> 5011 chars. **327 tokens of context
+still spare** with the facts store full, the inventory at its cap and
+this on top -- tighter than it was, and worth knowing before the next
+thing rides on every turn.
+
+**Seven new tests, each verified by breaking it**: her prompt teaching
+a marker the code cannot catch, merely offering spending the budget, no
+cap on how many she offers, offering what she already knows, the marker
+left in her history, and one of the two reply routes dropping the
+offers. All go red.
+
+**RENDERED at 1024x600 and 412 and driven in a browser** -- two chips,
+tap one, it vanishes and the count goes up. And rendering found the
+layout fault the assertions could not: `#offers` is `flex: 0 0 100%`,
+and **without `flex-wrap` on `#knows` it took that width inside the
+same row**, squeezing "she knows 2 things about you" into a column one
+word wide down the left of the screen. Same family as the `min-width:
+0` faults.
+
+**UNMEASURED.** Whether a 3B actually offers anything sensible is the
+round that decides this, and nobody has asked her yet.
 
 ## SHE KNOWS WHAT IS ON THE BOARD WITH HER (Sept 22)
 
@@ -123,17 +235,19 @@ dropped instead of named, the cap raised past the window, the cache
 never refreshing, and the inventory sent to a character off the deck.
 All go red.
 
-### AND A BACKGROUND SHUFFLE RUN WENT RED FOR A REASON THAT WAS MINE
+### AND A BACKGROUND SHUFFLE RUN WENT RED -- **SEE THE CORRECTION BELOW**
 
 `--shuffle 47` failed while `--shuffle 11` passed, which is the exact
-signature of test pollution. It was not: **I edited `yuzu_face.py` while
-that background job was running**, so the second seed imported a
-half-written module. Re-run on a settled tree, seed 47 is clean.
+signature of test pollution. I had edited `yuzu_face.py` while that
+background job was running, so the seed imported a half-written module,
+and I wrote that down as the explanation.
 
-**Same shape as reading a stale screenshot as evidence** -- the layer
-below was answering about a file that no longer existed. Shuffle runs
-go LAST now, on a tree nobody is touching, and a red seed is worth
-reproducing before it is believed.
+**THAT DIAGNOSIS WAS WRONG AND I SHOULD NOT HAVE WRITTEN IT.** It was
+plausible, it was never reproduced, and there was a real defect
+underneath it. See "THE SHUFFLE BANNER IS A HINT, NOT A DIAGNOSIS"
+below. The race is real and shuffle runs do belong last, on a tree
+nobody is touching -- but **a red seed is worth REPRODUCING before it
+is believed**, which is the rule I quoted and then did not follow.
 
 ## SHE KEEPS WHAT HE TELLS HER TO, AND IT CANNOT FILL UP (Sept 22)
 
