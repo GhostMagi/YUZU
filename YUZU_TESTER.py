@@ -5757,6 +5757,48 @@ class TestSheSpeaksOutOfThePage(unittest.TestCase):
         self.assertNotIn("leans", self.rendered)
         self.assertIn("All good", self.rendered)
 
+    # A stage direction in round brackets, and the word it would be heard
+    # as. Ghost, Sept 23: *"itd make it more realistic if she didnt
+    # verbalize (laughs)"*.
+    PAREN_DIRECTIONS = [("Not much changed (laughs). You?", "laughs"),
+                        ("(winks) Sure thing.", "winks"),
+                        ("Fine. (sighs dramatically) Go on.", "sighs"),
+                        ("(clears throat) Right.", "throat"),
+                        ("(in a low voice) Listen.", "voice"),
+                        ("(softly) Goodnight.", "softly"),
+                        ("Wait. (beat) Okay.", "beat"),
+                        # Capitalised, because a model opening a reply
+                        # with one writes it that way.
+                        ("(Smirks) Told you.", "smirks")]
+
+    def test_a_stage_direction_in_PARENTHESES_is_not_said_out_loud(self):
+        """Kokoro read "(laughs)" as the word "laughs". Brackets and
+        asterisks were already silent; round brackets were not."""
+        for text, heard in self.PAREN_DIRECTIONS:
+            self.post({"text": text, "who": "four"}).read()
+            self.assertNotIn(heard, self.rendered.lower(),
+                             "%r was read out loud" % text)
+            self.assertRegex(self.rendered, r"[A-Z][a-z]",
+                             "the words around %r went too" % text)
+
+    def test_an_ASIDE_in_parentheses_is_still_said(self):
+        """THE HALF THAT IS EASY TO FORGET. Unlike a bracket, a
+        parenthesis often carries speech -- on a deck he asks Linux
+        questions on, "(not DHCP)" is the answer. A rule that silences
+        every parenthesis eats it, so each of these must be heard whole,
+        including the ones that START with a word a direction could."""
+        for text in ["I run on an Orin (six cores, all mine).",
+                     "Set it to static (not DHCP).",
+                     "The power light (blinking green) means it is on.",
+                     "The download (paused at 83 percent) carries on.",
+                     "It is slow (in a good way).",
+                     "Take it (with a grain of salt).",
+                     "Beat it (beat the boss first)."]:
+            self.post({"text": text, "who": "four"}).read()
+            aside = text[text.index("(") + 1:text.index(")")]
+            self.assertIn(aside, self.rendered,
+                          "an aside he was meant to hear went silent")
+
     def test_the_voice_is_built_ONCE_per_character(self):
         """Kokoro loads a ~310MB model. Building one per request would
         make her slower than Piper rather than nicer than it, and on a

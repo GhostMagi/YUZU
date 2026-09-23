@@ -93,6 +93,44 @@ _STAGE_BOLD = re.compile(r'\*\*(\S[^*\n]*?)\*\*')
 _STAGE_EMPH = re.compile(r'\*(\S[^*\n]*?)\*')
 _STAGE_BRACKET = re.compile(r'\[[^\]]*\]')
 
+# A THIRD WRAPPER, AND THE ONE THAT CANNOT BE STRIPPED WHOLESALE. Ghost,
+# Sept 23, on Four's voice: *"itd make it more realistic if she didnt
+# verbalize (laughs)"*. Kokoro read "(laughs)" as the word "laughs".
+#
+# A bracket or an asterisk never carries speech in her replies; a
+# parenthesis often does. "The Orin (six cores)" and "set it to static
+# (not DHCP)" are asides she means him to HEAR, on a deck he asks Linux
+# questions on. So a parenthesis goes silent only when it OPENS with a
+# stage direction -- a laugh, a look, a way of saying it -- and anything
+# not on this list is spoken, which is exactly what happened before it
+# existed. A missing word costs one "smirks" out loud; an over-eager rule
+# would eat the answer.
+#
+# Only the forms a direction uses and an aside does not: "leans", never
+# "lean"; "blinks", never "blinking", because "the power light
+# (blinking green)" is a hardware answer. No nouns as openers --
+# "beams", "bounces" and "glitches" are things a sentence can be
+# about -- and "(beat)" or "(silence)" count only standing alone.
+_STAGE_WORDS = (
+    r"laugh(?:s|ing|ter)?|giggl(?:e|es|ing)|chuckl(?:e|es|ing)|"
+    r"snicker(?:s|ing)|snort(?:s|ing)|cackl(?:e|es|ing)|"
+    r"smirk(?:s|ing)?|grin(?:s|ning)|smil(?:es|ing)|wink(?:s|ing)?|"
+    r"sigh(?:s|ing)?|gasp(?:s|ing)?|groan(?:s|ing)|yawn(?:s|ing)|"
+    r"huff(?:s|ing)|pout(?:s|ing)|blush(?:es|ing)|sniff(?:s|ing)|"
+    r"sob(?:s|bing)|cries|crying|squeal(?:s|ing)|purr(?:s|ing)|"
+    r"hums|pause|pauses|pausing|whisper(?:s|ing)?|"
+    r"mutter(?:s|ing)|murmur(?:s|ing)|shrug(?:s|ging)?|nod(?:s|ding)|"
+    r"blinks|stares|staring|glances|glancing|tilts|tilting|"
+    r"leans|leaning|flickers|"
+    r"clears (?:her |my )?throat|rolls (?:her |my )?eyes|"
+    r"under (?:her|my) breath|to (?:herself|myself)|"
+    r"in a\b[^()\n]*?\b(?:voice|tone|whisper)|"
+    r"with a (?:grin|smirk|smile|wink|laugh|sigh|shrug)|"
+    r"softly|quietly|sarcastically|dramatically|playfully|teasingly|"
+    r"nervously|smugly|dryly|flatly|deadpan|mischievously|sheepishly|"
+    r"(?:beat|silence)(?=\s*\))")
+_STAGE_PAREN = re.compile(r"\(\s*(?:%s)\b[^()\n]*\)" % _STAGE_WORDS, re.I)
+
 # A FENCED CODE BLOCK IS NOT SPEECH. Asked to centre a div, Shiro
 # returned markdown headings and ```css blocks, and Piper read out
 # "backtick backtick backtick c s s hash my div open brace two hundred
@@ -106,7 +144,9 @@ _INLINE_CODE = re.compile(r"`([^`\n]+)`")
 
 
 def strip_stage_directions(text):
-    """Drop [bracketed] and *asterisked* stage directions.
+    """Drop [bracketed], *asterisked* and (parenthesised) stage
+    directions -- the last only when it opens with one; see
+    _STAGE_WORDS.
 
     MEASURED, Sept 8, Ghost's first live deck conversation: 3 of 4
     replies from Shiro carried one -- "*whispers*", "*silence*",
@@ -122,6 +162,7 @@ def strip_stage_directions(text):
     text = _STAGE_BOLD.sub(" ", text)
     text = _STAGE_EMPH.sub(" ", text)
     text = _STAGE_BRACKET.sub(" ", text)
+    text = _STAGE_PAREN.sub(" ", text)
     return _INLINE_CODE.sub(r"\1", text)
 
 

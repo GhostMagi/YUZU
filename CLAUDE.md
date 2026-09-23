@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 767 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 769 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,42 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## "(laughs)" IS NOT SAID OUT LOUD NOW, AND "(not DHCP)" STILL IS (Sept 23)
+
+Ghost: *"I suppose itd make it more realistic if she didnt verbalize
+(laughs)"*. Kokoro read her round-bracket stage directions as words --
+`(laughs)`, `(winks)` -- while `[brackets]` and `*asterisks*` had been
+silent since Sept 8.
+
+**A PARENTHESIS IS NOT A BRACKET, and that is why it is not one more
+wrapper in the list.** Neither a bracket nor an asterisk ever carries
+speech in her replies; a parenthesis often does. `The Orin (six
+cores)`, `set it to static (not DHCP)`, `the power light (blinking
+green)` are asides she means him to HEAR, on a deck he asks Linux
+questions on. `\([^)]*\)` would have eaten the answer.
+
+**SO IT GOES SILENT ONLY WHEN IT OPENS WITH A STAGE DIRECTION**:
+`_STAGE_WORDS` in `yuzu_voice.py`, a list of how she laughs, looks and
+says things. **The failure modes are lopsided on purpose**: a word the
+list lacks is spoken, which is exactly what happened before it existed;
+a word it has too many of silences part of an answer. So only the forms
+a direction uses and an aside does not -- `leans` never `lean`,
+`blinks` never `blinking` -- no nouns as openers, and `(beat)` /
+`(silence)` count only standing alone.
+
+**VOICE ONLY.** The bubble still shows `(laughs)`, which is the
+readable RP he has said he is fine with. The page already hides
+`[brackets]` from the bubble, so that is one line in `spoken()` if he
+wants it; he asked about hearing it.
+
+**Two tests, driven through the real `/voice.wav` route, seven breaks,
+all red**: the rule removed, every parenthesis silenced, `blinking`
+allowed, `beat` as an opener, any `in a ...` or `with a ...`, and the
+match made case-sensitive -- which stayed GREEN until a capitalised
+`(Smirks)` joined the cases, because every direction in the first
+draft was lower case and a model opening a reply writes it capitalised.
+**767 -> 769.** **UNHEARD on the board.**
 
 ## SHE STILL SAID "USER", AND THE WORD WAS NEVER IN HER PROMPT (Sept 23)
 
