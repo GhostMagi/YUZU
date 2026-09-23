@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 760 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 762 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -237,6 +237,17 @@ title that only matches once its punctuation is stripped loses a tie
 `/search` before ranking; and `_Extract` cuts at the first footer
 marker. Three tests, each verified by breaking it. **UNCONFIRMED on the
 board** until `python3 ~/YUZU/yuzu_wiki.py cat` says `Cat`.
+
+**IT SAID `Cat (disambiguation)`, and that was my fix's fault.** The
+footer was gone and `.cat` had lost -- but `_raw_exact` stripped the
+`(disambiguation)` qualifier before asking "is this the title", so a
+shortlist holding only that page was TRUSTED and search never ran. A
+check that could not tell a list of links from the article, in the
+round written to stop exactly that. Now: the qualifier stays; **the
+article is fetched BY NAME first** (`/content/<book>/Cat`, a 404 costs
+one local request and cannot be outranked); and any page that "may
+refer to" something is skipped, kept only as a last resort (the
+Mercury case). Three break-checks, all red.
 
 **AND `--status` SAID "Not running" UNDER A DOWNLOAD AT 83%.** It was
 about the wiki SERVER, which had not been started -- sitting directly

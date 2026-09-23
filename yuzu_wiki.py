@@ -484,8 +484,11 @@ def _raw_exact(term, path):
     """The title IS the term, punctuation and all -- `Cat` for "cat",
     never `.cat`. rank()'s normalising makes those two an exact TIE, so
     this is what breaks it."""
+    # THE QUALIFIER STAYS. Stripping it made `Cat_(disambiguation)`
+    # "exactly" cat -- measured on his board the same night -- so a
+    # shortlist holding only that was trusted and search never asked.
     raw = urllib.parse.unquote(path.rstrip("/").rsplit("/", 1)[-1])
-    raw = re.sub(r"\s*\(.*?\)\s*", " ", raw.replace("_", " ")).strip().lower()
+    raw = raw.replace("_", " ").strip().lower()
     want = " ".join((term or "").lower().split())
     return raw in (want, _singular(want)) or _singular(raw) == _singular(want)
 
@@ -559,7 +562,22 @@ def look_up(term, max_chars=MAX_CHARS):
     if not paths:
         return None, f"Nothing in the archive about '{term}'."
 
-    for path in rank(term, paths)[:3]:
+    # ASK FOR THE ARTICLE BY NAME FIRST. "cat" is `Cat` in any
+    # Wikipedia, and a direct fetch cannot be outranked by `.cat`,
+    # `Cat_the_Cat` or a disambiguation page the way a shortlist can.
+    # A miss is a 404 and costs one local request.
+    book = book_name()
+    guesses = []
+    if book:
+        for word in (term, _singular(term)):
+            title = word[:1].upper() + word[1:]
+            guess = "/content/%s/%s" % (
+                book, urllib.parse.quote(title.replace(" ", "_")))
+            if guess not in guesses:
+                guesses.append(guess)
+    fallback = None
+    for path in guesses + [p for p in rank(term, paths)[:3]
+                           if p not in guesses]:
         if not path.startswith("/"):
             path = "/" + path
         try:
@@ -572,13 +590,22 @@ def look_up(term, max_chars=MAX_CHARS):
         if len(text) < 80:          # a stub or a redirect, try the next
             continue
         title = parser.title or term
+        # A DISAMBIGUATION PAGE IS A LIST OF LINKS, whatever its title
+        # says -- "Mercury" is one. Kept only as a last resort.
         if len(text) > max_chars:
             # Cut on a sentence so she is never handed half a clause.
             cut = text[:max_chars]
             stop = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
             text = cut[:stop + 1] if stop > max_chars // 2 else cut + "..."
+        # A DISAMBIGUATION PAGE IS A LIST OF LINKS, whatever its title
+        # says -- "Mercury" is one. Kept only as a last resort.
+        if re.search(r"\bmay (also )?refer to\b", text[:400]):
+            fallback = fallback or (title, text)
+            continue
         return title, text
 
+    if fallback:
+        return fallback
     return None, f"Found '{term}' but couldn't read the article."
 
 

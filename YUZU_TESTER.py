@@ -10136,6 +10136,53 @@ class TestHerEncyclopedia(unittest.TestCase):
         got = self.wiki.rank("cat", self.wiki._suggest("cat"))
         self.assertEqual(got[0], "/content/%s/Cat" % self.FULL[1], got)
 
+    def test_the_article_itself_beats_its_DISAMBIGUATION_page(self):
+        """The second night's screen: `yuzu_wiki.py cat` said `Cat
+        (disambiguation)`. The shortlist held that and not `Cat`, and it
+        was trusted because the qualifier had been stripped before
+        asking "is this the title". So the article is asked for BY NAME
+        first, and a page that "may refer to" something is a last resort."""
+        body = lambda t, x: "<h1>%s</h1><p>%s %s</p>" % (t, x, "word " * 30)
+        disambig = body("Cat (disambiguation)", "Cat or CAT may also refer to:")
+        suggest = ('[{"value": "Cat (disambiguation)", "kind": "path", '
+                   '"path": "Cat_(disambiguation)"}, {"value": ".cat", '
+                   '"kind": "path", "path": ".cat"}]')
+        base, asked = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(_catalog_entry(*self.FULL))),
+            (("/suggest?", "content="), suggest),
+            (("/content/%s/Cat_" % self.FULL[1],), disambig),
+            (("/content/%s/.cat" % self.FULL[1],), body(".cat", "A domain.")),
+            (("/content/%s/Cat" % self.FULL[1],),
+             body("Cat", "The cat is a small mammal."))])
+        self.point_at(base)
+        self.assertFalse(self.wiki._raw_exact(
+            "cat", "/content/b/Cat_(disambiguation)"))
+        with mock.patch.object(self.wiki, "available", return_value=True):
+            title, text = self.wiki.look_up("cat")
+        self.assertEqual(title, "Cat", text)
+        # and a page that only refers onward is never preferred
+        with mock.patch.object(self.wiki, "available", return_value=True):
+            self.assertNotIn("may also refer",
+                             self.wiki.look_up("cat")[1])
+
+    def test_a_name_that_IS_a_disambiguation_page_is_passed_over(self):
+        """"Mercury" is a list of links in Wikipedia. Fetched by name it
+        "may refer to" a planet, an element and a god; the real article
+        from the shortlist wins, and the list is only a last resort."""
+        body = lambda t, x: "<h1>%s</h1><p>%s %s</p>" % (t, x, "word " * 30)
+        base, _ = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(_catalog_entry(*self.FULL))),
+            (("/suggest?", "content="), '[{"value": "Mercury (planet)", '
+             '"kind": "path", "path": "Mercury_(planet)"}]'),
+            (("/content/%s/Mercury_(planet)" % self.FULL[1],),
+             body("Mercury (planet)", "Mercury is the smallest planet.")),
+            (("/content/%s/Mercury" % self.FULL[1],),
+             body("Mercury", "Mercury may refer to:"))])
+        self.point_at(base)
+        with mock.patch.object(self.wiki, "available", return_value=True):
+            self.assertEqual(self.wiki.look_up("mercury")[0],
+                             "Mercury (planet)")
+
     def test_the_page_FOOTER_is_not_the_article(self):
         """Also measured on his board: the extract ran on into
         "Category: ... Hidden categories: ... This page is issued from
