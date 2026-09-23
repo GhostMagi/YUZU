@@ -946,11 +946,21 @@ def load_memory(brain, key):
         with open(_memory_file(key), encoding="utf-8") as fh:
             past = json.load(fh)
         if isinstance(past, list):
-            brain.history = [m for m in past
-                             if isinstance(m, dict)
-                             and m.get("role") in ("user", "assistant")
-                             and isinstance(m.get("content"), str)
-                             ][-brain.history_turns * 2:]
+            # AN OLD "user!" IS SCRUBBED ON THE WAY IN, so a memory saved
+            # before `by_name` existed stops teaching it on the first
+            # turn after a pull, rather than whenever it ages out -- and
+            # it never ages out while she keeps repeating it. HIS turns
+            # are his own words and are never touched.
+            name = _his_name(key)
+            kept = []
+            for m in past:
+                if (isinstance(m, dict)
+                        and m.get("role") in ("user", "assistant")
+                        and isinstance(m.get("content"), str)):
+                    if m["role"] == "assistant":
+                        m = dict(m, content=by_name(m["content"], name))
+                    kept.append(m)
+            brain.history = kept[-brain.history_turns * 2:]
     except Exception:
         pass
 
@@ -1414,6 +1424,68 @@ def suggestions(reply, key=None):
     return clean, offers[:SUGGEST_MAX]
 
 
+# SHE CALLED HIM "USER" AGAIN, WITH HIS NAME ALL OVER HER PROMPT.
+#
+# Ghost, Sept 23, the day after her example labels became his name:
+# *"she still called me user but were close lol"* --
+# `...not much changed, user!`
+#
+# HER PROMPT WAS NOT THE LAST PLACE THE WORD LIVED. It says his name
+# sixteen times and `User:` nowhere -- but every turn he sends reaches
+# the model inside the chat template's role header, Llama's
+# `<|start_header_id|>user<|end_header_id|>`, so the word `user` sits in
+# front of every single thing he says and no persona file can edit it.
+#
+# AND HER MEMORY KEEPS IT. Her own replies outweigh the system prompt
+# within a few turns -- measured, the reason `_canonicalise` exists --
+# and since Sept 16 they survive a restart. So one "user!" is saved,
+# read back as her own example, said again, and saved again. A fault
+# that re-teaches itself every turn never ages out of an 8-turn window.
+#
+# SO THE CODE PUTS HIS NAME THERE: the prompt reduces, code guarantees.
+# ONLY WHERE SHE IS TALKING TO HIM -- after a comma or a greeting at the
+# end of a clause, or shouted at the start of one -- because "the user's
+# permissions" and "make a new user" are real English in a technical
+# answer, and rewriting those would put his name in the wrong sentence.
+# A sentence-opening "User," is deliberately NOT caught: "User, group,
+# others." is how a chmod answer starts, on a deck he asks Linux
+# questions on. A persona with no USER_NAME is untouched to the byte.
+_HELLO = (r"hey|hi|hiya|heya|hello|yo|sup|thanks|thank you|bye|goodbye|"
+          r"night|goodnight|morning|evening|welcome back|welcome")
+_CALLED_USER = (
+    # "Not much changed, user!"  "Welcome back, user."  "Listen, user, ..."
+    re.compile(r"(?P<lead>,[ \t]*)user"
+               r"(?=[ \t]*(?:[.!?…~,;:)\]\[*♡—–]|$))", re.I | re.M),
+    # "Hey user"  "Thanks user."  "Hi, user"
+    re.compile(r"(?P<lead>\b(?:%s)\b[ \t]*,?[ \t]*)user(?![\w'’-])" % _HELLO,
+               re.I | re.M),
+    # "User! You're back."  "User?"
+    re.compile(r"(?P<lead>(?:^|(?<=[.!?…~]))[ \t]*)user(?=[ \t]*[!?])",
+               re.I | re.M),
+)
+
+
+def by_name(text, name):
+    """Her words with "user" swapped for his name where she is talking
+    TO him, and nowhere else. No name, no change."""
+    if not name or not text:
+        return text
+    for pattern in _CALLED_USER:
+        text = pattern.sub(lambda m: m.group("lead") + name, text)
+    return text
+
+
+def _his_name(key):
+    """USER_NAME off the character's own settings, or nothing. READ,
+    never typed in here: the persona is the one place his name lives."""
+    try:
+        import yuzu_personas
+        return (yuzu_personas.load(key).settings.get("USER_NAME")
+                or "").strip()
+    except Exception:
+        return ""
+
+
 def facts_line(key):
     """The one sentence her prompt carries, or nothing at all.
 
@@ -1691,6 +1763,11 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
                 on_suggest(offers)
             except Exception:
                 pass
+        # HIS NAME WHERE SHE CALLED HIM "USER" -- in the bubble, in the
+        # voice, and in the history below, which is the half that stops
+        # her teaching it to herself. See `by_name`.
+        name = _his_name(key)
+        reply = by_name(reply, name)
         # AND OUT OF HER HISTORY TOO, before it is written to disk.
         # Her own replies outweigh the system prompt within a few turns
         # -- measured, on a real 7-turn chat, which is the whole reason
@@ -1698,8 +1775,8 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
         # is her teaching herself to emit more of them.
         try:
             if brain.history and brain.history[-1].get("role") == "assistant":
-                brain.history[-1]["content"] = suggestions(
-                    brain.history[-1]["content"])[0]
+                brain.history[-1]["content"] = by_name(suggestions(
+                    brain.history[-1]["content"])[0], name)
         except Exception:
             pass
         # The brain already wrote `talking` WITH the token rate it just

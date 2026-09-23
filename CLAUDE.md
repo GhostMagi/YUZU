@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 762 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 767 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,56 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE STILL SAID "USER", AND THE WORD WAS NEVER IN HER PROMPT (Sept 23)
+
+Ghost, the day after her example labels became his name: *"Okay so she
+still called me user but were close lol"* -- `...not much changed,
+user!`
+
+    Ghost in her composed prompt     16
+    User: in her composed prompt      0
+
+**THE SEPT 22 ENTRY GOT THE MECHANISM HALF WRONG.** It says his turns
+arrive "with no label on them at all". They do not: `/api/chat` renders
+every one of them inside the chat template's role header, Llama's
+`<|start_header_id|>user<|end_header_id|>`, so the word `user` sits in
+front of everything he says -- the one label no persona file can edit.
+The eleven `User:` examples were the loudest teacher, not the only one.
+
+**AND HER MEMORY MAKES IT PERMANENT.** Her own replies outweigh the
+system prompt within a few turns, and since Sept 16 they survive a
+restart. One "user!" is saved, read back as her own example, said
+again, saved again -- **a fault that re-teaches itself every turn never
+ages out of an 8-turn window.** The memory feature turned a slip into a
+habit.
+
+**`by_name()` IN `yuzu_face.py`: the prompt reduces, code guarantees.**
+Where she calls him "user", his name goes there instead -- in the
+bubble, in the voice, in her history, and in an OLD memory the first
+time it is read back, so the pull that delivers this cleans the file
+on his board with nothing for him to run. His own turns are never
+touched. `USER_NAME` is READ off the persona, so a character with none
+(Yuzu) is untouched to the byte.
+
+**ONLY WHERE SHE IS TALKING TO HIM**, and that half is the one worth
+the test: after a comma or a greeting at the end of a clause, or
+shouted at the start of one. She lives on a Linux box and gets Linux
+questions, so "the user's permissions" and "make a new user" are real
+English -- **a blanket swap puts his name in a sentence about
+accounts.** A sentence-opening `User,` is deliberately NOT caught,
+because *"User, group, others."* is how a chmod answer starts.
+
+**THE PROMPT WAS NOT TOUCHED.** Rule 9 still says "the user's words",
+and that phrase is how `MEASURED_WINS` recognises the no-puppeteering
+win on every character. One variable.
+
+**Five new tests, eight breaks, all red**: the bubble keeping it, her
+history keeping it, an old memory loaded as it was, HIS words rewritten
+on load, a blanket swap, an empty name defaulting to his, the comma
+form dropped, and the name hardcoded instead of read. **762 -> 767.**
+
+**UNMEASURED on the board** until he says hello to her after a pull.
 
 ## THE WIKI SERVED WHATEVER WAS DOWNLOADED LAST, AND `wiki --get` (Sept 23)
 
@@ -961,7 +1011,9 @@ my name as Ghost?"*
 **THE EXAMPLE LABEL IS THE ONLY WORD IN HER ENTIRE CONTEXT THAT NAMES
 THE PERSON SHE IS TALKING TO.** His real turns arrive over the chat API
 as `role: user` with no label on them at all, so nothing else in front
-of her says who he is. Eleven lines of `User:` is eleven lessons, and
+of her says who he is. **CORRECTED Sept 23: they DO carry one** -- the
+chat template wraps every turn in Llama's `user` role header, which is
+why the word outlived this fix. See the Sept 23 entry at the top. Eleven lines of `User:` is eleven lessons, and
 she learned it exactly as taught and said it to his face.
 
 **AND IT CONTRADICTS A RECORDED DECISION, which is the finding rather

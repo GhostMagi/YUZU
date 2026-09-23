@@ -5545,6 +5545,71 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
                              "the marker is in her transcript, so she is "
                              "teaching herself to write more of them")
 
+    def test_she_never_learns_user_from_her_OWN_history(self):
+        """Ghost, Sept 23: *"she still called me user"*. Her memory
+        survives a restart, and her own replies outweigh her prompt --
+        so one saved "user!" is read back as her own example, said
+        again, and saved again. A fault that re-teaches itself every
+        turn never ages out.
+
+        Driven through the real `answer()`: the bubble, her history and
+        the file on disk must all carry his name."""
+        face = self.store()
+        name = yuzu_personas.load("four").settings["USER_NAME"]
+        said = "Not much changed, user!"
+
+        class Saying:
+            system_prompt = "BASE"
+            history_turns = 8
+
+            def __init__(self, **kw):
+                self.history = []
+
+            def ask(self, text):
+                self.history += [{"role": "user", "content": text},
+                                 {"role": "assistant", "content": said}]
+                return said
+
+        import yuzu_brain
+        with mock.patch.object(yuzu_brain, "YuzuBrain", Saying), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, error = face.answer("hey user", "four")
+            self.assertIsNone(error)
+            self.assertIn(name, reply, "the bubble and the voice say user")
+            history = face._BRAINS["four"].history
+            self.assertIn(name, history[-1]["content"],
+                          "her transcript says user, so she teaches it "
+                          "to herself every turn from here on")
+            self.assertEqual(history[-2]["content"], "hey user",
+                             "HIS words were rewritten")
+        with open(face._memory_file("four"), encoding="utf-8") as fh:
+            saved = json.load(fh)
+        self.assertIn(name, saved[-1]["content"],
+                      "the file on disk still teaches it after a restart")
+
+    def test_an_old_memory_that_says_user_is_cleaned_on_LOAD(self):
+        """A memory saved BEFORE the fix would go on teaching it until it
+        aged out -- and it never does while she keeps repeating it. So it
+        is scrubbed the first time it is read back, which on his board is
+        the first turn after `pull` restarts her."""
+        face = self.store()
+        name = yuzu_personas.load("four").settings["USER_NAME"]
+        os.makedirs(face.MEMORY_DIR, exist_ok=True)
+        with open(face._memory_file("four"), "w", encoding="utf-8") as fh:
+            json.dump([{"role": "user", "content": "hi user"},
+                       {"role": "assistant", "content": "Hey user."}], fh)
+
+        class Blank:
+            history_turns = 8
+            history = []
+
+        brain = Blank()
+        face.load_memory(brain, "four")
+        self.assertEqual(brain.history[-1]["content"], "Hey %s." % name,
+                         "an old reply saying user was loaded as it was")
+        self.assertEqual(brain.history[0]["content"], "hi user",
+                         "HIS words were rewritten on the way in")
+
     def test_BOTH_routes_ship_what_she_offered(self):
         """`/say` and `/stream` are one `answer()` with a callback, and
         that is exactly the shape that grew a second copy to forget
@@ -6167,8 +6232,9 @@ class TestFour(unittest.TestCase):
 
         ELEVEN `User:` LABELS AND ZERO `Ghost`. The label in front of
         his turn was the ONLY word anywhere in her context naming the
-        person she is talking to -- his real turns arrive as
-        `role: user` with no label on them at all -- so it was the only
+        person she is talking to in words she can copy -- his real
+        turns arrive under the chat template's `user` role header, which
+        names a ROLE rather than him -- so it was the only
         thing she had to copy, and she copied it to his face.
 
         AND IT CONTRADICTS A RECORDED DECISION, which is why it is
@@ -6207,6 +6273,63 @@ class TestFour(unittest.TestCase):
         self.assertIn(name, preamble,
                       "she is shown his name eleven times and never "
                       "actually told it")
+
+    # ---- when she says "user" anyway ---------------------------------
+
+    CALLED_USER = ["Not much changed, user!", "Welcome back, user.",
+                   "Listen, user, this matters.", "Hey user",
+                   "Thanks user.", "Hi, user! [waves]",
+                   "User! You're back.", "Thanks, User~"]
+
+    def test_when_she_calls_him_user_the_code_says_his_name(self):
+        """Ghost, Sept 23, the day after the labels became his name:
+        *"she still called me user but were close lol"* --
+        `...not much changed, user!`
+
+        Her prompt says his name sixteen times and `User:` nowhere. What
+        still says it is the chat template: every turn he sends arrives
+        inside Llama's `user` role header, which no persona can edit.
+        So the prompt REDUCES it and the code GUARANTEES it, the split
+        this repo keeps paying for."""
+        import yuzu_face
+        for said in self.CALLED_USER:
+            fixed = yuzu_face.by_name(said, "Ghost")
+            self.assertIn("Ghost", fixed, "%r still calls him user" % said)
+            self.assertNotRegex(fixed, r"(?i)\buser\b",
+                                "%r came out as %r" % (said, fixed))
+
+    def test_user_in_a_TECHNICAL_answer_is_left_alone(self):
+        """THE HALF THAT IS EASY TO FORGET. She lives on a Linux box and
+        gets asked Linux questions, so "user" is real English in her
+        answers -- and a blanket swap would put his name in the middle
+        of a sentence about accounts. A sentence-opening "User," is
+        left alone on purpose: it is how a chmod answer starts."""
+        import yuzu_face
+        for said in ["Never write the user's words or actions.",
+                     "Make a new user, then log in as them.",
+                     "Run it as a normal user, not root.",
+                     "User accounts live in /etc/passwd.",
+                     "sudo adduser ghost",
+                     "Every user, including root, has a home.",
+                     "Only you call me 'user'.",
+                     "It's fast, user-friendly, and free.",
+                     "User, group, others. Each gets read, write, execute.",
+                     "If you're root, user permissions don't apply."]:
+            self.assertEqual(yuzu_face.by_name(said, "Ghost"), said,
+                             "a sentence about ACCOUNTS got his name in it")
+
+    def test_a_character_with_no_name_for_him_is_untouched(self):
+        """No USER_NAME, no change, to the byte -- Yuzu has never shown
+        the fault, and one variable at a time. READ off the persona, so
+        the day she is given his name she gets this too."""
+        import yuzu_face
+        for said in self.CALLED_USER:
+            self.assertEqual(yuzu_face.by_name(said, ""), said)
+        self.assertEqual(yuzu_face._his_name("four"),
+                         yuzu_personas.load("four").settings["USER_NAME"])
+        for key in yuzu_personas.available():
+            if not yuzu_personas.load(key).settings.get("USER_NAME"):
+                self.assertEqual(yuzu_face._his_name(key), "", key)
 
     # ---- her prompt --------------------------------------------------
 
