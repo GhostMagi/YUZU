@@ -215,6 +215,22 @@ settled:
   `Cat` is in that ten is UNCONFIRMED. `python3 ~/YUZU/yuzu_wiki.py cat`
   prints the article she would actually get.
 
+**ANSWERED, 23:54: IT IS WRONG. `yuzu_wiki.py cat` returned `.cat`**
+-- the Catalan top-level domain -- and the extract carried the page
+FOOTER ("Category: ... Hidden categories ... This page is issued from
+Wikipedia ... Creative Commons"). Two faults, NOT YET FIXED (he was out
+of credits until Wednesday), first thing next session:
+
+- **`.cat` normalises to "cat", an EXACT tie with `Cat`**, and the sort
+  is stable, so kiwix's order decides -- or `Cat` was not in the ten
+  suggestions at all. Fix: a tie-break on the raw title (punctuation
+  that was stripped counts against it), and merge `/search` hits into
+  the candidates when no raw-exact title is among the suggestions.
+- **The mini pages carry category/licence footer text** that the old
+  archive did not, and `_Extract` keeps it. Skip the footer block (or
+  cut at "Category:" / "This page is issued from") before capping at
+  700 -- or she reads licence boilerplate aloud.
+
 **AND `--status` SAID "Not running" UNDER A DOWNLOAD AT 83%.** It was
 about the wiki SERVER, which had not been started -- sitting directly
 under the download line, where it reads as the download having stopped.
