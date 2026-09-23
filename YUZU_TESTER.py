@@ -8379,6 +8379,20 @@ class TestWikiServer(unittest.TestCase):
         self.assertNotIn("PARTWAY", quiet.stdout)
         self.assertNotIn("DOWNLOADING", quiet.stdout)
 
+    def test_status_says_WHICH_thing_is_not_running(self):
+        """Measured on his screen, Sept 23: "Not running. Start it
+        with: ~/YUZU/wiki" printed directly under a download at 83%,
+        about the SERVER -- where it reads as the download having
+        stopped. Every line about the server names the wiki."""
+        done, _ = self._run("--status", parts=[
+            ("zims/wikipedia_en_all_mini_2026-09.zim.part", 10, 40)])
+        server = [l for l in done.stdout.splitlines()
+                  if "running" in l.lower() and "DOWNLOAD" not in l]
+        self.assertTrue(server, done.stdout)
+        for line in server:
+            self.assertIn("wiki", line.lower(),
+                          "a bare 'not running' under a download: %r" % line)
+
     def test_it_finds_the_archive_itself(self):
         """A 982MB download's path is not something to retype on a
         phone keyboard. Found with no argument needed."""

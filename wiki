@@ -105,19 +105,29 @@ case "${1:-}" in
     ;;
 --status)
     downloads
+    # EVERY LINE BELOW NAMES THE WIKI. Measured Sept 23, on his screen:
+    #
+    #     DOWNLOADING wikipedia_en_all_mini_2026-09.zim
+    #         12.0 GB of 14.4 GB (83%)
+    #     Not running.  Start it with:  ~/YUZU/wiki
+    #
+    # "Not running" was about the SERVER and sat directly under the
+    # download, where it reads as the download having stopped. Two
+    # answers in one output have to say which thing each one is about.
     if serving; then
         echo
-        echo "  UP.  Open this on your phone:  http://$(lan_ip):$PORT"
+        echo "  THE WIKI IS UP.  Open this on your phone:  http://$(lan_ip):$PORT"
         echo
         exit 0
     fi
     echo
     if pgrep -f kiwix-serve >/dev/null 2>&1; then
-        echo "  Running, but NOT reachable from the network."
+        echo "  The wiki is running, but NOT reachable from the network."
         echo "  Listening on:"
         ss -ltn | grep "$PORT" || echo "    nothing on port $PORT"
     else
-        echo "  Not running.  Start it with:  ~/YUZU/wiki"
+        echo "  The wiki is not running. It starts by itself the first"
+        echo "  time you use /wiki, or start it now with:  ~/YUZU/wiki"
     fi
     echo
     exit 1

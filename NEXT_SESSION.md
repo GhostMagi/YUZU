@@ -54,7 +54,7 @@ So:
     FRONT          four        (yuzu_face.py     — who GREETS you)
     roster         Yuzu, Four  (Cait, Mimi, Saya are `retired: yes`)
     Four's prompt  5446 chars
-    tests          756, ~95s,  `python YUZU_TESTER.py`
+    tests          757, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -79,7 +79,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 756 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 757 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means
@@ -187,7 +187,10 @@ a phone, so a file path is useless to him.
 ## Queued, in his own words
 
 - **Multi-ZIM `/wiki` (#1)** — later, keep in mind. iFixit, WikiMed,
-  WikiHow, Wikivoyage, Appropedia, Gutenberg are already on the board.
+  WikiHow, Wikivoyage, Appropedia, Gutenberg are the ones he named.
+  **They are NOT on the board** — `wiki --test` counted two archives on
+  Sept 23 (Simple English + `wikipedia_en_all_mini`). This line used to
+  say they were; that was a wish list read as an inventory.
   **Half-done Sept 23:** `wiki` serves every archive and `/wiki` reads
   the biggest Wikipedia on purpose (it used to read whichever file was
   downloaded LAST). Searching the others is what is left, and it adds

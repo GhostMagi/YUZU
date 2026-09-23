@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 756 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 757 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -186,9 +186,40 @@ pinned to agree with `wiki`.
 `~/YUZU/wiki --get wikipedia_en_all_mini` and reported *"Downloaded
 ayyye"* -- so the catalog query, the flavour match and the `.meta4`
 strip all held against the real site, which the container could never
-reach. **Still unconfirmed: that `/wiki` moved to the new book on his
-kiwix-serve** (its version is unknown and the fallbacks stay).
-`~/YUZU/wiki --test` names the book it reads; that is the check. Every failure
+reach. **CONFIRMED by `wiki --test` on his board, 23:49:**
+
+    books:    2 on the server -- /wiki reads the one below
+    book:     wikipedia_en_all_mini_2026-09
+    suggest:  FAILED (HTTP Error 404: Not Found)
+    result:   10 paths  first: /content/wikipedia_en_all_mini_2026-09/Cat_the_Cat
+
+**She moved to the new book by herself.** Four things that screen
+settled:
+
+- **14.4 GB**, not the ~13 his Kiwix page and my web search said -- the
+  2026-09 release is bigger. The tool said so before it spent it, which
+  is exactly why sizes are not written into this file.
+- **`/suggest` WITH `content=` WORKS on his kiwix-serve.** `result: 10
+  paths` is the count=10 shape answering. So the Sept 10 `suggest: 404`
+  was the `books.name=` form all along, as the 3.5 reproduction said.
+  (The `suggest` line in the diagnostic asks unscoped, which still
+  404s with two books; the verdict above it says to ignore it.)
+- **ONLY TWO ARCHIVES ARE ON THE BOARD**: Simple English and the new
+  mini. NEXT_SESSION said iFixit, WikiMed, WikiHow and the rest were
+  "already on the board" -- they are not, or not under the three roots
+  `wiki` searches. That line came from the Sept 22 wish list, read as
+  an inventory. Corrected there.
+- **Kiwix's first suggestion for "cat" is `Cat_the_Cat`**, not `Cat`.
+  `rank()` puts an exact title first, but only among the ten it is
+  handed -- and with the whole of English Wikipedia behind it, whether
+  `Cat` is in that ten is UNCONFIRMED. `python3 ~/YUZU/yuzu_wiki.py cat`
+  prints the article she would actually get.
+
+**AND `--status` SAID "Not running" UNDER A DOWNLOAD AT 83%.** It was
+about the wiki SERVER, which had not been started -- sitting directly
+under the download line, where it reads as the download having stopped.
+Every server line names the wiki now, and a test pins that no bare
+"not running" can sit under a download again. Every failure
 prints the site's own error, verdict first. **Sizes are not written
 here on purpose** -- the tool prints the real one before it spends it.
 
