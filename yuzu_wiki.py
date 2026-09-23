@@ -35,6 +35,10 @@ MAX_CHARS = 700          # enough to answer from, small enough not to
                          # blow out the 4096-token context on the Orin
 
 
+FOOTER = ("Category:", "Categories:", "Hidden categories:",
+          "This page is issued from", "This article is issued from")
+
+
 class _Extract(HTMLParser):
     """Pull readable prose out of a Kiwix article page.
 
@@ -76,6 +80,16 @@ class _Extract(HTMLParser):
         # residue. Neither survives being read out loud, and neither
         # helps a 3B answer a question.
         joined = re.sub(r"\[\s*\d+\s*\]", " ", joined)
+        # THE PAGE FOOTER IS NOT THE ARTICLE. The mini archive ends every
+        # page with its categories and a licence line -- measured on his
+        # board, Sept 23: "Category: Domain Name System Security
+        # Extensions Hidden categories: ... This page is issued from
+        # Wikipedia ... Creative Commons". Handed to her, that is what
+        # she reads aloud. Everything from the first footer marker on
+        # goes.
+        cut = [joined.find(m) for m in FOOTER if joined.find(m) > 0]
+        if cut:
+            joined = joined[:min(cut)]
         return re.sub(r"\s+", " ", joined).strip()
 
 
@@ -273,7 +287,16 @@ def _suggest(term):
                 paths.append("/content/%s/%s" % (
                     book, urllib.parse.quote(hit["value"].replace(" ", "_"))))
         if paths:
-            return paths
+            # TEN SUGGESTIONS OUT OF SIX MILLION TITLES may not include
+            # the article itself -- "cat" came back led by `Cat_the_Cat`
+            # and `.cat`. Only a suggestion list that holds the real title
+            # is trusted alone; otherwise search too and rank both.
+            if any(_raw_exact(term, p) for p in paths):
+                return paths
+            suggested = paths
+            break
+    else:
+        suggested = []
 
     for path in (f"/search?books.name={q_book}&pattern={quoted}"
                  if book else None,
@@ -314,8 +337,8 @@ def _suggest(term):
             real = _book_of(found[0])
             if real:
                 _BOOK = real
-            return found
-    return []
+            return suggested + [p for p in found if p not in suggested]
+    return suggested
 
 
 def diagnose():
@@ -457,6 +480,16 @@ def _singular(words):
                     for w in words.split())
 
 
+def _raw_exact(term, path):
+    """The title IS the term, punctuation and all -- `Cat` for "cat",
+    never `.cat`. rank()'s normalising makes those two an exact TIE, so
+    this is what breaks it."""
+    raw = urllib.parse.unquote(path.rstrip("/").rsplit("/", 1)[-1])
+    raw = re.sub(r"\s*\(.*?\)\s*", " ", raw.replace("_", " ")).strip().lower()
+    want = " ".join((term or "").lower().split())
+    return raw in (want, _singular(want)) or _singular(raw) == _singular(want)
+
+
 def rank(term, paths):
     """Search hits, best TITLE MATCH first.
 
@@ -495,7 +528,12 @@ def rank(term, paths):
         # scores an exact match on "black holes" and would have won --
         # a list of links where she expected an article. Demoted, not
         # dropped: if it is genuinely all there is, it still gets tried.
-        return (-score(path), "disambig" in path.lower(), i)
+        # MEASURED Sept 23 on the full English archive: `/wiki cat` got
+        # `.cat`, the Catalan web domain, because it normalises to "cat"
+        # and tied `Cat` exactly -- and a tie keeps kiwix's order. A title
+        # that only matches once its punctuation is thrown away loses.
+        return (-score(path), "disambig" in path.lower(),
+                not _raw_exact(term, path), i)
 
     return [p for _, p in sorted(enumerate(paths), key=key)]
 

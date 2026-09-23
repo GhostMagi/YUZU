@@ -10111,6 +10111,43 @@ class TestHerEncyclopedia(unittest.TestCase):
         self.assertEqual(self.wiki._suggest("cat"),
                          ["/content/%s/Cat" % self.FULL[1]])
 
+    def test_dot_cat_never_beats_Cat(self):
+        """MEASURED on his board, Sept 23: `yuzu_wiki.py cat` returned
+        `.cat`, the Catalan web domain. It normalises to "cat" and tied
+        the real article exactly, and a tie kept kiwix's order."""
+        for order in (["/content/b/.cat", "/content/b/Cat"],
+                      ["/content/b/Cat", "/content/b/.cat"]):
+            self.assertEqual(self.wiki.rank("cat", order)[0],
+                             "/content/b/Cat", order)
+
+    def test_suggestions_WITHOUT_the_real_title_are_joined_by_search(self):
+        """Ten suggestions out of the whole English Wikipedia: "cat"
+        came back led by `Cat_the_Cat` and `.cat`. When the real title
+        is not among them, search is asked too and both are ranked."""
+        suggest = ('[{"value": "Cat the Cat", "kind": "path", "path": '
+                   '"Cat_the_Cat"}, {"value": ".cat", "kind": "path", '
+                   '"path": ".cat"}]')
+        base, asked = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(_catalog_entry(*self.FULL))),
+            (("/suggest?", "content="), suggest),
+            (("/search?books.name=",),
+             '<a href="/content/%s/Cat">Cat</a>' % self.FULL[1])])
+        self.point_at(base)
+        got = self.wiki.rank("cat", self.wiki._suggest("cat"))
+        self.assertEqual(got[0], "/content/%s/Cat" % self.FULL[1], got)
+
+    def test_the_page_FOOTER_is_not_the_article(self):
+        """Also measured on his board: the extract ran on into
+        "Category: ... Hidden categories: ... This page is issued from
+        Wikipedia ... Creative Commons" -- which she would read aloud."""
+        page = ('<h1>Cat</h1><p>The cat is a small mammal.</p><div>'
+                'Category: Felines Hidden categories: x This page is '
+                'issued from Wikipedia. The text is available under '
+                'Creative Commons.</div>')
+        x = self.wiki._Extract()
+        x.feed(page)
+        self.assertEqual(x.text(), "The cat is a small mammal.")
+
     def test_the_choice_is_NOT_kept_forever(self):
         """It used to be, on the reasoning that it "cannot change while
         the server is up" -- and a finished download now restarts the

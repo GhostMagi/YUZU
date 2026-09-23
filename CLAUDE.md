@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 757 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 760 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -230,6 +230,13 @@ of credits until Wednesday), first thing next session:
   archive did not, and `_Extract` keeps it. Skip the footer block (or
   cut at "Category:" / "This page is issued from") before capping at
   700 -- or she reads licence boilerplate aloud.
+
+**FIXED THE SAME NIGHT** (he asked: *"Fix now real fast homie"*). A
+title that only matches once its punctuation is stripped loses a tie
+(`_raw_exact`); a suggestion list without the real title is merged with
+`/search` before ranking; and `_Extract` cuts at the first footer
+marker. Three tests, each verified by breaking it. **UNCONFIRMED on the
+board** until `python3 ~/YUZU/yuzu_wiki.py cat` says `Cat`.
 
 **AND `--status` SAID "Not running" UNDER A DOWNLOAD AT 83%.** It was
 about the wiki SERVER, which had not been started -- sitting directly
