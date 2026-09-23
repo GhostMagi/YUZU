@@ -5,6 +5,7 @@
 #   ~/YUZU/wiki --off     stop it
 #   ~/YUZU/wiki --status  is it up, and where
 #   ~/YUZU/wiki --test    WHY a lookup found nothing
+#   ~/YUZU/wiki --get wikipedia_en_all_mini    fetch another archive
 #
 # The last attempt at this ran kiwix-serve in the FOREGROUND. It held
 # the terminal, which on a phone serial link is indistinguishable from
@@ -30,24 +31,80 @@ serving() {
         END { exit !found }'
 }
 
-# Find the ZIM rather than making him type a path on a phone keyboard.
-# Newest wins, so a freshly downloaded archive is picked up with no
-# argument and no editing.
-find_zim() {
+# Find the ZIMs rather than making him type a path on a phone keyboard.
+#
+# EVERY ARCHIVE, NOT JUST THE NEWEST. This used to serve one file --
+# whichever was downloaded last -- which was right while there was one,
+# and silently wrong the day a second arrived: fetch iFixit after
+# Wikipedia and `/wiki cats` became a search of repair guides.
+# Reproduced with real archives on a real kiwix-serve. So everything is
+# served (he can browse all of it from the phone), and yuzu_wiki picks
+# which one SHE reads from, on purpose, by size.
+#
+# NEWEST PER BOOK. Two releases of the same archive differ only in the
+# date on the end of the name; serving both would put every article in
+# twice. The part before the date is the book.
+find_zims() {
     find "$HOME" /media /mnt -maxdepth 4 -name '*.zim' -size +1M \
-        -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-
+        -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2- |
+    awk '{ book = $0; sub(/.*\//, "", book)
+           sub(/(_[0-9][0-9][0-9][0-9]-[0-9][0-9])?\.zim$/, "", book)
+           if (!seen[book]++) print }'
 }
 
+# A download in flight, or one that stopped partway. `.part` is what
+# yuzu_zimget writes until the file is whole, and `.part.size` is how big
+# it is meant to be.
+downloads() {
+    local part have want name running
+    while IFS= read -r part; do
+        [ -n "$part" ] || continue
+        have=$(stat -c %s "$part" 2>/dev/null || echo 0)
+        want=$(cat "$part.size" 2>/dev/null || echo 0)
+        name=$(basename "$part" .part)
+        running=0
+        pgrep -f -- "$part" >/dev/null 2>&1 && running=1
+        if [ "$running" = 1 ]; then
+            echo "  DOWNLOADING $name"
+        else
+            echo "  STOPPED PARTWAY: $name"
+        fi
+        awk -v h="$have" -v w="$want" '
+            function sz(n) { return n >= 1e9 ? sprintf("%.1f GB", n/1e9) \
+                                             : sprintf("%d MB", n/1e6) }
+            BEGIN { if (w > 0) printf "    %s of %s (%d%%)\n", sz(h), sz(w), 100*h/w
+                    else       printf "    %s so far\n", sz(h) }'
+        if [ "$running" = 0 ]; then
+            # THE LINE ITSELF, not "the line you started it with" -- he
+            # will not remember it, and the book is right there in the
+            # file's name.
+            echo "    To carry on from here, paste:"
+            echo "      ~/YUZU/wiki --get $(basename "$part" .zim.part \
+                                   | sed -E 's/_[0-9]{4}-[0-9]{2}$//')"
+        fi
+    done < <(find "$HOME" /media /mnt -maxdepth 4 -name '*.zim.part' 2>/dev/null)
+}
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
 case "${1:-}" in
+--get)
+    # The filename is asked of the live Kiwix catalog, never typed here.
+    # yuzu_zimget does the asking, the size check and the background
+    # run -- in its own module, because it reaches the internet and the
+    # four modules her turn runs through are held to never doing that.
+    shift
+    exec python3 "$HERE/yuzu_zimget.py" "$@" ;;
 --test|--why)
     # What the server actually says, four lines, no paste.
-    exec python3 "$(cd "$(dirname "$0")" && pwd)/yuzu_wiki.py" --test ;;
+    exec python3 "$HERE/yuzu_wiki.py" --test ;;
 --off)
     pkill -f kiwix-serve 2>/dev/null && echo "Wiki stopped." \
                                      || echo "It was not running."
     exit 0
     ;;
 --status)
+    downloads
     if serving; then
         echo
         echo "  UP.  Open this on your phone:  http://$(lan_ip):$PORT"
@@ -74,12 +131,16 @@ if serving; then
     exit 0
 fi
 
-ZIM="${1:-$(find_zim)}"
-if [ -z "$ZIM" ] || [ ! -f "$ZIM" ]; then
+if [ -n "${1:-}" ]; then
+    ZIMS=("$1")
+else
+    mapfile -t ZIMS < <(find_zims)
+fi
+if [ "${#ZIMS[@]}" -eq 0 ] || [ ! -f "${ZIMS[0]}" ]; then
     echo
     echo "  No .zim archive found under $HOME, /media or /mnt."
-    echo "  Download one from library.kiwix.org, or pass the path:"
-    echo "    ~/YUZU/wiki /path/to/wikipedia.zim"
+    echo "  Get one (it asks library.kiwix.org for the real file):"
+    echo "    ~/YUZU/wiki --get wikipedia_en_all_mini"
     echo
     exit 1
 fi
@@ -87,7 +148,7 @@ fi
 pkill -f kiwix-serve 2>/dev/null          # clear a half-dead instance
 # nohup + & is the whole point. A foreground server on a serial link
 # reads as a hang, and that already cost this board a power-cycle.
-nohup kiwix-serve --port=$PORT "$ZIM" >"$LOG" 2>&1 &
+nohup kiwix-serve --port=$PORT "${ZIMS[@]}" >"$LOG" 2>&1 &
 sleep 3
 
 if ! serving; then
@@ -99,7 +160,8 @@ if ! serving; then
 fi
 
 echo
-echo "  Wiki is UP:   $(basename "$ZIM")"
+echo "  Wiki is UP with ${#ZIMS[@]} archive(s):"
+for z in "${ZIMS[@]}"; do echo "    $(basename "$z")"; done
 echo "  On your phone, open:  http://$(lan_ip):$PORT"
 echo
 echo "  It keeps running after you close this. Stop it with:"

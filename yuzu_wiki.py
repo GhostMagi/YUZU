@@ -99,18 +99,81 @@ def available():
 # indistinguishable from "no such article" and is the likeliest reason
 # `/wiki cats` came back empty on a Simple English Wikipedia.
 _BOOK = None
+_BOOK_AT = 0.0
+# HOW LONG A CHOICE OF BOOK IS TRUSTED. It used to be forever, on the
+# reasoning that it "cannot change while the server is up" -- true
+# while `wiki` served one archive. It serves every archive now, and a
+# download finishing restarts it with one more, so the book she should
+# be reading can change under a face server that has been up all day.
+# Two minutes, the same as her inventory: a new book is noticed without
+# a restart, and a lookup never pays for the catalog twice in a row.
+_BOOK_TTL = 120
+
+
+def _catalog():
+    """Every book the server holds: [{name, id, articles}], or [].
+
+    `id` is what the server puts in its article URLs --
+    `wikipedia_en_simple_all_nopic_2026-05` -- and it is the only name
+    that scopes a search on a modern kiwix-serve. `name` is the book's
+    own claim about itself, `wikipedia_en_simple_all`, which is not.
+    Verified against a real kiwix-serve 3.5 with three real ZIMs: a
+    search scoped by `name` came back EMPTY and /suggest answered 404
+    "No such book" -- the exact 404 his board printed on Sept 10."""
+    try:
+        page = _get("/catalog/v2/entries?count=-1", timeout=6)
+    except Exception:
+        return []
+    books = []
+    for entry in re.findall(r"<entry>(.*?)</entry>", page, re.S):
+        name = re.search(r"<name>([^<]+)</name>", entry)
+        where = re.search(r'href="/content/([^/"?#]+)"', entry)
+        count = re.search(r"<articleCount>(\d+)</articleCount>", entry)
+        if name or where:
+            books.append({
+                "name": html.unescape(name.group(1)).strip() if name else "",
+                "id": html.unescape(where.group(1)) if where else "",
+                "articles": int(count.group(1)) if count else 0})
+    return books
+
+
+def choose_book(books):
+    """The one book /wiki reads from: THE BIGGEST WIKIPEDIA ON THE BOARD.
+
+    **IT USED TO BE WHICHEVER FILE WAS DOWNLOADED LAST.** `wiki` served
+    only the newest .zim, so fetching iFixit after Simple English
+    Wikipedia silently turned `/wiki cats` into a search of repair
+    guides -- reproduced with real archives, it came back "Nothing in
+    the archive about 'cats'". A lookup is an encyclopedia question, so
+    the encyclopedia is chosen on purpose: the Wikipedia with the most
+    articles, whatever order they arrived in. Only when there is no
+    Wikipedia at all does the biggest book of any kind stand in.
+
+    Chosen by COUNT, never by name: `wikipedia_en_all_mini` beating
+    `wikipedia_en_simple_all` is the whole English Wikipedia against
+    the Simple English one, read off the catalog rather than written
+    down here as a preference."""
+    if not books:
+        return None
+    pool = [b for b in books if b["name"].lower().startswith("wikipedia")
+            or b["id"].lower().startswith("wikipedia")] or books
+    return max(pool, key=lambda b: b["articles"])
 
 
 def book_name(force=False):
-    """The name kiwix-serve knows his archive by, or "" if it will not
-    say. Asked once and remembered: it cannot change while the server
-    is up, and every lookup would otherwise pay for it."""
-    global _BOOK
-    if _BOOK is not None and not force:
+    """The name kiwix-serve knows her encyclopedia by, or "" if it will
+    not say. Remembered for _BOOK_TTL seconds."""
+    global _BOOK, _BOOK_AT
+    if _BOOK is not None and not force and time.time() - _BOOK_AT < _BOOK_TTL:
         return _BOOK
-    _BOOK = ""
-    for path in ("/catalog/v2/entries?count=-1", "/catalog/searchdescription.xml",
-                 "/"):
+    _BOOK, _BOOK_AT = "", time.time()
+    best = choose_book(_catalog())
+    if best:
+        _BOOK = best["id"] or best["name"]
+        return _BOOK
+    # An older kiwix-serve with no usable catalog: fall back to the
+    # first name any page will admit to, which is what this always did.
+    for path in ("/catalog/searchdescription.xml", "/"):
         try:
             page = _get(path, timeout=6)
         except Exception:
@@ -126,6 +189,11 @@ def book_name(force=False):
                 _BOOK = html.unescape(found.group(1)).strip()
                 return _BOOK
     return _BOOK
+
+
+def _book_of(path):
+    got = re.match(r"/content/([^/]+)/", path)
+    return got.group(1) if got else ""
 
 
 def _article_links(page):
@@ -158,18 +226,24 @@ def _article_links(page):
 
 
 def _suggest(term):
-    """Ask Kiwix for matching article paths.
+    """Ask Kiwix for matching article paths IN HER BOOK.
 
     Several shapes, because kiwix-serve has changed across versions and
     this project cannot pin the one on his board. Each is cheap and the
     first that answers wins."""
     quoted = urllib.parse.quote(term)
     book = book_name()
-    scoped = ("&books.name=" + urllib.parse.quote(book)) if book else ""
+    q_book = urllib.parse.quote(book)
 
-    for path in (f"/suggest?term={quoted}&count=10{scoped}",
-                 f"/suggest?term={quoted}{scoped}",
-                 f"/suggest?term={quoted}"):
+    shapes = []
+    if book:
+        # `content=` is what /suggest wants on kiwix-serve 3.5 -- the
+        # `books.name=` form answers 404 there, measured.
+        shapes += [f"/suggest?term={quoted}&count=10&content={q_book}",
+                   f"/suggest?term={quoted}&count=10&books.name={q_book}",
+                   f"/suggest?term={quoted}&books.name={q_book}"]
+    shapes.append(f"/suggest?term={quoted}")
+    for path in shapes:
         try:
             hits = json.loads(_get(path))
         except Exception:
@@ -180,18 +254,30 @@ def _suggest(term):
         for hit in hits:
             if not isinstance(hit, dict):
                 continue
+            # "containing 'cat'..." is an offer to SEARCH, not an
+            # article, and building a path out of it asks for a page
+            # called `cat_` that does not exist.
+            if hit.get("kind") == "pattern":
+                continue
             # `path` when it is offered; otherwise build one from the
-            # title, which is what the newer JSON gives back.
+            # title, which is what the newer JSON gives back. A RELATIVE
+            # path is relative to the BOOK -- kiwix-serve 3.5 answers
+            # `"path": "Cat"`, and "/Cat" is not a page.
             if hit.get("path"):
                 where = hit["path"]
-                paths.append(where if where.startswith("/") else "/" + where)
+                if where.startswith("/"):
+                    paths.append(where)
+                elif book:
+                    paths.append("/content/%s/%s" % (book, where))
             elif hit.get("value") and book:
                 paths.append("/content/%s/%s" % (
                     book, urllib.parse.quote(hit["value"].replace(" ", "_"))))
         if paths:
             return paths
 
-    for path in (f"/search?books.name={urllib.parse.quote(book)}&pattern={quoted}"
+    for path in (f"/search?books.name={q_book}&pattern={quoted}"
+                 if book else None,
+                 f"/search?content={q_book}&pattern={quoted}"
                  if book else None,
                  f"/search?pattern={quoted}",
                  f"/search?books.filter.lang=eng&pattern={quoted}"):
@@ -202,6 +288,21 @@ def _suggest(term):
         except Exception:
             continue
         found = _article_links(page)
+        # AN UNSCOPED SEARCH NOW SEARCHES EVERY BOOK. With one archive
+        # served that was the same thing as searching hers; with all of
+        # them served, `/search?pattern=cats` on a real kiwix-serve came
+        # back with Simple English, the full Wikipedia AND an iFixit
+        # guide mixed together. So a book-less answer is narrowed to her
+        # book before anything is taken from it. Searching the OTHER
+        # archives is a real feature (multi-ZIM /wiki, still queued) and
+        # it is not going to arrive by accident through a fallback.
+        #
+        # "Hers" is a PREFIX match, and that is load-bearing for the old
+        # case below: a catalog that only gives `wikipedia_en_simple_all`
+        # must still recognise `wikipedia_en_simple_all_nopic_2026-05`.
+        if book:
+            found = [p for p in found
+                     if _book_of(p).startswith(book) or not _book_of(p)]
         if found:
             # LEARN THE BOOK FROM THE ANSWER. The catalog gave
             # `wikipedia_en_simple_all` on his board while the real
@@ -210,9 +311,9 @@ def _suggest(term):
             # scoped query would miss. An article path that actually
             # exists is ground truth; a catalogue entry is a claim.
             global _BOOK
-            real = re.match(r"/content/([^/]+)/", found[0])
+            real = _book_of(found[0])
             if real:
-                _BOOK = real.group(1)
+                _BOOK = real
             return found
     return []
 
@@ -233,6 +334,10 @@ def diagnose():
         lines.append("          start it with:  ~/YUZU/wiki")
         return lines
     book = book_name(force=True)
+    books = _catalog()
+    if len(books) > 1:
+        lines.append("books:    %d on the server -- /wiki reads the one below"
+                     % len(books))
     lines.append("book:     " + (book or "COULD NOT FIND ONE -- see below"))
     for label, path in (("suggest", "/suggest?term=cat&count=5"),
                         ("search", "/search?pattern=cat")):
@@ -291,6 +396,50 @@ def start_server(wait=12):
             return True
         time.sleep(1)
     return False
+
+
+# ---- what is on the board -------------------------------------------
+# Shared with yuzu_zimget.py, which FETCHES archives. That lives in its
+# own module on purpose: her prompt tells her nothing she does reaches
+# the internet, a derived test holds every module in her turn to it,
+# and a downloader is maintenance he starts -- the same line `pull`
+# sits on. Nothing here has an address in it.
+ROOTS = (os.path.expanduser("~"), "/media", "/mnt")
+
+
+def _stem(filename):
+    """`wikipedia_en_all_mini_2026-07.zim.meta4` -> `wikipedia_en_all_mini`.
+
+    The dated part changes every release and the rest does not, so the
+    rest is the book's identity -- the same rule `wiki` uses to serve
+    only the newest copy of each book."""
+    name = os.path.basename(filename or "").strip()
+    for tail in (".meta4", ".part", ".zim"):
+        if name.endswith(tail):
+            name = name[:-len(tail)]
+    return re.sub(r"_\d{4}-\d{2}$", "", name)
+
+
+def _zims():
+    """Every archive on the board, newest first. Same roots and the
+    same 1MB floor as `wiki`, so the two cannot disagree."""
+    import glob
+    found = set()
+    for root in ROOTS:
+        for depth in range(1, 5):
+            pattern = os.path.join(root, *(["*"] * (depth - 1)), "*.zim")
+            try:
+                found.update(glob.glob(pattern))
+            except Exception:
+                pass
+    keep = []
+    for path in found:
+        try:
+            if os.path.getsize(path) >= 1 << 20:
+                keep.append((os.path.getmtime(path), path))
+        except OSError:
+            pass
+    return [p for _, p in sorted(keep, reverse=True)]
 
 
 def _title_of(path):

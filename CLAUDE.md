@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 734 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 756 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,174 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE WIKI SERVED WHATEVER WAS DOWNLOADED LAST, AND `wiki --get` (Sept 23)
+
+Ghost: *"i wana get a few more wikipedia files for her but i dont
+think ill need 100gb worth. Maybe just some useful files from the
+same way we got em last time. (Which i cant recall how we did it)"*
+
+**NOTHING IN THIS REPO RECORDED HOW.** The Simple English archive
+arrived in a chat this repo never saw; grep finds no URL, no wget, no
+doc. So the honest first answer was "I can't tell you what you did",
+and the way is now written down -- in code, where it cannot go stale.
+
+### The trap his request would have walked into
+
+`wiki`'s `find_zim` served **ONE archive: the newest by modification
+time.** Right while there was one, and silently wrong the day a second
+arrived. **Reproduced with three real ZIMs** (built with `libzim`) on a
+real `kiwix-serve` 3.5 installed in the container: iFixit downloaded
+after Simple English Wikipedia, and `/wiki cats` came back *"Nothing in
+the archive about 'cats'"* -- a search of repair guides, with nothing
+on screen to say so. **The failure looks like a thin encyclopedia, not
+like a bug.** And NEXT_SESSION already listed iFixit and WikiMed as on
+the board, so it may be happening today.
+
+**Every archive is served now, newest release of each BOOK** (the name
+minus its `_YYYY-MM`; two releases of one book would put every article
+in twice). He can browse all of them from the phone. **Which one SHE
+reads is chosen on purpose: the Wikipedia with the most articles**,
+read off the catalog's `<articleCount>`, whatever order they arrived
+in; the biggest book of any kind only when there is no Wikipedia at
+all. iFixit is bigger than both Wikipedias in the test on purpose.
+
+### What the real server said, which stubs never could
+
+- **Unscoped `/search` searches EVERY book.** Harmless with one
+  archive, and with three it came back Simple, full Wikipedia and an
+  iFixit guide mixed together -- after which the old "learn the book
+  from the answer" code would have LEARNED iFixit as her book for the
+  session. Unscoped answers are narrowed to her book now, by PREFIX,
+  which is what keeps the Sept 10 case working (catalog says
+  `wikipedia_en_simple_all`, articles live under `..._nopic_2026-05`).
+- **`books.name=<catalog name>` finds nothing; the content id does.**
+  And `/suggest?books.name=` answers **404 "No such book"** -- almost
+  certainly the `suggest: FAILED (404)` his board printed on Sept 10.
+  `/suggest` wants `content=<id>`. The id is read out of the catalog
+  entry's `/content/` link.
+- **A suggestion's `"path": "Cat"` is RELATIVE TO THE BOOK**; the old
+  code made it `/Cat`, which is not a page. And the `"kind": "pattern"`
+  row ("containing 'cat'...") is an offer to search, not an article.
+
+**The choice of book expires after two minutes** instead of never: a
+finished download restarts the wiki with one more book under a face
+server that has been up all day. Pinned under ten minutes absolutely,
+not against its own constant.
+
+**Searching the OTHER archives is still multi-ZIM `/wiki` (#1), still
+queued**, and it must not arrive by accident through a fallback. This
+round is the groundwork: they are served, and she is told they exist.
+
+### `~/YUZU/wiki --get wikipedia_en_all_mini`
+
+**The one worth having FOR HER, and the reason is arithmetic.** A
+lookup hands her at most `MAX_CHARS` (700) of an article -- its first
+paragraph. The `mini` flavour IS the first paragraph and infobox of
+every article in English Wikipedia: everything she can use, at a small
+fraction of the full archive. When it lands she moves to it by herself
+(most articles wins).
+
+**THE FILENAME COMES FROM KIWIX AT RUN TIME, NEVER FROM HERE.** Archives
+are dated and replaced every few months, so a URL typed into a chat is
+a 404 by the next release -- the 8BitDo lesson. `yuzu_zimget.py` asks
+`library.kiwix.org/catalog/v2/entries?name=...` for the book (shortening
+the stem a word at a time, because `wikipedia_en_all_mini` is filed
+under `wikipedia_en_all` beside `_maxi` and `_nopic`), takes the newest
+release of EXACTLY that flavour, strips `.meta4` to get the file, and
+reads the size from `length=`. **A link pasted from the Kiwix site
+works too** -- it is reduced to the book, so last month's link fetches
+this month's release.
+
+**It says the size first and refuses if it would fill the disk** (1GB
+margin -- the NVMe also holds her memory and his ROMs). **It runs
+DETACHED** -- a new session, so the serial cable dropping does not kill
+it; a foreground multi-gigabyte download on his one terminal is the
+kiwix-serve power-cycle again. **`-C -`, so the SAME LINE CARRIES ON**
+after WiFi or power goes; `.part` until whole so the wiki is never
+handed half an archive; and **the wiki restarts itself at the end**, so
+the new book is simply there. `wiki --status` shows progress, or
+`STOPPED PARTWAY` with **the exact line to paste** -- not "the line you
+started it with", because he will not remember it.
+
+**PASTING IT TWICE IS THE LIKELY CASE**, not the odd one -- he forgets,
+and the natural answer to "is it still going?" is to paste it again.
+Two curls appending to one `.part` is a corrupt archive that looks
+finished, so a second start is refused ("ALREADY DOWNLOADING") by
+reading `/proc/*/cmdline` for the exact `.part` argument. The first
+version asked `pgrep`, and the suite's own mock of `subprocess.Popen`
+swallowed that call too -- `subprocess.run` is built on Popen -- so the
+check was invisible to the tests that most needed it.
+
+**The URL, path and script go to bash as ARGUMENTS**, never pasted into
+the command text, so nothing the catalog says can become shell. Only a
+name matching `[a-z0-9_.-]` ever makes a request.
+
+### IT IS ITS OWN MODULE BECAUSE A TEST SAID SO
+
+The first draft put the downloader in `yuzu_wiki.py`, and
+**`test_the_CODE_still_makes_that_claim_TRUE` went red** -- her prompt
+tells her nothing she does reaches the internet, and `library.kiwix.org`
+had just landed in a module her turn runs through. **The guard was
+right.** Fetching an archive is maintenance he starts, the same line
+`pull` sits on, so it lives in `yuzu_zimget.py` and a new test (read as
+IMPORTS via `ast`, not as text) keeps all four turn modules from ever
+importing it.
+
+### `pull` restarts the wiki too
+
+kiwix-serve is handed its archives on its command line, so changing
+`wiki` does nothing to a running one -- the stale-process trap one
+server over, and the board would have gone on serving the wrong archive
+until a reboot. Same two guards as the face: only if it is already
+running, and never for a change that is not `wiki`'s.
+
+### Verified, and what is not
+
+**End to end in the container**: a local Kiwix library (real
+`kiwix-manage` + `kiwix-serve --library`, so the acquisition links are
+in the real format), a local mirror, the real `wiki` and the real
+downloader -- downloaded, renamed, wiki restarted with both archives,
+and `/wiki` moved to the new book by itself. **A stopped download was
+resumed and came out byte-identical** (after my first mirror, Python's
+`http.server`, turned out not to support ranges -- the test setup, not
+the code). Her inventory now counts each book once, newest release,
+pinned to agree with `wiki`.
+
+**UNVERIFIED: the live `library.kiwix.org`.** It is blocked from the
+container, so the query shape is checked against the same catalog
+format from a local server, not against the real site; and his board's
+kiwix-serve version is unknown (the fallbacks stay). Every failure
+prints the site's own error, verdict first. **Sizes are not written
+here on purpose** -- the tool prints the real one before it spends it.
+
+**Twenty-seven breaks, every one red in the end** -- and two of my own tests were
+caught by it first: the pasted-link test ERRORED rather than failed
+(read the failure KIND), and **the new-release test passed with its rule
+deleted**, because a board with one archive put both answers in the
+same folder. It has a second archive in a second folder now.
+**734 -> 756**, one of them the memory guard below.
+
+### AND THE SUITE WAS WRITING FAKE TURNS INTO HER REAL MEMORY
+
+Found by looking in `~/.yuzu/history/` after a run, which is how the
+Sept 20 shredder was found too: **`four.json`, four fake "hi" /
+"Noted." turns, one per full run.** Reproduced on the untouched
+`dcdd625` with a throwaway HOME -- pre-existing, not this round's.
+
+`test_the_marker_never_lands_in_her_HISTORY` drives the real
+`answer()`, which saves her conversation, and its class's `store()`
+redirected `FACTS_DIR` and **not `MEMORY_DIR`**. Every test stayed
+green, because nothing checked the one place that mattered. **On his
+board that file is Four's memory of him**, and running the suite there
+would have appended strangers' turns to it.
+
+`store()` redirects both now, and `test_this_class_leaves_his_REAL
+_memory_alone` **runs the class again in a child with a throwaway HOME**
+and fails if anything lands under its `.yuzu` -- driven, because reading
+the setup is what missed it. Verified by taking the fix back out: red.
+It watches `.yuzu` only, since onnxruntime drops its own cache under
+`~/.cache` whatever we do.
 
 ## THE V-PET IS DELETED, AND PS1 IS OFF THE LIST (Sept 23)
 
@@ -637,6 +805,8 @@ a chat reminder dies with the session.**
   Gutenberg. The rank-and-extract code already exists and is scoped to
   one book; making it search every loaded archive adds **no new
   command**, which is what makes it the cheapest big win on the list.
+  **Sept 23: `wiki` SERVES every archive now and `/wiki` reads the
+  biggest Wikipedia on purpose; searching the others is what is left.**
 - **Offline maps (#3). LATER, and HE ASKED TO BE REMINDED** -- *"the
   maps thing is a later thing as well remind me sometime"*, the same
   standing request as the right-angle adapters and `nvpmodel -m 0`.

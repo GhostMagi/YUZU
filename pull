@@ -234,6 +234,27 @@ else
             fi
         fi
     fi
+    # THE WIKI SERVES WHAT IT WAS STARTED WITH, the same trap one server
+    # over. kiwix-serve is handed its archives on its command line, so
+    # a change to `wiki` -- which archives, how -- is not in effect
+    # until it is started again, and nothing on screen says so. Sept 23
+    # made `wiki` serve every archive instead of the newest one; without
+    # this, a board already serving the wrong one would go on serving
+    # it until the next reboot. Same two guards as the face: only when
+    # it is ALREADY running, and quiet unless it does not come back.
+    # Not suppressed for POST /pull -- that caller is the face server,
+    # and this is not the process holding the request.
+    if printf '%s\n' "$files" | grep -qx wiki \
+       && pgrep -f kiwix-serve >/dev/null 2>&1; then
+        ./wiki --off >/dev/null 2>&1
+        if said=$(./wiki 2>&1); then
+            echo "    THE WIKI WAS SERVING THE OLD WAY. Restarted it."
+        else
+            echo "    THE WIKI WAS SERVING THE OLD WAY and did not"
+            echo "    come back. Its own output:"
+            printf '%s\n' "$said" | tail -6 | sed 's/^/    /'
+        fi
+    fi
 fi
 
 # --- HER VOICE, ONCE, WITHOUT A SECOND COMMAND TO REMEMBER --------

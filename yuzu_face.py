@@ -1065,16 +1065,25 @@ def _archives():
                 found.extend(glob.glob(pattern))
             except Exception:
                 pass
-    names = []
+    # NEWEST COPY OF EACH BOOK, because that is what `wiki` serves. Two
+    # releases of one archive differ only in the date on the end of the
+    # name, and counting both tells her she has a book twice -- the
+    # same two layers, pinned to agree, as the ROM folders.
+    dated = []
     for path in found:
         try:
             if os.path.getsize(path) < 1 << 20:
                 continue          # `wiki` skips anything under 1MB too
+            dated.append((os.path.getmtime(path), path))
         except OSError:
             continue
-        name = os.path.basename(path)[:-4].replace("_", " ")
-        if name not in names:
-            names.append(name)
+    names, books = [], set()
+    for _, path in sorted(dated, reverse=True):
+        book = re.sub(r"_\d{4}-\d{2}$", "", os.path.basename(path)[:-4])
+        if book in books:
+            continue
+        books.add(book)
+        names.append(os.path.basename(path)[:-4].replace("_", " "))
     return names
 
 

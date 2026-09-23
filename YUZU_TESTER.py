@@ -4988,6 +4988,16 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
                       "one game is pluralised as if it were several")
         self.assertIn("wikipedia en simple all", line)
 
+    def test_a_book_is_counted_ONCE_however_many_releases_he_has(self):
+        """`wiki` serves the newest copy of each book, and her inventory
+        is pinned to agree with it -- two releases of one archive are
+        one book, not two, and the one she names is the newest."""
+        line = self.fake_board(zims=[
+            "wikipedia_en_all_mini_2026-03.zim",
+            "wikipedia_en_all_mini_2026-07.zim", "ifixit_en_all_2026-06.zim"])
+        self.assertEqual(line.count("wikipedia en all mini"), 1, line)
+        self.assertIn("ifixit en all", line)
+
     def test_a_SAVE_is_not_a_game(self):
         """Counting them tells him he has twice the library he has --
         and he WILL have them, because the whole point of the emulator
@@ -5217,6 +5227,16 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp, True)
         patch = mock.patch.object(yuzu_face, "FACTS_DIR", tmp)
+        patch.start()
+        self.addCleanup(patch.stop)
+        # AND HER MEMORY. One test here drives the real `answer()`, which
+        # saves her conversation -- and this redirected the facts but not
+        # the history, so every full run appended a fake "hi" / "Noted."
+        # to the REAL `~/.yuzu/history/four.json`. Found Sept 23 by
+        # looking in that folder after a run, four runs, four fake turns.
+        # On his board that file IS Four's memory of him.
+        history = os.path.join(tmp, "history")
+        patch = mock.patch.object(yuzu_face, "MEMORY_DIR", history)
         patch.start()
         self.addCleanup(patch.stop)
         return yuzu_face
@@ -5538,6 +5558,35 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
             "she offers into the void on that one")
         self.assertEqual(code.count('"suggests"'), 2,
                          "one of the two reply routes drops the offers")
+
+    def test_this_class_leaves_his_REAL_memory_alone(self):
+        """DRIVEN, because reading the setup is what missed it. One test
+        here runs the real `answer()`, and `store()` redirected the facts
+        and not her history -- so every full run appended a fake "hi" /
+        "Noted." to the real `~/.yuzu/history/four.json`, which on his
+        board IS her memory of him. Four runs, four fake turns, and every
+        test green throughout.
+
+        So this class is run again in a child with a throwaway HOME, and
+        nothing may land in it."""
+        import subprocess
+        if os.environ.get("YUZU_SUITE_CHILD"):
+            self.skipTest("the child run does not run itself again")
+        home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, home, True)
+        done = subprocess.run(
+            [sys.executable, "-m", "unittest",
+             "YUZU_TESTER." + type(self).__name__],
+            cwd=str(Path(__file__).parent), capture_output=True, text=True,
+            timeout=240, env=dict(os.environ, HOME=home, YUZU_SUITE_CHILD="1"))
+        self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+        # ~/.yuzu only. onnxruntime drops its own cache under ~/.cache
+        # whatever we do, and that is not his memory.
+        left = [os.path.relpath(os.path.join(d, f), home)
+                for d, _, files in os.walk(os.path.join(home, ".yuzu"))
+                for f in files]
+        self.assertEqual(left, [], "the suite wrote into his ~/.yuzu: %s"
+                         % left)
 
     def test_his_REAL_facts_directory_is_never_touched_by_the_suite(self):
         """The memory round found five zero-byte files in the REAL
@@ -8227,7 +8276,7 @@ class TestWikiServer(unittest.TestCase):
 
     SCRIPT = Path(__file__).parent / "wiki"
 
-    def _run(self, *args, zims=(), up=False):
+    def _run(self, *args, zims=(), up=False, parts=()):
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -8251,8 +8300,16 @@ class TestWikiServer(unittest.TestCase):
                 target = binv / name
                 target.write_text("#!/bin/bash\n" + body)
                 target.chmod(0o755)
-            for zim in zims:
+            # FIRST LISTED IS NEWEST, so a test can say which release
+            # of a book arrived last without sleeping between writes.
+            for i, zim in enumerate(zims):
+                (home / zim).parent.mkdir(parents=True, exist_ok=True)
                 (home / zim).write_bytes(b"z" * (2 * 1024 * 1024))
+                os.utime(home / zim, (1e9 - i * 100, 1e9 - i * 100))
+            for part, have, want in parts:
+                (home / part).parent.mkdir(parents=True, exist_ok=True)
+                (home / part).write_bytes(b"p" * have)
+                (home / (part + ".size")).write_text(str(want))
             env = dict(os.environ, HOME=str(home),
                        PATH=f"{binv}:{os.environ['PATH']}")
             done = subprocess.run(["bash", str(self.SCRIPT), *args],
@@ -8280,9 +8337,51 @@ class TestWikiServer(unittest.TestCase):
                         "kiwix-serve runs in the FOREGROUND -- it will hold "
                         "the terminal and read as a hung board")
 
+    def test_it_serves_EVERY_archive_and_the_newest_copy_of_each(self):
+        """IT USED TO SERVE ONE: whichever .zim was downloaded last.
+        Right while there was one archive, and silently wrong the day a
+        second arrived -- iFixit fetched after Wikipedia and `/wiki cats`
+        became a search of repair guides, reproduced on a real
+        kiwix-serve. Every book is served now and yuzu_wiki chooses
+        hers.
+
+        Two releases of ONE book differ only in the date on the end of
+        the name, and serving both would put every article in twice --
+        so the newest of each."""
+        done, calls = self._run(zims=(
+            "ifixit_en_all_2026-06.zim",
+            "zims/wikipedia_en_simple_all_nopic_2026-09.zim",
+            "wikipedia_en_simple_all_nopic_2026-05.zim",
+            "wikipedia_en_all_mini_2026-07.zim"))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        for served in ("ifixit_en_all_2026-06.zim",
+                       "wikipedia_en_simple_all_nopic_2026-09.zim",
+                       "wikipedia_en_all_mini_2026-07.zim"):
+            self.assertIn(served, calls, "%s was not served" % served)
+        self.assertNotIn("wikipedia_en_simple_all_nopic_2026-05", calls,
+                         "an OLD release of a book is served beside the new")
+
+    def test_a_download_that_STOPPED_says_so_and_how_to_carry_on(self):
+        """The cable drops, the WiFi goes, the board is switched off:
+        a multi-gigabyte download WILL stop partway some day, and a
+        `.part` file nobody mentions is a download that silently never
+        finished. --status names it, says how far, and says the same
+        line carries on."""
+        done, _ = self._run("--status", parts=[
+            ("zims/wikipedia_en_all_mini_2026-07.zim.part", 1000, 4000)])
+        self.assertIn("STOPPED PARTWAY", done.stdout, done.stdout)
+        self.assertIn("wikipedia_en_all_mini_2026-07.zim", done.stdout)
+        self.assertIn("(25%)", done.stdout, "it does not say how far")
+        self.assertIn("~/YUZU/wiki --get wikipedia_en_all_mini\n",
+                      done.stdout, "it does not give him the line that "
+                      "carries on -- and he will not remember it")
+        quiet, _ = self._run("--status")
+        self.assertNotIn("PARTWAY", quiet.stdout)
+        self.assertNotIn("DOWNLOADING", quiet.stdout)
+
     def test_it_finds_the_archive_itself(self):
         """A 982MB download's path is not something to retype on a
-        phone keyboard. Newest .zim wins, no argument needed."""
+        phone keyboard. Found with no argument needed."""
         done, calls = self._run(zims=("wikipedia_en_simple_all_nopic.zim",))
         self.assertIn("wikipedia_en_simple_all_nopic.zim", calls,
                       done.stdout + done.stderr)
@@ -8292,6 +8391,8 @@ class TestWikiServer(unittest.TestCase):
         done, calls = self._run(zims=())
         self.assertEqual(done.returncode, 1)
         self.assertIn("kiwix.org", done.stdout)
+        self.assertIn("--get", done.stdout,
+                      "it names a website instead of the one line to paste")
         self.assertEqual(calls, "", "it launched a server with no archive")
 
     def test_it_checks_the_PHONE_can_reach_it(self):
@@ -9817,6 +9918,452 @@ class TestWikiNamespace(unittest.TestCase):
                       "it does not say how to start the server")
 
 
+def _kiwix_stub(testcase, answers):
+    """A throwaway HTTP server that answers like kiwix-serve.
+
+    `answers` is a list of (needles, body): the first entry whose every
+    needle appears in the request path answers it, anything else is a
+    404 -- which is exactly how a real kiwix-serve refuses a book it
+    does not know. Returns (base URL, list of paths it was asked for)."""
+    import http.server, threading
+    asked = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            asked.append(self.path)
+            body = next((b for needles, b in answers
+                         if all(n in self.path for n in needles)), None)
+            data = (body or "").encode()
+            self.send_response(200 if body is not None else 404)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    testcase.addCleanup(srv.server_close)
+    testcase.addCleanup(srv.shutdown)
+    return "http://127.0.0.1:%d" % srv.server_port, asked
+
+
+def _catalog_entry(name, content_id, articles, acquisition=None):
+    """One <entry>, copied from what a REAL kiwix-serve 3.5 printed for
+    a real ZIM on Sept 23 -- field for field, so the parser is checked
+    against the shape his server speaks rather than a shape invented
+    for the test."""
+    acq = ('\n    <link rel="http://opds-spec.org/acquisition/open-access" '
+           'type="application/x-zim" href="%s" length="%d" />'
+           % acquisition) if acquisition else ""
+    return ('  <entry>\n'
+            '    <id>urn:uuid:ae6c609e-1995-2649-2f90-558bf8e21c1b</id>\n'
+            '    <title>%s</title>\n'
+            '    <updated>2026-01-01T00:00:00Z</updated>\n'
+            '    <language>eng</language>\n'
+            '    <name>%s</name>\n'
+            '    <flavour></flavour>\n'
+            '    <articleCount>%d</articleCount>\n'
+            '    <mediaCount>0</mediaCount>\n'
+            '    <link type="text/html" href="/content/%s" />\n'
+            '    <author>\n      <name>test</name>\n    </author>%s\n'
+            '  </entry>\n' % (name, name, articles, content_id, acq))
+
+
+def _feed(*entries):
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<feed xmlns="http://www.w3.org/2005/Atom">\n'
+            '  <totalResults>%d</totalResults>\n%s</feed>\n'
+            % (len(entries), "".join(entries)))
+
+
+class TestHerEncyclopedia(unittest.TestCase):
+    """WHICH ARCHIVE `/wiki` READS, now that there is more than one.
+
+    Ghost, Sept 23: "i wana get a few more wikipedia files for her".
+
+    **`wiki` SERVED ONLY THE NEWEST .zim**, which was right while there
+    was one and quietly wrong the day a second arrived. Reproduced with
+    three real archives on a real kiwix-serve 3.5: iFixit downloaded
+    after Simple English Wikipedia, and `/wiki cats` came back "Nothing
+    in the archive about 'cats'" -- a search of repair guides, with
+    nothing on screen to say so. The fix serves everything and chooses
+    HER book on purpose."""
+
+    import yuzu_wiki as wiki
+
+    SIMPLE = ("wikipedia_en_simple_all", "wikipedia_en_simple_all_nopic_2026-05", 300)
+    FULL = ("wikipedia_en_all", "wikipedia_en_all_mini_2026-07", 6000)
+    FIXIT = ("ifixit_en_all", "ifixit_en_all_2026-06", 90000)
+
+    def books(self, *which):
+        return [{"name": n, "id": i, "articles": a} for n, i, a in which]
+
+    def point_at(self, base):
+        for name, value in (("BASE", base), ("_BOOK", None), ("_BOOK_AT", 0.0)):
+            patch = mock.patch.object(self.wiki, name, value)
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def test_the_biggest_WIKIPEDIA_wins_whatever_order_they_arrived_in(self):
+        """By COUNT, never by date and never by name. iFixit is the
+        biggest book here on purpose: a lookup is an encyclopedia
+        question, and the biggest book of any kind would have handed
+        her repair guides."""
+        import itertools
+        for order in itertools.permutations([self.SIMPLE, self.FULL,
+                                             self.FIXIT]):
+            got = self.wiki.choose_book(self.books(*order))
+            self.assertEqual(got["id"], self.FULL[1],
+                             "in the order %s she reads %s"
+                             % ([o[0] for o in order], got["id"]))
+
+    def test_with_no_wikipedia_at_all_the_biggest_book_stands_in(self):
+        """Absent rather than wrong applies to the wiki as well: a board
+        with only iFixit on it still answers from iFixit, rather than
+        from nothing."""
+        got = self.wiki.choose_book(self.books(self.FIXIT))
+        self.assertEqual(got["id"], self.FIXIT[1])
+        self.assertIsNone(self.wiki.choose_book([]))
+
+    def test_the_catalog_is_read_the_way_a_REAL_server_writes_it(self):
+        """The id comes out of the `/content/` link, because that is the
+        only name that scopes a search on kiwix-serve 3.5 -- measured:
+        scoped by `<name>` a search came back EMPTY and /suggest said
+        404 "No such book", the exact 404 his board printed Sept 10."""
+        base, _ = _kiwix_stub(self, [(("/catalog/v2/entries",), _feed(
+            *(_catalog_entry(*b) for b in (self.FIXIT, self.SIMPLE,
+                                           self.FULL))))])
+        self.point_at(base)
+        self.assertEqual(sorted(b["id"] for b in self.wiki._catalog()),
+                         sorted([self.FIXIT[1], self.SIMPLE[1], self.FULL[1]]))
+        self.assertEqual(self.wiki.book_name(force=True), self.FULL[1])
+
+    def test_a_lookup_NEVER_LEAVES_HER_BOOK(self):
+        """THE FAULT, driven. With every archive served, an UNSCOPED
+        search is a search of all of them -- on the real server it came
+        back with both Wikipedias and an iFixit guide mixed together. A
+        fallback that takes the first hit hands her a repair guide, and
+        then LEARNS iFixit as her book for the rest of the session.
+
+        Searching the other archives on purpose is a real feature
+        (multi-ZIM /wiki, still queued). It must not arrive by accident
+        through a fallback."""
+        mixed = ('<a href="/content/%s/Cat_Toy_Repair">x</a>'
+                 '<a href="/content/%s/Cat">x</a>' % (self.FIXIT[1], self.FULL[1]))
+        base, _ = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(
+                _catalog_entry(*self.FIXIT), _catalog_entry(*self.FULL))),
+            # every scoped shape finds nothing; only the unscoped one
+            # answers, and it answers with everybody's articles
+            (("/search?pattern=",), mixed)])
+        self.point_at(base)
+        got = self.wiki._suggest("cat")
+        self.assertEqual(got, ["/content/%s/Cat" % self.FULL[1]],
+                         "a lookup came back from another archive")
+        self.assertEqual(self.wiki._BOOK, self.FULL[1],
+                         "she LEARNED another archive as her encyclopedia")
+
+    def test_an_OLD_catalog_name_still_learns_the_real_book(self):
+        """The Sept 10 case must survive: a server whose catalog only
+        admits `wikipedia_en_simple_all` while the articles live under
+        `wikipedia_en_simple_all_nopic_2026-05`. "Hers" is a PREFIX
+        match for exactly this reason."""
+        base, _ = _kiwix_stub(self, [
+            (("/catalog/searchdescription.xml",),
+             "<name>wikipedia_en_simple_all</name>"),
+            (("/search?pattern=",),
+             '<a href="/content/%s/Cat">Cat</a>' % self.SIMPLE[1])])
+        self.point_at(base)
+        self.assertEqual(self.wiki._suggest("cat"),
+                         ["/content/%s/Cat" % self.SIMPLE[1]])
+        self.assertEqual(self.wiki._BOOK, self.SIMPLE[1],
+                         "the real book was not learned from the answer")
+
+    def test_a_relative_suggestion_is_INSIDE_the_book(self):
+        """kiwix-serve 3.5 answers /suggest with `"path": "Cat"` -- and
+        the old code turned that into "/Cat", which is not a page. Its
+        "containing 'cat'..." row is an offer to SEARCH, not an
+        article, and must not become a page called `cat_`. Both shapes
+        below are what the real server printed."""
+        answer = ('[{"value": "Cat", "label": "<b>Cat</b>", "kind": "path",'
+                  ' "path": "Cat"}, {"value": "cat ", "label": "containing'
+                  ' \'cat\'...", "kind": "pattern"}]')
+        base, _ = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(_catalog_entry(*self.FULL))),
+            (("/suggest?", "content=" + self.FULL[1]), answer)])
+        self.point_at(base)
+        self.assertEqual(self.wiki._suggest("cat"),
+                         ["/content/%s/Cat" % self.FULL[1]])
+
+    def test_the_choice_is_NOT_kept_forever(self):
+        """It used to be, on the reasoning that it "cannot change while
+        the server is up" -- and a finished download now restarts the
+        wiki with one more book under a face server that has been up all
+        day. So the choice expires, and it is pinned under ten minutes
+        rather than against its own constant."""
+        self.assertLessEqual(self.wiki._BOOK_TTL, 600)
+        answers = [(("/catalog/v2/entries",),
+                    _feed(_catalog_entry(*self.SIMPLE)))]
+        base, _ = _kiwix_stub(self, answers)
+        self.point_at(base)
+        self.assertEqual(self.wiki.book_name(), self.SIMPLE[1])
+        answers[0] = (("/catalog/v2/entries",), _feed(
+            _catalog_entry(*self.SIMPLE), _catalog_entry(*self.FULL)))
+        self.assertEqual(self.wiki.book_name(), self.SIMPLE[1],
+                         "remembered choice was not used within its TTL")
+        self.wiki._BOOK_AT = 0.0          # long ago, absolutely
+        self.assertEqual(self.wiki.book_name(), self.FULL[1],
+                         "a new, bigger Wikipedia was never noticed")
+
+
+class TestZimGet(unittest.TestCase):
+    """`~/YUZU/wiki --get <archive>` -- another archive, fetched safely.
+
+    Ghost, Sept 23: "Maybe just some useful files from the same way we
+    got em last time. (Which i cant recall how we did it)". Nothing in
+    the repo recorded how, so this is the way, and these are the ways
+    it would go wrong quietly."""
+
+    import yuzu_zimget as zimget
+    import yuzu_wiki as wiki
+
+    MINI_OLD = "wikipedia_en_all_mini_2026-03.zim"
+    MINI = "wikipedia_en_all_mini_2026-07.zim"
+
+    def library(self):
+        """A catalog in the real format holding three flavours of one
+        book and two releases of the one he wants."""
+        dl = "https://download.kiwix.org/zim/wikipedia/"
+        feed = _feed(*(_catalog_entry(
+            "wikipedia_en_all", f[:-4], 1, (dl + f + ".meta4", size))
+            for f, size in (("wikipedia_en_all_maxi_2026-07.zim", 10**11),
+                            ("wikipedia_en_all_nopic_2026-07.zim", 5 * 10**10),
+                            (self.MINI_OLD, 3 * 10**9),
+                            (self.MINI, 4 * 10**9))))
+        base, asked = _kiwix_stub(self, [
+            (("name=wikipedia_en_all&",), feed),
+            (("/catalog/v2/entries",), _feed())])
+        patch = mock.patch.object(self.zimget, "LIBRARY", base)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return asked
+
+    def board(self, *zims):
+        home = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, home, True)
+        for i, name in enumerate(zims):
+            path = os.path.join(home, "zims", name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as fh:
+                fh.write(b"\0" * (2 << 20))
+            os.utime(path, (1e9 - i, 1e9 - i))
+        for name, value in (("ROOTS", (home,)),):
+            patch = mock.patch.object(self.wiki, name, value)
+            patch.start()
+            self.addCleanup(patch.stop)
+        log = mock.patch.object(self.zimget, "GET_LOG",
+                                os.path.join(home, "get.log"))
+        log.start()
+        self.addCleanup(log.stop)
+        return home
+
+    def test_the_filename_comes_from_the_LIVE_catalog(self):
+        """Archives are dated and replaced every few months, so a URL
+        typed into a chat is a 404 by the next release -- the unverified
+        specific the 8BitDo taught this project to refuse. The newest
+        release of EXACTLY the flavour he named, the file rather than
+        its mirror list, and the size the catalog states."""
+        asked = self.library()
+        got, why = self.zimget.find_download("wikipedia_en_all_mini")
+        self.assertIsNone(why)
+        filename, url, size = got
+        self.assertEqual(filename, self.MINI, "not the newest mini")
+        self.assertTrue(url.endswith("/" + self.MINI), url)
+        self.assertFalse(url.endswith(".meta4"))
+        self.assertEqual(size, 4 * 10**9)
+        self.assertTrue(any("name=wikipedia_en_all_mini" in a for a in asked),
+                        "it never asked for the name he actually gave")
+
+    def test_a_name_that_is_not_one_never_reaches_the_network(self):
+        """Only a book name ever crosses, and it crosses as a quoted
+        query parameter. The file written is named by the CATALOG, not
+        by what was typed."""
+        asked = self.library()
+        for hostile in ("rm -rf /", "a;reboot", "", "$(reboot)",
+                        "`reboot`", "x y"):
+            got, why = self.zimget.find_download(hostile)
+            self.assertIsNone(got, hostile)
+            self.assertIn("--get", why, hostile)
+        self.assertEqual(asked, [], "a refused name still made a request")
+
+    def test_a_LINK_pasted_from_the_kiwix_site_works_too(self):
+        """He browses library.kiwix.org on his phone, long-presses a
+        download, and pastes that. The date in it is ignored -- the
+        catalog is asked for the newest -- so a link copied last month
+        still fetches this month's release rather than a 404."""
+        self.library()
+        pasted = ("https://download.kiwix.org/zim/wikipedia/"
+                  + self.MINI_OLD + ".meta4")
+        got, why = self.zimget.find_download(pasted)
+        self.assertIsNotNone(got, "a pasted link was refused: %s" % why)
+        self.assertEqual(got[0], self.MINI)
+
+    def test_it_will_not_fill_the_disk(self):
+        """A 4GB archive onto a board with 2GB free fails partway
+        through with a full NVMe -- which on this board is also where
+        her memory and his ROMs live. It says so BEFORE anything is
+        written, and starts nothing."""
+        self.library()
+        self.board()
+        full = mock.patch("shutil.disk_usage",
+                          return_value=shutil._ntuple_diskusage(0, 0, 2 * 10**9))
+        with full, mock.patch("subprocess.Popen") as popen:
+            code, lines = self.zimget.get("wikipedia_en_all_mini")
+        self.assertEqual(code, 1)
+        self.assertIn("NOT ENOUGH ROOM", lines[0], "the verdict is not first")
+        popen.assert_not_called()
+
+    def test_it_runs_DETACHED_and_the_url_is_never_shell(self):
+        """His only shell is a serial cable, and a foreground download
+        would hold it for an hour -- the kiwix-serve power-cycle, again.
+        A new session survives the cable dropping. And the URL arrives
+        as an ARGUMENT, never inside the command text, so nothing the
+        catalog says can become shell."""
+        self.library()
+        home = self.board()
+        with mock.patch("subprocess.Popen") as popen:
+            code, lines = self.zimget.get("wikipedia_en_all_mini")
+        self.assertEqual(code, 0, lines)
+        self.assertIn("DOWNLOADING", lines[0])
+        args, kw = popen.call_args
+        argv = args[0]
+        self.assertTrue(kw.get("start_new_session"),
+                        "the download dies when the cable drops")
+        self.assertEqual(argv[:3], ["bash", "-c", self.zimget.CHAIN])
+        self.assertNotIn("kiwix.org", self.zimget.CHAIN)
+        dest, url = argv[4], argv[5]
+        self.assertEqual(dest, os.path.join(home, "zims", self.MINI))
+        self.assertTrue(url.endswith(self.MINI))
+        with open(dest + ".part.size") as fh:
+            self.assertEqual(fh.read(), str(4 * 10**9),
+                             "--status cannot say how far along it is")
+
+    def test_pasting_it_TWICE_does_not_start_a_second_download(self):
+        """He has told us he forgets, so "is it still going?" gets
+        answered by pasting the line again. Two curls appending to one
+        `.part` is a corrupt archive that looks finished. Driven with a
+        REAL process carrying the path on its command line, which is
+        exactly what curl looks like to pgrep."""
+        import subprocess
+        self.library()
+        home = self.board()
+        part = os.path.join(home, "zims", self.MINI + ".part")
+        stand_in = subprocess.Popen([sys.executable, "-c",
+                                     "import time; time.sleep(30)", part])
+        self.addCleanup(stand_in.wait)
+        self.addCleanup(stand_in.kill)
+        with mock.patch("subprocess.Popen") as popen:
+            code, lines = self.zimget.get("wikipedia_en_all_mini")
+        self.assertIn("ALREADY DOWNLOADING", lines[0], lines)
+        popen.assert_not_called()
+
+    def test_a_book_he_already_has_is_not_fetched_again(self):
+        self.library()
+        self.board(self.MINI)
+        with mock.patch("subprocess.Popen") as popen:
+            code, lines = self.zimget.get("wikipedia_en_all_mini")
+        self.assertEqual(code, 0)
+        self.assertIn("ALREADY HERE", lines[0])
+        popen.assert_not_called()
+
+    def test_a_NEW_RELEASE_lands_beside_the_old_and_says_so(self):
+        """Not deleted for him -- a file he chose to download is his to
+        remove -- but not hidden either: `wiki` serves the newest copy
+        of each book, so the old one is only disk, and he is told."""
+        # A NEWER archive of a different book lives in another folder,
+        # so "next to the newest archive" and "next to the old copy of
+        # THIS book" are different answers and the test can tell them
+        # apart. With one archive on the board they were the same
+        # folder, and the first version of this passed with the rule
+        # deleted.
+        self.library()
+        home = self.board("ifixit_en_all_2026-06.zim",
+                          "elsewhere/" + self.MINI_OLD)
+        with mock.patch("subprocess.Popen") as popen:
+            code, lines = self.zimget.get("wikipedia_en_all_mini")
+        self.assertEqual(popen.call_args[0][0][4],
+                         os.path.join(home, "zims", "elsewhere", self.MINI))
+        self.assertIn(self.MINI_OLD, " ".join(lines),
+                      "the older copy is left on disk without a word")
+
+    def test_the_CHAIN_finishes_what_it_starts_and_nothing_else(self):
+        """Driven for real, with a stub curl. On success the half-file
+        becomes the archive, the size note goes, and the wiki is
+        restarted so the new book is simply there. On failure NOTHING
+        is renamed -- `wiki` must never be handed half an archive -- the
+        partial stays so the same line carries on, and the wiki is left
+        alone."""
+        import subprocess
+        for curl_ok in (True, False):
+            tmp = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, tmp, True)
+            binv = os.path.join(tmp, "bin")
+            os.makedirs(binv)
+            with open(os.path.join(binv, "curl"), "w") as fh:
+                fh.write('#!/bin/bash\nwhile [ "$1" != "-o" ]; do shift; done\n'
+                         'echo data >> "$2"\nexit %d\n' % (0 if curl_ok else 22))
+            wiki = os.path.join(tmp, "wiki")
+            with open(wiki, "w") as fh:
+                fh.write('#!/bin/bash\necho "wiki $*" >> %s/calls\n' % tmp)
+            for f in (os.path.join(binv, "curl"), wiki):
+                os.chmod(f, 0o755)
+            dest = os.path.join(tmp, "x_2026-07.zim")
+            with open(dest + ".part.size", "w") as fh:
+                fh.write("5")
+            subprocess.run(["bash", "-c", self.zimget.CHAIN, "wiki-get", dest,
+                            "https://example.invalid/x.zim", wiki],
+                           env=dict(os.environ,
+                                    PATH=binv + ":" + os.environ["PATH"]),
+                           timeout=30)
+            calls = (open(os.path.join(tmp, "calls")).read()
+                     if os.path.exists(os.path.join(tmp, "calls")) else "")
+            if curl_ok:
+                self.assertTrue(os.path.exists(dest), "never renamed")
+                self.assertFalse(os.path.exists(dest + ".part"))
+                self.assertFalse(os.path.exists(dest + ".part.size"))
+                self.assertEqual(calls, "wiki --off\nwiki \n",
+                                 "the wiki was not restarted with it on")
+            else:
+                self.assertFalse(os.path.exists(dest),
+                                 "a FAILED download became an archive")
+                self.assertTrue(os.path.exists(dest + ".part"),
+                                "the partial was thrown away, so the same "
+                                "line cannot carry on")
+                self.assertEqual(calls, "", "the wiki restarted over a failure")
+
+    def test_the_downloader_is_NOT_in_her_turn(self):
+        """Her prompt says nothing she does reaches the internet, and a
+        derived test holds the four modules her turn runs through to it.
+        This one reaches library.kiwix.org, like `pull` reaches github,
+        so it must stay something HE starts: none of the four may import
+        it. Read as imports, not as text, so a comment naming it is not
+        mistaken for a dependency."""
+        import ast
+        here = Path(__file__).parent
+        for name in ("yuzu_brain.py", "yuzu_wiki.py", "yuzu_voice.py",
+                     "yuzu_face.py"):
+            tree = ast.parse((here / name).read_text())
+            imported = {a.name for n in ast.walk(tree)
+                        if isinstance(n, (ast.Import, ast.ImportFrom))
+                        for a in n.names} | {
+                n.module for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module}
+            self.assertNotIn("yuzu_zimget", imported,
+                             "%s pulls the downloader into her turn" % name)
+
+
 class TestPull(unittest.TestCase):
     """`pull` -- get the latest, and SAY whether it worked.
 
@@ -9860,7 +10407,8 @@ class TestPull(unittest.TestCase):
 
     # ---- a running server keeps serving the OLD code ------------------
 
-    def _restart_run(self, changed, server_up, added=(), face_ok=True):
+    def _restart_run(self, changed, server_up, added=(), face_ok=True,
+                     wiki_up=False):
         """Drive the REAL pull script in a temp dir, with stubs beside it.
 
         A copy rather than the repo itself, because `pull` cds to its own
@@ -9884,6 +10432,11 @@ class TestPull(unittest.TestCase):
                 '  echo "That is the HOME SCREEN, not her face."\n'
                 '  exit %d\n}\n' % (log, 0 if face_ok else 1))
             (here / "face").chmod(0o755)
+            # `wiki` logs into the SAME file, so a test can see the order
+            # things were stopped and started in across both servers.
+            (here / "wiki").write_text(
+                '#!/bin/bash\necho "wiki $*" >> %s\n' % log)
+            (here / "wiki").chmod(0o755)
 
             binv = here / "bin"
             binv.mkdir()
@@ -9911,8 +10464,11 @@ class TestPull(unittest.TestCase):
                 '  *) exit 0 ;;\n'
                 'esac\n'.format(t=tmp, names=names, fresh=fresh))
             (binv / "git").chmod(0o755)
+            # Two servers, two answers: the face and the wiki are each
+            # up or down on their own.
             (binv / "pgrep").write_text(
-                "#!/bin/bash\nexit %d\n" % (0 if server_up else 1))
+                '#!/bin/bash\ncase "$*" in *kiwix-serve*) exit %d ;; esac\n'
+                "exit %d\n" % (0 if wiki_up else 1, 0 if server_up else 1))
             (binv / "pgrep").chmod(0o755)
 
             done = subprocess.run(
@@ -9982,6 +10538,33 @@ class TestPull(unittest.TestCase):
                       "it was stopped and never started again")
         self.assertIn("OLD CODE", done.stdout,
                       "it restarted silently; he cannot tell it happened")
+
+    def test_a_pull_that_changes_the_WIKI_restarts_a_running_wiki(self):
+        """The same trap one server over. kiwix-serve is handed its
+        archives on its command line, so a change to `wiki` is not in
+        effect until it starts again. Sept 23 made `wiki` serve every
+        archive instead of the newest one; without this, a board already
+        serving the wrong one goes on serving it until a reboot --
+        pulled, landed, and looking exactly like the fix never arrived.
+
+        Same two guards as the face, and both halves are driven: never
+        a wiki he did not have running, and never for a change that is
+        not the wiki's."""
+        done, calls = self._restart_run(["wiki"], server_up=False,
+                                        wiki_up=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("wiki --off\nwiki \n", calls,
+                      "the running wiki kept its old archives")
+        self.assertIn("THE WIKI", done.stdout, "it restarted silently")
+        self.assertNotIn("face", calls, "the face was bounced for a wiki change")
+
+        done, calls = self._restart_run(["wiki"], server_up=False,
+                                        wiki_up=False)
+        self.assertNotIn("wiki", calls, "it started a wiki nobody was running")
+
+        done, calls = self._restart_run(["ui/home.html"], server_up=False,
+                                        wiki_up=True)
+        self.assertNotIn("wiki", calls, "it bounced the wiki over a page")
 
     def test_a_pull_that_changes_WHO_SHE_IS_also_restarts_her(self):
         """FOUND BY SHIPPING ONE, Sept 22. The offline sentence went

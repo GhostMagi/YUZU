@@ -54,7 +54,7 @@ So:
     FRONT          four        (yuzu_face.py     — who GREETS you)
     roster         Yuzu, Four  (Cait, Mimi, Saya are `retired: yes`)
     Four's prompt  5446 chars
-    tests          734, ~95s,  `python YUZU_TESTER.py`
+    tests          756, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -79,7 +79,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 734 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 756 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means
@@ -188,8 +188,16 @@ a phone, so a file path is useless to him.
 
 - **Multi-ZIM `/wiki` (#1)** — later, keep in mind. iFixit, WikiMed,
   WikiHow, Wikivoyage, Appropedia, Gutenberg are already on the board.
-  The rank-and-extract code exists and is scoped to one book; widening
-  it adds **no new command**, which makes it the cheapest big win.
+  **Half-done Sept 23:** `wiki` serves every archive and `/wiki` reads
+  the biggest Wikipedia on purpose (it used to read whichever file was
+  downloaded LAST). Searching the others is what is left, and it adds
+  **no new command**, which makes it the cheapest big win.
+- **More archives: `~/YUZU/wiki --get <name>`**, e.g.
+  `wikipedia_en_all_mini` (the one worth having for HER — she only
+  ever reads an article's first paragraph). Asks the live Kiwix
+  catalog, says the size, runs in the background, resumes. **Never
+  type a dated filename or a size into a chat for him** — let the tool
+  say it.
 - **Her answering from his own files (#13)** — someday, same machinery.
 - **Whisper (#15)** — waiting, and the shape is decided:
   **push-to-talk, never a wake word.** *"like a walkie talkie."*
