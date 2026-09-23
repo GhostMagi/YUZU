@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 740 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 743 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -29,7 +29,7 @@ three. If you touch any of them, keep the reminder.
 **The laptop works now and it is the eval machine.** Acer Aspire
 VN7-592G, Ubuntu 22.04.5, i7-6700HQ, 16GB, GTX 960M, heretic GGUF pulled
 via `ollama pull hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-ablitered-uncensored-GGUF:Q4_K_M`
-(that repo path is confirmed working). 740 tests pass on it. Getting it
+(that repo path is confirmed working). 743 tests pass on it. Getting it
 to boot took a night and the whole story is in UBUNTU_LAPTOP.md —
 **locked NVRAM**, so it only boots via a firmware-registered trusted
 file, and only from **F12 → entry 3 `ubuntu`**. **RESOLVED: a Bluetooth keyboard is
@@ -48,6 +48,67 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## A NOTE FOR THE NEXT SESSION, AND I CLOBBERED HIS (Sept 23)
+
+Ghost: *"Can you make a handoff note brotha? Its for your 5.5 opus
+mode i wana try it."*
+
+`NEXT_SESSION.md`, and **it is explicitly an EXPIRING SNAPSHOT that
+names CLAUDE.md as the real record.** A second long doc that goes
+stale is the fault this repo keeps deleting -- `--show shiro_deck` sat
+wrong in a doc for eleven days, and a hardcoded cast in a DOC is worse
+than one in a page because a page has a test. So it carries only what
+CLAUDE.md buries: today's pointers, **the 201 tokens of context
+headroom**, the working loop, the non-negotiables, the standing
+reminders, and what is UNMEASURED.
+
+### AND I OVERWROTE `HANDOFF.md` WITHOUT LOOKING AT IT
+
+It already existed. It is **a different document for a different
+reader** -- what GHOST pastes into a fresh DESIGN chat that has
+nothing: product level, no engineering, no repo. I wrote mine straight
+over it and only found out because `git diff --stat` said *modified*
+rather than *new*.
+
+**Look at the target before overwriting it.** Nothing was lost, because
+it was committed -- which is the same reason the alpha-blind crop that
+ate `blink.png` was a two-minute problem. It is restored byte for byte
+and mine is named for its own audience.
+
+**HIS IS STALE AND IS DELIBERATELY NOT FIXED IN THIS PASS.** Rewritten
+Sept 10, it still names Saya as the character and describes a cast of
+five, which the Sept 20 cut ended. Refreshing it is a real job with a
+real audience decision in it, and **its reader is not me** -- so it is
+offered rather than done. One variable at a time.
+
+### The guard pins the two things that cannot go stale by being right
+
+Asserting that it still says `four`, or still says 201 tokens, would be
+**a test that has to be edited every time it works** -- the fault that
+put "Saya's Face" on an app icon. So `TestNextSession` pins only that
+the note keeps saying it expires and keeps naming CLAUDE.md, and that
+it never teaches a command hardcoding a pointer's VALUE.
+
+**AND THE GREP-MATCHES-PROSE TRAP FIRED AGAIN, FIFTEENTH INSTANCE, in
+the test written to guard against exactly that class of staleness.**
+The first version banned `--show <key>` outright and went red on the
+note's own paragraph explaining that `--show shiro_deck` is the fault
+being avoided. It reads indented COMMAND lines now, and **the prose
+case is verified to stay QUIET** -- the half that is easy to forget to
+test, same as the comment naming a domain in the offline guard.
+
+**Six ways, each verified**: the expiry line dropped, CLAUDE.md
+unnamed, the pointer hardcoded in the command, the command deleted
+entirely, a named file missing -- all five red -- and a `--show` in
+prose, which stays green.
+
+**AND THE SELF-REFERENTIAL TEST COUNT DID ITS JOB.** Adding three
+tests turned `test_the_test_count_it_promises_is_the_real_one` red
+until `NANO_DAY_ONE.md` was updated. 740 -> 743, in the runbook and in
+this file's conventions block. That guard exists because he will not
+cross-check it, and it is the only thing in the repo that fails on
+purpose when work lands.
 
 ## FOUR MORE SYSTEMS, AND `deck --check` ASKS RATHER THAN TELLS (Sept 22)
 

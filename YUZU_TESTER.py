@@ -9422,6 +9422,81 @@ class TestVoice(unittest.TestCase):
                         "no line exercises a shouted word (PFFT/GOSH)")
 
 
+class TestNextSession(unittest.TestCase):
+    """NEXT_SESSION.md is a SNAPSHOT for a fresh CODE session, and a snapshot is a
+    thing that goes stale on purpose.
+
+    So this class deliberately pins almost nothing about it. Asserting
+    that it still says `four`, or still says 201 tokens, would be a test
+    that has to be edited every single time it works -- which is the
+    fault this repo keeps deleting, most recently on the icon that had
+    to be renamed whenever the front door moved.
+
+    What it pins is the two properties that CANNOT go stale by being
+    right, and whose loss is exactly how a snapshot becomes a lie: it
+    must keep saying it expires and name CLAUDE.md as the real record,
+    and it must never teach a command that hardcodes a pointer's VALUE.
+    `--show shiro_deck` sat wrong in CLAUDE.md for eleven days, and a
+    stale cast in a DOC is worse than one in a page, because a page has
+    a test."""
+
+    def setUp(self):
+        self.doc = (Path(__file__).parent / "NEXT_SESSION.md").read_text()
+
+    def test_it_says_it_expires_and_names_the_real_record(self):
+        """A snapshot that does not announce itself as one gets read as
+        current, which is the only way this file can hurt anybody."""
+        self.assertIn("expires", self.doc.lower(),
+                      "NEXT_SESSION.md must say out loud that it expires -- "
+                      "otherwise a two-month-old pointer reads as today's")
+        self.assertIn("CLAUDE.md", self.doc,
+                      "NEXT_SESSION.md must name CLAUDE.md as the real record")
+
+    def test_it_never_teaches_a_command_that_hardcodes_a_pointer(self):
+        """`--show live` names the POINTER. `--show four` names today's
+        answer, and is wrong the day he promotes somebody -- with the
+        failure looking exactly like the deck working.
+
+        AND IT READS THE COMMANDS, NOT THE PROSE. The first version of
+        this test banned the string outright and went red on the
+        paragraph at the top of the doc explaining that `--show
+        shiro_deck` is the fault being avoided -- the grep-matches-prose
+        trap, fifteenth instance, in the test written to guard against
+        exactly that class of staleness. A note explaining an absence
+        must never read as that thing being present, so only indented
+        command lines count."""
+        commands = [ln for ln in self.doc.splitlines()
+                    if ln.startswith("    ") and ln.strip()]
+        found = False
+        for line in commands:
+            for stale in re.findall(r"--show\s+(\S+)", line):
+                found = True
+                self.assertEqual(
+                    stale, "live",
+                    "NEXT_SESSION.md tells a fresh session to run `--show %s`. "
+                    "That is a persona KEY, so it goes stale the moment "
+                    "LIVE_PERSONA moves -- name the pointer "
+                    "(`--show live`) instead." % stale)
+        self.assertTrue(
+            found,
+            "NEXT_SESSION.md no longer shows how to print the live composed "
+            "prompt -- that is the deliverable every prompt change here "
+            "is measured on, and he pastes it into PocketPal by hand")
+
+    def test_the_files_and_commands_it_names_actually_exist(self):
+        """It hands a fresh session a working loop. A path in it that is
+        not there reads as the repo being broken rather than as the note
+        being old."""
+        here = Path(__file__).parent
+        for name in ("CLAUDE.md", "YUZU_TESTER.py", "yuzu_personas.py",
+                     "yuzu_face.py", "yuzu_brain.py", "deck"):
+            self.assertIn(name, self.doc,
+                          "NEXT_SESSION.md no longer mentions %s" % name)
+            self.assertTrue((here / name).exists(),
+                            "NEXT_SESSION.md names %s and it does not exist"
+                            % name)
+
+
 class TestDayOneRunbook(unittest.TestCase):
     """NANO_DAY_ONE.md is the one page Ghost reads at the board, off a
     phone, with the box open. A stale command there costs an evening,
