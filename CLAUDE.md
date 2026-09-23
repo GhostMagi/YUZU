@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 743 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 734 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,74 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE V-PET IS DELETED, AND PS1 IS OFF THE LIST (Sept 23)
+
+Ghost, first session on the new model: *"Can you put the vpet aside
+while i get it set up? As in "delete it" from the cyberdeck. Prolly
+requires screen layout changing etc."* and *"Ive decided i dont need
+ps1 for now. Too lazy to fw bios."*
+
+**DELETED, NOT RETIRED -- the LEDs' call, not the cast's.** `retired:
+yes` is one line of data nobody loads; the pet was a module
+(`yuzu_vpet.py`), a page, twelve sprites, two source zips in
+`assets/`, and a POST route on a server bound to 0.0.0.0. A dead
+subsystem you still have to read around is worse than none. **It is
+all in git** -- `git show dcdd625:yuzu_vpet.py` and the same for
+`ui/vpet.html`, `ui/vpet/` and `assets/` brings it back. His board
+keeps a tiny `~/.yuzu/vpet.json` mood file; harmless, outside the
+repo, and deliberately not touched.
+
+**NOT WRITING AN ICON DOES NOT REMOVE THE OLD ONE.** `deckapps` had
+installed a Pet icon on his board, and dropping the `write_app` line
+would have left it on his desktop pointing at a page that no longer
+exists -- the exact dead icon `write_app` was built to never leave.
+So retired apps are removed BY NAME on every run (`for gone in
+yuzu-pet`), which is one word per future retirement, and it says so
+when it does. Pinned by planting the old icon in a fake HOME.
+
+**THE DRAWER CENTRES ITS SHORT ROW NOW.** Six tiles filled two rows of
+three; five left a hole in the bottom right. Rendered three ways at
+1024x600 and LOOKED at, thirty-third time: a grid of three kept the
+hole, five across made tall skinny pillars, and **a wrapping row of
+thirds with `justify-content: center`** kept every tile exactly the
+size it was (320x230) with Browser and Calculator centred under the
+top three. The next tile he adds lands in it with nobody touching the
+rule. The layout test had pinned `repeat(3, 1fr)` and `count % 3 ==
+0`; it pins the centring instead, because the drawer is the one view
+whose count moves both ways. Re-checked at 412: one column, Update at
+392/412, no horizontal scroll.
+
+**`every page the deck links to is really there` is the guard worth
+keeping**, and it is a PROPERTY rather than a search for "vpet": every
+`data-go`/`href` to a `.html` in every page must exist. It covers the
+NEXT thing that gets deleted too. **Comments are stripped first** --
+`face.html` still tells the story of the pet leaving its screen, and a
+link inside that comment is verified to stay QUIET (the
+grep-matches-prose trap, the half that is easy to forget).
+
+### PS1
+
+**`mednafen` STAYS** -- it is what plays NES and SNES; it simply is
+not offered as a PlayStation any more. The row reads `nes/snes`, and
+the setup no longer makes a `~/ROMs/psx` folder, because `--check`
+ends with ONE line that installs everything missing and a declined
+system riding along in the line he pastes is the wrong kind of
+helpful.
+
+**THE BIOS NOTE FIRES ON A GAME NOW, NOT ON A FOLDER.** It used to fire
+the moment `~/ROMs/psx` existed -- and an earlier `deck` may already
+have made an empty one on his board, which would nag him every run
+about a system he turned down. A PS1 game actually sitting there is
+the moment the caveat becomes true again. Hidden files do not count.
+
+**Seven tests new or rewritten, each verified by breaking it**: a Pet
+tile put back, a link only inside a comment (stays green), the
+`/vpet.json` route answering again, the stale-icon cleanup removed,
+the drawer back to a grid of three, a PS1 row back in `--check`, a
+`psx` folder made again, and the BIOS note back on an empty folder.
+All go red except the comment, which is the point. **743 -> 734**: the
+thirteen V-Pet tests went with the V-Pet.
 
 ## A NOTE FOR THE NEXT SESSION, AND I CLOBBERED HIS (Sept 23)
 
@@ -596,7 +664,8 @@ a chat reminder dies with the session.**
   carefully while the server binds 0.0.0.0 -- a fixed pair of modes, no
   argument from the request, same discipline as `/launch/` and
   `run_deckapps()`.
-- **ES-DE cores: SNES, PS1, NES, Game Boy Color. HE ASKED TO BE
+- **ES-DE cores: SNES, ~~PS1~~, NES, Game Boy Color.** (PS1 dropped
+  Sept 23, his call: *"Too lazy to fw bios."*) **HE ASKED TO BE
   REMINDED WHEN HE IS BACK** -- *"we will do the apt installs when i
   wake just pls remind me about it when i come back"*. Same standing
   request as the right-angle adapters: **bring it up rather than

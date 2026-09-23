@@ -19,8 +19,7 @@
 
   ONE LOOK. Ghost, Sept 11: "id like it removed. only use the cool
   green on black crt for ui." The swatches are gone from both screens
-  and there is no control for it anywhere -- the exception, on purpose,
-  is the V-Pet page, which is its own little world in full colour.
+  and there is no control for it anywhere.
 
   The icons are line drawings in this file, not emoji. Ghost wanted
   "clean single-color line icons... rather than smartphone", and the
@@ -123,12 +122,23 @@ body {
    the fifth tile brought back once already. Four goes in a 2x2.
 
    The drawer stays three across: it is where he means to "pile up our
-   fancy future apps", so it grows, and six fills two rows of three
-   exactly. A single shared grid would force one of them to look
-   wrong. */
+   fancy future apps", so it grows. A single shared grid would force
+   one of them to look wrong.
+
+   AND THE DRAWER CENTRES ITS LAST ROW, because it is the one view
+   whose count moves both ways. Six filled two rows of three exactly;
+   then the V-Pet went (Sept 23, "put the vpet aside ... As in 'delete
+   it' from the cyberdeck") and five left a hole in the bottom right.
+   Rendered three ways at 1024x600 and looked at: five across made tall
+   skinny pillars, and a grid of three left the hole. A wrapping row
+   of thirds, centred, keeps every tile the size it was and turns the
+   short row into a deliberate one -- and the next tile he adds lands
+   in it without anybody touching this rule. */
 #grid.main { grid-template-columns: repeat(2, 1fr); }
 #grid.stuff { grid-template-columns: repeat(2, 1fr); }
-#grid.misc { grid-template-columns: repeat(3, 1fr); }
+#grid.misc { display: flex; flex-wrap: wrap; justify-content: center;
+             align-content: stretch; }
+#grid.misc > .tile { flex: 0 0 calc((100% - 2 * 12px) / 3); }
 /* THE A.I. VIEW SETS ITS OWN LAYOUT FROM JAVASCRIPT -- its columns AND
    its icon size, together, off one number -- because it is the only
    view whose tile count is not known when this file is written: it is
@@ -192,7 +202,8 @@ body {
   100% { transform: scaleY(1);    filter: brightness(1) }
 }
 #d20.settled .roll { animation: crt .42s ease-out; }
-@media (max-width: 560px) { #grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { #grid { grid-template-columns: 1fr; }
+                            #grid.misc > .tile { flex-basis: 100%; } }
 
 /* ---- the calculator -----------------------------------------------
    Ghost: "wana toss a working calculator in the same style into the
@@ -351,7 +362,7 @@ body {
 
            home     <the front character>   ☆Stuff☆
            ☆Stuff☆  A.I.                    ☆Misc☆
-           ☆Misc☆   Wikipedia Game Boy d20 Pet Browser Calculator
+           ☆Misc☆   Wikipedia Game Boy d20 Browser Calculator
            A.I.     built from the roster
 
        THE FRONT TILE IS NOT IN THIS FILE, and that is the whole
@@ -400,11 +411,6 @@ body {
     <b>d20</b>
     <span class="roll">tap to roll</span>
   </div>
-  <div class="tile" id="pet" data-view="misc" data-go="vpet.html">
-    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 20c-4 0-6.5-2.2-6.5-5.5C5.5 11 8 8.5 12 8.5s6.5 2.5 6.5 6c0 3.3-2.5 5.5-6.5 5.5z"/><path d="M8 8.2 6.6 4.5 9.6 6M16 8.2 17.4 4.5 14.4 6"/><path d="M10 14h.01M14 14h.01"/></svg></div>
-    <b>Pet</b>
-    <span>he lives here</span>
-  </div>
   <div class="tile" data-view="misc" data-launch="browser">
     <div class="big"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3.5 9h17M3.5 15h17"/></svg></div>
     <b>Browser</b>
@@ -445,8 +451,7 @@ body {
 <script>
 // THERE IS NO COLOUR CONTROL. "only use the cool green on black crt
 // for ui" -- so the palette is two CSS variables at the top of this
-// file and nothing on screen offers to change them. The one page
-// allowed to break the rule is vpet.html, deliberately.
+// file and nothing on screen offers to change them.
 
 // ---- clock ---------------------------------------------------------
 // 1969 on screen is the board telling you it has not reached NTP yet.

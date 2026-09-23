@@ -109,6 +109,19 @@ TERM_APP=$(term_cmd)
 mkdir -p "$APPS" "$DESKTOP"
 BROKEN=0
 
+# ICONS FOR THINGS THIS DECK NO LONGER HAS. Not writing an icon any
+# more does not take the old one off his desktop -- it stays there,
+# pointing at a page that is gone, which is exactly the dead icon
+# write_app below exists to never leave. So a retired app is removed
+# by NAME, every run. The V-Pet went on Sept 23 ("put the vpet aside
+# ... As in 'delete it' from the cyberdeck").
+for gone in yuzu-pet; do
+    if [ -e "$APPS/$gone.desktop" ] || [ -e "$DESKTOP/$gone.desktop" ]; then
+        rm -f "$APPS/$gone.desktop" "$DESKTOP/$gone.desktop"
+        echo "  removed: $gone (that app is not on the deck any more)"
+    fi
+done
+
 write_app() {                    # name, comment, exec, icon, filename
     local file="$APPS/$5.desktop"
     cat > "$file" <<DESK
@@ -253,10 +266,8 @@ APP
     fi
     write_app "Deck" "Home screen" \
         "$YUZU/.face-app home.html" "go-home" "yuzu-home"
-    write_app "Pet" "The creature on the deck" \
-        "$YUZU/.face-app vpet.html" "applications-games" "yuzu-pet"
 else
-    echo "  SKIPPED the character pages, Deck and Pet: no browser found."
+    echo "  SKIPPED the character pages and Deck: no browser found."
     echo "    sudo apt install -y chromium-browser"
 fi
 

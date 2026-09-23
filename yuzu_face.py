@@ -529,7 +529,7 @@ def get_state():
 # main live in ai."
 #
 # A NAME CROSSES, AND A NAME IS ALL THAT CROSSES. Same discipline as
-# /launch/ and /vpet/: the page POSTs "cait", this dict turns it into a
+# /launch/: the page POSTs "cait", this dict turns it into a
 # persona KEY, and nothing a caller sends can name a file. An unknown
 # name is REFUSED rather than quietly answered by whoever is live --
 # putting the wrong character on screen is the confusing kind of wrong,
@@ -934,7 +934,7 @@ MEMORY_DIR = os.path.join(os.path.expanduser("~"), ".yuzu", "history")
 
 def _memory_file(key):
     # The key comes from CHARACTERS, never from the request -- same
-    # allowlist discipline as /launch/ and /vpet/. basename is the belt
+    # allowlist discipline as /launch/. basename is the belt
     # to that braces: nothing here can ever name a path.
     return os.path.join(MEMORY_DIR, os.path.basename(key) + ".json")
 
@@ -1963,28 +1963,6 @@ def stats():
     return out
 
 
-# The pet is a NICETY, exactly like the face: a missing or broken
-# yuzu_vpet.py must never be able to stop her talking, so the import is
-# guarded the same way Piper's and the wiki's are.
-def _pet_look():
-    try:
-        import yuzu_vpet
-        return yuzu_vpet.look()
-    except Exception as exc:
-        return {"frames": {}, "says": "The pet module is not here (%s)." % exc}
-
-
-def _pet_do(action):
-    try:
-        import yuzu_vpet
-        got = yuzu_vpet.do(action)
-        return got or {"ok": False, "says": "He does not know how to do that."}
-    except Exception as exc:
-        return {"frames": {}, "says": "The pet module is not here (%s)." % exc}
-
-
-
-
 class _Handler(SimpleHTTPRequestHandler):
     """Static files out of ui/, plus one generated endpoint.
 
@@ -2036,9 +2014,6 @@ class _Handler(SimpleHTTPRequestHandler):
                 urllib.parse.urlparse(self.path).query)
             self._json(poses((query.get("who") or [""])[0]))
             return
-        if self.path.split("?")[0].rstrip("/") in ("/vpet.json", "/vpet"):
-            self._json(_pet_look())
-            return
         if self.path.split("?")[0].rstrip("/") in ("/sprites.json", "/sprites"):
             body = json.dumps(manifest(), indent=1).encode()
             self.send_response(200)
@@ -2076,12 +2051,6 @@ class _Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0].rstrip("/")
-        if path.startswith("/vpet/"):
-            # Same allowlist discipline as /launch/: a NAME crosses and
-            # nothing else. yuzu_vpet.do() refuses anything not in its
-            # own tuple, so this route cannot grow a hole by accident.
-            self._json(_pet_do(path[len("/vpet/"):]))
-            return
         if path == "/say":
             try:
                 size = int(self.headers.get("Content-Length") or 0)
@@ -2288,7 +2257,7 @@ def run_pull():
     that kept the deck tethered, and it is the part he runs most.
 
     IT TAKES NO ARGUMENTS AND IT NEVER WILL. Same discipline as
-    /launch/ and /vpet/: this route runs ONE fixed script that lives in
+    /launch/: this route runs ONE fixed script that lives in
     this repo, and nothing from the request reaches it -- no branch, no
     remote, no path, no shell string. The server binds 0.0.0.0, so a
     route that could be told WHAT to pull would be a box on his WiFi
@@ -2348,7 +2317,7 @@ def run_deckapps():
     already dressed the first time he looks at the monitor.
 
     IT TAKES NO ARGUMENTS AND IT NEVER WILL -- same discipline as
-    /pull, /launch/ and /vpet/: one fixed script in this repo, and
+    /pull and /launch/: one fixed script in this repo, and
     nothing from the request reaches it. `--autostart` and `--remove`
     are deliberately NOT reachable from here; a route that could be
     told WHICH word to pass is a box on his WiFi that runs what it is

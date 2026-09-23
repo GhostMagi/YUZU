@@ -7714,16 +7714,22 @@ class TestDeckApps(unittest.TestCase):
 
     SCRIPT = Path(__file__).parent / "deckapps"
 
-    def _run(self, *args, have=()):
+    def _run(self, *args, have=(), plant=()):
         """Install into a fake HOME with only `have` on PATH, so both
         'everything present' and 'nothing installed' are driven from
-        fixtures rather than from whatever this machine has."""
+        fixtures rather than from whatever this machine has. `plant`
+        puts old icons in place first, the way his board has them."""
         import subprocess
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             home, binv = tmp / "home", tmp / "bin"
             (home / "YUZU").mkdir(parents=True)
             binv.mkdir()
+            for icon in plant:
+                for where in (home / ".local/share/applications",
+                              home / "Desktop"):
+                    where.mkdir(parents=True, exist_ok=True)
+                    (where / icon).write_text("[Desktop Entry]\n")
             # `python3` is here because `deckapps` now ASKS who the
             # front character is rather than naming one. That is a new
             # dependency at install time for a script that used to need
@@ -7772,18 +7778,34 @@ class TestDeckApps(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr.decode())
 
     def test_it_installs_every_app_when_the_desktop_has_what_it_needs(self):
-        """Seven now. Her FACE and the HOME screen joined the original
+        """Six now. Her FACE and the HOME screen joined the original
         three when Ghost asked for "a desktop with my apps and a saya
-        button visible", and BROWSER joined when the home screen started
-        opening fullscreen -- see the test below."""
+        button visible", BROWSER joined when the home screen started
+        opening fullscreen -- see the test below -- and PET left with
+        the V-Pet on Sept 23."""
         done, names, on_desktop, _ = self._run(have=("chromium", "xterm"))
         self.assertEqual(names, ["yuzu-browser.desktop", "yuzu-chat.desktop",
                                  "yuzu-face.desktop", "yuzu-gba.desktop",
-                                 "yuzu-home.desktop", "yuzu-pet.desktop",
+                                 "yuzu-home.desktop",
                                  "yuzu-wiki.desktop"], done.stdout)
         # and on the Desktop too, which is where a touchscreen user taps
         self.assertIn("yuzu-wiki.desktop", on_desktop)
         self.assertIn("yuzu-home.desktop", on_desktop)
+
+    def test_an_icon_for_an_app_that_LEFT_is_taken_off_his_desktop(self):
+        """Not writing the Pet icon any more does not remove the one
+        already on his board. It would sit there pointing at a page
+        that is gone -- the dead icon write_app exists to never leave --
+        so a retired app is removed by name, on every run, and it says
+        so."""
+        done, names, on_desktop, _ = self._run(
+            have=("chromium", "xterm"), plant=("yuzu-pet.desktop",))
+        self.assertNotIn("yuzu-pet.desktop", names, done.stdout)
+        self.assertNotIn("yuzu-pet.desktop", on_desktop, done.stdout)
+        self.assertIn("removed: yuzu-pet", done.stdout)
+        # and a board that never had it is not told about it
+        done, _, _, _ = self._run(have=("chromium", "xterm"))
+        self.assertNotIn("yuzu-pet", done.stdout)
 
     def test_her_pages_open_FULLSCREEN_but_never_as_a_kiosk(self):
         """Ghost, Sept 11: "I do not want it using a browser tab on the
@@ -10266,24 +10288,34 @@ class TestDeckSetup(unittest.TestCase):
 
     # ---- the systems he asked for ----------------------------------
 
-    SYSTEMS = ("gb", "gbc", "gba", "nes", "snes", "psx")
-
     def test_every_system_he_asked_for_is_INVENTORIED(self):
         """Ghost, Sept 22: *"Snes ps1 nes and gameboy color please add
-        those to ES-DE"*.
+        those to ES-DE"* -- and Sept 23: *"Ive decided i dont need ps1
+        for now. Too lazy to fw bios."*
 
         He is not going to remember which package plays what, and a
         list typed into a doc is a list that goes stale against his
-        actual Ubuntu. `--check` asks HIS board and names the fix."""
+        actual Ubuntu. `--check` asks HIS board and names the fix.
+
+        AND IT NEVER OFFERS WHAT HE TURNED DOWN. `--check` ends with one
+        line that installs everything missing, so a PS1 row left in it
+        is an install he said no to, riding along in the line he pastes
+        -- and the setup must not make a folder for it either."""
         done, home, tmp = self._stub_run(self.SCRIPT, extra=["--check"])
         try:
             out = done.stdout.lower()
-            for system in ("gbc", "nes", "snes", "ps1"):
+            for system in ("gbc", "nes", "snes"):
                 self.assertIn(system, out,
                               "%s is not in the inventory, so he has no "
                               "way to find out what plays it" % system)
+            for gone in ("ps1", "playstation", "psx"):
+                self.assertNotIn(gone, out,
+                                 "--check still offers PlayStation")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+        made = re.search(r"for system in ([^;]+); do",
+                         self.SCRIPT.read_text()).group(1).split()
+        self.assertNotIn("psx", made, "the setup still makes a PS1 folder")
 
     def test_GAME_BOY_COLOR_needs_no_new_package_at_all(self):
         """THE FIRST ANSWER IS THAT ONE OF THE FOUR IS ALREADY DONE.
@@ -10309,17 +10341,32 @@ class TestDeckSetup(unittest.TestCase):
         which reads as a broken emulator.
 
         Same rule as writing the Forge fallback into the failure
-        message rather than into a doc he will not open."""
+        message rather than into a doc he will not open.
+
+        PS1 IS OFF THE LIST NOW (Sept 23), so this fires on a GAME and
+        never on a folder: an earlier `deck` left an empty ~/ROMs/psx
+        on his board, and a caveat about a system he turned down,
+        printed every run, is noise."""
         import subprocess
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp, True)
         home = Path(tmp) / "home"
         (home / "ROMs" / "psx").mkdir(parents=True)
-        done = subprocess.run(
-            ["bash", str(self.SCRIPT), "--check"],
-            capture_output=True, text=True, timeout=60,
-            env={"PATH": "/usr/bin:/bin", "HOME": str(home)})
-        self.assertIn("BIOS", done.stdout,
+
+        def check():
+            return subprocess.run(
+                ["bash", str(self.SCRIPT), "--check"],
+                capture_output=True, text=True, timeout=60,
+                env={"PATH": "/usr/bin:/bin", "HOME": str(home)}).stdout
+
+        self.assertNotIn("BIOS", check(),
+                         "an EMPTY psx folder nags him about a system he "
+                         "decided against")
+        (home / "ROMs" / "psx" / ".directory").write_text("")
+        self.assertNotIn("BIOS", check(), "a hidden file counted as a game")
+        (home / "ROMs" / "psx" / "Crash Bandicoot (USA).cue").write_text("")
+        done = check()
+        self.assertIn("BIOS", done,
                       "he finds out PS1 needs a BIOS by a game failing "
                       "at the panel")
         # AND IT STAYS QUIET WHEN THERE IS NO PS1 FOLDER. A caveat that
@@ -10835,205 +10882,58 @@ class TestWikiBrevity(unittest.TestCase):
                          "the characters disagree about the ceiling: %s" % seen)
 
 
-class TestVPet(unittest.TestCase):
-    """The creature on the deck.
+class TestTheVPetIsGone(unittest.TestCase):
+    """Ghost, Sept 23: "Can you put the vpet aside while i get it set
+    up? As in "delete it" from the cyberdeck. Prolly requires screen
+    layout changing etc."
 
-    Ghost asked for a Tamagotchi-ish page and then immediately drew the
-    important line: *"dont make him require food id like it to be more
-    of an interactive bare bones game almost. not a babysitting program
-    per se (on the surface sure)."* Most of what follows pins that."""
+    DELETED, NOT RETIRED -- the LEDs' call rather than the cast's.
+    `retired: yes` is one line of data nobody loads; the pet was a
+    module, a page, twelve sprites, two source zips and a POST route on
+    a server bound to 0.0.0.0, and a dead subsystem you still have to
+    read around is worse than none. It is all in git.
 
-    import yuzu_vpet as vpet
+    What is pinned is what would go wrong QUIETLY: a tap that lands on
+    a page that is not there, a route that still answers, and an icon
+    left on his desktop pointing at nothing."""
 
-    PAGE = Path(__file__).parent / "ui" / "vpet.html"
+    UI = Path(__file__).parent / "ui"
 
-    def setUp(self):
-        self._real = self.vpet.STATE_FILE
-        self._tmp = tempfile.mkdtemp()
-        self.vpet.STATE_FILE = os.path.join(self._tmp, "vpet.json")
+    def test_every_page_the_deck_links_to_is_really_there(self):
+        """A PROPERTY, not a search for the word "vpet". The Pet tile
+        was `data-go="vpet.html"`; leave one like it behind and the tap
+        does nothing, which on this deck reads as broken rather than
+        as missing. So every page any page on the deck opens has to
+        exist -- which also covers the next thing that gets deleted.
 
-    def tearDown(self):
-        self.vpet.STATE_FILE = self._real
-        shutil.rmtree(self._tmp, ignore_errors=True)
+        Comments are stripped first. face.html still tells the story of
+        the pet leaving its screen, and a comment describing an absence
+        must never read as the thing being present."""
+        for page in sorted(self.UI.glob("*.html")):
+            body = re.sub(r"<!--.*?-->", "", page.read_text(), flags=re.S)
+            for target in re.findall(
+                    r'(?:data-go|href)="([\w./-]+\.html)(?:[#?][^"]*)?"',
+                    body):
+                self.assertTrue((self.UI / target).exists(),
+                                "%s opens %s, which is not on the deck"
+                                % (page.name, target))
 
-    # ---- the whole point --------------------------------------------
-
-    def test_nothing_gets_WORSE_for_being_ignored(self):
-        """NO NEEDS, NO FAIL STATE. Mood drifts toward NEUTRAL from
-        either side, so a week away leaves him quiet rather than
-        starving -- and bond, which is the thing that will drive
-        evolution later, never moves at all. A toy you owe nothing to
-        was the request; this is the assertion that keeps it one."""
-        now = time.time()
-        self.vpet.do("play", now)
-        self.vpet.do("play", now)
-        before = self.vpet.look(now)
-        self.assertGreater(before["mood"], self.vpet.NEUTRAL)
-
-        week = self.vpet.look(now + 7 * 86400)
-        self.assertEqual(week["mood"], self.vpet.NEUTRAL,
-                         "mood drifted past neutral -- that is a needs bar")
-        self.assertGreaterEqual(week["bond"], before["bond"],
-                                "time away took bond off him")
-        self.assertNotIn(week["state"], ("dead", "dying"))
-        # and from BELOW neutral it comes back up, unprompted
-        low = self.vpet.look(now)
-        self.vpet._write(dict(self.vpet._read(), mood=10, at=now))
-        self.assertGreater(self.vpet.look(now + 20 * 3600)["mood"], 10,
-                           "a low mood never recovers on its own")
-
-    def test_there_is_no_hunger_anywhere_in_the_model(self):
-        """"dont make him require food". Not softened, not renamed --
-        absent. A stat that exists is a stat something will eventually
-        be built on top of.
-
-        THIS ASSERTS THE MODEL, NOT THE PROSE. The first version grepped
-        the source for "hunger" and failed on the comment that EXPLAINS
-        why there is no hunger -- the same false positive as "remaining"
-        in the runtime note and "no hype" in Coco's rule. Grepping
-        source text is a proxy; the state file is the fact."""
-        self.assertEqual(
-            sorted(k for k in self.vpet.FRESH if k not in
-                   ("born", "at", "who", "pokes", "grumpy_until")),
-            ["bond", "mood", "sleeping"],
-            "a new stat appeared, and every stat is a future chore")
-        self.assertNotIn("feed", [a.lower() for a in self.vpet.ACTIONS])
-        buttons = re.findall(r'data-do="([a-z]+)"', self.PAGE.read_text())
-        self.assertNotIn("feed", buttons, "there is a Feed button")
-        self.assertTrue(set(buttons) <= set(self.vpet.ACTIONS),
-                        f"the page offers {buttons}, the deck allows "
-                        f"{self.vpet.ACTIONS}")
-
-    def test_grumpy_is_a_REACTION_and_it_wears_off(self):
-        """The one negative in the whole thing, and it is a character
-        beat rather than a punishment: poke him enough and he is fed up
-        for a minute. Nothing has to be won back."""
-        now = time.time()
-        for _ in range(self.vpet.POKES_BEFORE_GRUMPY):
-            got = self.vpet.do("poke", now)
-        self.assertEqual(got["state"], "sad")
-        later = self.vpet.look(now + self.vpet.GRUMPY_FOR + 1)
-        self.assertNotEqual(later["state"], "sad",
-                            "being fed up is permanent, which is a sulk")
-
-    def test_only_the_allowlisted_actions_can_ever_run(self):
-        """Same discipline as /launch/: a NAME crosses and nothing else.
-        The server binds 0.0.0.0, so this route must never be able to
-        take a path, an argument or a folder name from a request."""
-        for hostile in ("", "eat", "../../etc/passwd", "swap; rm -rf /",
-                        "poke ", "PLAY", "who/demon"):
-            self.assertIsNone(self.vpet.do(hostile),
-                              f"{hostile!r} was allowed to run")
-        self.assertEqual(sorted(self.vpet.ACTIONS),
-                         ["play", "poke", "rest", "swap"])
-
-    # ---- the art pipeline -------------------------------------------
-
-    def test_a_sprite_STRIP_is_counted_without_being_sliced(self):
-        """The packs ship one PNG per animation -- 600x100 is six cels.
-        A width that is an exact multiple of the height IS that many
-        frames, so the file out of the zip is the file that runs: no
-        slicing step, no generated art, no PIL on the deck."""
-        with tempfile.TemporaryDirectory() as tmp:
-            import yuzu_face
-            yuzu_face.write_rgba(os.path.join(tmp, "idle.png"),
-                                 300, 50, bytearray(300 * 50 * 4))
-            yuzu_face.write_rgba(os.path.join(tmp, "sleep.png"),
-                                 50, 50, bytearray(50 * 50 * 4))
-            got = self.vpet.frames(tmp)
-        self.assertEqual(len(got["idle"]), 6, "a 300x50 strip is six cels")
-        self.assertEqual(got["idle"][0], ["vpet/idle.png", 0, 6])
-        self.assertEqual(got["idle"][5], ["vpet/idle.png", 5, 6])
-        self.assertEqual(len(got["sleep"]), 1, "a square file is one cel")
-
-    def test_the_packs_own_filenames_are_accepted(self):
-        """`Demon_A_Idle.png` reads as `idle`. Making him rename
-        fourteen files before anything appears on screen is the kind of
-        friction that stops a thing being used -- the same call as
-        recognising /wiki anywhere in a line rather than only at the
-        start."""
-        for stem, want in (("idle", ("idle", 0)),
-                           ("Demon_A_Idle", ("idle", 0)),
-                           ("Blood Monster_A_Walk", ("walk", 0)),
-                           ("walk_2", ("walk", 2)),
-                           ("Demon_A_Walk_3", ("walk", 3))):
-            self.assertEqual(self.vpet._state_of(stem), want, stem)
-
-    def test_a_folder_is_a_character_and_one_button_cycles_them(self):
-        """Ghost: "can you add the orc as an option to select from."
-        Adding a fifth creature is copying PNGs into a new folder --
-        there is no list, no menu and no code to touch."""
-        everyone = self.vpet.cast()
-        self.assertIn("demon", everyone)
-        self.assertIn("orc", everyone)
-        for who, states in everyone.items():
-            self.assertIn("idle", states, f"{who} cannot stand still")
-            for cel in states["idle"]:
-                self.assertTrue(cel[0].startswith("vpet/" + who + "/"),
-                                f"{who} asks for {cel[0]}, which is not "
-                                "inside its own folder")
-        now = time.time()
-        first = self.vpet.look(now)["who"]
-        second = self.vpet.do("swap", now)["who"]
-        self.assertNotEqual(first, second)
-        # and it is a CYCLE, so it always comes back
-        for _ in range(len(everyone) - 1):
-            self.vpet.do("swap", now)
-        self.assertEqual(self.vpet.look(now)["who"], first)
-
-    def test_a_character_that_was_deleted_falls_back_rather_than_blanks(self):
-        """A remembered folder that is no longer there must not leave an
-        empty room. Same call yuzu_voice makes about a voice that was
-        uninstalled: fall back, never go silent."""
-        now = time.time()
-        self.vpet._write(dict(self.vpet._read(), who="a-thing-that-left",
-                              at=now))
-        got = self.vpet.look(now)
-        self.assertIn(got["who"], got["cast"])
-        self.assertTrue(got["frames"], "the room came back empty")
-
-    # ---- the rules this deck has already paid for --------------------
-
-    def test_the_state_file_is_OUTSIDE_the_repo(self):
-        """Not tidiness. A file inside the repo is a local change, and
-        `~/YUZU/pull` stops on local changes rather than overwriting
-        them -- so his pet's mood would have blocked every update he
-        ever ran."""
-        self.assertNotIn(str(Path(__file__).parent), self._real,
-                         "the pet writes into the repo")
-        self.assertIn(".yuzu", self._real)
-
-    def test_the_pet_page_always_has_a_way_out(self):
-        """The rule two power cycles paid for. A colourful page with no
-        exit is still a page with no exit."""
-        page = self.PAGE.read_text()
-        self.assertIn('id="home"', page, "there is no way off this page")
-        self.assertIn("home.html", page)
-
-    def test_the_pet_page_is_the_ONE_allowed_to_be_in_colour(self):
-        """Everything else on the deck is green on black, permanently.
-        This page is the deliberate exception -- "its own little world"
-        -- so it must NOT inherit the CRT palette, and no other page may
-        start quietly borrowing its colours."""
-        page = self.PAGE.read_text()
-        self.assertNotIn("#39ff5e", page,
-                         "the pet page went green like everything else")
-        for other in ("face.html", "home.html"):
-            body = (Path(__file__).parent / "ui" / other).read_text()
-            self.assertIn("#39ff5e", body, f"{other} lost the CRT ink")
-
-    def test_the_pet_is_a_nicety_and_cannot_take_her_face_down(self):
-        """Same guard as Piper and the wiki. If yuzu_vpet.py is missing
-        or broken the face server keeps serving her face -- the reply is
-        the product, the pet is not."""
-        import yuzu_face
-        body = (Path(__file__).parent / "yuzu_face.py").read_text()
-        block = body.split("def _pet_look(")[1].split("def _pet_do(")[0]
-        self.assertIn("except Exception", block, "the import is not guarded")
-        with unittest.mock.patch.dict("sys.modules", {"yuzu_vpet": None}):
-            got = yuzu_face._pet_look()
-        self.assertEqual(got["frames"], {})
-        self.assertTrue(got["says"], "it fails without saying anything")
+    def test_the_server_does_not_answer_for_it_any_more(self):
+        """Driven, not read. Both halves of the old route -- the GET the
+        page polled and the POST its buttons sent -- must come back
+        404, the same as any other name this server does not know."""
+        import threading, urllib.error, urllib.request, yuzu_face
+        from http.server import ThreadingHTTPServer
+        server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base = "http://127.0.0.1:%d" % server.server_address[1]
+        for path, data in (("/vpet.json", None), ("/vpet.html", None),
+                           ("/vpet/poke", b"{}")):
+            with self.assertRaises(urllib.error.HTTPError, msg=path) as got:
+                urllib.request.urlopen(base + path, data=data, timeout=5)
+            self.assertEqual(got.exception.code, 404, path)
 
 
 class TestTelemetry(unittest.TestCase):
@@ -11490,20 +11390,31 @@ class TestHomeScreen(unittest.TestCase):
                          "something other than ☆Stuff☆ is typed onto the "
                          "front page")
         self.assertEqual(len(views["stuff"]), 2, "☆Stuff☆ is not two")
-        self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
+        self.assertEqual(len(views["misc"]), 5, "the drawer is not five")
         for css in ("#grid.main { grid-template-columns: repeat(2, 1fr); }",
-                    "#grid.stuff { grid-template-columns: repeat(2, 1fr); }",
-                    "#grid.misc { grid-template-columns: repeat(3, 1fr); }"):
+                    "#grid.stuff { grid-template-columns: repeat(2, 1fr); }"):
             self.assertIn(css, page)
         # NO VIEW MAY END ON A ROW WITH A HOLE IN IT. Stated as the
         # PROPERTY rather than as numbers, so the next tile added has to
         # answer for the layout it lands in. `main` counts the generated
         # front character as well as the ☆Stuff☆ tile in the markup --
         # one typed plus one built is the two that reach the screen.
-        for view, built, columns in (("main", 1, 2), ("stuff", 0, 2),
-                                     ("misc", 0, 3)):
+        for view, built, columns in (("main", 1, 2), ("stuff", 0, 2)):
             self.assertEqual((len(views[view]) + built) % columns, 0,
                              f"the {view} view orphans a tile on its own row")
+        # THE DRAWER IS THE ONE VIEW WHOSE COUNT MOVES BOTH WAYS, so it
+        # does not rely on the count at all: its short row is CENTRED.
+        # Rendered at 1024x600 when the V-Pet left -- a grid of three
+        # left a hole in the corner and five across made pillars.
+        misc = re.search(r"#grid\.misc\s*\{([^}]*)\}", page).group(1)
+        for want in (r"display:\s*flex", r"flex-wrap:\s*wrap",
+                     r"justify-content:\s*center"):
+            self.assertRegex(misc, want,
+                             "the drawer's short row is not centred, so it "
+                             "ends on a hole: " + want)
+        self.assertRegex(page, r"#grid\.misc > \.tile \{ flex: 0 0 "
+                               r"calc\(\(100% - 2 \* 12px\) / 3\); \}",
+                         "the drawer's tiles are not a third each")
         # The rule is about the TILE grid: a wide tile forced an odd row
         # and orphaned two others. The calculator's display spanning its
         # own keypad is not that, so pin WHICH selector may span rather
@@ -11517,8 +11428,6 @@ class TestHomeScreen(unittest.TestCase):
         self.assertEqual(
             sorted(re.findall(r'data-show="(\w+)"', "".join(views["stuff"]))),
             ["ai", "misc"], "☆Stuff☆ does not hold exactly A.I. and ☆Misc☆")
-        self.assertIn('data-go="vpet.html"', "".join(views["misc"]),
-                      "the pet left the drawer")
         self.assertIn('data-launch="browser"', "".join(views["misc"]),
                       "there is no way to the web from her screen")
         # TALK IS NOT A TERMINAL. It used to POST /launch/chat, which

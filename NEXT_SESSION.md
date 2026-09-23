@@ -54,7 +54,7 @@ So:
     FRONT          four        (yuzu_face.py     — who GREETS you)
     roster         Yuzu, Four  (Cait, Mimi, Saya are `retired: yes`)
     Four's prompt  5446 chars
-    tests          740, ~99s,  `python YUZU_TESTER.py`
+    tests          734, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -79,7 +79,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 743 tests, ~19s on his board, ~99s here.
+2. `python YUZU_TESTER.py` — 734 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means
@@ -115,7 +115,7 @@ a phone, so a file path is useless to him.
 
 ## The rules that are not negotiable
 
-- **`/launch/`, `/vpet/`, `/pull`, `/icons` take no arguments, ever.**
+- **`/launch/`, `/pull`, `/icons` take no arguments, ever.**
   The server binds 0.0.0.0. Allowlists of NAMES only; nothing from a
   request reaches a shell.
 - **A destructive route gets no defaults.** `/forget` and
@@ -176,8 +176,8 @@ a phone, so a file path is useless to him.
   stated as a step cost an hour on the 8BitDo. Two things already
   settled so they don't get re-litigated: **Game Boy Color needs
   nothing** (mGBA plays GB/GBC/GBA — folder only), and **PlayStation
-  needs a console BIOS no package ships**, which `deck --check` says
-  the moment a `~/ROMs/psx` folder exists.
+  is OFF the list, his call Sept 23** (*"Too lazy to fw bios"*) —
+  `deck --check` no longer offers it or makes a `psx` folder.
 - **Offline maps.** *"the maps thing is a later thing as well remind me
   sometime."*
 - **The right-angle adapters.** *"maybe remind me soon ill forget that

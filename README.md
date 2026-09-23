@@ -116,7 +116,6 @@ $400.
 | `tile` | Auto-tiling windows (Pop Shell). `--off` gives floating back |
 | `drop.py` | Phone → board file drop. Run it in the target folder |
 | `yuzu_face.py` | Sprite system. Finds the art, serves it, reports the board's state |
-| `yuzu_vpet.py` | The creature on the deck. A folder is a character; no needs, no chores |
 | `yuzu_art.py` | Raw drawing → sprite: white out, squared. `python3 yuzu_art.py` |
 | `ui/raw/` | His original drawings, kept so the conversion can be redone |
 | `ui/sprites/` | Her expressions. **One PNG per face — the filename is the name** |

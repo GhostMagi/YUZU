@@ -74,14 +74,20 @@ row "kiwix"    "$(have kiwix-serve && echo kiwix-serve)" "kiwix-tools"
 # package at all -- only a folder for the ROMs to live in, which the
 # setup below creates.
 #
-# For the other three, `mednafen` is ONE package covering NES, SNES and
-# PlayStation. NOTHING HERE IS STATED AS A FACT ABOUT HIS BOARD: `row`
+# For NES and SNES, `mednafen` is ONE package covering both. NOTHING
+# HERE IS STATED AS A FACT ABOUT HIS BOARD: `row`
 # asks, and prints an apt line only when the thing is genuinely absent.
 # That is the rule the 8BitDo cost an hour to learn -- an unverified
 # specific presented as a step sends a person debugging their own hands
 # -- and it is why this checks rather than instructs.
+#
+# PLAYSTATION IS OFF THE LIST. Ghost, Sept 23: "Ive decided i dont need
+# ps1 for now. Too lazy to fw bios." It needs a console BIOS no package
+# ships, so it was the one system here that could not just run a ROM.
+# mednafen stays because it is what plays NES and SNES; it simply is
+# not offered as a PlayStation any more, and no psx folder is made.
 row "gb/gbc/gba"   "$(first_of mgba-qt mgba)" "mgba-qt"
-row "nes/snes/ps1" "$(first_of mednafen retroarch snes9x-gtk fceux)" "mednafen"
+row "nes/snes"     "$(first_of mednafen retroarch snes9x-gtk fceux)" "mednafen"
 
 # The art and the pages are the only things that CANNOT be apt-installed,
 # so they get checked separately and loudly.
@@ -125,7 +131,13 @@ fi
 # console BIOS image that no package ships, and without it a game dies
 # with an error about the machine rather than about the file. Said HERE,
 # once, rather than discovered at the panel.
-if [ -d "$HOME/ROMs/psx" ] || [ -d "$HOME/ROMs/ps1" ]; then
+#
+# IT FIRES ON A GAME, NOT ON A FOLDER. PS1 is off the list (Sept 23),
+# but an earlier `deck` made an empty ~/ROMs/psx, and a caveat about a
+# system he decided against, printed every run, is noise. A PS1 game
+# actually sitting there is the moment it becomes true again.
+if [ -n "$(find "$HOME/ROMs/psx" "$HOME/ROMs/ps1" -maxdepth 1 -type f \
+           ! -name '.*' 2>/dev/null | head -1)" ]; then
     echo
     echo "  PlayStation also needs a console BIOS image, which no"
     echo "  package ships. Without it a PS1 game fails in a way that"
@@ -173,10 +185,10 @@ echo
 # the folders existing is what turns "I sent a ROM over" into "she knows
 # I have it" with nothing else to configure. Empty ones cost nothing:
 # they are skipped everywhere until a file lands in them.
-for system in gb gbc gba nes snes psx; do
+for system in gb gbc gba nes snes; do
     mkdir -p "$HOME/ROMs/$system"
 done
-echo "    rom folders: ~/ROMs/{gb,gbc,gba,nes,snes,psx}"
+echo "    rom folders: ~/ROMs/{gb,gbc,gba,nes,snes}"
 
 # Prove the face actually serves, rather than assuming. A tap landing on
 # a dead port is the dead end this whole thing exists to avoid.
