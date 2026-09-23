@@ -182,10 +182,13 @@ resumed and came out byte-identical** (after my first mirror, Python's
 the code). Her inventory now counts each book once, newest release,
 pinned to agree with `wiki`.
 
-**UNVERIFIED: the live `library.kiwix.org`.** It is blocked from the
-container, so the query shape is checked against the same catalog
-format from a local server, not against the real site; and his board's
-kiwix-serve version is unknown (the fallbacks stay). Every failure
+**THE LIVE `library.kiwix.org` WORKED ON HIS BOARD, same day.** He ran
+`~/YUZU/wiki --get wikipedia_en_all_mini` and reported *"Downloaded
+ayyye"* -- so the catalog query, the flavour match and the `.meta4`
+strip all held against the real site, which the container could never
+reach. **Still unconfirmed: that `/wiki` moved to the new book on his
+kiwix-serve** (its version is unknown and the fallbacks stay).
+`~/YUZU/wiki --test` names the book it reads; that is the check. Every failure
 prints the site's own error, verdict first. **Sizes are not written
 here on purpose** -- the tool prints the real one before it spends it.
 
