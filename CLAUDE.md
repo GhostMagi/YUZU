@@ -49,6 +49,17 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## YUZU KNOWS HE IS GHOST (Sept 24)
+
+*"Let her also know im Ghost plz"*. Four's mechanism, unchanged:
+`USER_NAME: Ghost` in her settings, a WHO YOU TALK TO line, her
+example labels `{USER_NAME}:`, and ONE example (the greeting) that
+uses his name. The roster carries it, so his lines on her page now say
+GHOST; `by_name()` now guards her replies too. Three tests had pinned
+her NOT knowing him (a literal `User:` label twice, and `""` as her
+roster name) -- repointed to read the label off her examples, as the
+stop token does. Still 816. UNMEASURED on the board.
+
 ## HIS WORDS ON FOUR'S AND YUZU'S PAGES (Sept 24)
 
 Ghost: *"I cant see my own words on Yuzus page and Fours page like i

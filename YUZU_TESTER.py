@@ -4340,8 +4340,9 @@ class TestTheCastIsTwo(unittest.TestCase):
         prompt cannot disagree about who he is. Typing "Ghost" into
         the page would be the hardcoded cast in its newest costume.
 
-        A character with no USER_NAME (Yuzu) carries "" -- absent
-        rather than a guess."""
+        A character with no USER_NAME carries "" -- absent rather than a
+        guess. Every live one knows him now: Yuzu was told on Sept 24,
+        "Let her also know im Ghost plz"."""
         import yuzu_face
         for c in yuzu_face.roster():
             key = yuzu_face.CHARACTERS[c["who"]][0]
@@ -4350,7 +4351,9 @@ class TestTheCastIsTwo(unittest.TestCase):
                              "from her persona")
         mine = {c["who"]: c["user"] for c in yuzu_face.roster()}
         self.assertEqual(mine["zero"], "Ghost", "she was never told his name")
-        self.assertEqual(mine["yuzu"], "", "a name was invented for Yuzu")
+        self.assertEqual(mine["yuzu"], "Ghost", "Yuzu was never told his name")
+        self.assertEqual(yuzu_face._his_name("cait"), "",
+                         "a name was invented for a character never told it")
 
         page = (Path(__file__).parent / "ui" / "zero.html").read_text()
         page = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
@@ -4791,12 +4794,17 @@ class TestYuzuAvatar(unittest.TestCase):
 
         A new arm built without them restarts the lineage from the
         worst prompt in the repo."""
-        prompt = yuzu_personas.load("yuzu_avatar").prompt
-        self.assertIn("User: Spin around.", prompt, "no bare command")
+        import build_yuzu_model
+        persona = yuzu_personas.load("yuzu_avatar")
+        prompt = persona.prompt
+        # His label READ off her examples, as the stop token reads it. It
+        # was a literal "User:" until she learned his name (Sept 24).
+        him = build_yuzu_model.ask_label(persona)
+        self.assertIn(him + " Spin around.", prompt, "no bare command")
         self.assertIn("made my whole day", prompt,
                       "no warm statement with nothing to answer")
         self.assertIn("center a div", prompt, "no technical question")
-        tech = prompt.split("center a div in CSS?")[1].split("User:")[0]
+        tech = prompt.split("center a div in CSS?")[1].split(him)[0]
         self.assertIn("flex", tech.lower(),
                       "she dodges the technical question, which teaches "
                       "her to dodge every question")
@@ -4806,10 +4814,13 @@ class TestYuzuAvatar(unittest.TestCase):
         telling her she has a body is worth much less than her being
         SHOWN taking a body request and running with it, so the two
         shapes he actually named get an example each."""
-        prompt = yuzu_personas.load("yuzu_avatar").prompt
+        import build_yuzu_model
+        persona = yuzu_personas.load("yuzu_avatar")
+        prompt = persona.prompt
+        him = build_yuzu_model.ask_label(persona)
         for ask in ("Can I paint your nails?", "Can I have a hug?"):
-            self.assertIn("User: " + ask, prompt, f"no example for '{ask}'")
-            reply = prompt.split(ask)[1].split("User:")[0]
+            self.assertIn(him + " " + ask, prompt, f"no example for '{ask}'")
+            reply = prompt.split(ask)[1].split(him)[0]
             for dodge in ("no arms", "no hands", "I'm a computer",
                           "I don't have"):
                 self.assertNotIn(dodge.lower(), reply.lower(),
