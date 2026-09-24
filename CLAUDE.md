@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 805 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 806 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,35 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HER CODE IN CODE BOXES (Sept 24)
+
+**The wall fix held on the board**: asked again to teach him Python,
+she answered properly -- correct examples, no "user", no invented
+questions. It ran to the reply ceiling and stopped at "...how
+machines"; "continue" is the answer, as it always has been. She also
+offered the Jetson's camera, which this deck does not have.
+
+Ghost, shown her lesson with the ``` fences on screen as text: *"yes"*
+to proper code boxes.
+
+**`fill()` in `zero.html`.** A fenced block becomes a monospace box
+holding EXACTLY what she wrote, and **it skips `spoken()` entirely** --
+that strips `[brackets]` as stage directions, and `nums = [1, 2, 3]` is
+Python, not a gesture. The words around it are cleaned as before, and
+`inline code` is a small chip. No wrapping inside a box, because
+Python's indentation IS the program; a long line scrolls inside its
+box, and the page never scrolls sideways (measured at 1024 and 412).
+**An unclosed fence is still code**, since her replies can hit the
+ceiling mid-block. textContent throughout, never innerHTML. Her voice
+is unchanged: the server already drops ``` blocks before she speaks.
+
+Rendered at 1024x600 and 412 with her REAL lesson text, and a test runs
+the page's own `fill()` under node with a tiny stand-in DOM. **Its
+first version failed a correct page**: the "no innerHTML" check matched
+the page's own comment saying *never innerHTML* -- the grep-matches-
+prose trap, in the test written this round. Comments are stripped
+first now. **One test, five breaks, all red. 805 -> 806.**
 
 ## ZERO WROTE HIS SIDE OF THE CONVERSATION (Sept 24)
 

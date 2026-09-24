@@ -148,6 +148,25 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
 .her { color: var(--her); text-shadow: 0 0 6px rgba(255,45,149,.30); }
 .turn .by { opacity: .75; }
 .her.pending { color: var(--dim); text-shadow: none; }
+
+/* HER CODE, AS CODE. Ghost, Sept 24, shown her Python lesson with the
+   ``` fences sitting on screen as text: "yes" to proper code boxes. She
+   is the one he brings code to. Monospace, no wrapping -- Python's
+   indentation IS the program -- so a long line scrolls inside its box
+   and never pushes the page sideways. A pink edge says whose it is. */
+.turn pre.code {
+  display: block; max-width: 100%; margin: 8px 0; padding: 10px 12px;
+  background: #0b0b0b; color: #f3e9f0; text-shadow: none;
+  border: 1px solid var(--edge); border-left: 2px solid var(--her);
+  border-radius: 3px;
+  font: 14.5px/1.5 ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  white-space: pre; overflow-x: auto; overflow-wrap: normal;
+}
+.turn code {
+  font: .92em ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  background: #161616; color: #f3e9f0; text-shadow: none;
+  padding: 1px 5px; border-radius: 3px;
+}
 .her.pending .by { color: var(--her); }
 .her.pending .dots { animation: blink 1.2s steps(4) infinite; }
 @keyframes blink { 0% { opacity: .3 } 50% { opacity: 1 } 100% { opacity: .3 } }
@@ -306,10 +325,57 @@ function entry(cls, by, text) {
   return turn;
 }
 
+// HER CODE, SHOWN AS CODE. A ``` block becomes a code box holding
+// EXACTLY what she wrote: it skips spoken() entirely, because that
+// strips [brackets] as stage directions -- and `nums = [1, 2, 3]` is
+// Python, not a gesture. The words around it are cleaned as before, and
+// `inline code` gets a small monospace chip. textContent throughout,
+// never innerHTML: what she writes is shown as text, whatever is in it.
+//
+// AN UNCLOSED FENCE IS STILL CODE. Her replies can hit the ceiling
+// mid-block, and the tail of a program shown as prose would lose its
+// indentation and its brackets.
+function fill(turn, text) {
+  text.split('```').forEach((part, i) => {
+    if (i % 2) {
+      const lines = part.replace(/^[ \t]*\n/, '').split('\n');
+      // "```python" -- the language tag is a label, not a line of code.
+      if (lines.length > 1 && /^[\w+#.-]*$/.test(lines[0].trim())) lines.shift();
+      const code = lines.join('\n').replace(/\s+$/, '');
+      if (!code) return;
+      const pre = document.createElement('pre');
+      pre.className = 'code';
+      pre.textContent = code;
+      turn.appendChild(pre);
+      return;
+    }
+    const prose = spoken(part);
+    if (!prose) return;
+    prose.split(/(`[^`\n]+`)/).forEach(bit => {
+      if (/^`[^`\n]+`$/.test(bit)) {
+        const chip = document.createElement('code');
+        chip.textContent = bit.slice(1, -1);
+        turn.appendChild(chip);
+      } else if (bit) {
+        turn.appendChild(document.createTextNode(bit));
+      }
+    });
+  });
+}
+
 function said(pending, text) {
   const words = spoken(text);
   pending.remove();
-  entry('her', 'Zero', words || text.trim());
+  const turn = entry('her', 'Zero', '');
+  fill(turn, text);
+  // Everything cleaned away (a reply that was all stage direction):
+  // show it as it came rather than an empty line.
+  if (turn.childNodes.length <= 2 && !turn.lastChild.textContent.trim()) {
+    turn.appendChild(document.createTextNode(text.trim()));
+  }
+  log.scrollTop = log.scrollHeight;
+  // The server drops ``` blocks before her voice says anything, so the
+  // same text as before goes to it -- she never reads code aloud.
   hear(words || text.trim());
 }
 

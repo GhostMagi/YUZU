@@ -4149,6 +4149,71 @@ class TestTheCastIsTwo(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(json.loads(out.stdout), list(cases.values()))
 
+    def test_zeros_CODE_is_shown_exactly_as_she_wrote_it(self):
+        """Ghost, Sept 24, her Python lesson on screen with the ```
+        fences sitting there as text: "yes" to proper code boxes.
+
+        The load-bearing half is that code SKIPS the cleanup her words
+        go through, which strips [brackets] as stage directions --
+        `nums = [1, 2, 3]` is Python, not a gesture. Run under node with
+        a tiny stand-in page when node is there; the pieces that matter
+        are refused either way."""
+        page = (Path(__file__).parent / "ui" / "zero.html").read_text()
+        # COMMENTS STRIPPED FIRST -- the first version matched the page's
+        # own note saying "never innerHTML" and went red on a correct
+        # page. The grep-matches-prose trap, in the test written for it.
+        code = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
+        code = re.sub(r"/\*.*?\*/", " ", code, flags=re.S)
+        code = "\n".join(ln.split("//")[0] if "://" not in ln else ln
+                         for ln in code.splitlines())
+        self.assertFalse("innerHTML" in code,
+                         "her words reach the page as HTML, not as text")
+        said = code[code.index("function said(pending, text)"):]
+        said = said[:said.index("\n}\n")]
+        self.assertTrue("fill(turn, text)" in said,
+                        "her reply is shown without its code boxes")
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own functions")
+        fns = ""
+        for name in ("function spoken(text)", "function fill(turn, text)"):
+            body = page[page.index(name):]
+            fns += body[:body.index("\n}\n") + 3] + "\n"
+        cases = [
+            "Look:\n```python\nnums = [1, 2, 3]\nfor n in nums:\n    print(n * 2)\n```\n"
+            "Run `python3 x.py` to see *each* line.",
+            # Cut off by the reply ceiling mid-block: still code.
+            "Try:\n```python\nfor i in range(3):\n    print(i)",
+            "[leans in] Here:\n```\nx = [0]\n```",
+        ]
+        script = fns + """
+const document = {
+  createElement: t => ({ tag: t, className: '', textContent: '', kids: [],
+                         appendChild(c) { this.kids.push(c); } }),
+  createTextNode: t => ({ tag: '#text', textContent: t }),
+};
+console.log(JSON.stringify(%s.map(text => {
+  const turn = document.createElement('div');
+  fill(turn, text);
+  return turn.kids.map(k => [k.tag, k.textContent]);
+})));""" % json.dumps(cases)
+        import subprocess
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        self.assertEqual(got[0], [
+            ["#text", "Look:"],
+            ["pre", "nums = [1, 2, 3]\nfor n in nums:\n    print(n * 2)"],
+            ["#text", "Run "], ["code", "python3 x.py"],
+            ["#text", " to see each line."]],
+            "her code lost its brackets, its indentation or its box")
+        self.assertEqual(got[1], [["#text", "Try:"],
+                                  ["pre", "for i in range(3):\n    print(i)"]],
+                         "a block cut off mid-way was shown as prose")
+        self.assertEqual(got[2], [["#text", "Here:"], ["pre", "x = [0]"]],
+                         "a stage direction survived, or code was cleaned")
+
     def test_zero_does_not_claim_a_fix_she_cannot_make(self):
         """Ghost, on the board: "you still got a small bug. fixing now
         <3". Zero: "Aha -- found it. A memory leak in the background
