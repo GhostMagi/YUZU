@@ -13,9 +13,11 @@
   NEW ART, Sept 24: "Make this Yuzus new art. Maybe change her
   background to be a bit more lavender too... Remove her old art and
   clothes switch feature maybe just make this one slightly 'breathe'".
-  One picture now (ui/yuzu/yuzu.jpg), no wardrobe, no /outfits.json. It
-  is a bust portrait on a white ground, so she is shown as a PORTRAIT
-  CARD: the white is the card, framed, and the card breathes.
+  One picture now (ui/yuzu/yuzu.png), no wardrobe, no /outfits.json.
+  Then: "can u take the white background out? Like make it go fluidly
+  with the page". So the white is CUT OUT (ui/yuzu/ART.txt has the
+  recipe), she stands straight on the lavender, and the bottom edge of
+  the bust fades into the room instead of ending in a hard line.
 
   The room is lavender, his call. The hot pink stays: that is her
   character and lives in her persona, not a chassis colour.
@@ -135,21 +137,27 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   0%, 100% { opacity: .28 }
   50%      { opacity: .8 }
 }
-/* A PORTRAIT CARD. His picture is a bust on a white ground, so the
-   white IS the card: framed, rounded, lit from behind by the pink glow.
-   96% of the stage, not 100%: the breath scales her 1.2% and needs
-   room, and `overflow: hidden` on the stage would clip the top. */
+/* SHE STANDS IN THE ROOM, no frame. The white of his picture is cut
+   out, so she sits on the lavender itself; the bottom of the bust fades
+   out rather than stopping at a hard edge. 96%, not 100%: the breath
+   scales her 1.2% and needs headroom.
+
+   MAX height and width with the size left auto, so the box IS the
+   picture at every width -- a fixed `height` letterboxed her at 412.
+
+   NO drop-shadow: the fade's mask clips a shadow to her RECTANGLE, and
+   that drew a dark box behind her. Found by rendering it. */
 #yuzu {
-  /* MAX height and width with the size left auto, so the box IS the
-     picture at every screen size and the frame never outlines empty
-     space -- `height: 96%` fixed the box and letterboxed her on a
-     phone. */
   max-height: 96%; max-width: 46%; width: auto; height: auto;
   object-fit: contain; object-position: bottom center;
-  border-radius: 14px;
-  border: 2px solid color-mix(in srgb, var(--pink) 45%, var(--edge));
-  box-shadow: 0 0 0 6px color-mix(in srgb, var(--dusk) 70%, transparent),
-              0 14px 34px rgba(8, 4, 16, .6);
+  /* The bust is cropped at the bottom AND at both sleeves, so all three
+     edges fade; the two fades are INTERSECTED, so a corner fades twice. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 84%, transparent),
+                      linear-gradient(to right, transparent, #000 9%, #000 91%, transparent);
+  -webkit-mask-composite: source-in;
+          mask-image: linear-gradient(to bottom, #000 84%, transparent),
+                      linear-gradient(to right, transparent, #000 9%, #000 91%, transparent);
+          mask-composite: intersect;
   animation: breathe 5.5s ease-in-out infinite;
   position: relative;
   transform-origin: bottom center;
@@ -258,7 +266,7 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   <div id="glow"></div>
   <!-- A REAL src, not one JavaScript has to supply: she is on screen
        whatever the server is doing. -->
-  <img id="yuzu" src="yuzu/yuzu.jpg" alt="Yuzu">
+  <img id="yuzu" src="yuzu/yuzu.png" alt="Yuzu">
   <div id="says"></div>
 </div>
 

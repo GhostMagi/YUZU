@@ -4771,6 +4771,26 @@ class TestYuzuAvatar(unittest.TestCase):
         self.assertFalse(hasattr(yuzu_face, "outfits"),
                          "the server still has a wardrobe route")
 
+    def test_her_white_is_CUT_OUT_and_she_stands_in_the_room(self):
+        """Ghost, Sept 24: "can u take the white background out? Like
+        make it go fluidly with the page". Her picture carries its own
+        transparency (a PNG with alpha, cut from ui/art_in by its recipe)
+        so no white box can come back, and nothing on her draws a box
+        either: a drop-shadow under the edge fade was clipped to her
+        rectangle and drew a dark one, found by rendering."""
+        import struct
+        png = self.ART / "yuzu.png"
+        head = png.read_bytes()[:26]
+        self.assertEqual(head[:8], b"\x89PNG\r\n\x1a\n", "her picture is not a PNG")
+        self.assertEqual(head[25], 6, "her picture has no transparency, so "
+                         "the white background is back")
+        self.assertTrue((self.PAGE.parent / "art_in" / "yuzu_portrait.jpg").exists(),
+                        "the original she was cut from is gone")
+        rule = re.search(r"#yuzu\s*\{([^}]*)\}", self.page_code()).group(1)
+        self.assertIn("mask-image", rule, "her cropped edges end in a hard line")
+        self.assertNotIn("drop-shadow", rule, "a shadow under the fade draws a box")
+        self.assertNotIn("border:", rule, "she is framed again")
+
     def test_she_breathes_SLIGHTLY(self):
         """His word. A breath, upward from the bottom edge so it never
         swells into the ask bar, and small enough to be felt rather

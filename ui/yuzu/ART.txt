@@ -1,16 +1,23 @@
 YUZU — where her picture came from
 ==================================
 
-  yuzu.jpg   735x949 JPEG, white background. A bust portrait: pale
-             blonde twin tails, pink eyes, pink frilled blouse.
+  yuzu.png   735x949 RGBA, white background cut out.
 
-             Sent by Ghost on Sept 24 2026: "Make this Yuzus new art."
+             Cut from ui/art_in/yuzu_portrait.jpg (735x949 JPEG, a bust
+             on white), sent by Ghost on Sept 24 2026: "Make this Yuzus
+             new art", then "can u take the white background out? Like
+             make it go fluidly with the page". To redo it:
+
+                 RECIPES["yuzu_portrait"] in yuzu_cutout.py
+                 (lo=6, hi=24, pockets, keep=<the oval of her face>)
+
+             `pockets` clears the white trapped between hair strands;
+             on its own it also ate her teeth and the shine on her hair,
+             so `keep` protects an oval around her face.
+
              It replaced the two cut-out winter outfits (zebra.png and
              cream.png) and the outfit switcher with them; both are in
              git (`git show cb088ba:ui/yuzu/zebra.png`).
-
-NOT CUT OUT, on purpose. The page shows it as a framed portrait card,
-so the white ground is the card rather than a backdrop to remove.
 
 PROVENANCE IS NOT RECORDED, same as her earlier art: it arrived as a
 finished image and nobody wrote down where it came from.

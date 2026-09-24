@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 812 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 813 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -50,6 +50,18 @@ character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
 ## YUZU'S NEW ART, AND THE WARDROBE IS GONE (Sept 24)
+
+**THEN THE WHITE CAME OUT**, his ask the same night: *"can u take the
+white background out? Like make it go fluidly with the page"*. The
+original is `ui/art_in/yuzu_portrait.jpg`; `yuzu.png` is cut from it
+by `RECIPES["yuzu_portrait"]`. **`pockets` on its own ate her TEETH and
+the shine on her hair** (both white and enclosed), so `lift()` gained
+`keep=`: an oval of her face that pockets does not reach. Rendered
+three ways on the page colour and looked at, thirty-sixth time. The
+card frame is gone; the bust's cropped bottom and sleeves FADE into the
+room (two mask gradients, intersected). **A drop-shadow drew a dark
+box** -- the fade's mask clips it to her rectangle -- so there is none;
+a test pins that and the PNG's alpha. 812 -> 813.
 
 Ghost, with a new picture: *"Make this Yuzus new art. Maybe change her
 background to be a bit more lavender too... Remove her old art and

@@ -114,9 +114,16 @@ RECIPES = {
     # Yuzu's cream poncho sits a few levels off the white page, so the
     # tolerance has to stay under that gap or the fill walks into her.
     "yuzu_outfits":    dict(lo=3, hi=9),
+    # Sept 24, her new bust portrait on white. `pockets` clears the white
+    # trapped between hair strands -- and on its own it also took her
+    # TEETH and the shine on her hair, which are white too and enclosed.
+    # `keep` is the oval of her face where pockets does not reach.
+    # Found by rendering all three ways on the page colour and looking.
+    "yuzu_portrait":   dict(lo=6, hi=24, pockets=True,
+                            keep=(215, 80, 535, 470)),
 }
 DEFAULTS = dict(lo=14, hi=58, denoise=1, pockets=False, seeds=(),
-                trim=0, halo=True)
+                trim=0, halo=True, keep=None)
 
 
 def _dist(a, b):
@@ -194,8 +201,19 @@ def trim_to_art(cut, floor=200, margin=6):
 
 
 def lift(image, lo=14, hi=58, denoise=1, pockets=False, seeds=(),
-         trim=0, halo=True):
+         trim=0, halo=True, keep=None):
     """One RGB image in, one RGBA image out, backdrop removed."""
+    if keep and pockets:
+        # POCKETS EVERYWHERE BUT THE OVAL `keep` (x0, y0, x1, y1): the cut
+        # with pockets, with the cut without them laid over that oval.
+        from PIL import ImageDraw, ImageFilter
+        args = dict(lo=lo, hi=hi, denoise=denoise, seeds=seeds, halo=halo)
+        cleared = lift(image, pockets=True, **args)
+        plain = lift(image, pockets=False, **args)
+        oval = Image.new("L", cleared.size, 0)
+        ImageDraw.Draw(oval).ellipse(keep, fill=255)
+        out = Image.composite(plain, cleared, oval.filter(ImageFilter.GaussianBlur(4)))
+        return trim_to_art(out, trim) if trim else out
     from collections import deque
     im, test, _bg = prepare(image, denoise)
     w, h = im.size
