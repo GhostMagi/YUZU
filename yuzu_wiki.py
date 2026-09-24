@@ -493,6 +493,22 @@ def _raw_exact(term, path):
     return raw in (want, _singular(want)) or _singular(raw) == _singular(want)
 
 
+def _score(term, path):
+    """How well a path's TITLE matches what he typed: 3 exact, 2 one
+    starts the other, 1 every word present, 0 only the body matched."""
+    want = _singular(re.sub(r"[^a-z0-9]+", " ", (term or "").lower()).strip())
+    got = _singular(_title_of(path))
+    if not want:
+        return 0
+    if got == want:
+        return 3                      # "fish" -> Fish
+    if got.startswith(want) or want.startswith(got):
+        return 2                      # "fish" -> Fish farming
+    if all(w in got.split() for w in want.split()):
+        return 1                      # every word is in the title
+    return 0                          # only the BODY matched
+
+
 def rank(term, paths):
     """Search hits, best TITLE MATCH first.
 
@@ -515,14 +531,7 @@ def rank(term, paths):
         return list(paths)
 
     def score(path):
-        got = _singular(_title_of(path))
-        if got == want:
-            return 3                      # "fish" -> Fish
-        if got.startswith(want) or want.startswith(got):
-            return 2                      # "fish" -> Fish farming
-        if all(w in got.split() for w in want.split()):
-            return 1                      # every word is in the title
-        return 0                          # only the BODY matched
+        return _score(term, path)
 
     def key(pair):
         i, path = pair
@@ -569,17 +578,34 @@ def look_up(term, max_chars=MAX_CHARS):
     book = book_name()
     guesses = []
     if book:
-        for word in (term, _singular(term)):
+        words = [term, _singular(term)]
+        # AN ABBREVIATION IS TITLED IN CAPITALS. Sept 24: `/wiki emp` got
+        # (R)-MDMA. "Emp" is not a page and `EMP` is; with the real title
+        # missed, the best title match left was `EMP-01` -- one of that
+        # drug's trial names, which redirects to it -- and she explained
+        # the article she was handed. So a short single word is asked
+        # for in capitals too, after the ordinary spelling.
+        if term.isalpha() and 2 <= len(term) <= 5:
+            words.append(term.upper())
+        for word in words:
             title = word[:1].upper() + word[1:]
             guess = "/content/%s/%s" % (
                 book, urllib.parse.quote(title.replace(" ", "_")))
             if guess not in guesses:
                 guesses.append(guess)
     fallback = None
+    stray = None
+    exact_list = False
     for path in guesses + [p for p in rank(term, paths)[:3]
                            if p not in guesses]:
         if not path.startswith("/"):
             path = "/" + path
+        # ONCE WHAT HE TYPED TURNED OUT TO BE A LIST OF MEANINGS, only a
+        # page NAMED what he typed can beat it -- "Mercury (planet)" does;
+        # a near-miss title like `EMP-01` does not. The list is the honest
+        # answer: she can say what it might mean and ask which.
+        if exact_list and path not in guesses and _score(term, path) < 3:
+            continue
         try:
             page = _get(path)
         except Exception:
@@ -588,10 +614,24 @@ def look_up(term, max_chars=MAX_CHARS):
         parser.feed(page)
         text = parser.text()
         if len(text) < 80:          # a stub or a redirect, try the next
+            # ...but a SHORT list of meanings for exactly what he typed
+            # still rules out the near misses. The mini archive keeps a
+            # page's opening lines, so its `EMP` can be "EMP may refer
+            # to:" with the list itself cut away.
+            if re.search(r"\brefers? to\b", text) and \
+                    (path in guesses or _raw_exact(term, path)):
+                exact_list = True
             continue
         title = parser.title or term
-        # A DISAMBIGUATION PAGE IS A LIST OF LINKS, whatever its title
-        # says -- "Mercury" is one. Kept only as a last resort.
+        # A NEAR-MISS TITLE THAT LANDS SOMEWHERE ELSE ENTIRELY is not a
+        # match. `EMP-01` scored "starts with emp" and redirected to
+        # (R)-MDMA. Held only to prefix matches from the shortlist: an
+        # exact alias ("Big Apple" -> New York City) and a body-only
+        # search hit never claimed a near-miss name.
+        if path not in guesses and _score(term, path) == 2 and \
+                _score(term, "/" + title.replace(" ", "_")) == 0:
+            stray = stray or (title, text)
+            continue
         if len(text) > max_chars:
             # Cut on a sentence so she is never handed half a clause.
             cut = text[:max_chars]
@@ -601,11 +641,19 @@ def look_up(term, max_chars=MAX_CHARS):
         # says -- "Mercury" is one. Kept only as a last resort.
         if re.search(r"\bmay (also )?refer to\b", text[:400]):
             fallback = fallback or (title, text)
+            if path in guesses or _raw_exact(term, path):
+                exact_list = True
             continue
         return title, text
 
     if fallback:
         return fallback
+    if exact_list:
+        return None, (f"'{term}' means more than one thing in the archive "
+                      "-- try the full name.")
+    if stray:
+        return None, (f"Nothing in the archive is called '{term}' -- "
+                      "try the full name.")
     return None, f"Found '{term}' but couldn't read the article."
 
 

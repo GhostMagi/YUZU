@@ -11540,6 +11540,104 @@ class TestHerEncyclopedia(unittest.TestCase):
             self.assertEqual(self.wiki.look_up("mercury")[0],
                              "Mercury (planet)")
 
+    def test_EMP_is_never_an_article_about_a_DRUG(self):
+        """MEASURED on his board, Sept 24: `/wiki emp` and Zero explained
+        (R)-MDMA. "Emp" is not a page -- an abbreviation is titled `EMP`
+        -- and with the real title missed, the best title match left was
+        `EMP-01`, one of that drug's trial names, which redirects to it.
+        Three ways the archive can hold EMP; none of them ends at the
+        drug. The redirect is simulated the way kiwix-serve answers it:
+        the near-miss path serves the TARGET's page."""
+        body = lambda t, x: "<h1>%s</h1><p>%s %s</p>" % (t, x, "word " * 30)
+        book = self.FULL[1]
+        drug = (("/content/%s/EMP-01" % book,),
+                body("(R)-MDMA", "(R)-MDMA is a version of MDMA."))
+        suggest = (("/suggest?", "content="),
+                   '[{"value": "EMP-01", "kind": "path", "path": "EMP-01"}]')
+        cases = {
+            "an article": body("Electromagnetic pulse",
+                               "An electromagnetic pulse is a burst of energy."),
+            "a list": body("EMP", "EMP may refer to: Electromagnetic pulse, "
+                                  "a burst of energy; EMP Museum."),
+            "nothing": None,
+            # The mini archive keeps a page's opening lines: its list of
+            # meanings can be the first line and nothing else.
+            "a cut-short list": "<h1>EMP</h1><p>EMP may refer to:</p>",
+        }
+        for held, page in cases.items():
+            with self.subTest(archive=held):
+                routes = [(("/catalog/v2/entries",),
+                           _feed(_catalog_entry(*self.FULL))), suggest, drug]
+                if page:
+                    routes.append((("/content/%s/EMP" % book,), page))
+                base, asked = _kiwix_stub(self, routes)
+                self.point_at(base)
+                with mock.patch.object(self.wiki, "available", return_value=True):
+                    title, text = self.wiki.look_up("emp")
+                self.assertNotIn("MDMA", "%s %s" % (title, text),
+                                 "EMP became a drug again (%s)" % held)
+                if held == "an article":
+                    self.assertEqual(title, "Electromagnetic pulse")
+                if held == "a list":
+                    self.assertIn("may refer to", text,
+                                  "she was not given the meanings to choose from")
+                if held == "nothing":
+                    self.assertIsNone(title)
+                    self.assertIn("emp", text, "the verdict does not say what was asked")
+                if held == "a cut-short list":
+                    self.assertIsNone(title, "a near miss beat a list of meanings")
+                    self.assertIn("more than one thing", text)
+                self.assertTrue(any(a.endswith("/EMP") for a in asked),
+                                "EMP was never asked for in capitals")
+
+    def test_a_LIST_of_meanings_beats_a_near_miss_article(self):
+        """Once what he typed is itself a list of meanings, only a page
+        NAMED what he typed can beat it ("Mercury (planet)" does). A
+        near-miss title that is a real article of its own does not --
+        the list lets her say what it might mean and ask which."""
+        body = lambda t, x: "<h1>%s</h1><p>%s %s</p>" % (t, x, "word " * 30)
+        book = self.FULL[1]
+        base, _ = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(_catalog_entry(*self.FULL))),
+            (("/suggest?", "content="),
+             '[{"value": "EMP-01", "kind": "path", "path": "EMP-01"}]'),
+            (("/content/%s/EMP-01" % book,),
+             body("EMP-01", "EMP-01 is the name of a clinical trial.")),
+            (("/content/%s/EMP" % book,),
+             body("EMP", "EMP may refer to: Electromagnetic pulse; EMP Museum."))])
+        self.point_at(base)
+        with mock.patch.object(self.wiki, "available", return_value=True):
+            title, text = self.wiki.look_up("emp")
+        self.assertEqual(title, "EMP", "a near-miss article beat the list of meanings")
+
+    def test_a_long_word_is_not_shouted_and_a_real_alias_still_lands(self):
+        """The capitals are for abbreviations: "cat" still finds `Cat`
+        first, and a word longer than five letters is never asked for
+        in capitals. And an EXACT alias that redirects elsewhere is a
+        real answer, not a stray: "big apple" -> New York City."""
+        body = lambda t, x: "<h1>%s</h1><p>%s %s</p>" % (t, x, "word " * 30)
+        book = self.FULL[1]
+        base, asked = _kiwix_stub(self, [
+            (("/catalog/v2/entries",), _feed(_catalog_entry(*self.FULL))),
+            (("/suggest?", "content="),
+             '[{"value": "Big Apple", "kind": "path", "path": "Big_Apple"}]'),
+            (("/content/%s/Big_Apple" % book,),
+             body("New York City", "New York City is the largest city."))])
+        self.point_at(base)
+        with mock.patch.object(self.wiki, "available", return_value=True):
+            title, _ = self.wiki.look_up("big apple")
+        self.assertEqual(title, "New York City", "an exact alias was refused")
+        # A single LONG word with no page of its own: never asked for in
+        # capitals. (The first draft checked "big apple", which has a
+        # space and so could never be shouted -- vacuous, caught by its
+        # own break-check.)
+        with mock.patch.object(self.wiki, "available", return_value=True):
+            self.wiki.look_up("zzyzzyxwords")
+        self.assertFalse(any("ZZYZZYXWORDS" in a for a in asked),
+                         "a long ordinary word was asked for in capitals")
+        self.assertEqual(self.wiki._score("emp", "/content/b/EMP-01"), 2)
+        self.assertEqual(self.wiki._score("emp", "/x/(R)-MDMA"), 0)
+
     def test_the_page_FOOTER_is_not_the_article(self):
         """Also measured on his board: the extract ran on into
         "Category: ... Hidden categories: ... This page is issued from

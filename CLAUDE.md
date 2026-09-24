@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 816 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 819 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,40 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## `/wiki emp` WAS AN ARTICLE ABOUT A DRUG (Sept 24)
+
+His screen: `/wiki emp`, and Zero explained **(R)-MDMA**. *"Lol nothing
+to do with EMP."* She explained exactly what she was handed; the lookup
+handed her the wrong page.
+
+**Reproduced on a REAL kiwix-serve** with a tiny archive built by
+libzim: `/suggest?term=emp` answers `EMP`, `EMP-01`, `Empire`, and
+`EMP-01` (one of that drug's trial names) answers **302 to `(R)-MDMA`**.
+The old code asked for "Emp" by name (not a page -- abbreviations are
+titled in capitals), passed over `EMP` because it is a list of meanings
+(or, in the mini archive, a list cut to its first line and skipped as a
+stub), and took the next best TITLE match, `EMP-01` -- which landed on
+the drug. Old code on the real server: (R)-MDMA twice out of three
+archive shapes, his exact screen.
+
+Three rules, each with its own break-check:
+- **Capitals**: a short single word is also asked for BY NAME in
+  capitals (`EMP`), after the ordinary spelling, so `Cat` still wins.
+- **A near-miss that redirects somewhere unrelated is not a match**
+  (`EMP-01` -> `(R)-MDMA`). Held to prefix matches only: an exact alias
+  (`Big Apple` -> New York City) and a body-only hit are untouched.
+- **Once what he typed IS a list of meanings, only a page named what he
+  typed can beat it** ("Mercury (planet)" still does). She gets the
+  list and says what it might mean; a list cut short says "'emp' means
+  more than one thing in the archive -- try the full name".
+
+New code on the real server: Electromagnetic pulse / the EMP list / that
+sentence. **A stub test of mine was vacuous first**: "never shout a long
+word" checked "big apple", which has a space and can never be shouted --
+its own break-check stayed green. Three tests, six breaks, all red.
+816 -> 819. **UNMEASURED on his archive**, which the container cannot
+reach: `/wiki emp` again after an Update decides it.
 
 ## YUZU KNOWS HE IS GHOST (Sept 24)
 
