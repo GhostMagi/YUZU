@@ -55,7 +55,7 @@ So:
     roster         Yuzu, Four, Zero  (Cait, Mimi, Saya are `retired: yes`)
     Zero's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
     Four's prompt  5446 chars
-    tests          782, ~95s,  `python YUZU_TESTER.py`
+    tests          798, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -80,7 +80,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 782 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 798 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means
@@ -236,6 +236,14 @@ real board:
 - **She has a shape for a lookup** — one example, because handed 700
   characters of encyclopedia with no demonstration she answered
   *"I'm not going to try to summarize this information again."*
+
+- **Zero hears him** (Sept 24): the mic on her page, tap to talk,
+  tap to stop, faster-whisper `base.en` on the board. Needs `pull`
+  once to install, and Chrome told once to trust the page (the page
+  says how). Whether it hears HIM well is the open question -- he is
+  missing teeth; `small.en` is the stronger ear if not.
+- **Zero's sums are exact** (Sept 24): `maths: exact`, worked out in
+  `yuzu_maths` and handed to her beside what he typed.
 
 The round that decides any of these is the next time he talks to her.
 

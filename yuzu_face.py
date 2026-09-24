@@ -1677,6 +1677,13 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
         has_wiki = yuzu_personas.load(key).hardware == "cyberdeck"
     except Exception:
         has_wiki = drives_face
+    # EXACT SUMS, for a character whose settings ask for them (Zero).
+    # Worked out in code inside ground(), beside the /wiki lookup, so
+    # the page and the terminal chat get the same thing.
+    try:
+        exact = yuzu_brain.wants_exact_maths(yuzu_personas.load(key))
+    except Exception:
+        exact = False
 
     def face(*args, **kw):
         if drives_face:
@@ -1690,7 +1697,7 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
     # on a character who has never heard of an encyclopedia.
     problem = None
     if has_wiki:
-        text, problem = yuzu_brain.ground(text)
+        text, problem = yuzu_brain.ground(text, maths=exact)
     if problem:
         # The VERDICT, in the bubble, where he is already looking --
         # not silence, and not a sentence she never said.
@@ -2148,6 +2155,35 @@ class _Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0].rstrip("/")
+        if path == "/listen":
+            # HIS VOICE IN, HIS WORDS OUT -- see yuzu_ears. The page
+            # recorded on his own device; this only turns it into text,
+            # and the page then sends that exactly as if he had typed
+            # it, through /say, so nothing about her turn is different.
+            #
+            # THE BODY IS AUDIO AND NOTHING ELSE. It is written to a
+            # temp file under a name chosen here, never one from the
+            # request, and the size is checked BEFORE it is read, so a
+            # huge upload costs nothing but the refusal.
+            try:
+                import yuzu_ears
+            except ImportError:
+                self._json({"ok": False, "said": "yuzu_ears.py isn't here."})
+                return
+            try:
+                size = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                size = 0
+            if size > yuzu_ears.MAX_BYTES:
+                self._json({"ok": False, "said": "That recording is too "
+                            "long for her -- keep it under a minute."})
+                return
+            audio = self.rfile.read(size) if size > 0 else b""
+            heard, problem = yuzu_ears.transcribe(
+                audio, self.headers.get("Content-Type", ""))
+            self._json({"ok": problem is None, "heard": heard,
+                        "said": problem})
+            return
         if path == "/say":
             try:
                 size = int(self.headers.get("Content-Length") or 0)

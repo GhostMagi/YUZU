@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 782 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 798 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,107 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ZERO HEARS HIM, AND HER SUMS ARE EXACT (Sept 24)
+
+Ghost, handed a list of what she could learn next: *"1 and 5 are
+approooooved. Bout time we set up listening. I just prefer typing tbh
+(im missing a lot of teeth) so lets make it so its only when i wana use
+the talk to her functionality. Maybe a button for the touch screen
+starts listening when i tap it, ends recording when i tap it again and
+bam?"*
+
+### Exact maths -- `yuzu_maths.py`, `maths: exact`
+
+**The prompt reduces, code guarantees, applied to numbers.** A 4B
+explains a sum well and can slip a digit in a long one, just as
+confidently. So when his message has a sum in it, `ground()` works it
+out in code and the answer rides in beside what he typed -- the /wiki
+shape:
+
+    What's 17 times 23? (The deck worked it out exactly: 17 × 23 = 391.)
+
+She explains the number; she never produces it. **Her 17 x 23 example
+carries the note in the exact words the code writes**, and a test
+derives one from the other.
+
+- **No `eval()`.** `ast`, walked by hand over a short list of nodes;
+  pinned by reading the module as code, since the docstring saying
+  "no eval()" would match itself as text.
+- **Huge powers are refused** (`9 ** 9 ** 9` would hold the server
+  for minutes). The break-check for that one HUNG rather than failed,
+  which is its own proof.
+- **What counts as a sum is narrow on purpose.** A hyphen, a slash or
+  an x between numbers is a date, a range or `the panel is 1024x600`
+  until the message asks for working out. A wrong note hands her a
+  confident number for a question he never asked. His real first
+  message to her is one of the pinned no-note cases.
+- **THE FIRST DRAFT DROPPED A LEADING MINUS**: `-5 x 3` came out as
+  `5 x 3 = 15`, the confident wrong answer this module exists to
+  prevent. Caught by trying it before wiring it in.
+- **Only `maths: exact` characters**, and never on a /wiki turn.
+  Four's turns are unchanged, driven through the real `answer()`.
+
+### Push-to-talk -- `yuzu_ears.py`, `POST /listen`, the mic on Zero's page
+
+**THE MICROPHONE IS WHATEVER HE IS HOLDING**, the same split as her
+voice the other way round: the board has no mic. The page records
+(MediaRecorder), `/listen` turns it into text with **faster-whisper**
+(CTranslate2 on the CPU, `base.en` int8, ~150MB -- not the PyTorch
+`openai-whisper`, the same call Kokoro made), and the text is sent
+through the same form as typing. Tap to start, tap to stop, and a
+forgotten recording stops itself at a minute. The mic is released the
+moment it stops, and her own voice is paused so it cannot end up in
+his clip.
+
+**A BROWSER ONLY HANDS A PAGE THE MIC WHEN IT TRUSTS THE PAGE**: https
+or localhost. His address is plain http on his WiFi. So the mic, when
+refused, says exactly how to fix it, with the page's own address: in
+Chrome, once per device, `chrome://flags/#unsafely-treat-insecure-
+origin-as-secure`, add the address, Enabled, Relaunch. **VERIFIED in
+real Chromium**: without it the page is refused and the note appears;
+with it `isSecureContext` is true and a fake-device recording went all
+the way through. **The headless-shell build ignores that setting**,
+which read at first as the instructions being wrong -- they were not.
+
+**Driven end to end in a browser**: a fake microphone, the real page,
+the real route, and a stand-in model that decodes the REAL clip with
+faster-whisper's own decoder (PyAV) -- 2.6 seconds of webm/opus in,
+his line out, sent, answered. Only Whisper itself was not run: Hugging
+Face is blocked from the container.
+
+**IT NEVER DOWNLOADS MID-TURN.** Every model load in `yuzu_ears` is
+`local_files_only=True`, pinned via `ast`; `pull` installs it once and
+fetches the model, with the size first, and a failure leaves typing
+exactly as it was. `yuzu_maths` and `yuzu_ears` joined the offline
+guard's list of turn-path modules.
+
+**UNVERIFIED ON HIS BOARD**: whether faster-whisper's aarch64 wheels
+install, and how well base.en hears him. `YUZU_WHISPER_MODEL=small.en`
+is the stronger ear (~480MB) if it mishears; that change should arrive
+with a pull, not as a command for him.
+
+### Found on the way
+
+- **`pull`'s Kokoro download block had lost its indentation the day it
+  was written** (Sept 16) and never ran: Python stopped at line 3,
+  printed nothing, and the voice setup could only ever report failure.
+  His board got its voice some other way. Fixed, and a property test
+  now compiles every quoted Python heredoc in every deck script.
+- **The suite ran `pull`'s setup blocks FOR REAL.** The harnesses copy
+  `pull` into a temp folder without `yuzu_voice.py`, so the voice
+  block called the real `pip` on every run -- and the ears block would
+  have installed 200MB and fetched a model mid-suite on his board.
+  `plant_ready_setup()` now puts stand-ins beside every copy.
+- **A cap test matched the text "60000", not the delay**, and stayed
+  green with the cap broken to `0 * 60000 + 1e12`. It reads the
+  number now. Grep-as-proxy, again, in a test written this round.
+- **A fake brain module had the old `ground(text)` signature** and
+  eight tests errored. Fixed in the fake, not by loosening the real
+  code: a stub must match what it stands in for.
+
+**Sixteen new tests, twenty breaks, all red once the cap test was
+fixed. 782 -> 798.**
 
 ## ZERO'S EMPHASIS WAS BEING DELETED, AND SHE "FIXED" A BUG SHE CANNOT SEE (Sept 24)
 

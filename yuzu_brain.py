@@ -36,6 +36,12 @@ try:
     import yuzu_wiki
 except ImportError:
     yuzu_wiki = None
+# Same guard: exact sums for a character who asks for them, and a
+# missing file costs the note, never the reply.
+try:
+    import yuzu_maths
+except ImportError:
+    yuzu_maths = None
 
 # Same guard as yuzu_all_in_one: Piper is a real binary and a real model
 # file, and neither exists on a phone. Absent, --chat just prints, which
@@ -334,6 +340,7 @@ class YuzuBrain:
         wants = str(self.persona.settings.get("think", "")).strip().lower() \
             if self.persona else ""
         self.think = False if wants in ("no", "false", "off", "0") else None
+        self.exact_maths = wants_exact_maths(self.persona)
         # Precedence: explicit options > persona settings > defaults.
         # Layered rather than dict(a, **b, **c) -- that form raises
         # TypeError the moment two layers set the same key, which is
@@ -711,8 +718,23 @@ def _is_kill_attempt(line):
         ("yuzu" in lowered or "brain" in lowered or lowered.endswith("kill"))
 
 
-def ground(text):
+def wants_exact_maths(persona):
+    """`maths: exact` in her settings. One reading of the setting, for
+    the brain and the face server both."""
+    try:
+        return str(persona.settings.get("maths", "")).strip().lower() == "exact"
+    except Exception:
+        return False
+
+
+def ground(text, maths=False):
     """Substitute a `/wiki` lookup into what he typed. (text, problem).
+
+    `maths` is for a character whose settings say `maths: exact`: a sum
+    in his message is worked out HERE, in code, and the answer rides in
+    beside what he typed, so she explains the number instead of
+    producing it. Never on a /wiki turn -- an encyclopedia paragraph is
+    full of numbers that nobody asked to add up. See yuzu_maths.
 
     `problem` is a sentence to show INSTEAD of asking her; None means
     carry on with `text`, whether or not a lookup happened.
@@ -740,6 +762,10 @@ def ground(text):
     silently hands her the whole line. Same mechanism that made `Quit.`
     fail to quit, and just as invisible on screen."""
     if "/wiki" not in text.lower():
+        if maths and yuzu_maths is not None:
+            worked = yuzu_maths.note(text)
+            if worked:
+                return "%s %s" % (text.rstrip(), worked), None
         return text, None
     if yuzu_wiki is None:
         return text, "yuzu_wiki.py isn't here"
@@ -855,7 +881,7 @@ def _cli(argv):
             brain.reset()
             print("(history cleared)\n")
             continue
-        text, problem = ground(text)
+        text, problem = ground(text, maths=brain.exact_maths)
         if problem:
             print(f"({problem})\n")
             continue

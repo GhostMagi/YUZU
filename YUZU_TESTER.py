@@ -3542,6 +3542,266 @@ def drive_route(path, body):
     return answered
 
 
+class TestExactMaths(unittest.TestCase):
+    """Ghost, Sept 24: "1 and 5 are approooooved" -- 1 being exact
+    maths for Zero. She runs on a 4B, which explains a sum well and can
+    slip a digit in a long one with exactly the same confidence.
+
+    PROMPT REDUCES, CODE GUARANTEES: the deck works the sum out in code
+    and the answer rides in beside what he typed, the way /wiki hands
+    her an article. She explains the number; she never has to make it.
+    """
+
+    def worked(self, text):
+        import yuzu_maths
+        return dict(yuzu_maths.sums(text))
+
+    def test_it_gets_the_sums_he_would_actually_type_RIGHT(self):
+        """Every answer checked against Python's own arithmetic, not
+        against a number typed into this file."""
+        import yuzu_maths
+        cases = {
+            "What's 17 times 23?": 17 * 23,
+            "17*23": 17 * 23,
+            "what is 123456789 * 987654321": 123456789 * 987654321,
+            "what's 2 + 2 * 3": 2 + 2 * 3,
+            "(3 + 4) * 5": (3 + 4) * 5,
+            "what's -5 * 3": -5 * 3,
+            "−5 × 3": -5 * 3,
+            "3 * -2": 3 * -2,
+            "what's 10 - -3": 10 - -3,
+            "2^10": 2 ** 10,
+            "12 squared": 12 ** 2,
+            "15% of 80?": 12,
+            "square root of 144": 12,
+            "what's 1,000,000 + 1": 1000001,
+            "what's 10 / 4": 2.5,
+        }
+        for text, want in cases.items():
+            found = yuzu_maths.sums(text)
+            self.assertEqual(len(found), 1, "no sum found in %r" % text)
+            got = found[0][1].replace(",", "")
+            self.assertEqual(float(got), float(want),
+                             "%r worked out as %s, not %s" % (text, got, want))
+        self.assertEqual(yuzu_maths.sums("what's 0.1 + 0.2")[0][1], "0.3",
+                         "a float artefact reached her")
+        self.assertIn("divides by zero", yuzu_maths.note("what's 7 divided by 0"))
+
+    def test_a_number_that_is_not_a_sum_gets_NO_note(self):
+        """A wrong note is worse than none: it hands her a confident
+        number for a question he never asked. Dates, ranges, the size
+        of his own screen, and his real first message to her."""
+        import yuzu_maths
+        for text in ("my birthday is 2026-09-24",
+                     "give me 3-4 sentences",
+                     "meet me 9/24",
+                     "the panel is 1024x600",
+                     "I tried 3 times",
+                     "I have 7.4GB RAM and 6 cores",
+                     "list 1, 2, 3",
+                     "hiii Zero, Welcome to my cyberdeck .-. 1st of its "
+                     "kind. AI cyberdeck of the 1st ever. Everyone uses "
+                     "Raspberry Pi. im using a Nvidia Jetson Nano Orin "
+                     "Super Devkit ;)"):
+            self.assertEqual(yuzu_maths.note(text), "",
+                             "%r got a sum it never asked for" % text)
+
+    def test_a_power_that_would_hold_the_server_is_REFUSED(self):
+        """9 ** 9 ** 9 is a valid sum that would hold the face server
+        for minutes. Refused, and quickly."""
+        import yuzu_maths
+        started = time.time()
+        self.assertEqual(yuzu_maths.note("what's 9 ** 9 ** 9"), "")
+        self.assertEqual(yuzu_maths.note("2 ^ 99999999"), "")
+        self.assertLess(time.time() - started, 2.0)
+
+    def test_there_is_no_eval(self):
+        """Read as CODE via ast, not as text: the docstring saying
+        "THERE IS NO eval()" would otherwise match itself."""
+        import ast as _ast
+        tree = _ast.parse((Path(__file__).parent / "yuzu_maths.py").read_text())
+        called = {n.func.id for n in _ast.walk(tree)
+                  if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)}
+        self.assertFalse(called & {"eval", "exec", "compile"},
+                         "a sum from his message reaches eval")
+
+    def test_only_a_character_who_ASKS_gets_it(self):
+        """`maths: exact` in her settings. Zero has it; Four does not,
+        and her turns must stay exactly as they were. Driven through
+        the face server's real answer(), stopped at ground() so nothing
+        reaches a model or a memory file."""
+        import yuzu_face, yuzu_brain
+        seen = {}
+
+        def record(text, maths=False):
+            seen[text] = maths
+            return text, "stopped here"
+
+        with mock.patch.object(yuzu_brain, "ground", record):
+            yuzu_face.answer("what's 17 times 23", "zero")
+            self.assertIs(seen.pop("what's 17 times 23"), True,
+                          "Zero's page never asked for exact maths")
+            yuzu_face.answer("what's 17 times 23", "four")
+            self.assertIs(seen.pop("what's 17 times 23"), False,
+                          "Four's turns grew a maths note she never asked for")
+        self.assertTrue(yuzu_brain.YuzuBrain(persona="zero").exact_maths)
+        self.assertFalse(yuzu_brain.YuzuBrain(persona="four").exact_maths)
+
+    def test_her_example_carries_the_note_the_code_WRITES(self):
+        """Examples beat rules: her 17 x 23 example shows the note in
+        the exact words the code produces, so a real turn looks like
+        one she has already been shown. Derived from the code, so a
+        change to either spelling goes red here."""
+        import yuzu_brain, yuzu_personas
+        prompt = yuzu_personas.load("zero").prompt
+        asked = "What's 17 times 23?"
+        turn, _ = yuzu_brain.ground(asked, maths=True)
+        self.assertNotEqual(turn, asked, "no note was written at all")
+        self.assertIn("Ghost: %s\n" % turn, prompt,
+                      "her example and the code disagree about the note")
+
+    def test_a_wiki_turn_never_gets_a_maths_note(self):
+        """An encyclopedia paragraph is full of numbers nobody asked to
+        add up."""
+        import yuzu_brain
+        extract = ("I looked up Cat and it says: what is 3 + 4 cats? "
+                   "Born 1879-1955. Tell me about Cat in your own words.")
+        with mock.patch.object(yuzu_brain.yuzu_wiki, "as_context",
+                               lambda tail: (extract, None)):
+            turn, problem = yuzu_brain.ground("/wiki cat", maths=True)
+        self.assertIsNone(problem)
+        self.assertNotIn("worked it out", turn)
+
+
+class TestHerEars(unittest.TestCase):
+    """Ghost, Sept 24: "Maybe a button for the touch screen starts
+    listening when i tap it, ends recording when i tap it again and
+    bam?" -- and "I just prefer typing tbh (im missing a lot of teeth)
+    so lets make it so its only when i wana use the talk to her
+    functionality."
+
+    The page records on HIS device, POST /listen turns it into text
+    with faster-whisper on the board, and the text is sent exactly as
+    if he had typed it. See yuzu_ears.py."""
+
+    def listen(self, audio, content_type="audio/webm;codecs=opus", size=None):
+        """The REAL /listen branch, with a raw audio body."""
+        import io, yuzu_face
+        handler = object.__new__(yuzu_face._Handler)
+        handler.path = "/listen"
+        handler.headers = {"Content-Length": str(len(audio) if size is None else size),
+                           "Content-Type": content_type}
+        handler.rfile = io.BytesIO(audio)
+        answered = {}
+        handler._json = lambda obj, code=200: answered.update(obj)
+        handler.do_POST()
+        return answered, handler.rfile
+
+    def test_a_recording_becomes_HIS_words(self):
+        """Driven through the route with a stand-in model. Also pins
+        that the clip reaches the decoder as a real file under a name
+        chosen here, with the right suffix, and is gone afterwards."""
+        import yuzu_ears
+        seen = {}
+
+        class Model:
+            def transcribe(self, path, **kw):
+                seen["path"], seen["there"] = path, os.path.exists(path)
+                seen["kw"] = kw
+                return iter([mock.Mock(text=" what's 17 times 23 ")]), None
+
+        with mock.patch.object(yuzu_ears, "_load", lambda: Model()), \
+                mock.patch.object(yuzu_ears, "why_not", lambda: ""):
+            said, _ = self.listen(b"\x1aE\xdf\xa3 fake webm")
+        self.assertEqual(said, {"ok": True, "heard": "what's 17 times 23",
+                                "said": None})
+        self.assertTrue(seen["there"], "the decoder was handed no file")
+        self.assertTrue(seen["path"].endswith(".webm"))
+        self.assertFalse(os.path.exists(seen["path"]),
+                         "his recording was left on the board")
+
+    def test_no_ears_yet_is_a_SENTENCE_and_typing_still_works(self):
+        """A missing ear costs the microphone, never the chat -- and the
+        sentence names the one word that fixes it."""
+        import yuzu_ears
+        with mock.patch.object(yuzu_ears, "why_not",
+                               lambda: yuzu_ears.NOT_INSTALLED):
+            said, _ = self.listen(b"some audio")
+        self.assertFalse(said["ok"])
+        self.assertIn("pull", said["said"])
+        said, _ = self.listen(b"")
+        self.assertFalse(said["ok"])
+        self.assertIn("Nothing was recorded", said["said"])
+
+    def test_an_oversized_upload_is_refused_BEFORE_it_is_read(self):
+        """The server binds 0.0.0.0. The size is checked from the
+        header, so a huge upload costs nothing but the refusal."""
+        import yuzu_ears
+        said, rfile = self.listen(b"x" * 10, size=yuzu_ears.MAX_BYTES + 1)
+        self.assertFalse(said["ok"])
+        self.assertEqual(rfile.tell(), 0, "it read the body before refusing it")
+
+    def test_she_NEVER_downloads_in_the_middle_of_a_turn(self):
+        """Her prompt says nothing she does reaches the internet, and a
+        transcription is part of her turn. Every model load in
+        yuzu_ears is local-only; `pull` is the one place a model is
+        fetched. Read as CODE via ast, so a docstring cannot pass it."""
+        import ast as _ast
+        tree = _ast.parse((Path(__file__).parent / "yuzu_ears.py").read_text())
+        loads = [n for n in _ast.walk(tree) if isinstance(n, _ast.Call)
+                 and getattr(n.func, "id", "") == "WhisperModel"]
+        self.assertTrue(loads, "no model load found at all")
+        for call in loads:
+            local = [k for k in call.keywords if k.arg == "local_files_only"]
+            self.assertTrue(local and getattr(local[0].value, "value", None) is True,
+                            "a model load in her turn can reach the internet")
+
+    def page_code(self):
+        page = (Path(__file__).parent / "ui" / "zero.html").read_text()
+        page = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
+        page = re.sub(r"/\*.*?\*/", " ", page, flags=re.S)
+        return "\n".join(ln.split("//")[0] if "chrome://" not in ln else ln
+                         for ln in page.splitlines())
+
+    def test_the_mic_listens_ONLY_between_his_taps(self):
+        """His spec, made into properties: the microphone is opened only
+        inside the button's own handler, it is RELEASED when the
+        recording stops, a forgotten recording stops itself, and what
+        she heard is sent through the same form as typing."""
+        code = self.page_code()
+        tap = code[code.index("mic.onclick"):]
+        self.assertEqual(code.count("getUserMedia("), tap.count("getUserMedia("),
+                         "the mic can be opened without his tap")
+        stop = tap[tap.index("recorder.onstop"):]
+        self.assertRegex(stop, r"getTracks\(\)\.forEach\(t => t\.stop\(\)\)",
+                         "the microphone stays open after he stops")
+        # The DELAY, read as a number -- the first version matched the
+        # text "60000" and stayed green with the cap broken to
+        # `0 * 60000 + 1e12`, because the spelling survived the break.
+        cap = re.search(r"setTimeout\(\(\) => \{\s*if \(recorder[^}]*"
+                        r"recorder\.stop\(\);\s*\},\s*(\d+)\s*\)", tap)
+        self.assertTrue(cap, "a forgotten recording runs forever")
+        self.assertLessEqual(int(cap.group(1)), 120000,
+                             "a forgotten recording runs for too long")
+        self.assertRegex(stop, r"input\.value = r\.heard;\s*form\.requestSubmit\(\)",
+                         "what she heard does not go the way typing goes")
+        self.assertRegex(tap, r"sound\.pause\(\)",
+                         "her own voice can end up in his recording")
+
+    def test_a_refused_mic_says_EXACTLY_how_to_fix_it(self):
+        """A browser only hands a page the mic when it trusts the page,
+        and his address is plain http. The note carries the setting's
+        name and the page's own address, so he can act on it without
+        anyone -- the verdict names the fix, same as everywhere else.
+        Verified in real Chromium: with that setting on, the page is
+        trusted and the mic records over http://ghostnano.local."""
+        code = self.page_code()
+        tap = code[code.index("mic.onclick"):]
+        self.assertIn("isSecureContext", tap)
+        self.assertIn("unsafely-treat-insecure-origin-as-secure", tap)
+        self.assertIn("location.origin", tap)
+
+
 class TestTheCastIsTwo(unittest.TestCase):
     """Ghost, Sept 20: "Can we actually remove saya cait and mimi? I
     dont need them they were laye night tests really. Like from the
@@ -4970,9 +5230,15 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         outer = self
         class FakeBrainMod:
             YuzuBrain = outer.Brain
+            # The REAL signature -- a stub looser or stricter than what
+            # it stands in for cannot see the caller's mistakes.
             @staticmethod
-            def ground(text):
+            def ground(text, maths=False):
                 return text, None
+
+            @staticmethod
+            def wants_exact_maths(persona):
+                return False
         self._real_brain = sys.modules.get("yuzu_brain")
         sys.modules["yuzu_brain"] = FakeBrainMod
 
@@ -6273,6 +6539,26 @@ class TestKokoro(unittest.TestCase):
         self.assertIn("UNVERIFIED", self.voice.KOKORO_SOURCE)
 
 
+def plant_ready_setup(folder, voice=True, ears=True):
+    """Stand-ins beside a copied `pull`, so its ONE-TIME SETUP blocks
+    see a voice and ears that are already there.
+
+    `pull` asks `import yuzu_voice` and `import yuzu_ears` from its own
+    folder, and a test copies it into a temp folder without them -- so
+    both blocks ran FOR REAL on every suite run: the voice block called
+    the real `pip`, and the ears block would have installed ~200MB and
+    fetched a model in the middle of a test run on his board. Found
+    while adding the ears block. Every harness that runs `pull` plants
+    these; the tests OF those blocks plant their own."""
+    folder = Path(folder)
+    (folder / "yuzu_voice.py").write_text(
+        "class _V:\n    ready = %s\n"
+        "def pick_voice(**kw): return _V()\n" % bool(voice))
+    (folder / "yuzu_ears.py").write_text(
+        "MODEL = 'base.en'\n"
+        "def why_not(): return %r\n" % ("" if ears else "no ears"))
+
+
 class TestOneWordGetsHerTalking(unittest.TestCase):
     """Ghost: "Plz dont add new commands i cant actually remember any
     except /wiki. Just help me simply get this goin brobro."
@@ -6302,6 +6588,7 @@ class TestOneWordGetsHerTalking(unittest.TestCase):
         self.write("pip", '#!/bin/sh\necho "pip $*" >> "$LOG"\n')
         self.write("curl", '#!/bin/sh\necho "curl" >> "$LOG"\nexit 1\n')
         self.write("pgrep", '#!/bin/sh\nexit 1\n')
+        plant_ready_setup(self.work)
 
     def tearDown(self):
         import shutil
@@ -6366,6 +6653,59 @@ class TestOneWordGetsHerTalking(unittest.TestCase):
         self.assertIn("ALREADY UP TO DATE", out)
         self.assertIn("SHE HAS NO VOICE YET", out)
         self.assertIn("pip", called)
+
+    def run_pull_ears(self, fetch_works):
+        """Drive the real script with ears that are NOT there yet. The
+        stand-in faster_whisper logs the fetch instead of downloading,
+        and (when `fetch_works`) leaves the marker that makes the
+        stand-in yuzu_ears report ready afterwards."""
+        import subprocess
+        with open(os.path.join(self.work, "yuzu_ears.py"), "w") as fh:
+            fh.write("import os\nMODEL = 'base.en'\n"
+                     "def why_not():\n"
+                     "    return '' if os.path.exists('fetched') else 'no ears'\n")
+        with open(os.path.join(self.work, "faster_whisper.py"), "w") as fh:
+            fh.write("import os\n"
+                     "class WhisperModel:\n"
+                     "    def __init__(self, name, **kw):\n"
+                     "        open(os.environ['LOG'], 'a').write(\n"
+                     "            'fetch %%s local=%%s\\n' %% (name, kw.get('local_files_only')))\n"
+                     "        %s\n" % ("open('fetched', 'w').close()"
+                                        if fetch_works else "pass"))
+        open(self.log, "w").close()
+        env = dict(os.environ, PATH=self.stub + os.pathsep + os.environ["PATH"],
+                   LOG=self.log)
+        got = subprocess.run(["./pull"], cwd=self.work, env=env,
+                             capture_output=True, text=True, timeout=90)
+        with open(self.log) as fh:
+            called = fh.read()
+        return got.stdout + got.stderr, called
+
+    def test_it_sets_her_EARS_up_once_the_same_way(self):
+        """The mic on Zero's page needs faster-whisper and a model on
+        the board. Same promises as the voice: the one word he already
+        types does it, the size is said before it is spent, and it runs
+        even when the pull brought nothing new (this stub git never
+        changes commit).
+
+        And the model is fetched HERE -- yuzu_ears itself never
+        downloads, because a transcription is part of her turn and her
+        turn never reaches the internet. So the fetch must be the one
+        call WITHOUT local_files_only."""
+        out, called = self.run_pull_ears(fetch_works=True)
+        self.assertIn("ALREADY UP TO DATE", out)
+        self.assertIn("SHE CAN'T HEAR YET", out)
+        self.assertRegex(out, r"\d+\s*MB", "it spends ~200MB without saying so")
+        self.assertIn("pip install --quiet faster-whisper", called)
+        self.assertIn("fetch base.en local=None", called,
+                      "pull never fetched her ear model")
+        self.assertIn("SHE CAN HEAR NOW", out)
+
+    def test_ears_that_fail_to_set_up_leave_TYPING_and_the_pull_good(self):
+        out, _ = self.run_pull_ears(fetch_works=False)
+        self.assertIn("Nothing is broken", out)
+        self.assertNotIn("PULL FAILED", out)
+        self.assertNotIn("SHE CAN HEAR NOW", out)
 
     def welcome(self, hostname, routes=True):
         """Drive the real script with `hostname` stubbed. `routes=False`
@@ -6677,8 +7017,8 @@ class TestFour(unittest.TestCase):
         mid-reply, which is why it is not in this list."""
         import re as _re
         here = Path(__file__).parent
-        for name in ("yuzu_brain.py", "yuzu_wiki.py",
-                     "yuzu_voice.py", "yuzu_face.py"):
+        for name in ("yuzu_brain.py", "yuzu_wiki.py", "yuzu_voice.py",
+                     "yuzu_face.py", "yuzu_maths.py", "yuzu_ears.py"):
             src = (here / name).read_text(encoding="utf-8")
             code = "\n".join(l.split("#")[0] for l in src.split("\n"))
             for host in set(_re.findall(r'https?://([^/"\'\s:,)]+)', code)):
@@ -11005,6 +11345,7 @@ class TestPull(unittest.TestCase):
             here = Path(tmp)
             shutil.copy(self.SCRIPT, here / "pull")
             (here / "pull").chmod(0o755)
+            plant_ready_setup(here)
 
             # `face` records how it was called instead of doing anything
             # -- and prints its real startup banner, because what that
@@ -11251,9 +11592,7 @@ class TestPull(unittest.TestCase):
             (here / "new_pull").write_text(
                 self.SCRIPT.read_text() + "\n" + tail + "\n")
 
-            (here / "yuzu_voice.py").write_text(
-                "class _V:\n    ready = True\n"
-                "def pick_voice(**kw): return _V()\n")
+            plant_ready_setup(here)
 
             binv = here / "bin"
             binv.mkdir()
@@ -11359,6 +11698,36 @@ class TestPull(unittest.TestCase):
         done = subprocess.run(["bash", "-n", str(self.SCRIPT)],
                               capture_output=True)
         self.assertEqual(done.returncode, 0, done.stderr.decode())
+
+    def test_every_PYTHON_block_inside_a_deck_script_compiles(self):
+        """`bash -n` checks the shell and cannot see inside a heredoc.
+
+        The Kokoro download block in `pull` lost its indentation the day
+        it was written (Sept 16) and never ran once: Python stopped at
+        line 3, printed nothing, and the loop around it fetched nothing,
+        so the one-word voice setup could only ever report failure. The
+        suite was green the whole time. Every quoted `python3 - <<'X'`
+        block in every script is parsed here -- a property, so the next
+        script to grow one is covered without a list."""
+        import ast as _ast
+        here = Path(__file__).parent
+        checked = 0
+        for script in sorted(here.iterdir()):
+            if not script.is_file() or "." in script.name:
+                continue
+            text = script.read_text(encoding="utf-8", errors="replace")
+            if not text.startswith("#!"):
+                continue
+            for tag, body in re.findall(
+                    r"python3 -\s*<<-?\s*'(\w+)'[^\n]*\n(.*?)\n\1\s*\n",
+                    text, re.S):
+                checked += 1
+                try:
+                    _ast.parse(body)
+                except SyntaxError as exc:
+                    self.fail("%s: the %s block does not compile (%s)"
+                              % (script.name, tag, exc))
+        self.assertGreaterEqual(checked, 2, "the blocks were not found")
 
     def test_a_failed_pull_is_LOUD_and_exits_nonzero(self):
         """The whole point. His terminal showed the failure and then a

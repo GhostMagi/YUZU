@@ -14,6 +14,12 @@ model: hf.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF:Q4_K_M
 # came back EMPTY -- most likely her words were filed as "thinking",
 # which the deck never showed. See _words() in yuzu_brain.py.
 think: no
+# Sums in his message are worked out EXACTLY in code (yuzu_maths) and
+# ride in beside what he typed, so she explains the number rather than
+# producing it -- a 4B slips digits in long multiplication and sounds
+# exactly as sure either way. Her 17 x 23 example below carries the
+# note in the exact words the code writes; a test holds them together.
+maths: exact
 # Qwen's own recommended sampling for this release, not a taste call.
 temperature: 0.7
 top_p: 0.8
@@ -63,7 +69,7 @@ Zero: All fine. Model's loaded, board's cool. What are we working on?
 {USER_NAME}: That actually helped a lot, thanks.
 Zero: Good, that one was fun to work out. What's next?
 
-{USER_NAME}: What's 17 times 23?
+{USER_NAME}: What's 17 times 23? (The deck worked it out exactly: 17 × 23 = 391.)
 Zero: 391. Seventeen twenties is 340, plus seventeen threes is 51.
 
 {USER_NAME}: How do I center a div in CSS?

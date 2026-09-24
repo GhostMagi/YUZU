@@ -298,24 +298,30 @@ if ! python3 -c "import yuzu_voice,sys; sys.exit(0 if yuzu_voice.pick_voice().re
         # project an hour on the 8BitDo, and a release renames its
         # assets whenever it likes.
         for url in $(python3 - <<'ASK'
+# THIS BLOCK HAD LOST ITS INDENTATION and had never once run: Python
+# stopped at line 3 with an IndentationError, printed nothing, and the
+# loop below fetched nothing -- so the one-word voice setup could only
+# ever say "Could not set the new voice up here". Found Sept 24 while
+# adding the ears block beside it; his board got its voice some other
+# way. A test now compiles every Python block in this file.
 import json, urllib.request
 try:
-with urllib.request.urlopen(
-        "https://api.github.com/repos/thewh1teagle/kokoro-onnx/releases",
-        timeout=25) as r:
-    releases = json.load(r)
+    with urllib.request.urlopen(
+            "https://api.github.com/repos/thewh1teagle/kokoro-onnx/releases",
+            timeout=25) as r:
+        releases = json.load(r)
 except Exception:
-raise SystemExit
+    raise SystemExit
 for rel in releases:
-names = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
-model = [n for n in names if n.endswith(".onnx")]
-binp = [n for n in names if n.endswith(".bin")]
-# BOTH or neither: half a download reports success and then cannot
-# speak, which is worse than a clean failure.
-if model and binp:
-    print(names[sorted(model)[-1]])
-    print(names[sorted(binp)[-1]])
-    break
+    names = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
+    model = [n for n in names if n.endswith(".onnx")]
+    binp = [n for n in names if n.endswith(".bin")]
+    # BOTH or neither: half a download reports success and then cannot
+    # speak, which is worse than a clean failure.
+    if model and binp:
+        print(names[sorted(model)[-1]])
+        print(names[sorted(binp)[-1]])
+        break
 ASK
         ); do
             name="voices/$(basename "$url")"
@@ -333,6 +339,48 @@ ASK
     else
         echo "    Could not set the new voice up here -- she still"
         echo "    talks, just in the old one. Nothing is broken."
+    fi
+    echo
+fi
+# --- HER EARS, ONCE, THE SAME WAY AS HER VOICE ------------------------
+# Ghost, Sept 24: the mic button on Zero's page -- tap to talk, tap to
+# stop. The recording is made on his device; the board turns it into
+# text with faster-whisper (see yuzu_ears.py). This installs that, once,
+# and fetches the model, because yuzu_ears itself never downloads
+# anything -- a transcription is part of her turn, and her turn never
+# reaches the internet. Fetching is maintenance, and it lives here.
+#
+# SAME PROMISES AS THE VOICE BLOCK ABOVE: it asks the same question the
+# page asks (yuzu_ears.why_not), it says the size before it spends it,
+# and every failure leaves the pull successful and typing exactly as it
+# was. Outside the up-to-date branch, so a pull with nothing new still
+# sets up ears she does not have.
+if ! python3 -c "import yuzu_ears,sys; sys.exit(0 if not yuzu_ears.why_not() else 1)" 2>/dev/null; then
+    echo
+    echo "    SHE CAN'T HEAR YET. Setting that up -- about 200MB,"
+    echo "    once. Typing works exactly as before if this fails."
+    echo
+    pip install --quiet faster-whisper 2>&1 | tail -2
+    python3 - <<'EARS' 2>&1 | tail -2
+import yuzu_ears
+from faster_whisper import WhisperModel
+# local_files_only is NOT set here, on purpose: this is the one place
+# the model is allowed to be fetched.
+WhisperModel(yuzu_ears.MODEL, device="cpu", compute_type="int8")
+EARS
+    if python3 -c "import yuzu_ears,sys; sys.exit(0 if not yuzu_ears.why_not() else 1)" 2>/dev/null; then
+        echo "    SHE CAN HEAR NOW. Tap the mic on Zero's page."
+        # A server started before the install may not see the new
+        # package. The Update button restarts her after this script
+        # anyway; a pull from a terminal has to do it here.
+        if [ "${YUZU_PULL_NO_RESTART:-}" != 1 ] \
+           && pgrep -f "yuzu_face.py --serve" >/dev/null 2>&1; then
+            ./face --off >/dev/null 2>&1
+            ./face >/dev/null 2>&1
+        fi
+    else
+        echo "    Could not set her ears up here -- typing works exactly"
+        echo "    as before. Nothing is broken."
     fi
     echo
 fi
