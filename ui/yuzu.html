@@ -180,6 +180,13 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   font-size: 17px; line-height: 1.55;
 }
 #says.on { display: block; }
+/* HIS LINES AND HERS. His are dimmer, smaller and labelled with his
+   name; hers are the bubble's own colour. */
+#says .line + .line { margin-top: 10px; }
+#says .him { color: var(--dim); font-size: 14.5px; }
+#says .by { display: block; font-size: 10.5px; letter-spacing: .14em;
+            text-transform: uppercase; opacity: .85; }
+#says .pending, #says .deck { color: var(--dim); }
 #says::after {                       /* a small tail toward her */
   content: ''; position: absolute; right: -9px; top: 26px;
   border: 8px solid transparent;
@@ -300,6 +307,7 @@ fetch('characters.json', { cache: 'no-store' })
     const rail = document.getElementById('rail');
     cast.forEach(c => {
       const here = c.who === ME;
+      if (here && c.user) HIM = c.user;
       const el = document.createElement(here ? 'span' : 'a');
       el.textContent = c.name;
       el.title = c.blurb;
@@ -322,12 +330,62 @@ function spoken(text) {
              .trim();
 }
 
+// ---- HIS WORDS AND HERS ----------------------------------------------
+// Ghost, Sept 24: "I cant see my own words on Yuzus page and Fours page
+// like i can on Zeros page. Id like to." The bubble keeps the
+// conversation now, like Zero's log: his line goes up the moment he
+// sends it, hers fills in underneath, and the bubble scrolls to the
+// START of the newest exchange so a long reply is read from its top.
+// textContent only -- whatever anyone typed is shown as text. His label
+// is READ from the roster (her USER_NAME), never typed into this page.
+// ONE COPY on every page that has a bubble; a test holds them equal.
+let HIM = 'you';
+let waiting = null;
+
+function line(cls, by, text) {
+  const el = document.createElement('div');
+  el.className = 'line ' + cls;
+  if (by) {
+    const tag = document.createElement('span');
+    tag.className = 'by';
+    tag.textContent = by;
+    el.appendChild(tag);
+  }
+  el.appendChild(document.createTextNode(text));
+  says.appendChild(el);
+  // A long evening must not grow the page forever.
+  while (says.children.length > 40) says.removeChild(says.firstChild);
+  says.classList.add('on');
+  return el;
+}
+
+function show(el) {
+  says.scrollTop += el.getBoundingClientRect().top
+                    - says.getBoundingClientRect().top - 12;
+}
+
+function his(text) {
+  const mine = line('him', HIM, text);
+  waiting = line('her pending', '', '...');
+  show(mine);
+}
+
 function said(text) {
   const words = spoken(text);
-  says.textContent = words || text.trim();
-  says.classList.add('on');
-  says.scrollTop = 0;
+  const el = waiting || line('her', '', '');
+  waiting = null;
+  el.className = 'line her';
+  el.textContent = words || text.trim();
+  const before = el.previousElementSibling;
+  show(before && before.classList.contains('him') ? before : el);
   hear(words || text.trim());
+}
+
+// THE DECK'S OWN WORDS go in the bubble too, and she never says them
+// out loud -- "allow the microphone" in her voice would be her speaking
+// a line she never wrote.
+function note(text) {
+  show(line('deck', '', text));
 }
 
 // ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
@@ -375,6 +433,7 @@ form.onsubmit = (event) => {
   const asked = input.value.trim();
   if (!asked) return;
   input.value = '';
+  his(asked);
   send.disabled = true;
   send.textContent = '...';
   document.body.classList.add('thinking');
@@ -397,15 +456,6 @@ form.onsubmit = (event) => {
       input.focus();
     });
 };
-
-// THE DECK'S OWN WORDS go in her bubble, and she never says them out
-// loud -- "allow the microphone" in her voice would be her speaking a
-// line she never wrote.
-function note(text) {
-  says.textContent = text;
-  says.classList.add('on');
-  says.scrollTop = 0;
-}
 
 // ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------
 // Ghost: "a button for the touch screen starts listening when i tap it,

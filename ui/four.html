@@ -319,9 +319,14 @@ body.thinking #four { animation-duration: 1.6s; }
   font-size: 15.5px; line-height: 1.6;
 }
 #says.on { display: block; }
-#says::before {
-  content: '> '; color: var(--dim);
-}
+/* HIS LINES AND HERS. His are dimmer, smaller and labelled with his
+   name; hers carry the prompt mark the whole bubble used to. */
+#says .line + .line { margin-top: 10px; }
+#says .him { color: var(--dim); font-size: 14.5px; }
+#says .by { display: block; font-size: 10.5px; letter-spacing: .14em;
+            text-transform: uppercase; opacity: .85; }
+#says .her::before { content: '> '; color: var(--dim); }
+#says .pending, #says .deck { color: var(--dim); }
 
 /* ---- asking ---------------------------------------------------------- */
 #ask {
@@ -691,6 +696,8 @@ fetch('characters.json', { cache: 'no-store' })
     // beside the rail, so an empty rail costs the hop and never costs
     // the exit -- the one rule this deck will not trade.
     const mine = cast.find(c => c.who === ME);
+    // His label in the bubble: his name as she knows it (her USER_NAME).
+    if (mine && mine.user) HIM = mine.user;
     if (mine && mine.front) return;
     const rail = document.getElementById('rail');
     cast.forEach(c => {
@@ -715,12 +722,62 @@ function spoken(text) {
              .trim();
 }
 
+// ---- HIS WORDS AND HERS ----------------------------------------------
+// Ghost, Sept 24: "I cant see my own words on Yuzus page and Fours page
+// like i can on Zeros page. Id like to." The bubble keeps the
+// conversation now, like Zero's log: his line goes up the moment he
+// sends it, hers fills in underneath, and the bubble scrolls to the
+// START of the newest exchange so a long reply is read from its top.
+// textContent only -- whatever anyone typed is shown as text. His label
+// is READ from the roster (her USER_NAME), never typed into this page.
+// ONE COPY on every page that has a bubble; a test holds them equal.
+let HIM = 'you';
+let waiting = null;
+
+function line(cls, by, text) {
+  const el = document.createElement('div');
+  el.className = 'line ' + cls;
+  if (by) {
+    const tag = document.createElement('span');
+    tag.className = 'by';
+    tag.textContent = by;
+    el.appendChild(tag);
+  }
+  el.appendChild(document.createTextNode(text));
+  says.appendChild(el);
+  // A long evening must not grow the page forever.
+  while (says.children.length > 40) says.removeChild(says.firstChild);
+  says.classList.add('on');
+  return el;
+}
+
+function show(el) {
+  says.scrollTop += el.getBoundingClientRect().top
+                    - says.getBoundingClientRect().top - 12;
+}
+
+function his(text) {
+  const mine = line('him', HIM, text);
+  waiting = line('her pending', '', '...');
+  show(mine);
+}
+
 function said(text) {
   const words = spoken(text);
-  says.textContent = words || text.trim();
-  says.classList.add('on');
-  says.scrollTop = 0;
+  const el = waiting || line('her', '', '');
+  waiting = null;
+  el.className = 'line her';
+  el.textContent = words || text.trim();
+  const before = el.previousElementSibling;
+  show(before && before.classList.contains('him') ? before : el);
   hear(words || text.trim());
+}
+
+// THE DECK'S OWN WORDS go in the bubble too, and she never says them
+// out loud -- "allow the microphone" in her voice would be her speaking
+// a line she never wrote.
+function note(text) {
+  show(line('deck', '', text));
 }
 
 // ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
@@ -778,6 +835,7 @@ form.onsubmit = (event) => {
   keep.hidden = false;
   offer([]);
   input.value = '';
+  his(asked);
   send.disabled = true;
   send.textContent = '...';
   thinking(true);
@@ -928,15 +986,6 @@ function plain(asked) {
       // question he has already moved past.
       offer(r.suggests);
     });
-}
-
-// THE DECK'S OWN WORDS go in her bubble, and she never says them out
-// loud -- "allow the microphone" in her voice would be her speaking a
-// line she never wrote.
-function note(text) {
-  says.textContent = text;
-  says.classList.add('on');
-  says.scrollTop = 0;
 }
 
 // ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------

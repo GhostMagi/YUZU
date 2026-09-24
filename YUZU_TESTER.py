@@ -3999,6 +3999,132 @@ class TestHerEars(unittest.TestCase):
                 self.assertNotIn("said(", note, "the deck's note goes through her reply")
 
 
+class TestHisWordsOnScreen(unittest.TestCase):
+    """Ghost, Sept 24: "I cant see my own words on Yuzus page and Fours
+    page like i can on Zeros page. Id like to." Their bubble showed only
+    her reply, so what he typed vanished the moment he hit Speak. It
+    keeps the conversation now, his lines labelled with his name."""
+
+    MARK = "// ---- HIS WORDS AND HERS"
+
+    @staticmethod
+    def pages():
+        """Every page he can open a character on that has a BUBBLE (Zero
+        has a log instead), off the roster rather than typed."""
+        import yuzu_face
+        ui = Path(__file__).parent / "ui"
+        return sorted({e[1] for e in yuzu_face.CHARACTERS.values()
+                       if 'id="says"' in (ui / e[1]).read_text()})
+
+    def block(self, name):
+        page = (Path(__file__).parent / "ui" / name).read_text()
+        self.assertIn(self.MARK, page, "%s has no conversation in its bubble" % name)
+        start = page.index(self.MARK)
+        end = page.index("function note(", start)
+        return page[start:page.index("\n}\n", end) + 3]
+
+    def code(self, name):
+        page = (Path(__file__).parent / "ui" / name).read_text()
+        page = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
+        page = re.sub(r"/\*.*?\*/", " ", page, flags=re.S)
+        return "\n".join(ln.split("//")[0] if "://" not in ln else ln
+                         for ln in page.splitlines())
+
+    def test_every_bubble_page_carries_the_SAME_conversation_code(self):
+        """No build step, so each page has its own copy -- the guard the
+        mic and the voice fetch already have. Two pages that show a
+        conversation differently is one of them untested."""
+        pages = self.pages()
+        self.assertIn("four.html", pages)
+        self.assertIn("yuzu.html", pages)
+        first = self.block(pages[0])
+        for name in pages[1:]:
+            self.assertEqual(self.block(name), first,
+                             "%s shows the conversation differently" % name)
+
+    def test_his_line_goes_up_the_moment_he_SENDS_it(self):
+        """Before the reply, not after -- the wait is when he most wants
+        to see what he asked. And his label is READ from the roster (her
+        USER_NAME), never typed into the page."""
+        for name in self.pages():
+            with self.subTest(page=name):
+                code = self.code(name)
+                send = code[code.index("form.onsubmit"):]
+                send = send[:send.index("\n};")]
+                self.assertIn("his(asked)", send, "his words never reach the bubble")
+                self.assertLess(send.index("his(asked)"),
+                                send.index("fetch(") if "fetch(" in send
+                                else send.index("plain(asked)"),
+                                "his line waits for her reply")
+                self.assertRegex(code, r"HIM = (mine|c)\.user",
+                                 "his label is not read from the roster")
+                self.assertNotIn("innerHTML", self.block(name))
+
+    def test_the_bubble_DRIVEN(self):
+        """The page's own functions, run under node with a stand-in page:
+        his line with his label, hers under it with stage directions
+        cleaned, her voice asked for once with HER words only, the
+        deck's notes shown and never spoken, and a ceiling on how many
+        lines a long evening keeps."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own functions")
+        page = (Path(__file__).parent / "ui" / "four.html").read_text()
+        spoken = page[page.index("function spoken(text)"):]
+        spoken = spoken[:spoken.index("\n}\n") + 3]
+        script = r"""
+function El(tag) { this.tag = tag; this.className = ''; this.kids = [];
+                   this._t = ''; this.parent = null; this.scrollTop = 0; }
+Object.defineProperty(El.prototype, 'textContent', {
+  get() { return this.kids.length ? this.kids.map(k => k.textContent).join('|') : this._t; },
+  set(v) { this.kids = []; this._t = v; } });
+Object.defineProperty(El.prototype, 'children', { get() { return this.kids; } });
+Object.defineProperty(El.prototype, 'firstChild', { get() { return this.kids[0]; } });
+Object.defineProperty(El.prototype, 'previousElementSibling', {
+  get() { const k = this.parent.kids; return k[k.indexOf(this) - 1] || null; } });
+Object.defineProperty(El.prototype, 'classList', { get() { const el = this; return {
+  add: c => { if (!el.className.split(' ').includes(c)) el.className = (el.className + ' ' + c).trim(); },
+  contains: c => el.className.split(' ').includes(c) }; } });
+El.prototype.appendChild = function (c) { c.parent = this; this.kids.push(c); return c; };
+El.prototype.removeChild = function (c) { this.kids.splice(this.kids.indexOf(c), 1); };
+El.prototype.getBoundingClientRect = function () { return { top: 0 }; };
+const document = { createElement: t => new El(t),
+                   createTextNode: t => ({ tag: '#text', textContent: t }) };
+const says = new El('div');
+const voice = [];
+function hear(w) { voice.push(w); }
+""" + spoken + self.block("four.html") + r"""
+HIM = 'Ghost';
+his('what is up');
+const mid = says.kids.map(k => [k.className, k.textContent]);
+said('[waves] Not much, you?');
+note('The microphone was blocked.');
+const end = says.kids.map(k => [k.className, k.textContent]);
+for (let i = 0; i < 30; i++) { his('q' + i); said('a' + i); }
+console.log(JSON.stringify({ mid, end, voice, on: says.className,
+                             kept: says.kids.length, last: says.kids[says.kids.length - 1].textContent }));
+"""
+        import subprocess
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        self.assertEqual(got["mid"], [["line him", "Ghost|what is up"],
+                                      ["line her pending", "..."]],
+                         "his words are not on screen while she thinks")
+        self.assertEqual(got["end"], [["line him", "Ghost|what is up"],
+                                      ["line her", "Not much, you?"],
+                                      ["line deck", "The microphone was blocked."]])
+        self.assertEqual(got["voice"][0], "Not much, you?",
+                         "her voice was asked for something other than her words")
+        self.assertNotIn("The microphone was blocked.", got["voice"],
+                         "the deck's note was said in her voice")
+        self.assertEqual(len(got["voice"]), 31, "her voice was asked twice for one reply")
+        self.assertIn("on", got["on"])
+        self.assertLessEqual(got["kept"], 40, "the bubble grows forever")
+        self.assertEqual(got["last"], "a29")
+
+
 class TestTheCastIsTwo(unittest.TestCase):
     """Ghost, Sept 20: "Can we actually remove saya cait and mimi? I
     dont need them they were laye night tests really. Like from the

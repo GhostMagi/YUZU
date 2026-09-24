@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 813 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 816 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,26 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HIS WORDS ON FOUR'S AND YUZU'S PAGES (Sept 24)
+
+Ghost: *"I cant see my own words on Yuzus page and Fours page like i
+can on Zeros page. Id like to."* Their bubble showed only her reply, so
+what he typed vanished the moment he hit Speak.
+
+**The bubble keeps the conversation now**, like Zero's log: his line
+goes up the moment he sends it (labelled with his name, READ from the
+roster's `user` -- GHOST on Four, YOU on Yuzu, who has no USER_NAME),
+a `...` sits under it while she thinks, her reply fills that in, and
+the bubble scrolls to the START of the newest exchange so a long reply
+is read from its top. Deck notes (the mic's) are lines too and are
+never spoken. 40 lines at most. textContent only.
+
+**One copy on every bubble page, pinned equal**, and driven under node
+with a stand-in page: his label, her cleaned words, one voice request
+per reply with HER words only, the note silent, the ceiling. Rendered
+at 1024x600 and 412 and driven in a real browser on both pages. Three
+tests, six breaks, all red. 813 -> 816.
 
 ## YUZU'S NEW ART, AND THE WARDROBE IS GONE (Sept 24)
 
