@@ -347,8 +347,20 @@ class YuzuBrain:
         # precisely when an override is being used.
         merged = dict(DEFAULT_OPTIONS)
         merged.update(persona_options)
+        # `stop:` in her settings, comma-separated, sent as options.stop
+        # -- ONLY for a character who names one, because a request's
+        # stop list REPLACES the model's own, and Four's Modelfile
+        # carries stops she was built with. Zero runs the raw hf.co
+        # GGUF, which came with none that stop her at the start of HIS
+        # turn; see cut_his_turn().
+        stops = [t.strip() for t in str(
+            self.persona.settings.get("stop", "") if self.persona else ""
+        ).split(",") if t.strip()]
+        if stops:
+            merged["stop"] = stops
         merged.update(options or {})
         self.options = merged
+        self.last_cut = False
         self.timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
         self.keep_alive = _keep_alive(
             keep_alive if keep_alive is not None else DEFAULT_KEEP_ALIVE)
@@ -467,7 +479,8 @@ class YuzuBrain:
                 f"  Or allow longer:  export YUZU_TIMEOUT=600"
             ) from exc
 
-        reply = _words(data.get("message")).strip()
+        reply, self.last_cut = cut_his_turn(_words(data.get("message")),
+                                            self._his_name())
         self._face("talking", reply, _token_rate(data))
         if remember:
             self._remember(user_text, reply)
@@ -493,6 +506,8 @@ class YuzuBrain:
             payload["think"] = self.think
         collected = []
         thought = []            # see _words(): the answer can land here
+        raw = ""                # everything she wrote, for cut_his_turn()
+        self.last_cut = False
         self._face("thinking")
         rate = None
         try:
@@ -506,7 +521,20 @@ class YuzuBrain:
                         raise BrainError(f"Ollama error: {chunk['error']}")
                     message = chunk.get("message") or {}
                     thought.append(message.get("thinking") or "")
-                    piece = message.get("content", "")
+                    raw += message.get("content", "")
+                    # HELD BACK until it cannot be the start of HIS turn,
+                    # so "user" never reaches the screen and is then
+                    # taken back. Stops reading the moment it is.
+                    safe, cut = _safe_so_far(raw, self._his_name())
+                    piece = safe[len("".join(collected)):]
+                    if cut:
+                        self.last_cut = True
+                        if piece:
+                            if not collected:
+                                self._face("talking")
+                            collected.append(piece)
+                            yield piece
+                        break
                     if piece:
                         # The FIRST chunk is the moment she stops
                         # thinking and starts talking -- which is the
@@ -528,7 +556,16 @@ class YuzuBrain:
                 f"Stream stalled after {self.timeout}s ({exc}). "
                 f"Try: export YUZU_TIMEOUT=600"
             ) from exc
-        if not "".join(collected).strip() and "".join(thought).strip():
+        if not self.last_cut:
+            # Whatever the hold-back was still keeping when she finished.
+            rest = cut_his_turn(raw, self._his_name())[0]
+            tail = rest[len("".join(collected)):] if rest.startswith(
+                "".join(collected)) else ""
+            if tail:
+                collected.append(tail)
+                yield tail
+        if not "".join(collected).strip() and "".join(thought).strip() \
+                and not self.last_cut:
             # Nothing came back as the reply and something came back as
             # "thinking": that IS her reply. Handed over whole, at the
             # end -- late, but never an empty bubble.
@@ -543,6 +580,12 @@ class YuzuBrain:
         # silently disabled the whole recovery mechanism. Both paths
         # score now.
         self._check_drift(full_reply)
+
+    def _his_name(self):
+        try:
+            return (self.persona.settings.get("USER_NAME") or "").strip()
+        except Exception:
+            return ""
 
     @staticmethod
     def _canonicalise(reply):
@@ -716,6 +759,73 @@ def _is_kill_attempt(line):
     lowered = line.strip().lower()
     return lowered.startswith(("pkill", "killall", "kill ")) and \
         ("yuzu" in lowered or "brain" in lowered or lowered.endswith("kill"))
+
+
+# SHE STARTED WRITING HIS SIDE OF THE CONVERSATION.
+#
+# Ghost, Sept 24, a real exchange with Zero on the board:
+#
+#     Ghost: ...teach me what you know about Python coding.
+#     Zero:  user
+#            I want to learn, but I don't know where to start. ...
+#            And is there anything about Python that makes it ...
+#            (forty questions, until the reply ceiling cut her off)
+#
+# She never answered at all. She wrote the ROLE NAME of his turn and
+# then wrote his turn -- the chat template's own markup leaking out as
+# text. Qwen marks a turn with `<|im_start|>user` / `<|im_end|>`; she
+# skipped her own end marker and rolled straight into the next turn,
+# and nothing told Ollama that the start of HIS turn is where hers
+# stops. Four is protected by the stop words in her Modelfile; Zero
+# runs the raw hf.co GGUF, which brought none.
+#
+# THE PROMPT REDUCES, CODE GUARANTEES. Her settings now send stop
+# markers (`stop:`), and this is the guarantee under them: whatever
+# she writes from the first line that opens a new turn -- a bare role
+# name, a speaker label for him, or the template's own tokens -- never
+# reaches his screen, her voice or her memory. For EVERY character,
+# because writing his side is the no-puppeteering fault on all of them.
+#
+# A LINE, never a word: "log in as a normal user" is an answer about
+# accounts on a deck he asks Linux questions on. Only a line that is
+# nothing but a role name counts.
+_ROLE_LINE = re.compile(
+    r"^[ \t]*(?:user|assistant|system)[ \t]*$", re.I | re.M)
+_TEMPLATE_TOKEN = re.compile(
+    r"<\|(?:im_start|im_end|endoftext|eot_id|start_header_id|end_header_id)\|>")
+
+
+def _his_turn_at(text, name=""):
+    labels = ["User"] + ([name] if name else [])
+    label = re.compile(r"^[ \t]*(?:%s)[ \t]*:" % "|".join(
+        re.escape(n) for n in labels), re.I | re.M)
+    hits = [m.start() for m in (_ROLE_LINE.search(text), label.search(text),
+                                _TEMPLATE_TOKEN.search(text)) if m]
+    return min(hits) if hits else None
+
+
+def cut_his_turn(text, name=""):
+    """(her reply up to where she starts writing his turn, whether it
+    had to be cut)."""
+    text = text or ""
+    at = _his_turn_at(text, name)
+    return (text if at is None else text[:at]).strip(), at is not None
+
+
+def _safe_so_far(text, name=""):
+    """While streaming: (what is safe to show, whether his turn began).
+    A last line that could still grow into a role name or his label is
+    held back until it cannot."""
+    at = _his_turn_at(text, name)
+    if at is not None:
+        return text[:at].rstrip(), True
+    last = text.rsplit("\n", 1)[-1]
+    head = last.strip().lower()
+    if head and any(w.startswith(head)
+                    for w in ("user:", "assistant", "system", "<|",
+                              (name.lower() + ":") if name else "user:")):
+        return text[:len(text) - len(last)], False
+    return text, False
 
 
 def wants_exact_maths(persona):

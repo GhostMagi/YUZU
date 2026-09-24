@@ -958,13 +958,34 @@ def load_memory(brain, key):
             # it never ages out while she keeps repeating it. HIS turns
             # are his own words and are never touched.
             name = _his_name(key)
+            # IMPORTED HERE, deliberately: yuzu_brain is imported inside
+            # answer(), never at module level, so a bare reference in
+            # this function would be a NameError -- and the `except`
+            # below would swallow it and boot her with NO memory at all.
+            # That exact shape hid /wiki on Four's page for a week.
+            try:
+                import yuzu_brain
+                cut = yuzu_brain.cut_his_turn
+            except Exception:
+                cut = lambda text, who="": (text, False)
             kept = []
             for m in past:
                 if (isinstance(m, dict)
                         and m.get("role") in ("user", "assistant")
                         and isinstance(m.get("content"), str)):
                     if m["role"] == "assistant":
-                        m = dict(m, content=by_name(m["content"], name))
+                        # AND A TURN WHERE SHE WROTE HIS SIDE is cut the
+                        # same way it is cut live (yuzu_brain.cut_his_turn)
+                        # -- Zero's wall of forty invented questions was
+                        # saved before that existed, and read back it is
+                        # the strongest example in her context of doing it
+                        # again. Cut to nothing, the whole exchange goes.
+                        said = cut(m["content"], name)[0]
+                        if not said:
+                            if kept and kept[-1].get("role") == "user":
+                                kept.pop()
+                            continue
+                        m = dict(m, content=by_name(said, name))
                     kept.append(m)
             brain.history = kept[-brain.history_turns * 2:]
     except Exception:
@@ -1781,6 +1802,13 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
         # her teaching it to herself. See `by_name`.
         name = _his_name(key)
         reply = by_name(reply, name)
+        if not reply and getattr(brain, "last_cut", False) is True:
+            # She wrote nothing of her own before starting HIS side, and
+            # that part was cut (yuzu_brain.cut_his_turn). Say so, rather
+            # than "She said nothing." -- which reads as a dead deck.
+            face("idle")
+            return ("(She started writing your side of the conversation "
+                    "instead of answering. Ask her again.)"), None
         # AND OUT OF HER HISTORY TOO, before it is written to disk.
         # Her own replies outweigh the system prompt within a few turns
         # -- measured, on a real 7-turn chat, which is the whole reason

@@ -20,6 +20,13 @@ think: no
 # exactly as sure either way. Her 17 x 23 example below carries the
 # note in the exact words the code writes; a test holds them together.
 maths: exact
+# WHERE HER TURN ENDS. Sept 24 on the board she wrote "user" and then
+# forty lines of HIS side of the conversation: the template's own turn
+# markup, with nothing telling Ollama that the start of his turn is the
+# end of hers. Four has stop words in her Modelfile; the raw hf.co GGUF
+# brought none. Sent as options.stop for her only (yuzu_brain), with
+# cut_his_turn() as the guarantee underneath.
+stop: <|im_start|>, <|im_end|>, <|endoftext|>
 # Qwen's own recommended sampling for this release, not a taste call.
 temperature: 0.7
 top_p: 0.8

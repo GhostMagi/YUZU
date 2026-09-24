@@ -563,13 +563,16 @@ class MockOllama(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
             self.end_headers()
-            for word in reply.split(" "):
+            try:
+                for word in reply.split(" "):
+                    self.wfile.write(
+                        (json.dumps({"message": {"content": "",
+                                                 MockOllama.field: word + " "},
+                                     "done": False}) + "\n").encode())
                 self.wfile.write(
-                    (json.dumps({"message": {"content": "",
-                                             MockOllama.field: word + " "},
-                                 "done": False}) + "\n").encode())
-            self.wfile.write(
-                (json.dumps({"message": {"content": ""}, "done": True}) + "\n").encode())
+                    (json.dumps({"message": {"content": ""}, "done": True}) + "\n").encode())
+            except (BrokenPipeError, ConnectionResetError):
+                pass    # the brain stopped reading early, on purpose
         else:
             self._send(json.dumps({"message": {"content": "",
                                                MockOllama.field: reply},
@@ -807,6 +810,75 @@ class TestBrain(BrainTestCase):
         robot.ask("spin")
         self.assertIn("[spins]", robot.history[-1]["content"],
                       "the robot stopped getting its own format back")
+
+    def test_she_never_writes_HIS_side_of_the_conversation(self):
+        """Ghost, Sept 24, a real exchange with Zero on the board: she
+        answered "teach me what you know about Python" with "user" and
+        then forty of HIS questions -- the chat template's turn markup
+        leaking out as text, and her writing his turn instead of hers.
+
+        Whatever she writes from the line that opens his turn never
+        reaches his screen, her voice or her memory. Driven through a
+        real request, every way it has shown up or could."""
+        cases = {
+            "user\nI want to learn, but where do I start?": "",
+            "Start with print.\nuser\nAnd what next?": "Start with print.",
+            "Start with print.\nGhost: and then?": "Start with print.",
+            "Start with print.<|im_end|><|im_start|>user\nq": "Start with print.",
+        }
+        for said, want in cases.items():
+            MockOllama.replies = itertools.cycle([said])
+            zero = YuzuBrain(persona="zero", host=self.host)
+            self.assertEqual(zero.ask("teach me python"), want,
+                             "his side reached her reply: %r" % said)
+            self.assertTrue(zero.last_cut)
+            if not want:
+                self.assertEqual(zero.history, [],
+                                 "a turn of HIS words went into her memory")
+
+    def test_user_in_an_ANSWER_is_left_alone(self):
+        """He asks this deck Linux questions. "a new user" is English
+        about accounts; only a line that is nothing but a role name
+        opens a turn."""
+        said = "Add a new user with adduser, then log in as that user."
+        MockOllama.replies = itertools.cycle([said])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        self.assertEqual(zero.ask("how do I add a user"), said)
+        self.assertFalse(zero.last_cut)
+
+    def test_streaming_never_SHOWS_his_side_either(self):
+        """Streamed, "user" would be on screen before the newline that
+        proves it is a role name. It is held back until it cannot be."""
+        MockOllama.replies = itertools.cycle(["user\nI want to learn more"])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        pieces = list(zero.ask_stream("teach me"))
+        self.assertEqual("".join(pieces).strip(), "")
+        self.assertTrue(zero.last_cut)
+        MockOllama.replies = itertools.cycle(["Fine. \nuser\nnext question"])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        self.assertEqual("".join(zero.ask_stream("hi")).strip(), "Fine.")
+        # A last line that COULD be the start of his label is held
+        # back -- and must be let go when she finishes. The stub splits
+        # only on spaces, so the hold-back itself is pinned directly.
+        MockOllama.replies = itertools.cycle(["Fine.\nUse"])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        self.assertEqual("".join(zero.ask_stream("hi")).strip(), "Fine.\nUse",
+                         "a held-back line was never let go")
+        self.assertEqual(yuzu_brain_module._safe_so_far("Hello.\nus", "Ghost"),
+                         ("Hello.\n", False), "half a role name reached the screen")
+        self.assertEqual(yuzu_brain_module._safe_so_far("Hello.\nGh", "Ghost"),
+                         ("Hello.\n", False), "half his label reached the screen")
+
+    def test_only_the_character_who_names_them_sends_STOP_markers(self):
+        """A request's stop list REPLACES the model's own, and Four's
+        Modelfile carries stops she was built with -- so only a
+        character with `stop:` in her settings sends one."""
+        YuzuBrain(persona="zero", host=self.host).ask("hi")
+        self.assertIn("<|im_start|>", MockOllama.seen["last"]["options"].get("stop", []),
+                      "her turn has nothing telling Ollama where it ends")
+        YuzuBrain(persona="four", host=self.host).ask("hi")
+        self.assertNotIn("stop", MockOllama.seen["last"]["options"],
+                         "Four's own stop words were replaced")
 
     def test_a_think_block_never_reaches_her_words(self):
         """If the split does not happen, a `<think>` block lands in
@@ -6117,6 +6189,55 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
                          "an old reply saying user was loaded as it was")
         self.assertEqual(brain.history[0]["content"], "hi user",
                          "HIS words were rewritten on the way in")
+
+    def test_a_saved_turn_where_she_wrote_HIS_side_is_dropped_on_LOAD(self):
+        """The wall of forty invented questions was saved to her memory
+        on his board before the cut existed. Read back, it is the
+        strongest example in her context of doing it again -- so it is
+        cut on the way in, and a turn with nothing of hers left in it
+        goes entirely, his half too."""
+        face = self.store()
+        os.makedirs(face.MEMORY_DIR, exist_ok=True)
+        with open(face._memory_file("zero"), "w", encoding="utf-8") as fh:
+            json.dump([{"role": "user", "content": "how are you doing?"},
+                       {"role": "assistant", "content": "Warm and steady."},
+                       {"role": "user", "content": "teach me python"},
+                       {"role": "assistant",
+                        "content": "user\nI want to learn.\nAnd what next?"}],
+                      fh)
+
+        class Blank:
+            history_turns = 8
+            history = []
+
+        brain = Blank()
+        face.load_memory(brain, "zero")
+        self.assertEqual([m["content"] for m in brain.history],
+                         ["how are you doing?", "Warm and steady."],
+                         "the invented turn was loaded back into her memory")
+
+    def test_a_reply_that_was_ALL_his_side_says_so(self):
+        """Cut to nothing, the page would say "She said nothing." --
+        which reads as a dead deck. It says what happened instead."""
+        face = self.store()
+
+        class Wrote:
+            system_prompt = "BASE"
+            history_turns = 8
+            last_cut = True
+
+            def __init__(self, **kw):
+                self.history = []
+
+            def ask(self, text):
+                return ""
+
+        import yuzu_brain
+        with mock.patch.object(yuzu_brain, "YuzuBrain", Wrote), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, error = face.answer("teach me python", "zero")
+        self.assertIsNone(error)
+        self.assertIn("your side of the conversation", reply)
 
     def test_BOTH_routes_ship_what_she_offered(self):
         """`/say` and `/stream` are one `answer()` with a callback, and

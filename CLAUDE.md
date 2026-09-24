@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 799 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 805 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,61 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ZERO WROTE HIS SIDE OF THE CONVERSATION (Sept 24)
+
+A real exchange on the board, pasted by Ghost with a `>_>`:
+
+    Ghost: ...teach me what you know about Python coding.
+    Zero:  user
+           I want to learn, but I don't know where to start. ...
+           And is there anything about Python that makes it ...
+           (forty of HIS questions, until the reply ceiling)
+
+**She never answered at all.** She wrote the ROLE NAME of his turn and
+then wrote his turn: the chat template's own markup leaking out as
+text. Qwen marks turns with `<|im_start|>user` / `<|im_end|>`; she
+skipped her own end marker and rolled into the next turn, and nothing
+told Ollama that the start of his turn is where hers stops. **Four is
+protected by the stop words in her Modelfile; Zero runs the raw hf.co
+GGUF, which brought none** -- the risk the Zero entry below already
+named as "if she ever writes his side of the conversation".
+
+**Two layers, the usual split:**
+
+- **`stop:` in her settings** (`<|im_start|>, <|im_end|>,
+  <|endoftext|>`), sent as `options.stop` FOR HER ONLY -- a request's
+  stop list replaces the model's own, and Four's must stay hers. This
+  also ends a runaway early instead of making him wait through it.
+  **Whether Ollama matches template tokens as stop text on his build
+  is UNVERIFIED**; the next layer does not depend on it.
+- **`cut_his_turn()` in the brain, for EVERY character**: whatever she
+  writes from the first line that opens his turn -- a line that is
+  nothing but a role name, a speaker label for him, or a template
+  token -- never reaches his screen, her voice or her memory. Streaming
+  holds a last line back while it could still grow into one (`us...`,
+  `Gh...`), stops reading the moment it does (which ends the
+  generation), and lets it go when she finishes. **A LINE, never a
+  word**: "log in as a normal user" is an answer about accounts.
+
+**The wall was already in her saved memory**, where it is the
+strongest example in her context of doing it again. `load_memory`
+cuts assistant turns the same way; a turn with nothing of hers left
+goes entirely, his half too. And a reply cut to nothing says *"She
+started writing your side of the conversation instead of answering"*
+rather than "She said nothing.", which reads as a dead deck.
+
+**AND MY FIRST DRAFT OF THAT CLEANUP WOULD HAVE WIPED HER MEMORY.** It
+called `yuzu_brain.cut_his_turn` from `load_memory`, where `yuzu_brain`
+is not a module global -- a NameError, swallowed by the function's own
+`except`, and she boots remembering nothing. **The identical shape
+that hid /wiki on Four's page for a week**, caught by reading the diff
+before running it. It imports locally now, with a fallback.
+
+**Six tests, seven breaks, all red** -- after tightening two of my own:
+the stub Ollama only splits on spaces, so the stream test never
+exercised the hold-back or its release until it asserted both
+directly. 799 -> 805.
 
 ## CONFIRMED ON THE BOARD: SHE HEARS HIM (Sept 24, ~01:50)
 
