@@ -10,38 +10,26 @@
   thing. (in case i wana paint her nails she wouldnt just be like 'ima
   computer') same treatment as Cait."
 
-  Built on cait.html's shape on purpose — a portrait card, a breath, a
-  light that rises while she is thinking, a rail, and one way home. The
-  two things that are hers and not Cait's are the palette and the
-  wardrobe.
+  NEW ART, Sept 24: "Make this Yuzus new art. Maybe change her
+  background to be a bit more lavender too... Remove her old art and
+  clothes switch feature maybe just make this one slightly 'breathe'".
+  One picture now (ui/yuzu/yuzu.jpg), no wardrobe, no /outfits.json. It
+  is a bust portrait on a white ground, so she is shown as a PORTRAIT
+  CARD: the white is the card, framed, and the card breathes.
 
-  HER PALETTE IS SAMPLED OFF HER OWN PNGs. Warm skin and cream
-  (#f0d0c0 / #f0e0d0, the two most common colours in her), her blonde
-  (#e8c98f), and the cool slate of the zebra fit's jacket and leg
-  warmers (#505060 / #303040). The one colour that is NOT sampled is
-  the hot pink: that is character, it lives in her persona files, and
-  CLAUDE.md is explicit that the no-chassis-colours rule is about the
-  CASE and never about her taste.
-
-  Not the deck's green-on-black — same call as cait.html.
-  The CRT look is locked to the deck screens on purpose.
-
-  THE WARDROBE IS DATA, NOT CODE. /outfits.json is generated per
-  request from whatever PNGs are sitting in ui/yuzu/, so a new outfit
-  is a file dropped in that folder and nothing else — the same rule as
-  "a folder is a character" and "the filename is the expression". No
-  list lives in this page and none lives in her prompt.
+  The room is lavender, his call. The hot pink stays: that is her
+  character and lives in her persona, not a chassis colour.
 
   No network, no fonts, no libraries.
 -->
 <style>
 :root {
-  --night:  #241a26;          /* dusky plum, warm enough to hold her   */
-  --deep:   #150e17;
-  --dusk:   #3a2b3d;
-  --edge:   #5a4560;
+  --night:  #33294a;          /* lavender dusk, his call Sept 24       */
+  --deep:   #1c1629;
+  --dusk:   #4a3d66;
+  --edge:   #6c5a8c;
   --ink:    #f6e9e2;          /* cream, off her own skin highlights    */
-  --dim:    #c3a9bd;
+  --dim:    #c4b6dc;
   --pink:   #ff5fa8;          /* character. Hers. Not sampled.         */
   --blonde: #e8c98f;
   --slate:  #505060;          /* the jacket and the leg warmers        */
@@ -50,7 +38,7 @@
 html, body { height: 100vh; overflow: hidden; }
 body {
   background:
-    radial-gradient(120% 90% at 50% 6%, #3a2740 0%, var(--night) 46%,
+    radial-gradient(120% 90% at 50% 6%, #5b4a82 0%, var(--night) 46%,
                     var(--deep) 100%);
   color: var(--ink);
   font: 16px/1.5 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
@@ -103,34 +91,15 @@ body {
   background: rgba(0,0,0,.3);
 }
 
-/* ---- the wardrobe --------------------------------------------------
-   THE BUTTON NAMES THE OUTFIT IT WILL PUT HER IN, not the one she has
-   on — same reasoning as the V-Pet's swap button and the old colour
-   dot: what she is wearing right now is standing in the middle of the
-   screen. A button that labels the obvious tells you nothing.
-
-   It is ABSENT rather than broken when there is only one outfit, and
-   absent when /outfits.json cannot be reached. Same call sprites()
-   makes about a missing folder and the rail makes about a missing
-   roster: a broken extra must never take the character down with it. */
-#fit {
-  margin-left: auto; display: none; align-items: center; gap: 7px;
-  font: inherit; font-size: 12.5px; letter-spacing: .05em; cursor: pointer;
-  color: var(--blonde); background: rgba(0,0,0,.25);
-  border: 1px solid color-mix(in srgb, var(--blonde) 35%, transparent);
-  border-radius: 2px; padding: 6px 13px;
-}
-#fit.on { display: inline-flex; }
-#fit:hover { color: var(--ink); border-color: var(--blonde); }
-#fit .hanger { font-size: 14px; opacity: .85; }
 #home {
   width: 38px; height: 38px; flex: none;
   border-radius: 50%; cursor: pointer; display: grid; place-items: center;
   font-size: 17px; color: var(--pink); background: rgba(0,0,0,.25);
   border: 1px solid color-mix(in srgb, var(--pink) 35%, transparent);
 }
-#fit + #home { margin-left: 10px; }
-#top > #home:first-of-type { margin-left: auto; }
+/* The way out keeps the right-hand corner. The outfit button used to
+   push it there; with that gone, it has to hold the corner itself. */
+#top > #home { margin-left: auto; }
 
 /* ---- her ----------------------------------------------------------- */
 /* SHE STANDS ON THE RIGHT, HER WORDS GO ON THE LEFT. Rendering Cait
@@ -166,43 +135,31 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   0%, 100% { opacity: .28 }
   50%      { opacity: .8 }
 }
-/* SHE IS SHOWN WHOLE, AND THAT IS THE ONE PLACE THIS PAGE REFUSES TO
-   COPY CAIT'S. Cait is deliberately cropped at the shins: her picture
-   is a pose, nothing below the knee carries information, and letting
-   her overrun buys size for free.
-
-   Yuzu's picture is an OUTFIT, and the most legible difference between
-   her two looks is at the bottom of it -- grey fur boots and leg
-   warmers against white knee socks. Cropping her at the shins would
-   hide the exact thing the wardrobe button exists to show. Measured:
-   at Cait's 136% she cuts just above the leg warmers.
-
-   So she fills the stage's height and no more. She reads smaller than
-   Cait for a real reason -- she is a whole standing figure and Cait is
-   a pose from the knee up -- and the left half of the screen, which is
-   hers to talk in, is not wasted by it.
-
-   96%, not 100%: the breath below scales her 1.8% and needs somewhere
-   to go, and `overflow: hidden` on the stage would shave her hair off
-   the top on every cycle. */
+/* A PORTRAIT CARD. His picture is a bust on a white ground, so the
+   white IS the card: framed, rounded, lit from behind by the pink glow.
+   96% of the stage, not 100%: the breath scales her 1.2% and needs
+   room, and `overflow: hidden` on the stage would clip the top. */
 #yuzu {
-  height: 96%; max-width: 46%;
+  /* MAX height and width with the size left auto, so the box IS the
+     picture at every screen size and the frame never outlines empty
+     space -- `height: 96%` fixed the box and letterboxed her on a
+     phone. */
+  max-height: 96%; max-width: 46%; width: auto; height: auto;
   object-fit: contain; object-position: bottom center;
-  filter: drop-shadow(0 10px 26px rgba(0,0,0,.6));
-  animation: breathe 5s ease-in-out infinite;
-  position: relative; cursor: pointer;
+  border-radius: 14px;
+  border: 2px solid color-mix(in srgb, var(--pink) 45%, var(--edge));
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--dusk) 70%, transparent),
+              0 14px 34px rgba(8, 4, 16, .6);
+  animation: breathe 5.5s ease-in-out infinite;
+  position: relative;
   transform-origin: bottom center;
 }
-/* A 2% pulse, from the FEET. Scaling about the default centre grows
-   her downward as well as up, so her shins crawl under the ask bar on
-   every breath. She is standing on a floor; she breathes upward. */
+/* SLIGHTLY, as asked: 1.2% from the bottom edge, so she rises rather
+   than swelling into the ask bar. */
 @keyframes breathe {
   0%, 100% { transform: scale(1)      translateY(0) }
-  50%      { transform: scale(1.018)  translateY(-3px) }
+  50%      { transform: scale(1.012)  translateY(-2px) }
 }
-/* The change of clothes is a quick fade rather than a hard cut, so a
-   tap reads as HER changing rather than as the page reloading. */
-#yuzu.changing { opacity: 0; transition: opacity .16s linear; }
 
 /* ---- what she says -------------------------------------------------- */
 #says {
@@ -280,7 +237,7 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
      rail carries four characters. It is decoration; the name
      and the way out are not. */
   #title { display: none; }
-  #yuzu { max-width: 82%; height: 92%; }
+  #yuzu { max-width: 82%; max-height: 92%; }
   #says { position: static; width: auto; margin: 0 18px 10px;
           max-height: 34vh; }
   #says::after { display: none; }
@@ -294,16 +251,14 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   <div id="who">Yuzu</div>
   <div id="title">Gyaru</div>
   <div id="rail"></div>
-  <button id="fit" type="button"><span class="hanger">❖</span><span id="fitname">outfit</span></button>
   <div id="home" title="home">⌂</div>
 </div>
 
 <div id="stage">
   <div id="glow"></div>
-  <!-- A REAL src, not one JavaScript has to supply. She is on screen
-       before any fetch resolves, so a dead server costs the wardrobe
-       and never costs her. -->
-  <img id="yuzu" src="yuzu/zebra.png" alt="Yuzu" title="tap to change">
+  <!-- A REAL src, not one JavaScript has to supply: she is on screen
+       whatever the server is doing. -->
+  <img id="yuzu" src="yuzu/yuzu.jpg" alt="Yuzu">
   <div id="says"></div>
 </div>
 
@@ -324,9 +279,6 @@ const form = document.getElementById('ask');
 const input = document.getElementById('text');
 const send = document.getElementById('send');
 const says = document.getElementById('says');
-const her = document.getElementById('yuzu');
-const fit = document.getElementById('fit');
-const fitname = document.getElementById('fitname');
 
 document.getElementById('home').onclick = () => {
   location.href = 'home.html';
@@ -350,56 +302,6 @@ fetch('characters.json', { cache: 'no-store' })
   })
   .catch(() => {});
 
-// ---- the wardrobe ----------------------------------------------------
-// The server lists whatever PNGs are in ui/yuzu/. One outfit means no
-// button at all: a control with nothing to switch between is furniture
-// that lies about what the page can do.
-let outfits = [];
-let wearing = 0;
-
-function label() {
-  const next = outfits[(wearing + 1) % outfits.length];
-  fitname.textContent = next.charAt(0).toUpperCase() + next.slice(1);
-}
-
-function change(step) {
-  if (outfits.length < 2) return;
-  wearing = (wearing + step + outfits.length) % outfits.length;
-  her.classList.add('changing');
-  setTimeout(() => {
-    her.src = 'yuzu/' + outfits[wearing] + '.png';
-    her.classList.remove('changing');
-    label();
-  }, 160);
-}
-
-fetch('outfits.json', { cache: 'no-store' })
-  .then(r => r.json())
-  .then(list => {
-    if (!Array.isArray(list) || !list.length) return;
-    outfits = list;
-    // Whatever the markup already shows, if it is in the list, is what
-    // she has on -- so the first tap advances from HER rather than
-    // snapping her back to the top of the folder.
-    const now = her.getAttribute('src').split('/').pop().replace('.png', '');
-    const at = outfits.indexOf(now);
-    if (at >= 0) wearing = at;
-    else her.src = 'yuzu/' + outfits[0] + '.png';
-    if (outfits.length > 1) {
-      fit.classList.add('on');
-      label();
-      // Warm the others so a change is instant rather than a blank
-      // pause with her missing from her own page.
-      outfits.forEach(o => { new Image().src = 'yuzu/' + o + '.png'; });
-    }
-  })
-  .catch(() => {});
-
-fit.onclick = () => change(1);
-// Tapping HER changes too. It costs no pixels, it is how you check new
-// art, and it is the same call face.html makes about cycling her
-// expressions by tapping her face.
-her.onclick = () => change(1);
 
 // Stage directions are stripped from the BUBBLE, the same call
 // yuzu_voice already makes for the speaker. `[twirls]` is lovely to

@@ -181,28 +181,6 @@ def sprites(directory=None):
     return found
 
 
-def outfits(directory=None):
-    """Every outfit PNG in ui/yuzu/, sorted, as bare names.
-
-    Never raises and never returns None -- same guard as sprites(). A
-    missing folder is an empty list, and the page treats that as "no
-    wardrobe button", not as "no Yuzu": her <img> carries a real src in
-    the markup, so she is on screen before this is ever asked for.
-    """
-    directory = directory or OUTFIT_DIR
-    found = []
-    try:
-        names = sorted(os.listdir(directory))
-    except OSError:
-        return found
-    for entry in names:
-        stem, ext = os.path.splitext(entry)
-        if ext.lower() not in EXTS or entry.startswith("."):
-            continue
-        found.append(stem)
-    return found
-
-
 def poses(who):
     """Ordered (state, url) for a character whose picture changes, or
     [] for one whose does not.
@@ -587,7 +565,7 @@ CHARACTERS = {
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A
 # CONVERSATION, and this list is why it is a list.
 #
-# Yuzu's wardrobe is a FOLDER with no list anywhere, because her
+# Yuzu's old wardrobe was a FOLDER with no list anywhere, because her
 # outfits are one canvas and interchangeable -- any PNG in ui/yuzu/ is
 # a valid Yuzu. Mimi's six are different SHOTS of her, which ART.txt
 # says in as many words: "these are not interchangeable states of one
@@ -646,11 +624,9 @@ POSES = {
 # and this is not it.
 FRONT = "four"
 
-# HER WARDROBE IS A FOLDER, exactly like the V-Pet's cast and her own
-# sprite set: whatever PNGs are in ui/yuzu/ ARE the outfits, and the
-# filename is the name on the button. Adding one is dropping a file in,
-# with no list to update here, in the page, or in her prompt.
-OUTFIT_DIR = os.path.join(UI_DIR, "yuzu")
+# YUZU HAS ONE PICTURE NOW. Sept 24, Ghost: "Remove her old art and
+# clothes switch feature". The wardrobe folder, /outfits.json and her
+# outfit button went together; `git show cb088ba:yuzu_face.py` has them.
 
 _BRAINS = {}
 
@@ -2144,13 +2120,6 @@ class _Handler(SimpleHTTPRequestHandler):
         # update and reloads only once a DIFFERENT one does -- see BOOT.
         if self.path.split("?")[0].rstrip("/") == "/boot.json":
             self._json({"boot": BOOT})
-            return
-        # Regenerated PER REQUEST, same as /sprites.json: a new outfit
-        # is a PNG dropped in ui/yuzu/ and a page refresh, never a
-        # server restart. On a phone over a serial link that is a much
-        # bigger difference than it sounds.
-        if self.path.split("?")[0].rstrip("/") in ("/outfits.json", "/outfits"):
-            self._json(outfits())
             return
         # Regenerated per request like the rest. `who` is a NAME and it
         # is looked up in POSES, so nothing in the query string can ever

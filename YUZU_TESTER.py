@@ -4648,19 +4648,6 @@ class TestYuzuAvatar(unittest.TestCase):
             self.assertNotIn(hers, body_text,
                              f"the shared world file still says '{hers}'")
 
-    def test_no_outfit_is_named_in_her_prompt(self):
-        """THE WARDROBE IS DATA. ui/yuzu/ is the list, /outfits.json is
-        generated from it per request, and the filename is the button.
-        Naming the outfits in the prompt would make it code again and
-        the list would go stale the first time he draws another one --
-        the same reason `sprites()` scans a folder instead of reading a
-        manifest."""
-        prompt = yuzu_personas.load("yuzu_avatar").prompt.lower()
-        import yuzu_face
-        for outfit in yuzu_face.outfits():
-            self.assertNotIn(outfit, prompt,
-                             f"'{outfit}' is hardcoded into her prompt")
-
     def test_she_carries_the_levers_this_repo_actually_measured(self):
         """The three example SHAPES that each fixed a measured failure:
         the bare command (yuzu4, 4/4), the warm statement with nothing
@@ -4725,97 +4712,6 @@ class TestYuzuAvatar(unittest.TestCase):
         self.assertIn("CSS", yuzu_voice.SPOKEN_INITIALISMS)
         self.assertIn("CSS", yuzu_voice.for_speech("it's the only CSS I like"))
 
-    # ---- her wardrobe -------------------------------------------------
-
-    def test_a_folder_is_the_wardrobe_and_a_png_is_an_outfit(self):
-        """Same rule as "a folder is a character" in the V-Pet and "the
-        filename is the expression" in her sprites. Adding an outfit is
-        dropping a file in, with nothing else to edit anywhere."""
-        import yuzu_face
-        found = yuzu_face.outfits()
-        self.assertGreaterEqual(len(found), 2,
-                                "there is nothing to switch between")
-        for outfit in found:
-            self.assertTrue((self.ART / (outfit + ".png")).exists())
-        self.assertNotIn("ART", found, "the provenance note became an outfit")
-
-    def test_a_missing_wardrobe_is_empty_and_never_an_exception(self):
-        """Same guard as sprites(): the page treats an empty list as
-        "no button", not as "no Yuzu" -- her <img> carries a real src
-        in the markup, so a dead route costs the wardrobe and never
-        costs her."""
-        import yuzu_face
-        self.assertEqual(yuzu_face.outfits("/nowhere/at/all"), [])
-        page = self.PAGE.read_text()
-        self.assertIn('src="yuzu/', page,
-                      "she has no picture until JavaScript supplies one")
-
-    def test_every_outfit_is_the_same_canvas_so_she_does_not_jump(self):
-        """ONE box across every state of a character, never one per
-        state -- the V-Pet lesson, where a per-state crop made him
-        change size when his mood did.
-
-        Here it is worse than cosmetic: two outfits of the same girl at
-        two different scales read as a glitch rather than a change of
-        clothes."""
-        import yuzu_face
-        sizes = set()
-        for outfit in yuzu_face.outfits():
-            size = yuzu_face._png_size(str(self.ART / (outfit + ".png")))
-            self.assertIsNotNone(size, f"{outfit}.png is not a readable PNG")
-            sizes.add(size)
-        self.assertEqual(len(sizes), 1,
-                         f"her outfits are different sizes: {sizes}")
-
-    def test_the_button_names_the_outfit_it_will_PUT_HER_IN(self):
-        """Same call as the V-Pet's swap button and the old colour dot:
-        what she is wearing right now is standing in the middle of the
-        screen, so a button labelling it tells you nothing."""
-        page = self.PAGE.read_text()
-        self.assertIn("outfits[(wearing + 1) % outfits.length]", page,
-                      "the wardrobe button names what she already has on")
-
-    def test_the_outfits_route_is_regenerated_per_request(self):
-        """A new PNG needs a page refresh, never a server restart. On a
-        phone over a serial link that is a much bigger difference than
-        it sounds -- the same reason /sprites.json is rebuilt per GET.
-
-        DRIVEN, NOT GREPPED. An assertion that "outfits()" appears in
-        do_GET's source would pass just as happily against a list
-        cached at import time, which is the exact failure it exists to
-        catch. This one starts the real server, adds a real file, and
-        asks the real route twice."""
-        import json as _json
-        import shutil
-        import threading
-        import urllib.request
-        import yuzu_face
-
-        room = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, room, True)
-        shutil.copy(str(self.ART / "zebra.png"),
-                    os.path.join(room, "zebra.png"))
-
-        from http.server import ThreadingHTTPServer
-        server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        self.addCleanup(server.server_close)
-        self.addCleanup(server.shutdown)
-        url = "http://127.0.0.1:%d/outfits.json" % server.server_address[1]
-
-        def ask():
-            with urllib.request.urlopen(url, timeout=5) as got:
-                return _json.loads(got.read().decode())
-
-        with mock.patch.object(yuzu_face, "OUTFIT_DIR", room):
-            self.assertEqual(ask(), ["zebra"])
-            shutil.copy(str(self.ART / "cream.png"),
-                        os.path.join(room, "cream.png"))
-            self.assertEqual(ask(), ["cream", "zebra"],
-                             "a new outfit needs a server restart to "
-                             "show up, which on a phone is a real cost")
-
     # ---- her page ------------------------------------------------------
 
     def test_her_page_exists_offline_with_her_art(self):
@@ -4838,40 +4734,73 @@ class TestYuzuAvatar(unittest.TestCase):
         for hers in ("--pink", "--blonde", "--slate"):
             self.assertIn(hers, page, f"{hers} is missing from her palette")
 
-    def test_she_is_shown_WHOLE_because_her_shoes_are_half_the_outfit(self):
-        """The one place this page refuses to copy Cait's.
-
-        Cait is deliberately cropped at the shins -- her picture is a
-        pose and nothing below the knee carries information. Yuzu's
-        picture is an OUTFIT, and the most legible difference between
-        her two looks is at the bottom of it: grey fur boots and leg
-        warmers against white knee socks. Measured by rendering it at
-        the panel's real 1024x600: at Cait's 136% she is cut just above
-        the leg warmers, which hides the exact thing the wardrobe
-        button exists to show."""
-        page = self.PAGE.read_text()
-        height = re.search(r"#yuzu\s*\{[^}]*height:\s*(\d+)%", page)
-        self.assertIsNotNone(height, "her height is not set in percent")
-        self.assertLessEqual(int(height.group(1)), 100,
-                             "she overruns the stage and loses her shoes")
-        # and the breath needs headroom, or `overflow: hidden` shaves
-        # her hair off the top on every cycle
-        self.assertLess(int(height.group(1)), 100,
-                        "the breath has nowhere to go")
-        self.assertIn("align-items: end", page,
-                      "she is hung from the ceiling rather than standing")
-
-    def test_her_page_holds_no_list_of_the_cast_and_no_list_of_outfits(self):
-        """Both come from the server: /characters.json from ONE roster
-        in yuzu_face.py, /outfits.json from ONE folder. A page that
-        keeps its own copy of either drifts the first time something is
-        added."""
+    def test_her_page_holds_no_list_of_the_cast(self):
+        """The rail comes from /characters.json, ONE roster in
+        yuzu_face.py. A page that keeps its own copy drifts the first
+        time somebody is added."""
         page = self.PAGE.read_text()
         self.assertIn("characters.json", page)
-        self.assertIn("outfits.json", page)
         for name in ("Saya", "Cait", "Byte", "Coco", "Shiro"):
             self.assertNotIn(">%s<" % name, page,
                              f"{name} is hardcoded into her rail")
+
+    def page_code(self):
+        page = self.PAGE.read_text()
+        page = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
+        page = re.sub(r"/\*.*?\*/", " ", page, flags=re.S)
+        return "\n".join(ln.split("//")[0] for ln in page.splitlines())
+
+    def test_she_has_ONE_picture_and_no_wardrobe(self):
+        """Ghost, Sept 24: "Make this Yuzus new art... Remove her old art
+        and clothes switch feature". One picture in her folder, the one
+        her page shows, and no switcher left anywhere: not the button,
+        not the script, not the server route."""
+        import yuzu_face
+        pictures = [p.name for p in self.ART.iterdir()
+                    if p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")]
+        self.assertEqual(len(pictures), 1, "old art is still in ui/yuzu/: %s"
+                         % pictures)
+        code = self.page_code()
+        src = re.search(r'<img id="yuzu" src="([^"]+)"', code)
+        self.assertTrue(src, "her <img> has no src in the markup")
+        self.assertTrue((self.PAGE.parent / src.group(1)).exists(),
+                        "her page shows a picture that is not there")
+        self.assertEqual(Path(src.group(1)).name, pictures[0])
+        for gone in ("outfits.json", 'id="fit"', "change(1)"):
+            self.assertNotIn(gone, code, "the wardrobe is still in her page")
+        self.assertFalse(hasattr(yuzu_face, "outfits"),
+                         "the server still has a wardrobe route")
+
+    def test_she_breathes_SLIGHTLY(self):
+        """His word. A breath, upward from the bottom edge so it never
+        swells into the ask bar, and small enough to be felt rather
+        than seen."""
+        code = self.page_code()
+        rule = re.search(r"#yuzu\s*\{([^}]*)\}", code)
+        self.assertTrue(rule and "breathe" in rule.group(1),
+                        "her picture does not breathe")
+        self.assertIn("transform-origin: bottom", rule.group(1))
+        height = re.search(r"height:\s*(\d+)%", rule.group(1))
+        self.assertTrue(height and int(height.group(1)) < 100,
+                        "the breath has no headroom and gets clipped")
+        frames = code[code.index("@keyframes breathe"):]
+        frames = frames[:frames.index("}\n}") + 1]
+        peak = max(float(x) for x in re.findall(r"scale\(([\d.]+)\)", frames))
+        self.assertGreater(peak, 1.0, "she does not breathe at all")
+        self.assertLessEqual(peak, 1.02, "that is not slight")
+
+    def test_her_room_is_LAVENDER(self):
+        """His call, Sept 24: "change her background to be a bit more
+        lavender". Read off the colour itself: the room's hue sits in
+        lavender (blue-violet), not the plum it was."""
+        import colorsys
+        code = self.page_code()
+        for var in ("--night", "--deep"):
+            hexv = re.search(var + r":\s*#([0-9a-fA-F]{6})", code).group(1)
+            r, g, b = (int(hexv[i:i + 2], 16) / 255 for i in (0, 2, 4))
+            hue = colorsys.rgb_to_hsv(r, g, b)[0] * 360
+            self.assertTrue(245 <= hue <= 285,
+                            "%s is not lavender (hue %.0f)" % (var, hue))
 
     def test_she_has_a_way_out_and_it_is_never_a_mode(self):
         """Every screen on this deck has an exit, which is the rule two

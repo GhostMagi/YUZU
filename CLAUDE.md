@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 816 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 812 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,32 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## YUZU'S NEW ART, AND THE WARDROBE IS GONE (Sept 24)
+
+Ghost, with a new picture: *"Make this Yuzus new art. Maybe change her
+background to be a bit more lavender too... Remove her old art and
+clothes switch feature maybe just make this one slightly 'breathe'"*.
+The mics were confirmed on Four's and Yuzu's pages in the same message.
+
+- **`ui/yuzu/yuzu.jpg`**, a 735x949 bust on a white ground, shown as a
+  framed PORTRAIT CARD: the white is the card, not a backdrop to cut.
+  Sized by max-height/max-width with the box left auto, so the frame
+  IS the picture at every width -- a fixed `height` letterboxed her
+  inside the frame at 412, found by rendering.
+- **The wardrobe is deleted, not hidden**: zebra.png, cream.png, the
+  outfit button and script, `outfits()`, `OUTFIT_DIR` and
+  `/outfits.json`, and the seven tests that guarded them. All in git.
+- **The ⌂ lost its corner when the button went** -- the outfit button's
+  `margin-left: auto` was what pushed it right. `#home` holds it now.
+- **The room is lavender** (hue checked by a test) and the breath is
+  1.2%, from the bottom edge.
+
+**NOT changed, and worth doing next: her persona's `LOOK` still
+describes the old art** (brown eyes, a tail). She will describe herself
+wrongly if asked. That is a prompt change, so it comes with the
+composed prompt pasted for PocketPal. Three new tests, five breaks,
+all red. 816 -> 812.
 
 ## EVERY UPDATE SAID "fc6ca29" AND NOTHING NEW ARRIVED FOR AN HOUR (Sept 24)
 
