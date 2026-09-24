@@ -4596,8 +4596,17 @@ class TestYuzuAvatar(unittest.TestCase):
                         "battery", "cyberdeck", "language model"):
             self.assertNotIn(machine, prompt,
                              f"the avatar prompt still says '{machine}'")
-        for body in ("nails", "outfit", "tail", "hair"):
+        for body in ("nails", "clothes", "hair"):
             self.assertIn(body, prompt, f"she has no '{body}'")
+        # SHE DESCRIBES THE PICTURE HE LOOKS AT. Sept 24, new art: twin
+        # tails, pink eyes, a pink blouse -- and her prompt still gave
+        # her brown eyes, a fluffy tail and a wardrobe that no longer
+        # exists. Confident-wrong about her own body is the palmtop
+        # fault; a switcher that is gone is a thing she would offer.
+        for old_look in ("brown eyes", "fluffy tail", "tail goes round",
+                         "other outfit", "several outfits", "jacket"):
+            self.assertNotIn(old_look, prompt,
+                             f"she still describes her old art: '{old_look}'")
 
     def test_the_body_is_DRAWN_which_is_the_honest_bound(self):
         """"You have a body" with nothing bounding it is how deck Shiro

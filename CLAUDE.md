@@ -63,6 +63,15 @@ room (two mask gradients, intersected). **A drop-shadow drew a dark
 box** -- the fade's mask clips it to her rectangle -- so there is none;
 a test pins that and the PNG's alpha. 812 -> 813.
 
+**AND HER SELF-DESCRIPTION CAUGHT UP**, his call: *"Go ahead fix her
+self description i spose too"*. `LOOK` (hers and the avatar world's
+default) is the new art -- pale blonde twin tails, pink eyes, a pink
+frilly blouse with a bow. The tail and the jacket left her examples,
+"Put your other outfit on" was deleted rather than reworded (there is
+nothing to switch to, and an example is how she learns to offer it),
+and the world file no longer says she owns several outfits. A test
+pins the old look staying out; one break, red. Still 813. UNMEASURED.
+
 Ghost, with a new picture: *"Make this Yuzus new art. Maybe change her
 background to be a bit more lavender too... Remove her old art and
 clothes switch feature maybe just make this one slightly 'breathe'"*.
