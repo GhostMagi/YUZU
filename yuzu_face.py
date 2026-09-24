@@ -1783,6 +1783,14 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
             # that part was cut (yuzu_brain.cut_his_turn). Say so, rather
             # than "She said nothing." -- which reads as a dead deck.
             face("idle")
+            # AND ON A /wiki TURN, HE STILL GETS WHAT HE ASKED FOR. The
+            # lookup worked; only her retelling failed -- so the archive's
+            # own words go in the bubble. Sept 24: `/wiki emp` twice.
+            looked = re.match(r"I looked up (.+?) and it says: (.*?)\n\n"
+                              r"Tell me about ", text or "", re.S)
+            if looked:
+                return ("(She lost the thread, so here is what the archive "
+                        "says about %s: %s)" % looked.groups()), None
             return ("(She started writing your side of the conversation "
                     "instead of answering. Ask her again.)"), None
         # AND OUT OF HER HISTORY TOO, before it is written to disk.

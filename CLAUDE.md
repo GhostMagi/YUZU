@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 819 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 821 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,29 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE RETRY REPEATED ITSELF, AND A FUMBLED /wiki STILL ANSWERS (Sept 24)
+
+On the new code: `/wiki emp`, and "She started writing your side of
+the conversation" -- after the automatic retry. Ghost: *"Bruh were
+doing too much or sumn. Can you please make her work within this
+turn..."* He was right: the retry sent the SAME request and failed the
+same way. She ends her turn before saying a word, and every time she
+has done that it was with `"think": false` set -- my guess from the
+night she said nothing, never measured against the alternative.
+
+- **The second try is `_plainer()`**: the same messages WITHOUT this
+  repo's own additions (`think`, `stop`), the model's default shape.
+  If her answer lands in `thinking` there, `_words` already reads it.
+- **A /wiki turn she still fumbles shows the ARCHIVE**: the lookup
+  worked and only her retelling failed, so the bubble says "(She lost
+  the thread, so here is what the archive says about EMP: ...)" rather
+  than "ask her again".
+
+Replayed through the real `answer()` with a model that fails every
+time: the archive's words reach the bubble. Two tests, three breaks,
+all red. 819 -> 821. **Which request shape she prefers is UNMEASURED**
+-- if the plain one keeps winning, it should become the first try.
 
 ## `/wiki emp` WAS AN ARTICLE ABOUT A DRUG (Sept 24)
 

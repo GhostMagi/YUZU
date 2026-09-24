@@ -224,6 +224,25 @@ def load_system_prompt(persona=yuzu_personas.LIVE_PERSONA):
 _THINK_BLOCK = re.compile(r"<think>.*?</think>", re.S | re.I)
 
 
+def _plainer(payload):
+    """The same request WITHOUT this repo's own additions -- no `think`
+    and no `stop` -- the way the model runs by default.
+
+    Ghost, Sept 24, the retry live on his board: `/wiki emp`, and "She
+    started writing your side of the conversation" TWICE. The second
+    try was the same request as the first, so it failed the same way:
+    she ends her turn before saying anything. Every time she has done
+    that it was with `"think": false` set -- a guess of mine from the
+    night she said nothing -- so the second try drops it, and `_words`
+    reads the thinking field if that is where her answer lands. A retry
+    that repeats itself is not a second chance."""
+    plain = {k: v for k, v in payload.items() if k != "think"}
+    options = {k: v for k, v in (payload.get("options") or {}).items()
+               if k != "stop"}
+    plain["options"] = options
+    return plain
+
+
 def _words(message):
     """The words of a reply, from wherever Ollama put them.
 
@@ -468,6 +487,7 @@ class YuzuBrain:
                                                 self._his_name())
             if reply or not self.last_cut:
                 break
+            payload = _plainer(payload)
         self._face("talking", reply, _token_rate(data))
         if remember:
             self._remember(user_text, reply)
@@ -530,6 +550,7 @@ class YuzuBrain:
             rate = yield from self._stream_once(payload, collected, thought)
             if "".join(collected).strip() or not self.last_cut:
                 break
+            payload = _plainer(payload)
         if not "".join(collected).strip() and "".join(thought).strip() \
                 and not self.last_cut:
             # Nothing came back as the reply and something came back as

@@ -559,6 +559,7 @@ class MockOllama(BaseHTTPRequestHandler):
         request = json.loads(self.rfile.read(length))
         MockOllama.seen["last"] = request
         MockOllama.seen["count"] = MockOllama.seen.get("count", 0) + 1
+        MockOllama.seen.setdefault("all", []).append(request)
         reply = next(MockOllama.replies)
         if request.get("stream"):
             self.send_response(200)
@@ -937,6 +938,27 @@ class TestBrain(BrainTestCase):
             self.assertEqual(turn(zero), "Short answer.")
             self.assertEqual(MockOllama.seen["count"], 1,
                              "a real answer was thrown away and asked again")
+
+    def test_the_second_try_is_a_DIFFERENT_request(self):
+        """Ghost, Sept 24: `/wiki emp`, and she wrote his side TWICE -- the
+        retry sent the same request and failed the same way. The second
+        try drops this repo's own additions (`think`, `stop`), so it is
+        the model's default shape rather than the same roll again."""
+        his = "user\nwhat do you know about the Jetson Nano?"
+        for stream in (False, True):
+            MockOllama.replies = itertools.cycle([his, "A burst of energy."])
+            MockOllama.seen["all"] = []
+            zero = YuzuBrain(persona="zero", host=self.host)
+            got = ("".join(zero.ask_stream("/wiki emp")).strip() if stream
+                   else zero.ask("/wiki emp"))
+            self.assertEqual(got, "A burst of energy.")
+            first, second = MockOllama.seen["all"]
+            self.assertIs(first.get("think"), False)
+            self.assertIn("stop", first["options"])
+            self.assertNotIn("think", second, "the retry repeated the same request")
+            self.assertNotIn("stop", second["options"], "the retry repeated the same request")
+            self.assertEqual(second["messages"], first["messages"],
+                             "the retry asked her something different")
 
     def test_only_the_character_who_names_them_sends_STOP_markers(self):
         """A request's stop list REPLACES the model's own, and Four's
@@ -6523,6 +6545,38 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
             reply, error = face.answer("teach me python", "zero")
         self.assertIsNone(error)
         self.assertIn("your side of the conversation", reply)
+
+    def test_a_wiki_turn_she_fumbles_still_shows_the_ARCHIVE(self):
+        """The lookup worked and only her retelling failed -- so on a
+        /wiki turn the archive's own words go in the bubble instead of
+        "ask her again". Any other turn keeps the plain verdict."""
+        face = self.store()
+
+        class Wrote:
+            system_prompt = "BASE"
+            history_turns = 8
+            last_cut = True
+
+            def __init__(self, **kw):
+                self.history = []
+
+            def ask(self, text):
+                return ""
+
+        import yuzu_brain
+        grounded = ("I looked up EMP and it says: EMP may refer to: "
+                    "Electromagnetic pulse, a burst of energy.\n\n"
+                    "Tell me about EMP in your own words, in a sentence or two.")
+        with mock.patch.object(yuzu_brain, "YuzuBrain", Wrote), \
+                mock.patch.object(yuzu_brain, "ground",
+                                  lambda text, maths=False: (grounded, None)), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, error = face.answer("/wiki emp", "zero")
+        self.assertIsNone(error)
+        self.assertIn("Electromagnetic pulse, a burst of energy.", reply,
+                      "the archive's answer was thrown away with her reply")
+        self.assertIn("EMP", reply)
+        self.assertNotIn("Tell me about", reply, "the instruction to her leaked into his bubble")
 
     def test_BOTH_routes_ship_what_she_offered(self):
         """`/say` and `/stream` are one `answer()` with a callback, and
