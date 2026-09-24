@@ -564,8 +564,17 @@ class YuzuBrain:
         if not reply:
             return
         self.history.append({"role": "user", "content": user_text})
+        # ONLY ON A BODY THAT MOVES. The rewrite exists so the robot's
+        # parser keeps getting [brackets]; on a body with no moves it
+        # was teaching brackets to characters never told they exist --
+        # and Zero writes *emphasis*, so "17 is *not* prime" went into
+        # her history as "17 is [not] prime". Every page hides a
+        # bracket, so the day she copies that, the screen says "17 is
+        # prime". Found reading her first real reply on the board.
+        moves = self.persona.moves if self.persona else True
         self.history.append({"role": "assistant",
-                             "content": self._canonicalise(reply)})
+                             "content": self._canonicalise(reply)
+                             if moves else reply})
         # Trim eagerly so history can't creep past the window over a
         # long session.
         self.history = self.history[-self.history_turns * 2:]

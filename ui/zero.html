@@ -129,6 +129,9 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
   display: flex; flex-direction: column; gap: 14px;
   padding-right: 4px;
   -webkit-user-select: text; user-select: text;
+  /* A long answer scrolls, and the browser's default bar is a bright
+     white stripe down a black page. Thin and dark, still usable. */
+  scrollbar-width: thin; scrollbar-color: #3a3a3a transparent;
 }
 #log:empty::before {
   content: 'Ask her anything. /wiki cats looks something up first.';
@@ -244,10 +247,23 @@ fetch('characters.json', { cache: 'no-store' })
 // Stage directions are stripped from what she SAID, the same call
 // yuzu_voice makes for the speaker: they are lovely to write and they
 // are not words, and on a small screen they crowd out the ones that are.
+//
+// EXCEPT HER ASTERISKS, which are EMPHASIS, not stage directions. The
+// Llama characters write *giggles*; Zero, on Qwen, writes "something
+// that *thinks*" -- and the copy of this every other page carries
+// deleted the word. His first real exchange with her came out as
+// "You're building something that , and ." For the one he brings
+// maths to that is the worst possible fault: "17 is *not* prime"
+// loses its "not". So her markers come off and her words stay.
+//
+// Only a span that LOOKS like emphasis: no space just inside either
+// star, and no letter or digit just outside -- so "2 * 3 * 4" and
+// "2*3*4" are left alone as the sums they are.
 function spoken(text) {
   return text.replace(/\[[^\]]*\]/g, ' ')
-             .replace(/\*[^*]*\*/g, ' ')
-             .replace(/\s{2,}/g, ' ')
+             .replace(/(^|[^\w*])\*\*(?=\S)([^*\n]*?\S)\*\*(?!\w)/g, '$1$2')
+             .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1$2')
+             .replace(/[ \t]{2,}/g, ' ')
              .trim();
 }
 

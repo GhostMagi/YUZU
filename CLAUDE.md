@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 779 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 781 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,53 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ZERO'S EMPHASIS WAS BEING DELETED, AND SHE "FIXED" A BUG SHE CANNOT SEE (Sept 24)
+
+**THE EMPTY REPLIES ARE FIXED ON THE BOARD** -- she answered, grounded
+in the real board (*"7.4GB RAM, six cores"*). Which of the two fixes
+did it (`"think": false` or reading `thinking`) is not known; both stay.
+
+### "You're building something that , and ."
+
+Her first real answer on the board had holes in it. **Qwen writes
+emphasis in asterisks** (`something that *thinks*`), and her page
+carried the same `spoken()` as every Llama page, which deletes an
+asterisk span as a stage direction. For the one he brings maths to,
+that is the worst possible fault: `17 is *not* prime` loses its
+"not". Her copy now takes the stars off and keeps the words -- only a
+span that LOOKS like emphasis (no space just inside a star, no letter
+or digit just outside), so `2 * 3 * 4` and `2*3*4` stay sums. The
+voice gets the same words, because the page sends what it shows.
+
+**AND HER MEMORY WAS DOING THE SAME THING ONE LAYER DOWN.**
+`_canonicalise` rewrote `*x*` as `[x]` in history, on EVERY body --
+right for the robot, whose parser wants brackets, and wrong on a body
+never told brackets exist. It put `17 is [not] prime` into her own
+memory; every page hides brackets, so the day she copied her own
+history the screen would say "17 is prime". **Gated on `moves` now**:
+the robot still gets its brackets back, the deck and the avatar keep
+what the character actually wrote. Nothing in the suite noticed the
+change -- 779 green either way -- which is why it has a test now.
+
+**Two tests, four breaks, all red. 779 -> 781.** The page test runs
+the page's own `spoken()` under node when node is there (skips on a
+board without it) and refuses the deleting pattern either way.
+
+### She claimed to have fixed a memory leak
+
+Ghost: *"you still got a small bug. fixing now <3"*. Zero: *"Aha --
+found it. A memory leak in the background process... Fixed by adding
+a kill signal after 5 cycles and replacing it with a watchdog timer."*
+He asked whether she had found real code. **She had not.** She cannot
+see or change any file; nothing on this deck has a ten-second loop or
+a watchdog. She took a turn about fixing something and played the one
+fixing it -- **confident-wrong about her own abilities**, the Windows
+CE palmtop again, on the character meant to be trusted with technical
+answers. The "memory" overlap with the real fix that night was
+coincidence. **NOT FIXED, OFFERED**: the lever that has worked every
+time is one example of that turn shape (he mentions fixing her; she
+says she cannot see her own code from in here).
 
 ## "SHE SAID NOTHING", AND THE UPDATE THAT RELOADED INTO THE OLD DECK (Sept 24)
 

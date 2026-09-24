@@ -787,6 +787,27 @@ class TestBrain(BrainTestCase):
                          "17 times 23 is 391.",
                          "streaming threw the thinking-filed answer away")
 
+    def test_only_a_body_that_MOVES_has_its_history_rewritten(self):
+        """`_canonicalise` turns *asterisks* into [brackets] in her
+        history, so the robot's parser keeps seeing its own format. On
+        a body with no moves that taught brackets to characters never
+        told they exist -- and Zero writes *emphasis*. Her first reply
+        on the board would have gone into her memory as "something that
+        [thinks]"; for a sum, "17 is [not] prime". Every page hides a
+        bracket, so the day she copies her own history the screen says
+        "17 is prime". Driven through a real turn, both bodies."""
+        MockOllama.replies = itertools.cycle(["17 is *not* prime."])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        zero.ask("is 17 prime?")
+        self.assertEqual(zero.history[-1]["content"], "17 is *not* prime.",
+                         "a bodiless character's words were rewritten "
+                         "into brackets in her own memory")
+        MockOllama.replies = itertools.cycle(["On it! *spins*"])
+        robot = YuzuBrain(persona="yuzu4", host=self.host)
+        robot.ask("spin")
+        self.assertIn("[spins]", robot.history[-1]["content"],
+                      "the robot stopped getting its own format back")
+
     def test_a_think_block_never_reaches_her_words(self):
         """If the split does not happen, a `<think>` block lands in
         content. It is not something she said."""
@@ -3758,6 +3779,43 @@ class TestTheCastIsTwo(unittest.TestCase):
         self.assertTrue(re.search(r"entry\('him',\s*HIM", code),
                         "his lines are not labelled with that name")
         self.assertNotIn("Ghost", code, "his name is typed into the page")
+
+    def test_zeros_page_keeps_the_words_she_EMPHASISES(self):
+        """Ghost's first real exchange with her, on the board: "You're
+        building something that , and ." Her page carried the same
+        spoken() as every Llama character, which deletes anything in
+        *asterisks* as a stage direction -- and Qwen uses them for
+        emphasis. For the one he brings maths to, "17 is *not* prime"
+        would lose its "not".
+
+        Her copy takes the stars off and keeps the words, and leaves a
+        sum alone. Run under node when it is there; the pattern that
+        deletes is refused either way."""
+        page = (Path(__file__).parent / "ui" / "zero.html").read_text()
+        fn = page[page.index("function spoken(text)"):]
+        fn = fn[:fn.index("\n}\n") + 3]
+        self.assertNotIn(r".replace(/\*[^*]*\*/g, ' ')", fn,
+                         "her page deletes what she puts in asterisks again")
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own function")
+        cases = {
+            "You're building something that *thinks*, and *learns*.":
+                "You're building something that thinks, and learns.",
+            "17 is *not* prime.": "17 is not prime.",
+            "**391.** Seventeen twenties is 340.":
+                "391. Seventeen twenties is 340.",
+            "2 * 3 * 4 is 24, and 2*3*4 is too.":
+                "2 * 3 * 4 is 24, and 2*3*4 is too.",
+            "[leans in] Hey.": "Hey.",
+        }
+        import subprocess
+        script = fn + "\nconsole.log(JSON.stringify(%s.map(spoken)));" \
+            % json.dumps(list(cases))
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout), list(cases.values()))
 
     def test_the_cut_characters_are_off_the_INTERFACE_and_still_on_disk(self):
         """The two halves of "remove them from the interface entirely"
