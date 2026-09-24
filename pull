@@ -34,6 +34,12 @@ cd "$(dirname "$self")" || exit 1
 # started from. Empty on an ordinary pull. It is also the loop guard:
 # a re-exec never re-execs.
 reexec="${YUZU_PULL_REEXEC:-}"
+# AND NOTHING THIS STARTS MAY INHERIT IT. Sept 24: a terminal pull
+# re-ran itself with this set, then restarted the face server -- which
+# kept it, so every Update from the page ran pull as "the re-run": no
+# git pull at all, the same "UPDATED. fc6ca29" every time, and nothing
+# new ever reached the board. The re-exec below sets it for itself.
+unset YUZU_PULL_REEXEC
 
 # --- wait for the clock ------------------------------------------------
 # Not a sleep: it watches, tells him why, and gives up saying something

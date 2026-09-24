@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 814 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 816 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,28 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## EVERY UPDATE SAID "fc6ca29" AND NOTHING NEW ARRIVED FOR AN HOUR (Sept 24)
+
+His screenshot after tapping Update: `UPDATED. fc6ca29 pull installs
+past Ubuntu's locked Python, 5 files changed` -- an hour-old commit,
+with four newer ones on GitHub. **Nothing since fc6ca29 had reached the
+board**: not Zero's his-side fix (so "she's still being weird" was the
+OLD code, and the cache theory for the missing mic was wrong too).
+
+**The cause was pull's own re-run marker.** His terminal pull brought
+a change to `pull`, re-ran itself with `YUZU_PULL_REEXEC=c1fec5d`, and
+restarted the face server -- which inherited it. From then on every
+Update ran pull AS the re-run: no `git pull` at all, `before` read from
+the marker, the same "UPDATED. fc6ca29" every time, and a restart that
+passed the marker on again. A loop that reports success forever.
+
+**Fixed at both ends**: `pull` unsets it the moment it reads it, and
+the server drops it (`_clean_env`) from both the pull it runs and the
+restart it spawns. **His board cannot receive this by Update** -- its
+server still carries the marker -- so it needs ONE clean start: a
+terminal `~/YUZU/pull`, or a reboot then Update. Two tests, three
+breaks, all red. 814 -> 816.
 
 ## AN UPDATE LANDED AND CHROME SHOWED THE OLD PAGE (Sept 24)
 

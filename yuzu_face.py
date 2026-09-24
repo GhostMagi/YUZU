@@ -2487,6 +2487,14 @@ def running_stale():
     return bool(RUNNING and now and now != RUNNING)
 
 
+def _clean_env(**extra):
+    """This server's environment minus pull's private re-run marker, so
+    nothing it starts can be mistaken for pull's own second run."""
+    env = {k: v for k, v in os.environ.items() if k != "YUZU_PULL_REEXEC"}
+    env.update(extra)
+    return env
+
+
 def run_pull():
     """Update the deck from the browser. (text, needs_restart)
 
@@ -2522,7 +2530,12 @@ def run_pull():
             # a running face server, which here is the process holding
             # this very request -- he would tap Pull and get a network
             # error over an update that worked. The reply goes out first.
-            env=dict(os.environ, YUZU_PULL_NO_RESTART="1"))
+            #
+            # AND NEVER AS "THE RE-RUN". A server started by a pull that
+            # re-ran itself carries YUZU_PULL_REEXEC, and pull reads it as
+            # "I already pulled" -- so every Update skipped the pull and
+            # reported the same old commit. Sept 24, on his board.
+            env=_clean_env(YUZU_PULL_NO_RESTART="1"))
         text = (done.stdout or "") + (done.stderr or "")
     except subprocess.TimeoutExpired:
         return "The pull is taking longer than five minutes. Check WiFi.", False
@@ -2623,7 +2636,8 @@ def restart_later(delay=2):
     if not os.path.exists(face):
         return
     subprocess.Popen(
-        ["bash", "-c", "sleep %d; '%s' --off >/dev/null 2>&1; "
+        env=_clean_env(),
+        args=["bash", "-c", "sleep %d; '%s' --off >/dev/null 2>&1; "
                        "'%s' >/dev/null 2>&1" % (delay, face, face)],
         start_new_session=True,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

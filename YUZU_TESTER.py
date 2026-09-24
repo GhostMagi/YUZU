@@ -11788,10 +11788,12 @@ class TestPull(unittest.TestCase):
             log = here / "face.log"
             (here / "face").write_text(
                 '#!/bin/bash\necho "face $*" >> %s\n'
+                '[ -n "${YUZU_PULL_REEXEC:-}" ] && '
+                'echo "face saw REEXEC=$YUZU_PULL_REEXEC" >> %s\n'
                 '[ "$1" = "--off" ] || {\n'
                 '  echo "UP.  Open this on your phone:"\n'
                 '  echo "That is the HOME SCREEN, not her face."\n'
-                '  exit %d\n}\n' % (log, 0 if face_ok else 1))
+                '  exit %d\n}\n' % (log, log, 0 if face_ok else 1))
             (here / "face").chmod(0o755)
             # `wiki` logs into the SAME file, so a test can see the order
             # things were stopped and started in across both servers.
@@ -11841,6 +11843,38 @@ class TestPull(unittest.TestCase):
             return done, calls
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_a_pull_that_RE_RUNS_itself_never_hands_the_marker_on(self):
+        """Sept 24, his board: every Update said "UPDATED. fc6ca29" and
+        nothing new arrived for an hour. A terminal pull re-ran itself
+        (it had changed), restarted the face server, and the server
+        kept YUZU_PULL_REEXEC -- so every later Update ran pull as the
+        re-run, which skips `git pull`. The face it restarts must not
+        inherit it."""
+        done, calls = self._restart_run(["pull", "yuzu_face.py"], server_up=True)
+        self.assertIn("RUNNING THE NEW ONE", done.stdout.upper(), done.stdout)
+        self.assertIn("face --off", calls, "the stale server was not restarted")
+        self.assertNotIn("REEXEC", calls,
+                         "the restarted server inherited pull's re-run marker")
+
+    def test_the_SERVER_never_runs_pull_as_its_re_run_either(self):
+        """The other end: a server that already carries the marker (his
+        board, today) must still run a real pull, and must not pass it
+        to the server it restarts."""
+        import yuzu_face
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        script = Path(tmp) / "pull"
+        script.write_text('#!/bin/bash\necho "REEXEC=[${YUZU_PULL_REEXEC:-}]"\n')
+        with mock.patch.dict(os.environ, {"YUZU_PULL_REEXEC": "c1fec5d"}), \
+                mock.patch.object(yuzu_face, "PULL_SCRIPT", str(script)):
+            said, _ = yuzu_face.run_pull()
+            self.assertIn("REEXEC=[]", said, "pull was run as its own re-run")
+            with mock.patch("subprocess.Popen") as popen:
+                yuzu_face.restart_later(0)
+            env = popen.call_args.kwargs.get("env")
+            self.assertIsNotNone(env, "the restart inherits the whole environment")
+            self.assertNotIn("YUZU_PULL_REEXEC", env)
 
     def test_a_pull_NAMES_a_command_that_did_not_exist_before(self):
         """MEASURED, Sept 15. He was told to run `~/YUZU/name ghostnano`,
