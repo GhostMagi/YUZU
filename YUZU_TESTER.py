@@ -960,6 +960,96 @@ class TestBrain(BrainTestCase):
             self.assertEqual(second["messages"], first["messages"],
                              "the retry asked her something different")
 
+    def test_the_second_try_is_who_she_is_and_what_he_JUST_said(self):
+        """Ghost, Sept 24, `/wiki ghosts`: both tries fumbled, and "She
+        failed in my opinion. She had to use ur workaround." Every
+        fumble on his board had her saved memory loaded, and what she
+        wrote was a next turn of his in the shape of the ones before.
+        So the second draw is the system prompt and his new turn --
+        the article rides in that turn -- and the history is untouched
+        for the turn after, which this answer joins."""
+        his = "user\nwhat do you know about the Jetson Nano?"
+        old = [{"role": "user", "content": "what is a jetson?"},
+               {"role": "assistant", "content": "A small board."}]
+        for stream in (False, True):
+            MockOllama.replies = itertools.cycle([his, "A spirit."])
+            MockOllama.seen["all"] = []
+            zero = YuzuBrain(persona="zero", host=self.host)
+            zero.history = list(old)
+            got = ("".join(zero.ask_stream("/wiki ghosts")).strip() if stream
+                   else zero.ask("/wiki ghosts"))
+            self.assertEqual(got, "A spirit.")
+            first, second = MockOllama.seen["all"]
+            self.assertEqual(len(first["messages"]), 4,
+                             "the FIRST try lost the conversation")
+            self.assertEqual([m["role"] for m in second["messages"]],
+                             ["system", "user"],
+                             "the retry still carried the old conversation "
+                             "(stream=%s)" % stream)
+            self.assertEqual(second["messages"][0], first["messages"][0])
+            self.assertEqual(second["messages"][-1]["content"], "/wiki ghosts",
+                             "the retry lost what he just asked")
+            self.assertEqual([m["content"] for m in zero.history],
+                             ["what is a jetson?", "A small board.",
+                              "/wiki ghosts", "A spirit."],
+                             "the retry cost her the conversation itself")
+
+    def test_her_OWN_turn_header_is_not_his_turn(self):
+        """"assistant" on a line before her first word is her own turn
+        header -- the same markup as "user", at the other end. It was
+        read as HIS turn, so an answer that opened with it was cut at
+        character one and thrown away whole, answer and all."""
+        cut = yuzu_brain_module.cut_his_turn
+        for said in ("assistant\nA ghost is the soul of a dead person.",
+                     "  Assistant \r\nA ghost is the soul of a dead person.",
+                     "<|im_start|>assistant\nA ghost is the soul of a dead person."):
+            self.assertEqual(cut(said, "Ghost"),
+                             ("A ghost is the soul of a dead person.", False),
+                             "her own header threw her answer away: %r" % said)
+        # His turn after it is still his.
+        self.assertEqual(cut("assistant\nA spirit.\nuser\nand?", "Ghost"),
+                         ("A spirit.", True))
+        # And his turn at the very start is still cut: only HER header goes.
+        self.assertEqual(cut("user\nA ghost?", "Ghost"), ("", True))
+        # Streamed: never shown, never taken for his, and the answer
+        # under it arrives.
+        safe = yuzu_brain_module._safe_so_far
+        self.assertEqual(safe("assist", "Ghost"), ("", False))
+        self.assertEqual(safe("assistant", "Ghost"), ("", False),
+                         "her own header stopped the stream as his turn")
+        MockOllama.replies = itertools.cycle(
+            ["assistant\nA ghost is the soul of a dead person."])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        self.assertEqual("".join(zero.ask_stream("hi")).strip(),
+                         "A ghost is the soul of a dead person.")
+        self.assertFalse(zero.last_cut)
+        # "assistant" in the middle of a sentence is English.
+        self.assertEqual(cut("My assistant\nis busy.", "Ghost"),
+                         ("My assistant\nis busy.", False))
+
+    def test_the_screen_says_what_the_cut_TOOK_for_his(self):
+        """Three fixes for this fumble were guesses, because the screen
+        only ever said THAT it happened. The line the cut took for his
+        rides in the note -- that line only, never what followed."""
+        opening = yuzu_brain_module.cut_opening
+        self.assertEqual(opening("user\nwhat about the Jetson?", "Ghost"), "user")
+        self.assertEqual(opening("\n<|im_start|>user\nhi", "Ghost"), "user")
+        self.assertEqual(opening("Fine.\nGhost: and then?", "Ghost"),
+                         "Ghost: and then?")
+        self.assertEqual(opening("A plain answer.", "Ghost"), "")
+        self.assertLessEqual(len(opening("Ghost: " + "x" * 200,
+                                         "Ghost")), 40)
+        for stream in (False, True):
+            MockOllama.replies = itertools.cycle(["user\nwhat about the Jetson?"])
+            zero = YuzuBrain(persona="zero", host=self.host)
+            ("".join(zero.ask_stream("hi")) if stream else zero.ask("hi"))
+            self.assertEqual(zero.last_opening, "user",
+                             "the brain did not keep the line (stream=%s)" % stream)
+            MockOllama.replies = itertools.cycle(["All good."])
+            ("".join(zero.ask_stream("hi")) if stream else zero.ask("hi"))
+            self.assertEqual(zero.last_opening, "",
+                             "an old fumble was left behind (stream=%s)" % stream)
+
     def test_only_the_character_who_names_them_sends_STOP_markers(self):
         """A request's stop list REPLACES the model's own, and Four's
         Modelfile carries stops she was built with -- so only a
@@ -6578,6 +6668,46 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
         self.assertIn("EMP", reply)
         self.assertNotIn("Tell me about", reply, "the instruction to her leaked into his bubble")
 
+    def test_the_fumble_note_quotes_the_line_that_was_CUT(self):
+        """The note carries the line the cut took for his, so the next
+        screenshot says what she did. With nothing kept, the note reads
+        exactly as it did before."""
+        face = self.store()
+
+        def wrote(opening):
+            class Wrote:
+                system_prompt = "BASE"
+                history_turns = 8
+                last_cut = True
+                last_opening = opening
+
+                def __init__(self, **kw):
+                    self.history = []
+
+                def ask(self, text):
+                    return ""
+            return Wrote
+
+        import yuzu_brain
+        grounded = ("I looked up Ghost and it says: A ghost is a spirit."
+                    "\n\nTell me about Ghost in your own words, in a sentence or two.")
+        with mock.patch.object(yuzu_brain, "YuzuBrain", wrote("user")), \
+                mock.patch.object(yuzu_brain, "ground",
+                                  lambda text, maths=False: (grounded, None)), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, _ = face.answer("/wiki ghosts", "zero")
+        self.assertIn('began "user"', reply)
+        self.assertIn("A ghost is a spirit.", reply)
+        with mock.patch.object(yuzu_brain, "YuzuBrain", wrote("user")), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, _ = face.answer("teach me python", "zero")
+        self.assertIn('began "user". Ask her again.', reply)
+        with mock.patch.object(yuzu_brain, "YuzuBrain", wrote("")), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, _ = face.answer("teach me python", "zero")
+        self.assertEqual(reply, "(She started writing your side of the "
+                         "conversation instead of answering. Ask her again.)")
+
     def test_BOTH_routes_ship_what_she_offered(self):
         """`/say` and `/stream` are one `answer()` with a callback, and
         that is exactly the shape that grew a second copy to forget
@@ -11703,6 +11833,38 @@ class TestHerEncyclopedia(unittest.TestCase):
         x = self.wiki._Extract()
         x.feed(page)
         self.assertEqual(x.text(), "The cat is a small mammal.")
+
+    def test_the_HEADING_and_the_SIGNPOSTS_are_not_the_article(self):
+        """Ghost's `/wiki ghosts`, Sept 24: she was handed "Ghost For
+        other uses, see Ghost (disambiguation). ..." -- the heading
+        again, then a hatnote, before one word of the article. Both sit
+        exactly where she starts reading, and neither is the article."""
+        page = ('<html><head><title>Ghost</title></head><body>'
+                '<h1>Ghost</h1>'
+                '<div role="note" class="hatnote navigation-not-searchable">'
+                'For other uses, see <a>Ghost (disambiguation)</a>.</div>'
+                # Only the MARKUP says this one is a signpost, and it
+                # nests: the article after it must still arrive.
+                '<div class="hatnote"><div>This article is about the '
+                'spirit.</div> Its lore is kept apart.</div>'
+                '<p>In folklore, a <b>ghost</b> is the soul of a dead person.'
+                ' Not to be confused with Ghast. Ghosts are said to haunt'
+                ' places.</p></body></html>')
+        x = self.wiki._Extract()
+        x.feed(page)
+        self.assertEqual(x.title, "Ghost")
+        self.assertEqual(x.text(), "In folklore, a ghost is the soul of a "
+                         "dead person. Ghosts are said to haunt places.")
+        # Written as plain text rather than marked up, the same.
+        x = self.wiki._Extract()
+        x.feed('<p>For the band, see Ghost (band). "Spook" redirects here. '
+               'A ghost is the soul of a dead person.</p>')
+        self.assertEqual(x.text(), "A ghost is the soul of a dead person.")
+        # And an ordinary sentence that merely says "see" is the article.
+        x = self.wiki._Extract()
+        x.feed('<p>For a long time, people could see ghosts at night.</p>')
+        self.assertEqual(x.text(),
+                         "For a long time, people could see ghosts at night.")
 
     def test_the_choice_is_NOT_kept_forever(self):
         """It used to be, on the reasoning that it "cannot change while

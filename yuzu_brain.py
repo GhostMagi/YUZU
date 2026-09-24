@@ -240,6 +240,20 @@ def _plainer(payload):
     options = {k: v for k, v in (payload.get("options") or {}).items()
                if k != "stop"}
     plain["options"] = options
+    # AND WITHOUT THE CONVERSATION SO FAR. Ghost, Sept 24, `/wiki
+    # ghosts`: both tries fumbled, and "She failed in my opinion. She
+    # had to use ur workaround." Every fumble on his board happened with
+    # her saved memory loaded, and what she wrote was a NEXT TURN OF HIS
+    # in the shape of the ones before it -- "what do you know about the
+    # Jetson Nano?" is a conversation continuing, not an answer. The one
+    # thing her history can do on a turn like this is show her more
+    # turns to continue; the one thing a /wiki answer needs is the
+    # article, and that is in his new turn. So the second draw is who
+    # she is and what he just said. Nothing is forgotten: the history
+    # is still there for the turn after, and this reply joins it.
+    messages = payload.get("messages") or []
+    if len(messages) > 2 and messages[0].get("role") == "system":
+        plain["messages"] = [messages[0], messages[-1]]
     return plain
 
 
@@ -380,6 +394,7 @@ class YuzuBrain:
         merged.update(options or {})
         self.options = merged
         self.last_cut = False
+        self.last_opening = ""      # the line the cut took for his
         self.timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
         self.keep_alive = _keep_alive(
             keep_alive if keep_alive is not None else DEFAULT_KEEP_ALIVE)
@@ -483,8 +498,9 @@ class YuzuBrain:
         # one. Twice in a row is a pattern, and the sentence says so.
         for attempt in (1, 2):
             data = self._chat(payload)
-            reply, self.last_cut = cut_his_turn(_words(data.get("message")),
-                                                self._his_name())
+            said = _words(data.get("message"))
+            reply, self.last_cut = cut_his_turn(said, self._his_name())
+            self.last_opening = cut_opening(said, self._his_name())
             if reply or not self.last_cut:
                 break
             payload = _plainer(payload)
@@ -573,6 +589,7 @@ class YuzuBrain:
         `collected` and `thought`, returns the token rate."""
         raw = ""                # everything she wrote, for cut_his_turn()
         self.last_cut = False
+        self.last_opening = ""
         rate = None
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as response:
@@ -593,6 +610,7 @@ class YuzuBrain:
                     piece = safe[len("".join(collected)):]
                     if cut:
                         self.last_cut = True
+                        self.last_opening = cut_opening(raw, self._his_name())
                         if piece:
                             if not collected:
                                 self._face("talking")
@@ -863,6 +881,26 @@ def _lines(text):
     return _INVISIBLE.sub("", text)
 
 
+# HER OWN TURN HEADER IS NOT HIS TURN. The template's markup is
+# invisible when it arrives as the special token and plain text when it
+# does not, and her own header, "assistant" on a line before her first
+# word, is the same markup at the other end of her turn. `_ROLE_LINE`
+# read it as the start of HIS, so an answer that opened with it was cut
+# at character one and thrown away whole: the fumble exactly, with the
+# answer sitting right under the cut. Before any of her words it can
+# only be hers, so it is taken off and she is read from the line after.
+_OWN_HEADER = re.compile(
+    r"\A\s*(?:<\|im_start\|>)?[^\S\n]*assistant[^\S\n]*(?:\n|\Z)", re.I)
+
+
+def _without_own_header(text):
+    """Her text with a leading "assistant" header line taken off.
+    Prefix-stable while streaming: nothing is shown until the header
+    is whole, and after that the rest only ever grows."""
+    m = _OWN_HEADER.match(text)
+    return text[m.end():] if m else text
+
+
 def _his_turn_at(text, name=""):
     labels = ["User"] + ([name] if name else [])
     label = re.compile(r"^[^\S\n]*(?:%s)[^\S\n]*:" % "|".join(
@@ -875,16 +913,31 @@ def _his_turn_at(text, name=""):
 def cut_his_turn(text, name=""):
     """(her reply up to where she starts writing his turn, whether it
     had to be cut)."""
-    text = _lines(text)
+    text = _without_own_header(_lines(text))
     at = _his_turn_at(text, name)
     return (text if at is None else text[:at]).strip(), at is not None
+
+
+def cut_opening(text, name=""):
+    """The first line of what was cut -- "user", "Ghost: what's...".
+    Short, and only ever the line that was taken to be his, so the
+    screen can say what she did instead of guessing at it."""
+    text = _without_own_header(_lines(text))
+    at = _his_turn_at(text, name)
+    if at is None:
+        return ""
+    for line in text[at:].split("\n"):
+        line = _TEMPLATE_TOKEN.sub("", line).strip()
+        if line:
+            return line[:40]
+    return ""
 
 
 def _safe_so_far(text, name=""):
     """While streaming: (what is safe to show, whether his turn began).
     A last line that could still grow into a role name or his label is
     held back until it cannot."""
-    text = _lines(text)
+    text = _without_own_header(_lines(text))
     at = _his_turn_at(text, name)
     if at is not None:
         return text[:at].rstrip(), True

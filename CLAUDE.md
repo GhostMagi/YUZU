@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 821 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 826 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,45 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## "SHE HAD TO USE UR WORKAROUND": THE RETRY STARTS FRESH (Sept 24)
+
+`/wiki ghosts` on the new code, and the bubble was the fallback --
+"(She lost the thread, so here is what the archive says about Ghost:
+Ghost For other uses, see Ghost (disambiguation)...)". Ghost: *"Blah.
+She failed in my opinion. She had to use ur workaround."* Right: the
+archive answering is not her answering.
+
+**Her model cannot be run from here** (the registry and Hugging Face
+are blocked), so this is three changes aimed at the three live
+explanations, plus the one thing that stops it being guesswork:
+
+- **The second try is the system prompt and his new turn, NO
+  HISTORY** (`_plainer`). Every fumble on his board had her saved
+  memory loaded, and what she wrote was a next turn of HIS in the shape
+  of the earlier ones ("what do you know about the Jetson Nano?"). A
+  /wiki answer needs the article, which is in his turn. Her history is
+  untouched and the good answer joins it.
+- **Her own `assistant` header is not his turn.** The cut read a line
+  saying only `assistant` as HIS turn starting, so an answer opening
+  with her own turn header was cut at character one and thrown away
+  whole. Before any of her words it is hers: taken off, and she is
+  read from the line after (`_without_own_header`, stream-safe).
+- **The article starts at the article.** `_Extract` put the page
+  heading into the body whenever `<title>` had already set it ("Ghost
+  For other uses..."), and kept hatnotes. Heading and `hatnote`/
+  `role=note` divs are skipped now, and the same signposts written as
+  plain text ("For other uses, see", "redirects here", "Not to be
+  confused with") are cut.
+- **The fumble note quotes the line the cut took for his** --
+  `her reply began "user"` -- that line only, 40 characters at most.
+  Three fixes to this fumble were guesses because the screen only ever
+  said THAT it happened; the next screenshot says which case it is.
+
+Five tests, eleven breaks, all red -- after one of my own went green on
+its break: the markup hatnote rule was invisible because the text rule
+caught the same words. Its hatnote says something only markup can
+mark now. 821 -> 826. **UNMEASURED on the board.**
 
 ## THE RETRY REPEATED ITSELF, AND A FUMBLED /wiki STILL ANSWERS (Sept 24)
 

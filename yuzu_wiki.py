@@ -39,6 +39,17 @@ FOOTER = ("Category:", "Categories:", "Hidden categories:",
           "This page is issued from", "This article is issued from")
 
 
+# Wikipedia's own signpost sentences: "For other uses, see Ghost
+# (disambiguation).", "\"Spook\" redirects here.", "Not to be confused
+# with ...". Never a sentence of the article, and never across a full
+# stop, so an article sentence beside one is left whole.
+_HATNOTE = re.compile(
+    r"(?:For (?:other|the|more|a|an) [^.]{0,120}?, see [^.]{0,160}?\."
+    r"|[^.]{0,80}? redirects here\."
+    r"|Not to be confused with [^.]{0,160}?\."
+    r"|(?:Main|Further) (?:article|information): [^.]{0,120}?\.)")
+
+
 class _Extract(HTMLParser):
     """Pull readable prose out of a Kiwix article page.
 
@@ -55,23 +66,45 @@ class _Extract(HTMLParser):
         self.depth = 0          # inside something we are ignoring
         self.title = ""
         self._in_title = False
+        self._note = 0          # inside a hatnote, counting nested divs
+
+    # THE TOP OF A PAGE IS NOT ITS FIRST SENTENCE. Ghost's `/wiki
+    # ghosts`, Sept 24, handed her "Ghost For other uses, see Ghost
+    # (disambiguation). ..." -- the page heading again, then the
+    # hatnote, before a word of the article. The heading is already
+    # the title, and a hatnote is a signpost to OTHER pages: neither is
+    # something to retell, and both sit exactly where she starts
+    # reading.
+    @staticmethod
+    def _is_note(attrs):
+        attrs = dict(attrs)
+        classes = (attrs.get("class") or "").split()
+        return (attrs.get("role") == "note"
+                or any(c in ("hatnote", "dablink", "rellink") for c in classes))
 
     def handle_starttag(self, tag, attrs):
         if tag in self.SKIP:
             self.depth += 1
-        elif tag in ("h1", "title") and not self.title:
+        elif tag == "div" and (self._note or self._is_note(attrs)):
+            self._note += 1
+        elif tag in ("h1", "title"):
             self._in_title = True
 
     def handle_endtag(self, tag):
         if tag in self.SKIP and self.depth:
             self.depth -= 1
+        elif tag == "div" and self._note:
+            self._note -= 1
         elif tag in ("h1", "title"):
             self._in_title = False
 
     def handle_data(self, data):
-        if self._in_title and not self.title:
-            self.title = data.strip()
-        elif not self.depth:
+        if self._in_title:
+            # The heading is the title, never the body. It used to leak
+            # in whenever the page's <title> had already set it.
+            if not self.title and data.strip():
+                self.title = data.strip()
+        elif not self.depth and not self._note:
             self.parts.append(data)
 
     def text(self):
@@ -80,6 +113,9 @@ class _Extract(HTMLParser):
         # residue. Neither survives being read out loud, and neither
         # helps a 3B answer a question.
         joined = re.sub(r"\[\s*\d+\s*\]", " ", joined)
+        # And the same signposts when an archive writes them as plain
+        # text rather than as a marked-up note.
+        joined = _HATNOTE.sub(" ", joined)
         # THE PAGE FOOTER IS NOT THE ARTICLE. The mini archive ends every
         # page with its categories and a licence line -- measured on his
         # board, Sept 23: "Category: Domain Name System Security

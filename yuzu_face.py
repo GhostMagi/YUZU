@@ -1788,11 +1788,18 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
             # own words go in the bubble. Sept 24: `/wiki emp` twice.
             looked = re.match(r"I looked up (.+?) and it says: (.*?)\n\n"
                               r"Tell me about ", text or "", re.S)
+            # WHAT SHE ACTUALLY WROTE, in a few words. Three fixes for
+            # this fumble were guesses, because the screen only ever said
+            # THAT it happened; the next screenshot says which line the
+            # cut took for his. The cut line only, never what followed.
+            began = str(getattr(brain, "last_opening", "") or "").strip()
+            began = (' -- her reply began "%s" --' % began) if began else ","
             if looked:
-                return ("(She lost the thread, so here is what the archive "
-                        "says about %s: %s)" % looked.groups()), None
+                return ("(She lost the thread%s so here is what the archive "
+                        "says about %s: %s)" % ((began,) + looked.groups())), None
             return ("(She started writing your side of the conversation "
-                    "instead of answering. Ask her again.)"), None
+                    "instead of answering%s Ask her again.)"
+                    % (began.rstrip(" -,") + "." if began != "," else ".")), None
         # AND OUT OF HER HISTORY TOO, before it is written to disk.
         # Her own replies outweigh the system prompt within a few turns
         # -- measured, on a real 7-turn chat, which is the whole reason
