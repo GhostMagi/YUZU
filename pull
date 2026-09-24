@@ -257,6 +257,32 @@ else
     fi
 fi
 
+# --- INSTALLING A PYTHON PACKAGE ON HIS UBUNTU -----------------------
+# Ghost, Sept 24, a photo of the Update bar: "SHE CAN'T HEAR YET" and
+# then pip's own refusal -- "externally-managed-environment ... You can
+# override this, at the risk of breaking your Python installation or
+# OS, by passing --break-system-packages."
+#
+# HIS UBUNTU LOCKS THE SYSTEM PYTHON (PEP 668), so a plain `pip install`
+# is refused outright. Both setup blocks below used one, which means
+# the voice block's install could never have worked on his board
+# either -- Kokoro got there some other way.
+#
+# --user puts the package in HIS folder (~/.local), never in the
+# system's, so nothing apt owns is touched -- and the face server runs
+# as him, so it sees it. --break-system-packages is only what pip wants
+# said before it will do that, and it is only said AFTER pip has
+# refused without it: an older pip (Ubuntu 22.04) has no such flag and
+# would fail on the word itself.
+pip_install() {
+    local out
+    out=$(pip install --quiet "$@" 2>&1)
+    if printf '%s' "$out" | grep -q "externally-managed-environment"; then
+        out=$(pip install --quiet --user --break-system-packages "$@" 2>&1)
+    fi
+    printf '%s\n' "$out" | tail -2
+}
+
 # --- HER VOICE, ONCE, WITHOUT A SECOND COMMAND TO REMEMBER --------
 # OUTSIDE the up-to-date branch on purpose. He asked to type pull
 # and have her work -- so a pull that brings nothing new must still
@@ -290,7 +316,7 @@ if ! python3 -c "import yuzu_voice,sys; sys.exit(0 if yuzu_voice.pick_voice().re
     echo "    SHE HAS NO VOICE YET. Setting one up -- about 340MB,"
     echo "    once, and never again. Piper still works if this fails."
     echo
-    pip install --quiet kokoro-onnx soundfile 2>&1 | tail -2
+    pip_install kokoro-onnx soundfile
     if python3 -c "import kokoro_onnx" 2>/dev/null; then
         mkdir -p voices
         # The filenames come from the RELEASE, never from memory.
@@ -360,7 +386,7 @@ if ! python3 -c "import yuzu_ears,sys; sys.exit(0 if not yuzu_ears.why_not() els
     echo "    SHE CAN'T HEAR YET. Setting that up -- about 200MB,"
     echo "    once. Typing works exactly as before if this fails."
     echo
-    pip install --quiet faster-whisper 2>&1 | tail -2
+    pip_install faster-whisper
     python3 - <<'EARS' 2>&1 | tail -2
 import yuzu_ears
 from faster_whisper import WhisperModel

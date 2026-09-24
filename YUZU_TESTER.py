@@ -6660,6 +6660,13 @@ class TestOneWordGetsHerTalking(unittest.TestCase):
         and (when `fetch_works`) leaves the marker that makes the
         stand-in yuzu_ears report ready afterwards."""
         import subprocess
+        # START WITHOUT EARS, every call. The marker a previous call left
+        # made the second half of the locked-Ubuntu test see ears that
+        # were already there, so the install never ran and the check
+        # passed with nothing under it -- verified by breaking it.
+        marker = os.path.join(self.work, "fetched")
+        if os.path.exists(marker):
+            os.remove(marker)
         with open(os.path.join(self.work, "yuzu_ears.py"), "w") as fh:
             fh.write("import os\nMODEL = 'base.en'\n"
                      "def why_not():\n"
@@ -6700,6 +6707,32 @@ class TestOneWordGetsHerTalking(unittest.TestCase):
         self.assertIn("fetch base.en local=None", called,
                       "pull never fetched her ear model")
         self.assertIn("SHE CAN HEAR NOW", out)
+
+    def test_it_gets_past_UBUNTUS_locked_python(self):
+        """His board, Sept 24, in the Update bar: pip refused with
+        "externally-managed-environment" (PEP 668), so a plain `pip
+        install` can never work there. The stub refuses exactly like
+        that unless told --break-system-packages; the install must then
+        go to HIS folder (--user), never the system's.
+
+        And an older pip that ACCEPTS the plain install must never be
+        handed the flag, which it would fail on as an unknown option."""
+        self.write("pip", '#!/bin/sh\n'
+                   'echo "pip $*" >> "$LOG"\n'
+                   'case "$*" in *--break-system-packages*) exit 0 ;; esac\n'
+                   'echo "error: externally-managed-environment"\n'
+                   'exit 1\n')
+        out, called = self.run_pull_ears(fetch_works=True)
+        self.assertIn("pip install --quiet --user --break-system-packages "
+                      "faster-whisper", called,
+                      "a locked Ubuntu refused the install and nothing retried")
+        self.assertIn("SHE CAN HEAR NOW", out)
+
+        self.write("pip", '#!/bin/sh\necho "pip $*" >> "$LOG"\n')
+        out, called = self.run_pull_ears(fetch_works=True)
+        self.assertNotIn("--break-system-packages", called,
+                         "a pip that accepted the plain install was handed "
+                         "a flag it may not know")
 
     def test_ears_that_fail_to_set_up_leave_TYPING_and_the_pull_good(self):
         out, _ = self.run_pull_ears(fetch_works=False)

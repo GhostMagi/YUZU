@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 798 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 799 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -149,6 +149,24 @@ with a pull, not as a command for him.
 
 **Sixteen new tests, twenty breaks, all red once the cap test was
 fixed. 782 -> 798.**
+
+### And his Ubuntu refused the install
+
+First Update on the board: *"SHE CAN'T HEAR YET"* and then pip's own
+**"externally-managed-environment"** -- his Ubuntu locks the system
+Python (PEP 668), so a plain `pip install` is refused outright. **The
+voice block's install had the same line, so it could never have worked
+there either.** `pip_install()` in `pull` retries a refusal with
+`--user --break-system-packages`: the package lands in HIS folder,
+nothing apt owns is touched, and the face server runs as him so it
+sees it. The flag is only said after a refusal, because an older pip
+fails on the word itself. Both directions pinned.
+
+**AND THE TEST'S SECOND HALF PASSED WITH NOTHING UNDER IT.** It called
+the helper twice, and the first call's "model fetched" marker made the
+second see ears already installed, so the install never ran and "no
+flag was passed" was trivially true. Caught by the break-check. The
+helper starts clean every call now. 798 -> 799.
 
 ## ZERO'S EMPHASIS WAS BEING DELETED, AND SHE "FIXED" A BUG SHE CANNOT SEE (Sept 24)
 
