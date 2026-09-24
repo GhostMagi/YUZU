@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 775 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 779 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,72 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## "SHE SAID NOTHING", AND THE UPDATE THAT RELOADED INTO THE OLD DECK (Sept 24)
+
+Two faults from his first minutes with Zero on the board.
+
+### Zero answered with nothing, twice
+
+    Ghost: hiii Zero, Welcome to my cyberdeck ...
+    Zero:  She said nothing.
+
+That line is the PAGE's, shown when `/say` comes back with an EMPTY
+reply and no error. The same model answered *"17 times 23 is 391."* in
+a terminal an hour earlier.
+
+**The likely cause is Ollama's thinking field.** Qwen3 models can
+think before they answer, and Ollama files that under
+`message.thinking`, apart from `message.content`. If the prompt format
+Ollama picked for her expects a think block, it can file EVERYTHING
+she says as thinking. Her release (Instruct-2507) never thinks and
+never closes the block, so `content` comes back empty -- and the brain
+only read `content`. `ollama run` prints both, which is why the
+terminal looked fine.
+
+**UNCONFIRMED ON THE BOARD** (no Ollama in the container), so two
+fixes, either enough alone:
+
+- her persona says `think: no`, sent as `"think": false`, and only
+  for her. **Four's request is unchanged to the byte**, pinned.
+- `_words()` in `yuzu_brain.py` reads `thinking` when `content` is
+  empty, in both `ask` and `ask_stream`, and strips a `<think>` block
+  that reaches `content`.
+
+If she still says nothing after an update, this pasted on the board
+shows which field her words are in:
+
+    curl -s localhost:11434/api/chat -d '{"model":"hf.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF:Q4_K_M","messages":[{"role":"user","content":"hi"}],"stream":false}'
+
+### The home screen reloaded into the version it had just replaced
+
+His photo after an Update: Yuzu's tile said *"gyaru, fully dressed"*,
+a blurb the repo had already dropped, while Zero's page was new.
+
+**After UPDATED the page polled `/characters.json` and reloaded on the
+first answer.** `restart_later()` waits two seconds before it stops
+the server; the first poll is at one second. So the answer came from
+the OLD process, and the page reloaded into the old version, on every
+update that changed code. **The Sept 15 stale-roster fault, re-created
+by the code written to fix it.**
+
+**REPRODUCED BEFORE IT WAS FIXED**, on a copy of the deck in a real
+browser: the server said the new blurb, and the reloaded page showed
+the old one. **"Something answered" is not "the new one is up".** Each
+server process has a `BOOT` id; the pull reply carries it,
+`/boot.json` reports the current one, and the page reloads only once
+they differ. Same browser run afterwards: the new blurb, first time.
+An older server has no `/boot.json`, so any answer there is the new one.
+
+**THE FIRST UPDATE AFTER THIS STILL RELOADS STALE**: the page doing the
+waiting is the one already loaded. One refresh, then it is fixed.
+
+**Four new tests, nine breaks, all red.** One break-check read green
+for a false reason: a same-length edit (`/boot.json` -> `/nope.json`)
+restored within the same second left Python's `.pyc` for the BROKEN
+file in use, and the next three checks ran against it. Re-run with
+`PYTHONDONTWRITEBYTECODE=1`. **A break-check that edits a .py should
+not write bytecode.** 775 -> 779.
 
 ## ZERO GOES BLACK, AND HER LOG IS HIS TWO COLOURS (Sept 24)
 

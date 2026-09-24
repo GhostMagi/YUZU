@@ -10,6 +10,10 @@ description: The deck's second mind, for maths, code, science and anything that 
 # beats the deck-wide YUZU_MODEL, so Four's setting cannot quietly put
 # her on Four's weights. Pull it on the board with exactly this name.
 model: hf.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF:Q4_K_M
+# Sent to Ollama as "think": false. Her first two replies on the board
+# came back EMPTY -- most likely her words were filed as "thinking",
+# which the deck never showed. See _words() in yuzu_brain.py.
+think: no
 # Qwen's own recommended sampling for this release, not a taste call.
 temperature: 0.7
 top_p: 0.8

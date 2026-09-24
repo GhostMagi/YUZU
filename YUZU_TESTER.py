@@ -534,6 +534,9 @@ def character_pages():
 class MockOllama(BaseHTTPRequestHandler):
     replies = itertools.cycle(["Not much, just vibing! [squats] What's good?"])
     seen = {}
+    # Which field the words arrive in. "thinking" is what a Qwen3 model
+    # on Ollama can do: the whole answer filed as thinking, content "".
+    field = "content"
 
     def log_message(self, *args):
         pass
@@ -562,12 +565,15 @@ class MockOllama(BaseHTTPRequestHandler):
             self.end_headers()
             for word in reply.split(" "):
                 self.wfile.write(
-                    (json.dumps({"message": {"content": word + " "},
+                    (json.dumps({"message": {"content": "",
+                                             MockOllama.field: word + " "},
                                  "done": False}) + "\n").encode())
             self.wfile.write(
                 (json.dumps({"message": {"content": ""}, "done": True}) + "\n").encode())
         else:
-            self._send(json.dumps({"message": {"content": reply}, "done": True}).encode())
+            self._send(json.dumps({"message": {"content": "",
+                                               MockOllama.field: reply},
+                                   "done": True}).encode())
 
 
 class BrainTestCase(unittest.TestCase):
@@ -589,6 +595,7 @@ class BrainTestCase(unittest.TestCase):
     def setUp(self):
         MockOllama.replies = itertools.cycle(
             ["Not much, just vibing! [squats] What's good?"])
+        MockOllama.field = "content"
 
     def brain(self, **kwargs):
         kwargs.setdefault("model", "yuzu")
@@ -760,6 +767,48 @@ class TestBrain(BrainTestCase):
         self.assertIn("persona", made)
         self.assertIsNone(made.get("model"),
                           "the chat passed a model and overrode hers")
+
+    def test_her_words_are_read_even_when_filed_as_THINKING(self):
+        """Ghost, Sept 24, Zero's first two turns: "She said nothing."
+        Both times. The reply came back empty with no error, from a
+        model that answered fine in a terminal.
+
+        Most likely cause: Ollama filed her whole answer under
+        `message.thinking`, and the brain only read `content`. A model
+        that never thinks has nothing else in there, so it IS the
+        answer. Driven through both ways of asking, against a stub
+        Ollama that does exactly that."""
+        MockOllama.field = "thinking"
+        MockOllama.replies = itertools.cycle(["17 times 23 is 391."])
+        zero = YuzuBrain(persona="zero", host=self.host)
+        self.assertEqual(zero.ask("17 x 23?"), "17 times 23 is 391.",
+                         "her answer was filed as thinking and thrown away")
+        self.assertEqual("".join(zero.ask_stream("17 x 23?")).strip(),
+                         "17 times 23 is 391.",
+                         "streaming threw the thinking-filed answer away")
+
+    def test_a_think_block_never_reaches_her_words(self):
+        """If the split does not happen, a `<think>` block lands in
+        content. It is not something she said."""
+        MockOllama.replies = itertools.cycle(
+            ["<think>seventeen twenties...</think>391."])
+        self.assertEqual(YuzuBrain(persona="zero", host=self.host)
+                         .ask("17 x 23?"), "391.")
+
+    def test_only_the_character_who_asks_sends_think_false(self):
+        """Her persona says `think: no` and the request says
+        `"think": false`. Four's request must not change by a byte --
+        she runs a Llama that has never heard of thinking, and a field
+        an older Ollama does not know is a risk bought for nothing."""
+        YuzuBrain(persona="zero", host=self.host).ask("hi")
+        self.assertIs(MockOllama.seen["last"].get("think"), False,
+                      "her setting never reached the request")
+        list(YuzuBrain(persona="zero", host=self.host).ask_stream("hi"))
+        self.assertIs(MockOllama.seen["last"].get("think"), False,
+                      "the streaming request forgot it")
+        YuzuBrain(persona="four", host=self.host).ask("hi")
+        self.assertNotIn("think", MockOllama.seen["last"],
+                         "Four's request grew a field she never asked for")
 
     def test_streaming_reassembles_to_the_same_text(self):
         self.assertEqual("".join(self.brain().ask_stream("hey")).strip(),
@@ -7603,6 +7652,56 @@ class TestUpdatingWithoutTheCable(unittest.TestCase):
         reload_at = block.index("location.reload")
         self.assertLess(block.index("setInterval"), reload_at,
                         "it reloads without waiting for her to come back")
+
+    def test_the_page_waits_for_a_DIFFERENT_server_not_just_any_answer(self):
+        """Ghost, Sept 24, a photo of the home screen after an Update:
+        Yuzu's tile still said "gyaru, fully dressed", which the repo had
+        dropped that night, while Zero's page was new.
+
+        The page reloaded on the FIRST answer after UPDATED -- and the
+        old server lives two more seconds before restart_later() stops
+        it, so that answer was the old one, every time. Reproduced on a
+        copy of the deck in a real browser before the fix.
+
+        So the server that answers the pull says which process it is,
+        /boot.json says which one is answering NOW, and the page waits
+        for them to differ. Driven on the server; read on the page,
+        because the suite cannot run JavaScript -- and the page half was
+        driven in a browser against a real restart."""
+        import io
+        tmp, script = self._stub('#!/bin/bash\necho "  UPDATED."\n')
+        try:
+            with unittest.mock.patch.object(self.face, "PULL_SCRIPT",
+                                            str(script)), \
+                    unittest.mock.patch.object(self.face, "restart_later",
+                                               lambda *a, **k: None):
+                said = drive_route("/pull", {})
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertEqual(said.get("boot"), self.face.BOOT,
+                         "the pull reply does not say which server sent it")
+
+        got = {}
+        handler = object.__new__(self.face._Handler)
+        handler.path = "/boot.json"
+        handler._json = lambda obj, code=200: got.update(obj)
+        try:
+            handler.do_GET()
+        except Exception:
+            pass     # fell through to serving a FILE: there is no route
+        self.assertEqual(got.get("boot"), self.face.BOOT,
+                         "/boot.json does not answer with this server's id")
+
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        block = page[page.index("update.onclick"):]
+        block = block[:block.index("// ---- the deck, as an app")]
+        code = "\n".join(ln.split("//")[0] for ln in block.splitlines())
+        self.assertIn("r.boot", code, "the page ignores which server answered")
+        self.assertIn("boot.json", code, "the page never asks who is up now")
+        self.assertTrue(re.search(r"now\.boot\s*!==\s*was", code),
+                        "it reloads without checking the server CHANGED")
+        self.assertNotIn("characters.json", code,
+                         "any answer at all still counts as 'she is back'")
 
 
 class TestTheDeckPutsItselfOnTheDesktop(unittest.TestCase):

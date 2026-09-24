@@ -2091,6 +2091,11 @@ class _Handler(SimpleHTTPRequestHandler):
                                                    "/characters"):
             self._json(roster())
             return
+        # WHICH SERVER IS ANSWERING. The home page asks this after an
+        # update and reloads only once a DIFFERENT one does -- see BOOT.
+        if self.path.split("?")[0].rstrip("/") == "/boot.json":
+            self._json({"boot": BOOT})
+            return
         # Regenerated PER REQUEST, same as /sprites.json: a new outfit
         # is a PNG dropped in ui/yuzu/ and a page refresh, never a
         # server restart. On a phone over a serial link that is a much
@@ -2313,7 +2318,9 @@ class _Handler(SimpleHTTPRequestHandler):
             return
         if path == "/pull":
             said, restart = run_pull()
-            self._json({"ok": True, "said": said})
+            # `boot` says WHICH server gave this answer, so the page can
+            # wait for a different one before it reloads.
+            self._json({"ok": True, "said": said, "boot": BOOT})
             if restart:
                 restart_later()
             return
@@ -2333,6 +2340,26 @@ class _Handler(SimpleHTTPRequestHandler):
 
 
 PULL_SCRIPT = None      # the suite points this at a stub
+
+# ONE VALUE PER SERVER PROCESS, so "has she restarted yet" has an answer.
+#
+# Ghost, Sept 24, with a photo of the home screen after an Update:
+# Yuzu's tile still said "gyaru, fully dressed", a blurb the repo had
+# dropped that same night -- while Zero's page, opened a minute later,
+# was the new one. After UPDATED the page polled /characters.json and
+# reloaded on the first answer. But restart_later() waits two seconds
+# before it stops the server, and the first poll is at one second, so
+# the answer came from the OLD process, and the page reloaded into the
+# old version. It did that on every update that changed code. That is
+# the Sept 15 stale-roster fault, re-created by the code written to
+# fix it.
+#
+# Reproduced on a copy of the deck before the fix: server says the new
+# blurb, and the reloaded page shows the old one. "Any answer at all" is
+# not the same as "the new one is up", so the page now reloads only
+# when /boot.json names a DIFFERENT server than the one that answered
+# the pull.
+BOOT = "%x-%x" % (os.getpid(), int(time.time() * 1000))
 
 
 def run_pull():

@@ -213,6 +213,42 @@ def load_system_prompt(persona=yuzu_personas.LIVE_PERSONA):
         raise BrainError(str(exc)) from exc
 
 
+# A THINK BLOCK NEVER REACHES HER BUBBLE OR HER VOICE, whichever field
+# Ollama leaves it in.
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.S | re.I)
+
+
+def _words(message):
+    """The words of a reply, from wherever Ollama put them.
+
+    Ghost, Sept 24, Zero's first two turns on his board: "She said
+    nothing." Twice, every time. The page shows that line when the
+    reply comes back EMPTY -- no error, no timeout, just no words --
+    and the same model answered "17 times 23 is 391." in a terminal
+    an hour earlier.
+
+    THE LIKELY CAUSE IS THE THINKING FIELD. Qwen3 models can think
+    before they answer, and Ollama splits that into
+    `message.thinking`, apart from `message.content`. When the prompt
+    format Ollama picked for her expects a think block first, it can
+    treat EVERYTHING she says as thinking -- but her release
+    (Instruct-2507) never thinks and never closes one. The whole
+    answer lands in `thinking`, `content` is empty, and this file
+    only ever read `content`. `ollama run` prints both fields, which
+    is why the terminal looked fine.
+
+    UNCONFIRMED ON THE BOARD -- no Ollama in the container. So two
+    things, either one enough on its own: her persona sends
+    `"think": false`, and this reads `thinking` when `content` is
+    empty. For a model that never thinks, what is in there is the
+    answer; an empty bubble is never the better outcome."""
+    message = message or {}
+    said = _THINK_BLOCK.sub("", message.get("content") or "")
+    if said.strip():
+        return said
+    return message.get("thinking") or ""
+
+
 def _post(url, payload, timeout):
     request = urllib.request.Request(
         url,
@@ -292,6 +328,12 @@ class YuzuBrain:
         own = (self.persona.settings.get("model") or "").strip() \
             if self.persona else ""
         self.model = model or own or DEFAULT_MODEL
+        # `think: no` in her settings goes to Ollama as `"think": false`.
+        # Only for a character who says so: Four's request is unchanged
+        # to the byte. See _words() for why Zero needs it.
+        wants = str(self.persona.settings.get("think", "")).strip().lower() \
+            if self.persona else ""
+        self.think = False if wants in ("no", "false", "off", "0") else None
         # Precedence: explicit options > persona settings > defaults.
         # Layered rather than dict(a, **b, **c) -- that form raises
         # TypeError the moment two layers set the same key, which is
@@ -390,6 +432,8 @@ class YuzuBrain:
             "options": self.options,
             "keep_alive": self.keep_alive,
         }
+        if self.think is not None:
+            payload["think"] = self.think
         self._face("thinking")
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as r:
@@ -416,7 +460,7 @@ class YuzuBrain:
                 f"  Or allow longer:  export YUZU_TIMEOUT=600"
             ) from exc
 
-        reply = (data.get("message") or {}).get("content", "").strip()
+        reply = _words(data.get("message")).strip()
         self._face("talking", reply, _token_rate(data))
         if remember:
             self._remember(user_text, reply)
@@ -438,7 +482,10 @@ class YuzuBrain:
             "options": self.options,
             "keep_alive": self.keep_alive,
         }
+        if self.think is not None:
+            payload["think"] = self.think
         collected = []
+        thought = []            # see _words(): the answer can land here
         self._face("thinking")
         rate = None
         try:
@@ -450,7 +497,9 @@ class YuzuBrain:
                     chunk = json.loads(line)
                     if chunk.get("error"):
                         raise BrainError(f"Ollama error: {chunk['error']}")
-                    piece = (chunk.get("message") or {}).get("content", "")
+                    message = chunk.get("message") or {}
+                    thought.append(message.get("thinking") or "")
+                    piece = message.get("content", "")
                     if piece:
                         # The FIRST chunk is the moment she stops
                         # thinking and starts talking -- which is the
@@ -472,6 +521,13 @@ class YuzuBrain:
                 f"Stream stalled after {self.timeout}s ({exc}). "
                 f"Try: export YUZU_TIMEOUT=600"
             ) from exc
+        if not "".join(collected).strip() and "".join(thought).strip():
+            # Nothing came back as the reply and something came back as
+            # "thinking": that IS her reply. Handed over whole, at the
+            # end -- late, but never an empty bubble.
+            late = "".join(thought).strip()
+            collected.append(late)
+            yield late
         full_reply = "".join(collected).strip()
         self._face("talking", full_reply, rate)
         if remember:
