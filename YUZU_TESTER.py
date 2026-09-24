@@ -8411,6 +8411,28 @@ class TestUpdatingWithoutTheCable(unittest.TestCase):
         self.assertIn("r.restarting", block,
                       "the page only waits when the words say UPDATED")
 
+    def test_after_an_update_the_browser_asks_for_the_NEW_page(self):
+        """Ghost, Sept 24: "Im not seein a mic on the four or yuzu",
+        after an Update that delivered it. The pages carried no caching
+        rule, so Chrome could show the copy it saved before the update.
+        Every page -- and the bare address -- says no-cache; the data
+        routes keep their no-store. Driven through the real server."""
+        import threading
+        import urllib.request
+        from http.server import ThreadingHTTPServer
+        server = ThreadingHTTPServer(("127.0.0.1", 0), self.face._Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base = "http://127.0.0.1:%d" % server.server_address[1]
+        for page in ["/"] + ["/" + p for p in character_pages()] + ["/home.html"]:
+            with urllib.request.urlopen(base + page, timeout=5) as got:
+                self.assertIn("no-cache", got.headers.get("Cache-Control", ""),
+                              "%s can be shown from a stale copy" % page)
+        with urllib.request.urlopen(base + "/characters.json", timeout=5) as got:
+            self.assertEqual(got.headers.get("Cache-Control"), "no-store",
+                             "a data route lost its own rule")
+
     def test_the_route_takes_NOTHING_from_the_request(self):
         """The whole reason this is safe on a server bound to 0.0.0.0.
 

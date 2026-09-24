@@ -55,7 +55,7 @@ So:
     roster         Yuzu, Four, Zero  (Cait, Mimi, Saya are `retired: yes`)
     Zero's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
     Four's prompt  5446 chars
-    tests          813, ~95s,  `python YUZU_TESTER.py`
+    tests          814, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -80,7 +80,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 813 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 814 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means

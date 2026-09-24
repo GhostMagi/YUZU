@@ -2113,6 +2113,20 @@ class _Handler(SimpleHTTPRequestHandler):
     # whole WiFi.
     LANDING = "home.html"
 
+    # A PAGE IS CHECKED EVERY TIME IT OPENS. Ghost, Sept 24, after an
+    # Update: "Im not seein a mic on the four or yuzu" -- with the mic
+    # on GitHub and on his board. The JSON routes already said no-store;
+    # the pages themselves said nothing but Last-Modified, and Chrome is
+    # then free to show a copy it saved earlier without asking. So an
+    # Update landed and the page he opened was the one from before it.
+    # `no-cache` still lets it keep the copy -- it only has to ask first,
+    # and an unchanged page answers 304 with no body.
+    def end_headers(self):
+        if self.command in ("GET", "HEAD") and \
+                self.path.split("?")[0].endswith((".html", "/")):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def do_GET(self):
         if self.path.split("?")[0] in ("/", "/index.html"):
             self.path = "/" + self.LANDING

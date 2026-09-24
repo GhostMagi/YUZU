@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 813 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 814 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,17 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## AN UPDATE LANDED AND CHROME SHOWED THE OLD PAGE (Sept 24)
+
+Ghost, after the talk button shipped: *"Im not seein a mic on the four
+or yuzu"* -- with it on GitHub. The data routes said `no-store`; the
+PAGES said nothing but Last-Modified, so Chrome was free to show the
+copy it saved before the update. Every page and the bare address now
+send `Cache-Control: no-cache` (keep the copy, but ask first; an
+unchanged page is a 304). The first load after this lands can still be
+the saved copy, so he refreshes once. One test through the real
+server, one break, red. 813 -> 814.
 
 ## THE TALK BUTTON IS ON YUZU AND FOUR TOO (Sept 24)
 
