@@ -558,6 +558,7 @@ class MockOllama(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         request = json.loads(self.rfile.read(length))
         MockOllama.seen["last"] = request
+        MockOllama.seen["count"] = MockOllama.seen.get("count", 0) + 1
         reply = next(MockOllama.replies)
         if request.get("stream"):
             self.send_response(200)
@@ -868,6 +869,74 @@ class TestBrain(BrainTestCase):
                          ("Hello.\n", False), "half a role name reached the screen")
         self.assertEqual(yuzu_brain_module._safe_so_far("Hello.\nGh", "Ghost"),
                          ("Hello.\n", False), "half his label reached the screen")
+
+    def test_a_WINDOWS_line_ending_does_not_hide_his_turn(self):
+        """Ghost, Sept 24, after an Update: "Shes still bein weird" --
+        "user" / "what do you know about the Jetson Nano?", on screen.
+        Replayed through the real code, that reply was caught with "\\n"
+        and let through with "\\r\\n": `$` stops only before "\\n", so
+        "user\\r" was the word user with more text after it. Every line
+        ending counts, and so does every kind of space."""
+        cases = [
+            "user\r\nwhat do you know about the Jetson Nano?",
+            "user\rwhat do you know about the Jetson Nano?",
+            "user \u00a0\nwhat do you know about the Jetson Nano?",
+            "\u200buser\nwhat do you know about the Jetson Nano?",
+            "user\u2028what do you know about the Jetson Nano?",
+            "\u00a0user\r\nwhat do you know about the Jetson Nano?",
+        ]
+        for said in cases:
+            self.assertEqual(yuzu_brain_module.cut_his_turn(said, "Ghost"),
+                             ("", True), "his turn got through: %r" % said)
+            MockOllama.replies = itertools.cycle([said])
+            zero = YuzuBrain(persona="zero", host=self.host)
+            self.assertEqual("".join(zero.ask_stream("hi")).strip(), "",
+                             "his turn streamed onto the screen: %r" % said)
+        self.assertEqual(yuzu_brain_module.cut_his_turn(
+            "Fine.\r\nGhost: and then?", "Ghost"), ("Fine.", True))
+        # And English about accounts is still English, CRLF or not.
+        self.assertEqual(yuzu_brain_module.cut_his_turn(
+            "Add a new user\r\nthen log in as that user.", "Ghost"),
+            ("Add a new user\nthen log in as that user.", False))
+
+    def test_she_gets_ONE_more_try_when_she_wrote_ONLY_his_side(self):
+        """The cut turns an all-his-side reply into a sentence saying
+        so, which is honest and still not an answer -- and asking again
+        is the first thing he would do. So the deck does, once, while
+        nothing has been shown. Once: a model that does it twice in a
+        row is a pattern, and the sentence is what should say so."""
+        his = "user\nwhat do you know about the Jetson Nano?"
+        for stream in (False, True):
+            def turn(brain):
+                return ("".join(brain.ask_stream("/wiki emp")).strip()
+                        if stream else brain.ask("/wiki emp"))
+            MockOllama.replies = itertools.cycle([his, "A pulse of energy."])
+            MockOllama.seen["count"] = 0
+            zero = YuzuBrain(persona="zero", host=self.host)
+            self.assertEqual(turn(zero), "A pulse of energy.",
+                             "she was not asked again (stream=%s)" % stream)
+            self.assertFalse(zero.last_cut, "a good second answer was "
+                             "reported as cut")
+            self.assertEqual(MockOllama.seen["count"], 2)
+            self.assertEqual([m["content"] for m in zero.history],
+                             ["/wiki emp", "A pulse of energy."],
+                             "her memory kept the bad draw or lost the good")
+            # Twice in a row: two requests, never a third, and the cut
+            # is still reported so the page can say so.
+            MockOllama.replies = itertools.cycle([his])
+            MockOllama.seen["count"] = 0
+            zero = YuzuBrain(persona="zero", host=self.host)
+            self.assertEqual(turn(zero), "")
+            self.assertTrue(zero.last_cut)
+            self.assertEqual(MockOllama.seen["count"], 2,
+                             "it asked more than once more (stream=%s)" % stream)
+            # Her own words before the cut are an answer: no second try.
+            MockOllama.replies = itertools.cycle(["Short answer.\nuser\nmore?"])
+            MockOllama.seen["count"] = 0
+            zero = YuzuBrain(persona="zero", host=self.host)
+            self.assertEqual(turn(zero), "Short answer.")
+            self.assertEqual(MockOllama.seen["count"], 1,
+                             "a real answer was thrown away and asked again")
 
     def test_only_the_character_who_names_them_sends_STOP_markers(self):
         """A request's stop list REPLACES the model's own, and Four's
@@ -8216,6 +8285,75 @@ class TestUpdatingWithoutTheCable(unittest.TestCase):
             self.assertTrue(restart, "a real update left stale code serving")
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_it_reads_the_checkout_off_disk_in_every_shape_git_leaves(self):
+        """A loose ref, a packed one, a detached HEAD, and no .git at
+        all -- read without a git binary, and never raising."""
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            self.assertEqual(self.face.checked_out(str(tmp)), "",
+                             "no .git must read as unknown, not raise")
+            git = tmp / ".git"
+            (git / "refs" / "heads").mkdir(parents=True)
+            (git / "HEAD").write_text("ref: refs/heads/main\n")
+            (git / "packed-refs").write_text(
+                "# pack-refs with: peeled fully-peeled sorted\n"
+                + "b" * 40 + " refs/heads/main\n")
+            self.assertEqual(self.face.checked_out(str(tmp)), "b" * 40,
+                             "a packed ref was not read")
+            (git / "refs" / "heads" / "main").write_text("a" * 40 + "\n")
+            self.assertEqual(self.face.checked_out(str(tmp)), "a" * 40,
+                             "the loose ref must win over the packed one")
+            (git / "HEAD").write_text("c" * 40 + "\n")
+            self.assertEqual(self.face.checked_out(str(tmp)), "c" * 40)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        self.assertEqual(self.face.checked_out(), self.face.RUNNING,
+                         "this process does not know what it was started from")
+
+    def test_update_restarts_a_server_on_OLDER_code_than_the_deck_has(self):
+        """Ghost, Sept 24: "Hit update. Shes still bein weird", with the
+        fix for what she did already on GitHub. An Update restarted her
+        only on a pull that said UPDATED, so any pull that landed WITHOUT
+        bouncing her left a process on old code that every later Update
+        called ALREADY UP TO DATE and left alone. The question is the
+        code she RUNS against the code the deck HAS."""
+        tmp, script = self._stub('#!/bin/bash\necho "  ALREADY UP TO DATE."\n')
+        try:
+            def pull(running, now):
+                with unittest.mock.patch.object(self.face, "PULL_SCRIPT", str(script)), \
+                        unittest.mock.patch.object(self.face, "RUNNING", running), \
+                        unittest.mock.patch.object(self.face, "checked_out",
+                                                   lambda root=None: now):
+                    return self.face.run_pull()
+            said, restart = pull("a" * 40, "b" * 40)
+            self.assertTrue(restart, "a server on old code was left serving")
+            self.assertTrue(said.startswith("RESTARTING HER"),
+                            "the restart is not the first thing it says")
+            self.assertIn("ALREADY UP TO DATE", said)
+            for running, now in (("a" * 40, "a" * 40), ("", "b" * 40),
+                                 ("a" * 40, "")):
+                said, restart = pull(running, now)
+                self.assertFalse(restart, "bounced her with nothing to gain "
+                                 "(%r -> %r)" % (running[:1], now[:1]))
+                self.assertFalse(said.startswith("RESTARTING"))
+            # And the reply says so, so the page waits for her.
+            with unittest.mock.patch.object(self.face, "PULL_SCRIPT", str(script)), \
+                    unittest.mock.patch.object(self.face, "RUNNING", "a" * 40), \
+                    unittest.mock.patch.object(self.face, "checked_out",
+                                               lambda root=None: "b" * 40), \
+                    unittest.mock.patch.object(self.face, "restart_later",
+                                               lambda *a, **k: None):
+                reply = drive_route("/pull", {})
+            self.assertIs(reply.get("restarting"), True,
+                          "the page is not told she is restarting")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        block = page[page.index("update.onclick"):]
+        block = block[:block.index("setInterval")]
+        self.assertIn("r.restarting", block,
+                      "the page only waits when the words say UPDATED")
 
     def test_the_route_takes_NOTHING_from_the_request(self):
         """The whole reason this is safe on a server bound to 0.0.0.0.

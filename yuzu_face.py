@@ -2384,7 +2384,10 @@ class _Handler(SimpleHTTPRequestHandler):
             said, restart = run_pull()
             # `boot` says WHICH server gave this answer, so the page can
             # wait for a different one before it reloads.
-            self._json({"ok": True, "said": said, "boot": BOOT})
+            # `restarting` so the page waits whenever she is bounced,
+            # not only when the words say UPDATED.
+            self._json({"ok": True, "said": said, "boot": BOOT,
+                        "restarting": bool(restart)})
             if restart:
                 restart_later()
             return
@@ -2424,6 +2427,50 @@ PULL_SCRIPT = None      # the suite points this at a stub
 # when /boot.json names a DIFFERENT server than the one that answered
 # the pull.
 BOOT = "%x-%x" % (os.getpid(), int(time.time() * 1000))
+
+
+def checked_out(root=None):
+    """The commit checked out beside this file, read straight off .git
+    -- no git binary, nothing that can hang. "" when it cannot be read,
+    and "" never counts as a difference."""
+    git = os.path.join(root or os.path.dirname(os.path.abspath(__file__)), ".git")
+    try:
+        with open(os.path.join(git, "HEAD")) as fh:
+            head = fh.read().strip()
+        if not head.startswith("ref:"):
+            return head
+        ref = head[4:].strip()
+        loose = os.path.join(git, ref)
+        if os.path.exists(loose):
+            with open(loose) as fh:
+                return fh.read().strip()
+        with open(os.path.join(git, "packed-refs")) as fh:
+            for line in fh:
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == ref:
+                    return parts[0]
+    except Exception:
+        pass
+    return ""
+
+
+# WHAT THIS PROCESS WAS STARTED FROM. Ghost, Sept 24: "Hit update.
+# Shes still bein weird" -- with a fix for exactly what she did already
+# on GitHub, and nothing on his screen able to say whether the server
+# answering him was running it. An Update only restarted her on a pull
+# that said UPDATED, so any pull that landed WITHOUT bouncing her -- a
+# terminal `git pull`, a pull that ran out of time, one whose restart
+# failed -- left a process on old code that every later Update called
+# "ALREADY UP TO DATE" and left alone, forever. Now the question is the
+# right one: is the code she is RUNNING the code the deck HAS?
+RUNNING = checked_out()
+
+
+def running_stale():
+    """True when the checkout has moved past what this server started
+    from. Unknown on either side is never stale."""
+    now = checked_out()
+    return bool(RUNNING and now and now != RUNNING)
 
 
 def run_pull():
@@ -2472,7 +2519,17 @@ def run_pull():
     # history and nothing else, and getting the condition subtly wrong
     # is how a fresh page ends up asking a stale process -- which is the
     # exact fault this whole route was written the day after.
-    return text.strip(), "UPDATED." in text
+    #
+    # AND ON A PULL THAT BROUGHT NOTHING, IF SHE IS STILL ON OLDER CODE
+    # THAN THE DECK HAS. See RUNNING. Said first, because it is the
+    # thing that is about to change.
+    text = text.strip()
+    if "UPDATED." in text:
+        return text, True
+    if running_stale():
+        return ("RESTARTING HER: she was still running older code than "
+                "the deck has.\n" + text), True
+    return text, False
 
 
 DECKAPPS_SCRIPT = None   # the suite points this at a stub

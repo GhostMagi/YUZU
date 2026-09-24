@@ -900,7 +900,8 @@ update.onclick = () => {
       const text = (r.said || '').trim();
       // The first lines are the verdict and, when it failed, the fix.
       say(text.split('\n').filter(l => l.trim()).slice(0, 4).join('\n'));
-      if (text.indexOf('UPDATED.') >= 0) {
+      // `restarting` from the server; UPDATED. for one that predates it.
+      if (r.restarting || text.indexOf('UPDATED.') >= 0) {
         // HER SERVER IS RESTARTING ITSELF behind this reply, so the
         // page has to wait for it rather than reloading into a dead
         // port. A reload that lands on "unable to connect" reads as an

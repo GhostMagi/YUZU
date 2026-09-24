@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 806 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 810 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,52 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## "SHES STILL BEIN WEIRD": ONE MORE TRY, AND UPDATE KNOWS STALE CODE (Sept 24)
+
+Ghost, after tapping Update, with a photo of Zero's page:
+
+    Ghost: /wiki emp
+    Zero:  user
+           what do you know about the Jetson Nano?
+
+The same fault as the entry below, **after its fix was on GitHub.**
+Replayed through the real `answer()` with his exact reply: caught with
+`"\n"` line endings -- and **let through with `"\r\n"`**, because `$`
+in a multiline regex stops only before `"\n"`. So there were two ways
+his screen could happen and nothing on it could say which: her writing
+Windows line endings, or **the server answering him still running old
+code.** Both are closed, and which one it was is UNKNOWN.
+
+- **`_lines()` in the brain**: every line ending is `"\n"`, the
+  invisible characters go, and a space is anything Python calls one
+  (`[^\S\n]`, not `[ \t]`), before anything looks for his turn.
+  Prefix-stable, so the stream can tidy as it grows.
+- **ONE MORE TRY when she wrote nothing but his side**, in `ask()` and
+  `ask_stream()` both. The cut's sentence ("She started writing your
+  side...") is honest and still not an answer, and asking again is the
+  first thing he would do. Only while nothing has been shown, and
+  **once**: twice in a row is a pattern, and then the sentence says so.
+  A reply with her own words before the cut is an answer and is not
+  thrown away.
+- **Update restarts a server on OLDER CODE THAN THE DECK HAS.** It used
+  to restart only on a pull that said UPDATED, so any pull that landed
+  without bouncing her -- a terminal `git pull`, a pull that ran out of
+  time, a failed restart -- left a stale process that every later
+  Update called ALREADY UP TO DATE and left alone, forever. The server
+  now records the commit it started from (`RUNNING`, read straight off
+  `.git`, no git binary), and Update compares it to the checkout.
+  **Unknown on either side is never stale.** The reply carries
+  `restarting`, so the home page waits for her either way; it says
+  `RESTARTING HER` first when that is why.
+
+**Four tests, twelve breaks, all red**, and one of my own tests failed
+first for its own reason: `"# header\n" "b" * 40` repeats the JOINED
+literal forty times -- adjacent string literals bind before `*`.
+806 -> 810.
+
+**UNMEASURED on the board.** The next Update after this lands restarts
+her whatever state she is in, so what answers him after it is this code.
 
 ## HER CODE IN CODE BOXES (Sept 24)
 

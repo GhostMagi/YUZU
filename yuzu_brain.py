@@ -454,9 +454,32 @@ class YuzuBrain:
         if self.think is not None:
             payload["think"] = self.think
         self._face("thinking")
+        # ONE MORE TRY WHEN SHE WROTE NOTHING BUT HIS SIDE. Ghost, Sept
+        # 24, the same fault a second time: "Hit update. Shes still bein
+        # weird" -- "/wiki emp" answered with "user / what do you know
+        # about the Jetson Nano?". The cut turns that into a sentence
+        # saying so, which is honest and still not an answer, and the
+        # first thing he would do is ask again. So the deck does, once:
+        # nothing has been shown yet, and the second draw is a fresh
+        # one. Twice in a row is a pattern, and the sentence says so.
+        for attempt in (1, 2):
+            data = self._chat(payload)
+            reply, self.last_cut = cut_his_turn(_words(data.get("message")),
+                                                self._his_name())
+            if reply or not self.last_cut:
+                break
+        self._face("talking", reply, _token_rate(data))
+        if remember:
+            self._remember(user_text, reply)
+        self._check_drift(reply)
+        return reply
+
+    def _chat(self, payload):
+        """One /api/chat request, the parsed answer back. BrainError
+        with the dial to turn when it cannot be had."""
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as r:
-                data = json.load(r)
+                return json.load(r)
         except urllib.error.HTTPError as exc:
             raise BrainError(
                 f"Ollama returned {exc.code} for model '{self.model}': "
@@ -479,14 +502,6 @@ class YuzuBrain:
                 f"  Or allow longer:  export YUZU_TIMEOUT=600"
             ) from exc
 
-        reply, self.last_cut = cut_his_turn(_words(data.get("message")),
-                                            self._his_name())
-        self._face("talking", reply, _token_rate(data))
-        if remember:
-            self._remember(user_text, reply)
-        self._check_drift(reply)
-        return reply
-
     def ask_stream(self, user_text, remember=True):
         """Yield the reply in chunks as the model produces it.
 
@@ -504,11 +519,39 @@ class YuzuBrain:
         }
         if self.think is not None:
             payload["think"] = self.think
-        collected = []
-        thought = []            # see _words(): the answer can land here
+        self._face("thinking")
+        # ONE MORE TRY, exactly as ask() does it -- and only while
+        # NOTHING has reached the screen, which is the all-his-side case
+        # and the only one where a second draw cannot be seen to replace
+        # a first.
+        for attempt in (1, 2):
+            collected = []
+            thought = []        # see _words(): the answer can land here
+            rate = yield from self._stream_once(payload, collected, thought)
+            if "".join(collected).strip() or not self.last_cut:
+                break
+        if not "".join(collected).strip() and "".join(thought).strip() \
+                and not self.last_cut:
+            # Nothing came back as the reply and something came back as
+            # "thinking": that IS her reply. Handed over whole, at the
+            # end -- late, but never an empty bubble.
+            late = "".join(thought).strip()
+            collected.append(late)
+            yield late
+        full_reply = "".join(collected).strip()
+        self._face("talking", full_reply, rate)
+        if remember:
+            self._remember(user_text, full_reply)
+        # ask() scored drift and ask_stream() didn't, so streaming
+        # silently disabled the whole recovery mechanism. Both paths
+        # score now.
+        self._check_drift(full_reply)
+
+    def _stream_once(self, payload, collected, thought):
+        """One streamed request: yields what is safe to show, fills
+        `collected` and `thought`, returns the token rate."""
         raw = ""                # everything she wrote, for cut_his_turn()
         self.last_cut = False
-        self._face("thinking")
         rate = None
         try:
             with _post(f"{self.host}/api/chat", payload, self.timeout) as response:
@@ -559,27 +602,12 @@ class YuzuBrain:
         if not self.last_cut:
             # Whatever the hold-back was still keeping when she finished.
             rest = cut_his_turn(raw, self._his_name())[0]
-            tail = rest[len("".join(collected)):] if rest.startswith(
-                "".join(collected)) else ""
+            shown = "".join(collected).lstrip()
+            tail = rest[len(shown):] if rest.startswith(shown) else ""
             if tail:
                 collected.append(tail)
                 yield tail
-        if not "".join(collected).strip() and "".join(thought).strip() \
-                and not self.last_cut:
-            # Nothing came back as the reply and something came back as
-            # "thinking": that IS her reply. Handed over whole, at the
-            # end -- late, but never an empty bubble.
-            late = "".join(thought).strip()
-            collected.append(late)
-            yield late
-        full_reply = "".join(collected).strip()
-        self._face("talking", full_reply, rate)
-        if remember:
-            self._remember(user_text, full_reply)
-        # ask() scored drift and ask_stream() didn't, so streaming
-        # silently disabled the whole recovery mechanism. Both paths
-        # score now.
-        self._check_drift(full_reply)
+        return rate
 
     def _his_name(self):
         try:
@@ -789,15 +817,34 @@ def _is_kill_attempt(line):
 # A LINE, never a word: "log in as a normal user" is an answer about
 # accounts on a deck he asks Linux questions on. Only a line that is
 # nothing but a role name counts.
+#
+# AND A LINE IS WHATEVER ENDS ONE. `$` in a multiline regex stops only
+# before "\n", so "user\r\n" -- a Windows line ending -- read as the
+# word "user" followed by more text on the same line, and the cut let
+# it through; so did a no-break space beside it, which `[ \t]` does not
+# call a space. Replayed Sept 24 with his exact reply ("user" / "what
+# do you know about the Jetson Nano?"): caught with "\n", missed with
+# "\r\n". Every line ending is "\n" before anything is looked for, and
+# a space is anything Python calls one.
 _ROLE_LINE = re.compile(
-    r"^[ \t]*(?:user|assistant|system)[ \t]*$", re.I | re.M)
+    r"^[^\S\n]*(?:user|assistant|system)[^\S\n]*$", re.I | re.M)
 _TEMPLATE_TOKEN = re.compile(
     r"<\|(?:im_start|im_end|endoftext|eot_id|start_header_id|end_header_id)\|>")
+_INVISIBLE = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
+
+
+def _lines(text):
+    """Her text with every line ending a plain "\n" and nothing
+    invisible in it. Prefix-stable, so a stream can be tidied as it
+    grows and what was already shown stays a prefix of it."""
+    text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\u2028", "\n").replace("\u2029", "\n")
+    return _INVISIBLE.sub("", text)
 
 
 def _his_turn_at(text, name=""):
     labels = ["User"] + ([name] if name else [])
-    label = re.compile(r"^[ \t]*(?:%s)[ \t]*:" % "|".join(
+    label = re.compile(r"^[^\S\n]*(?:%s)[^\S\n]*:" % "|".join(
         re.escape(n) for n in labels), re.I | re.M)
     hits = [m.start() for m in (_ROLE_LINE.search(text), label.search(text),
                                 _TEMPLATE_TOKEN.search(text)) if m]
@@ -807,7 +854,7 @@ def _his_turn_at(text, name=""):
 def cut_his_turn(text, name=""):
     """(her reply up to where she starts writing his turn, whether it
     had to be cut)."""
-    text = text or ""
+    text = _lines(text)
     at = _his_turn_at(text, name)
     return (text if at is None else text[:at]).strip(), at is not None
 
@@ -816,6 +863,7 @@ def _safe_so_far(text, name=""):
     """While streaming: (what is safe to show, whether his turn began).
     A last line that could still grow into a role name or his label is
     held back until it cannot."""
+    text = _lines(text)
     at = _his_turn_at(text, name)
     if at is not None:
         return text[:at].rstrip(), True
