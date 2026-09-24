@@ -237,11 +237,10 @@ real board:
   characters of encyclopedia with no demonstration she answered
   *"I'm not going to try to summarize this information again."*
 
-- **Zero hears him** (Sept 24): the mic on her page, tap to talk,
-  tap to stop, faster-whisper `base.en` on the board. Needs `pull`
-  once to install, and Chrome told once to trust the page (the page
-  says how). Whether it hears HIM well is the open question -- he is
-  missing teeth; `small.en` is the stronger ear if not.
+- **Zero hears him -- CONFIRMED on the board** (Sept 24): installed,
+  Steam Deck mic, first try word for word. Open: she invented "battery
+  at 82%" from the board line (no battery level is readable), and runs
+  long. See CLAUDE.md, top.
 - **Zero's sums are exact** (Sept 24): `maths: exact`, worked out in
   `yuzu_maths` and handed to her beside what he typed.
 

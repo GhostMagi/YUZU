@@ -49,6 +49,34 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## CONFIRMED ON THE BOARD: SHE HEARS HIM (Sept 24, ~01:50)
+
+**Push-to-talk works end to end on his hardware.** Steam Deck, Chrome
+in Gaming Mode, the Deck's own mic: he tapped, said *"How are you
+doing?"*, tapped again, and it arrived as his line word for word, first
+try -- **base.en heard him fine, missing teeth and all** (n=1).
+`~/YUZU/pull` from his terminal installed faster-whisper and the model
+past the PEP 668 lock in about 25 seconds, ending "SHE CAN HEAR NOW".
+
+**THE STEAM DECK TRAP, now in the mic's own note:** after the flag,
+Chrome's **Relaunch** in Gaming Mode leaves Chrome running invisibly,
+and tapping it again only hands off to the hidden copy -- it "won't
+even open". Restarting the Deck clears it. And Chrome then shows a
+permanent bar, *"You are using an unsupported command-line flag"* --
+which he saw as weird text down the side. Expected; it is how you know
+the flag took.
+
+**A NEW FAULT IN THE SAME REPLY, NOT FIXED:** *"7.5 watts drawing, 49°
+outside, battery at 82%."* **Nothing on this deck can read a battery
+level** -- the whole battery section above is about refusing to invent
+one. Her board line says watts and *hours from a full bank*; she turned
+that into a percentage, and the board's temperature into the weather
+outside. Confident-wrong about her own body, the palmtop shape again.
+The obvious fix is wording in `board_now()`, which rides on every deck
+turn -- and **Four has ~200 tokens of context headroom**, so that is a
+`num_ctx` arithmetic question before it is a wording one. She also ran
+to seven sentences against "two or three". Both are watch items.
+
 ## ZERO HEARS HIM, AND HER SUMS ARE EXACT (Sept 24)
 
 Ghost, handed a list of what she could learn next: *"1 and 5 are

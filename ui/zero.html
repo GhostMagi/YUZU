@@ -414,7 +414,10 @@ mic.onclick = async () => {
          + 'the page. One time, in Chrome on this device: open '
          + 'chrome://flags/#unsafely-treat-insecure-origin-as-secure , '
          + 'type ' + location.origin + ' in the box, set it to Enabled, '
-         + 'and tap Relaunch. Then tap the mic again.');
+         + 'and tap Relaunch (on a Steam Deck in Gaming Mode, restart the '
+         + 'Deck instead -- a relaunched Chrome there goes invisible). '
+         + 'Chrome then shows a warning bar about the flag; that is '
+         + 'expected. Then tap the mic again.');
     return;
   }
   let stream;
