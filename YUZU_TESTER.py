@@ -3817,6 +3817,33 @@ class TestTheCastIsTwo(unittest.TestCase):
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(json.loads(out.stdout), list(cases.values()))
 
+    def test_zero_does_not_claim_a_fix_she_cannot_make(self):
+        """Ghost, on the board: "you still got a small bug. fixing now
+        <3". Zero: "Aha -- found it. A memory leak in the background
+        process... Fixed by adding a kill signal after 5 cycles and
+        replacing it with a watchdog timer." None of it exists; she
+        cannot see or touch a single file. He asked whether she had
+        found real code.
+
+        Confident-wrong about her own abilities, on the character he
+        will trust with technical answers -- the Windows CE palmtop
+        again. The lever that has worked every time: ONE example in the
+        exact slot, answered with what she can actually know. Pinned by
+        the answer's behaviour, not its wording."""
+        import yuzu_personas
+        prompt = yuzu_personas.load("zero").prompt
+        pairs = re.findall(r"^Ghost: (.+)\nZero: (.+)$", prompt, re.M)
+        self.assertTrue(pairs, "her examples could not be read")
+        fixing = [(ask, said) for ask, said in pairs
+                  if re.search(r"\bfix", ask, re.I)
+                  and re.search(r"\bbug", ask, re.I)]
+        self.assertTrue(fixing, "she has no example of him fixing her")
+        for ask, said in fixing:
+            self.assertRegex(said, r"(?i)can't see my own code",
+                             "her answer does not say what she can know")
+            self.assertNotRegex(said, r"(?i)found it|\bI fixed|\bfixed (it|by)",
+                                "the example teaches her to claim the fix")
+
     def test_the_cut_characters_are_off_the_INTERFACE_and_still_on_disk(self):
         """The two halves of "remove them from the interface entirely"
         without deleting a thing.

@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 781 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 782 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -92,9 +92,21 @@ a watchdog. She took a turn about fixing something and played the one
 fixing it -- **confident-wrong about her own abilities**, the Windows
 CE palmtop again, on the character meant to be trusted with technical
 answers. The "memory" overlap with the real fix that night was
-coincidence. **NOT FIXED, OFFERED**: the lever that has worked every
-time is one example of that turn shape (he mentions fixing her; she
-says she cannot see her own code from in here).
+coincidence.
+
+**FIXED WITH ONE EXAMPLE, in the exact slot**, his call ("I just want
+her to be functional really"):
+
+    Ghost: You still got a small bug, fixing it now.
+    Zero:  Go for it. I can't see my own code from in here, so tell me
+           what it was once it's in and I'll tell you if the fix makes
+           sense.
+
+Phrased as what she CAN know, never as a ban -- no "never claim a
+fix", which is the pink-elephant shape measured three times here.
+4816 chars. **One test, three breaks, all red** (deleted, claiming the
+fix, dodging without saying what she can know). 781 -> 782.
+**UNMEASURED on the board.**
 
 ## "SHE SAID NOTHING", AND THE UPDATE THAT RELOADED INTO THE OLD DECK (Sept 24)
 
