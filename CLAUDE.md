@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 774 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 775 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,32 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ZERO GOES BLACK, AND HER LOG IS HIS TWO COLOURS (Sept 24)
+
+Ghost, on her first render: *"Can you make her background more black?
+Blues not my vibe rly"*, then *"Neon green for me, Neon pink for her"*
+and *"Make sure she knows im Ghost"*.
+
+**THE BLUE CAME OUT OF THE ART, NOT ONLY THE PAGE.** The page was
+already `#000`; the blue was her machine room. Every blue-to-magenta
+pixel loses its colour, and **how far it darkens depends on how light
+it was**: the room sinks to black, the lavender shading on her plating
+only turns grey. Darkening both the same left dark blotches on her
+shoulders that read as bruises -- rendered three ways side by side and
+looked at, thirty-fifth time. Recipe in `ui/zero/ART.txt`.
+
+**His lines `#39ff5e`, hers `#ff2d95`** -- the deck's green and the
+hot pink he picked for Saya's face, so no new taste call. Speak is
+green because it sends HIS line.
+
+**"SHE KNOWS" WAS ALREADY TRUE; THE SCREEN NEVER SHOWED IT.** Her
+persona carries `USER_NAME: Ghost` and `by_name()` guards her replies
+-- but the log labelled his lines `YOU`. They carry his name now, READ
+from a new `user` field in the roster (her USER_NAME, `""` for Yuzu),
+so the label and her prompt cannot disagree. **One test, four breaks,
+all red**: the roster dropping the name, the name typed into the page,
+the label back to "you", and a hardcoded `HIM`. **774 -> 775.**
 
 ## ZERO: A SECOND MIND, ON HER OWN WEIGHTS (Sept 24)
 

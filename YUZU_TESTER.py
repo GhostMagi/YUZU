@@ -3676,6 +3676,40 @@ class TestTheCastIsTwo(unittest.TestCase):
         self.assertEqual(cast, set(yuzu_face.CHARACTERS),
                          "the rail and the roster disagree about the cast")
 
+    def test_his_lines_carry_the_name_SHE_knows_him_by(self):
+        """Ghost, on Zero's page: "Make sure she knows im Ghost."
+
+        She does -- USER_NAME is in her persona and by_name() swaps
+        "user" for it -- but the log labelled his own lines "YOU", so
+        the one screen he reads her on never showed it. The label is
+        READ: `user` in the roster is USER_NAME off her persona, the
+        same one place her prompt reads it from, so the page and her
+        prompt cannot disagree about who he is. Typing "Ghost" into
+        the page would be the hardcoded cast in its newest costume.
+
+        A character with no USER_NAME (Yuzu) carries "" -- absent
+        rather than a guess."""
+        import yuzu_face
+        for c in yuzu_face.roster():
+            key = yuzu_face.CHARACTERS[c["who"]][0]
+            self.assertEqual(c.get("user"), yuzu_face._his_name(key),
+                             f"{c['who']}'s roster name for him drifted "
+                             "from her persona")
+        mine = {c["who"]: c["user"] for c in yuzu_face.roster()}
+        self.assertEqual(mine["zero"], "Ghost", "she was never told his name")
+        self.assertEqual(mine["yuzu"], "", "a name was invented for Yuzu")
+
+        page = (Path(__file__).parent / "ui" / "zero.html").read_text()
+        page = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
+        page = re.sub(r"/\*.*?\*/", " ", page, flags=re.S)
+        code = "\n".join(ln.split("//")[0] for ln in page.splitlines())
+        # assertTrue, not assertRegex: the latter prints the whole page.
+        self.assertTrue(re.search(r"HIM\s*=\s*c\.user", code),
+                        "the page does not take his name from the roster")
+        self.assertTrue(re.search(r"entry\('him',\s*HIM", code),
+                        "his lines are not labelled with that name")
+        self.assertNotIn("Ghost", code, "his name is typed into the page")
+
     def test_the_cut_characters_are_off_the_INTERFACE_and_still_on_disk(self):
         """The two halves of "remove them from the interface entirely"
         without deleting a thing.

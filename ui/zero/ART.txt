@@ -10,3 +10,20 @@ where she is shown full height on the left.
 Not cut out, and not meant to be: it is a whole illustration with its
 own background, shown as a card on a black page (his call: "Black
 background").
+
+THE BLUE WAS TAKEN OUT, Sept 24. Ghost: "Can you make her background
+more black? Blues not my vibe rly". Done in the same single pass as
+the crop, from the original screenshot, so the art is re-encoded
+once. Every pixel whose hue is blue through violet to magenta
+(roughly 165..335 degrees, strongest at 250) loses its colour, and
+how far it DARKENS depends on how light it was:
+
+    dark blue   (the machine room)          -> sinks toward black
+    light blue  (the shading on her plating) -> just turns grey
+
+The second half matters: darkening everything blue by the same
+amount left dark blotches on her shoulders and chest, which read as
+bruises. Reds, the bone of her plating and the lamp are untouched,
+because none of them are blue. Done with headless Chromium (no PIL
+in the container); rendered side by side with the original and
+looked at before it shipped.

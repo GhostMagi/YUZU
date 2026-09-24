@@ -689,6 +689,10 @@ def roster():
             continue
         out.append({"who": who, "name": persona.name,
                     "page": page, "blurb": blurb,
+                    # What SHE calls him, so a page can label his lines
+                    # with the same name. Read off her persona, like
+                    # everything else here; "" for a character with none.
+                    "user": (persona.settings.get("USER_NAME") or "").strip(),
                     # The home screen reads this rather than holding a
                     # name of its own. One roster, one truth -- the same
                     # rule that stopped Mimi being invisible.

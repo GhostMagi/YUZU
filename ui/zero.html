@@ -20,22 +20,27 @@
   its right edge faded into the black so the two halves read as one
   screen. The phone's own buttons were cropped off it (ui/zero/ART.txt).
 
-  HER PALETTE IS SAMPLED OFF HER ART: the bone of her plating (#efe3c8),
-  the steel blue of the machine room behind her (#5b6aa8), and the red
-  of the cables inside her (#c8503f), which is kept for the one thing
-  that must stand out -- Speak.
+  BLACK AND GREY, NO BLUE -- his call the same night: "Can you make her
+  background more black? Blues not my vibe rly". The blue came out of
+  her art as well as the page (ui/zero/ART.txt says how).
+
+  THE LOG IS TWO COLOURS, AND BOTH ARE HIS: "Neon green for me, Neon
+  pink for her". The green is the deck's own (#39ff5e, Four's ink) and
+  the pink is the hot pink he picked for Saya's face months ago
+  (#ff2d95) -- so the page gains no new taste decision. Speak is
+  green because it sends HIS line.
 
   No network, no fonts, no libraries.
 -->
 <style>
 :root {
   --black: #000;
-  --panel: #07080f;
-  --edge:  #252c4a;
+  --panel: #050505;
+  --edge:  #262626;
   --ink:   #efe3c8;           /* her plating                           */
-  --dim:   #8e96bd;
-  --blue:  #5b6aa8;           /* the room behind her                   */
-  --red:   #c8503f;           /* the cables inside her                 */
+  --dim:   #8a8a8a;
+  --him:   #39ff5e;           /* neon green, his lines                 */
+  --her:   #ff2d95;           /* neon pink, hers                       */
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100vh; overflow: hidden; }
@@ -69,14 +74,14 @@ body {
 #rail a:hover { color: var(--ink); border-color: var(--edge); }
 #rail .here {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--blue) 60%, transparent);
-  background: rgba(91,106,168,.12);
+  border-color: color-mix(in srgb, var(--her) 55%, transparent);
+  background: rgba(255,45,149,.10);
 }
 #home {
   width: 38px; height: 38px; flex: none; margin-left: auto;
   border-radius: 50%; cursor: pointer; display: grid; place-items: center;
-  font-size: 17px; color: var(--ink); background: rgba(91,106,168,.12);
-  border: 1px solid color-mix(in srgb, var(--blue) 55%, transparent);
+  font-size: 17px; color: var(--ink); background: rgba(255,255,255,.06);
+  border: 1px solid #444;
 }
 
 /* ---- her, and the conversation ------------------------------------
@@ -102,11 +107,13 @@ body {
   transition: filter .6s ease;
 }
 /* THE "SHE IS THINKING" CUE, in her idiom: the machine room brightens
-   while a reply is being worked out, and settles when it lands. */
+   while a reply is being worked out, and settles when it lands. No
+   saturate(): the room is grey now, and boosting what colour is left
+   only brings the cables' red up, not the blue back. */
 body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
 @keyframes working {
   0%, 100% { filter: brightness(1) }
-  50%      { filter: brightness(1.28) saturate(1.15) }
+  50%      { filter: brightness(1.3) }
 }
 
 #chat {
@@ -114,7 +121,7 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
   display: flex; flex-direction: column; gap: 12px;
   background: var(--panel);
   border: 1px solid var(--edge);
-  border-top: 2px solid var(--blue);
+  border-top: 2px solid var(--her);
   border-radius: 3px; padding: 16px;
 }
 #log {
@@ -131,10 +138,14 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
         overflow-wrap: anywhere; }
 .turn .by { display: block; font-size: 11.5px; letter-spacing: .12em;
             text-transform: uppercase; margin-bottom: 2px; }
-.him { color: var(--dim); }
-.him .by { color: var(--blue); }
-.her .by { color: var(--red); }
-.her.pending { color: var(--dim); }
+/* HIS LINES GREEN, HERS PINK, the words as well as the labels -- a
+   log you can read by colour at a glance. A faint glow makes them neon
+   rather than just bright; any more and long answers smear. */
+.him { color: var(--him); text-shadow: 0 0 6px rgba(57,255,94,.28); }
+.her { color: var(--her); text-shadow: 0 0 6px rgba(255,45,149,.30); }
+.turn .by { opacity: .75; }
+.her.pending { color: var(--dim); text-shadow: none; }
+.her.pending .by { color: var(--her); }
 .her.pending .dots { animation: blink 1.2s steps(4) infinite; }
 @keyframes blink { 0% { opacity: .3 } 50% { opacity: 1 } 100% { opacity: .3 } }
 
@@ -148,10 +159,10 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
   border: 1px solid var(--edge);
 }
 #text::placeholder { color: var(--dim); opacity: .8; }
-#text:focus { outline: none; border-color: var(--blue); }
+#text:focus { outline: none; border-color: var(--him); }
 #send {
   font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-  color: #140504; background: var(--red); padding: 12px 22px;
+  color: #031006; background: var(--him); padding: 12px 22px;
   border: 0; border-radius: 3px;
 }
 #send:disabled { opacity: .5; cursor: default; }
@@ -209,12 +220,17 @@ document.getElementById('home').onclick = () => {
 
 // ---- who else is here ------------------------------------------------
 const ME = 'zero';
+// HIS LINES CARRY HIS NAME, the one SHE knows him by: `user` in the
+// roster is USER_NAME off her persona, so the log and her prompt can
+// never disagree about who he is. "you" only if the roster never answers.
+let HIM = 'you';
 fetch('characters.json', { cache: 'no-store' })
   .then(r => r.json())
   .then(cast => {
     const rail = document.getElementById('rail');
     cast.forEach(c => {
       const here = c.who === ME;
+      if (here && c.user) HIM = c.user;
       const el = document.createElement(here ? 'span' : 'a');
       el.textContent = c.name;
       el.title = c.blurb;
@@ -300,7 +316,7 @@ form.onsubmit = (event) => {
   send.disabled = true;
   send.textContent = '...';
   document.body.classList.add('thinking');
-  entry('him', 'you', asked);
+  entry('him', HIM, asked);
   // Where her reply will land, saying so while she works it out.
   const pending = entry('her pending', 'Zero', 'working it out ');
   const dots = document.createElement('span');
