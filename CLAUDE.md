@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 810 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 813 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,48 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE TALK BUTTON IS ON YUZU AND FOUR TOO (Sept 24)
+
+Ghost: *"Add same talk button to Yuzu and Four if havent already
+please"*. They had not -- it was Zero's page only.
+
+**The same mic, the same handler, character for character**: the
+button between the text box and Speak, the recording code copied from
+`zero.html` (confirmed working on his Steam Deck), and each page in its
+own colours -- Four's follows her `--ink` through every skin he taps
+her into, Yuzu's is her pink. **No new flag to set**: the Chrome
+setting he turned on trusts the whole address, `ghostnano.local:8081`,
+so every page on it already has the mic.
+
+**The deck's words go in her bubble, NEVER in her voice.** On Zero's
+page a note is a grey line in the log; Four and Yuzu have a bubble,
+and their `said()` speaks whatever it shows. So each gets its own
+`note()` that fills the bubble and does not call `hear()` -- "allow the
+microphone" in Four's voice would be her saying a line she never wrote.
+
+**Yuzu's `#text` gained `min-width: 0`**, the fault that has shoved
+buttons off a phone on this deck three times; with a third control in
+her row it would have been four.
+
+**Rendered and DRIVEN, thirty-fifth time.** 1024x600 and 412 on all
+three pages: Speak, the mic and the way out inside the viewport, no
+sideways scroll. Then a real browser recorded two seconds from a fake
+microphone on Four's and Yuzu's pages, the clip went through the real
+`/listen` route and the real audio decoder, and what came back was
+sent as his message. The untrusted-page note renders whole in Four's
+bubble.
+
+**The mic tests read the ROSTER now**, not Zero's page: every page he
+can open a character on must carry the button (typed as a button, so a
+tap never submits the form), and **the handler must be identical on
+every page** -- the two-copies guard the voice fetch already has. A
+retired page is a record and is not held to it. **One of my new checks
+could not see its own failure**: "the mic is `type=button`" read the
+form from the mic onward, where Four's own `remember that` buttons
+said `type="button"` for it. It reads the mic's own tag now; broken on
+both pages, red on both. **Three tests, nine breaks, all red. 810 ->
+813.**
 
 ## "SHES STILL BEIN WEIRD": ONE MORE TRY, AND UPDATE KNOWS STALE CODE (Sept 24)
 

@@ -3897,37 +3897,53 @@ class TestHerEars(unittest.TestCase):
             self.assertTrue(local and getattr(local[0].value, "value", None) is True,
                             "a model load in her turn can reach the internet")
 
-    def page_code(self):
-        page = (Path(__file__).parent / "ui" / "zero.html").read_text()
+    @staticmethod
+    def pages():
+        """Every page he can open a character on, off the ROSTER -- not
+        every file with a rail, because a retired page is a record."""
+        import yuzu_face
+        return sorted({entry[1] for entry in yuzu_face.CHARACTERS.values()})
+
+    def page_code(self, name="zero.html"):
+        page = (Path(__file__).parent / "ui" / name).read_text()
         page = re.sub(r"<!--.*?-->", " ", page, flags=re.S)
         page = re.sub(r"/\*.*?\*/", " ", page, flags=re.S)
         return "\n".join(ln.split("//")[0] if "chrome://" not in ln else ln
                          for ln in page.splitlines())
 
+    def tap_handler(self, name):
+        """The mic's own handler, up to the line that closes it."""
+        code = self.page_code(name)
+        tap = code[code.index("mic.onclick"):]
+        return tap[:tap.index("\n};") + 3]
+
     def test_the_mic_listens_ONLY_between_his_taps(self):
         """His spec, made into properties: the microphone is opened only
         inside the button's own handler, it is RELEASED when the
         recording stops, a forgotten recording stops itself, and what
-        she heard is sent through the same form as typing."""
-        code = self.page_code()
-        tap = code[code.index("mic.onclick"):]
-        self.assertEqual(code.count("getUserMedia("), tap.count("getUserMedia("),
-                         "the mic can be opened without his tap")
-        stop = tap[tap.index("recorder.onstop"):]
-        self.assertRegex(stop, r"getTracks\(\)\.forEach\(t => t\.stop\(\)\)",
-                         "the microphone stays open after he stops")
-        # The DELAY, read as a number -- the first version matched the
-        # text "60000" and stayed green with the cap broken to
-        # `0 * 60000 + 1e12`, because the spelling survived the break.
-        cap = re.search(r"setTimeout\(\(\) => \{\s*if \(recorder[^}]*"
-                        r"recorder\.stop\(\);\s*\},\s*(\d+)\s*\)", tap)
-        self.assertTrue(cap, "a forgotten recording runs forever")
-        self.assertLessEqual(int(cap.group(1)), 120000,
-                             "a forgotten recording runs for too long")
-        self.assertRegex(stop, r"input\.value = r\.heard;\s*form\.requestSubmit\(\)",
-                         "what she heard does not go the way typing goes")
-        self.assertRegex(tap, r"sound\.pause\(\)",
-                         "her own voice can end up in his recording")
+        she heard is sent through the same form as typing. On every
+        page he can talk to a character on."""
+        for name in self.pages():
+            with self.subTest(page=name):
+                code = self.page_code(name)
+                tap = code[code.index("mic.onclick"):]
+                self.assertEqual(code.count("getUserMedia("), tap.count("getUserMedia("),
+                                 "the mic can be opened without his tap")
+                stop = tap[tap.index("recorder.onstop"):]
+                self.assertRegex(stop, r"getTracks\(\)\.forEach\(t => t\.stop\(\)\)",
+                                 "the microphone stays open after he stops")
+                # The DELAY, read as a number -- the first version matched the
+                # text "60000" and stayed green with the cap broken to
+                # `0 * 60000 + 1e12`, because the spelling survived the break.
+                cap = re.search(r"setTimeout\(\(\) => \{\s*if \(recorder[^}]*"
+                                r"recorder\.stop\(\);\s*\},\s*(\d+)\s*\)", tap)
+                self.assertTrue(cap, "a forgotten recording runs forever")
+                self.assertLessEqual(int(cap.group(1)), 120000,
+                                     "a forgotten recording runs for too long")
+                self.assertRegex(stop, r"input\.value = r\.heard;\s*form\.requestSubmit\(\)",
+                                 "what she heard does not go the way typing goes")
+                self.assertRegex(tap, r"sound\.pause\(\)",
+                                 "her own voice can end up in his recording")
 
     def test_a_refused_mic_says_EXACTLY_how_to_fix_it(self):
         """A browser only hands a page the mic when it trusts the page,
@@ -3936,11 +3952,51 @@ class TestHerEars(unittest.TestCase):
         anyone -- the verdict names the fix, same as everywhere else.
         Verified in real Chromium: with that setting on, the page is
         trusted and the mic records over http://ghostnano.local."""
-        code = self.page_code()
-        tap = code[code.index("mic.onclick"):]
-        self.assertIn("isSecureContext", tap)
-        self.assertIn("unsafely-treat-insecure-origin-as-secure", tap)
-        self.assertIn("location.origin", tap)
+        for name in self.pages():
+            with self.subTest(page=name):
+                tap = self.tap_handler(name)
+                self.assertIn("isSecureContext", tap)
+                self.assertIn("unsafely-treat-insecure-origin-as-secure", tap)
+                self.assertIn("location.origin", tap)
+
+    def test_every_character_he_can_open_has_the_mic(self):
+        """Ghost, Sept 24: "Add same talk button to Yuzu and Four if
+        havent already please". Read off the roster, so the next
+        character's page has to carry it too -- beside the text box, in
+        the form, where his thumb already is."""
+        for name in self.pages():
+            with self.subTest(page=name):
+                page = (Path(__file__).parent / "ui" / name).read_text()
+                form = page[page.index('<form id="ask"'):]
+                form = form[:form.index("</form>")]
+                self.assertIn('id="mic"', form, "no talk button on this page")
+                tag = re.search(r'<button[^>]*id="mic"[^>]*>', form)
+                self.assertTrue(tag and 'type="button"' in tag.group(0),
+                                "the mic would SUBMIT the form when tapped")
+                self.assertLess(form.index('id="text"'), form.index('id="mic"'))
+                self.assertLess(form.index('id="mic"'), form.index('id="send"'))
+
+    def test_the_mic_is_ONE_copy_on_every_page(self):
+        """No build step, so every page that listens carries its own
+        copy -- the guard the voice fetch and the way out already have.
+        Zero's was confirmed working on his Steam Deck; a copy that
+        drifts from it is a mic nobody has tested."""
+        copies = {name: self.tap_handler(name) for name in self.pages()}
+        first = copies["zero.html"]
+        for name, tap in copies.items():
+            self.assertEqual(tap, first, "%s listens differently from "
+                             "zero.html" % name)
+
+    def test_the_DECK_s_words_are_never_said_in_HER_voice(self):
+        """How to fix the mic goes on screen and is not spoken: "allow
+        the microphone" in her voice is a line she never wrote."""
+        for name in self.pages():
+            with self.subTest(page=name):
+                code = self.page_code(name)
+                note = code[code.index("function note("):]
+                note = note[:note.index("}") + 1]      # it holds no braces
+                self.assertNotIn("hear(", note, "the deck's note is spoken aloud")
+                self.assertNotIn("said(", note, "the deck's note goes through her reply")
 
 
 class TestTheCastIsTwo(unittest.TestCase):

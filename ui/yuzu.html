@@ -232,7 +232,7 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   padding: 10px 26px calc(20px + env(safe-area-inset-bottom));
 }
 #text {
-  flex: 1; font: inherit; font-size: 16px; color: var(--ink);
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink);
   background: rgba(0,0,0,.32); padding: 12px 15px; border-radius: 3px;
   border: 1px solid var(--edge);
 }
@@ -244,6 +244,23 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   border: 0; border-radius: 3px;
 }
 #send:disabled { opacity: .5; cursor: default; }
+
+/* THE MIC, the same button as Zero's: tap to start, tap to stop. Her
+   pink, and it pulses while it is listening so a forgotten recording
+   is impossible to miss. */
+#mic {
+  flex: none; width: 46px; height: 46px; cursor: pointer;
+  display: grid; place-items: center; border-radius: 3px;
+  color: var(--pink); background: rgba(0,0,0,.32);
+  border: 1px solid color-mix(in srgb, var(--pink) 55%, transparent);
+}
+#mic svg { width: 22px; height: 22px; }
+#mic.on { color: #2a0a1a; background: var(--pink);
+          animation: live 1.1s ease-in-out infinite; }
+@keyframes live {
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--pink) 25%, transparent); }
+}
+#mic.busy { opacity: .45; cursor: default; }
 
 @media (max-width: 760px) {
   /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
@@ -292,6 +309,13 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
 
 <form id="ask" autocomplete="off">
   <input id="text" placeholder="Say something to her..." maxlength="2000">
+  <button id="mic" type="button" title="talk to her" aria-label="talk to her">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
+    </svg>
+  </button>
   <button id="send" type="submit">Speak</button>
 </form>
 
@@ -462,6 +486,94 @@ form.onsubmit = (event) => {
       document.body.classList.remove('thinking');
       input.focus();
     });
+};
+
+// THE DECK'S OWN WORDS go in her bubble, and she never says them out
+// loud -- "allow the microphone" in her voice would be her speaking a
+// line she never wrote.
+function note(text) {
+  says.textContent = text;
+  says.classList.add('on');
+  says.scrollTop = 0;
+}
+
+// ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------
+// Ghost: "a button for the touch screen starts listening when i tap it,
+// ends recording when i tap it again and bam". Nothing listens until he
+// taps, and it stops when he taps again -- or after a minute, so a
+// recording he forgot about cannot run forever.
+//
+// THE MICROPHONE IS WHATEVER HE IS HOLDING. This page records on his
+// own device, sends the clip to the board (/listen), and what comes
+// back is sent exactly as if he had typed it. The board has no mic.
+//
+// A BROWSER ONLY HANDS A PAGE THE MIC WHEN IT TRUSTS THE PAGE -- https,
+// or the device's own localhost. His address is plain http on his WiFi,
+// so on his phone or laptop the mic is refused until he tells the
+// browser to trust it, once. The note says exactly how, with this
+// page's own address in it, rather than a mic that silently does
+// nothing.
+const mic = document.getElementById('mic');
+let recorder = null, clip = [], cap = null;
+
+
+mic.onclick = async () => {
+  if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+  // Busy working out the last clip, or she is still answering.
+  if (mic.classList.contains('busy') || send.disabled) return;
+  if (!(window.isSecureContext && navigator.mediaDevices
+        && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
+    note('This browser only lets a page use the microphone once it trusts '
+         + 'the page. One time, in Chrome on this device: open '
+         + 'chrome://flags/#unsafely-treat-insecure-origin-as-secure , '
+         + 'type ' + location.origin + ' in the box, set it to Enabled, '
+         + 'and tap Relaunch (on a Steam Deck in Gaming Mode, restart the '
+         + 'Deck instead -- a relaunched Chrome there goes invisible). '
+         + 'Chrome then shows a warning bar about the flag; that is '
+         + 'expected. Then tap the mic again.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    note('The microphone was blocked. Allow it for this page -- the icon '
+         + 'by the address -- then tap the mic again.');
+    return;
+  }
+  // Her voice must not end up in his recording.
+  if (sound) { try { sound.pause(); } catch (e) {} }
+  clip = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) clip.push(e.data); };
+  recorder.onstop = () => {
+    clearTimeout(cap);
+    stream.getTracks().forEach(t => t.stop());      // the mic goes OFF
+    mic.classList.remove('on');
+    mic.classList.add('busy');
+    mic.title = 'working out what you said';
+    const audio = new Blob(clip, { type: recorder.mimeType || 'audio/webm' });
+    fetch('listen', { method: 'POST',
+                      headers: { 'Content-Type': audio.type },
+                      body: audio })
+      .then(r => r.json())
+      .then(r => {
+        if (r.ok && r.heard) {
+          input.value = r.heard;
+          form.requestSubmit();
+        } else {
+          note(r.said || "I didn't catch that.");
+        }
+      })
+      .catch(() => note('No answer from the deck. Is ~/YUZU/face running?'))
+      .then(() => { mic.classList.remove('busy'); mic.title = 'talk to her'; });
+  };
+  recorder.start();
+  mic.classList.add('on');
+  mic.title = 'listening -- tap again to stop';
+  cap = setTimeout(() => {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+  }, 60000);
 };
 
 if (location.hash === '#say') input.focus();
