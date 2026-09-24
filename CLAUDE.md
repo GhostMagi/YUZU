@@ -49,7 +49,16 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## ADA: A SECOND MIND, ON HER OWN WEIGHTS (Sept 24)
+## ZERO: A SECOND MIND, ON HER OWN WEIGHTS (Sept 24)
+
+**SHIPPED AS "ADA", A WORKING NAME; HE NAMED HER ZERO WITHIN THE HOUR.**
+*"Name her Zero"* -- which sits beside Four the way he probably meant
+it to. Renamed everywhere: persona, page, art folder, roster, icon,
+tests. A stranger WILL ask why, so she has a lore-free answer, the
+same call Four's got: *"Because that's where counting starts, if you
+count properly. Computers do."* If he talked to her as Ada first, a
+tiny `~/.yuzu/history/ada.json` is left orphaned on his board --
+harmless, and Zero starts with a clean memory under her own name.
 
 Ghost, night owl, one Ghost energy drink in: *"id like to get another
 offline AI LLM on the cyberdeck too... similar one (in the sense its
@@ -81,6 +90,30 @@ chatbox. Black background."*
 checked by web search, not fetched -- and said so to him. His board
 proved it.
 
+### THE PROMPT LAYOUT IS QWEN'S OWN, AND WE DO NOT HAND-FORMAT IT
+
+He asked: *"make sure were using the correct prompt layout for this
+model if youre giving her a system prompt"*. Qwen expects ChatML
+(`<|im_start|>system ... <|im_end|>`), Llama expects its header tokens,
+and a wrong layout is a real way to make a good model seem stupid.
+
+**The brain never writes either.** It sends `/api/chat` with a
+`role: system` message, and Ollama wraps it in the template that ships
+INSIDE the GGUF -- so Four gets Llama's layout and Zero gets Qwen's,
+from the same code. The evidence it took: her first answer on the
+board was one clean sentence, with no stray `<|im_start|>` and no
+runaway, which is what a mismatched template produces.
+`ollama show <her model> --template` prints it on the board.
+
+**AND NO `stop` IS SENT PER REQUEST, deliberately.** Four's anti-
+puppeteering stop token lives in her Modelfile; Zero is the raw hf.co
+model with none. The obvious fix -- `options.stop` on every request --
+REPLACES the model's own stop list rather than adding to it -- on
+Four it would silently drop the stop words her Modelfile was built
+with, on the character who did nothing to need it. Her rule 9
+carries it for now; if she ever writes his side of the conversation,
+a Modelfile for her is the fix, not a request option.
+
 ### A CHARACTER CAN BRING HER OWN WEIGHTS
 
 `model:` in a persona's settings. **Until now every character shared
@@ -90,9 +123,9 @@ carry one"*). Precedence, pinned by driven tests: an explicit `model=`
 
 **HER LINE BEATS `YUZU_MODEL`, and that is the half worth the test.**
 That variable is how a board points EVERYONE at Four's Llama; if it
-won, Ada would run on Llama weights and simply seem dimmer, with
+won, Zero would run on Llama weights and simply seem dimmer, with
 nothing anywhere saying why. **And `_cli`'s `--model` default was
-`DEFAULT_MODEL`, passed EXPLICITLY** -- so `--chat --persona ada` would
+`DEFAULT_MODEL`, passed EXPLICITLY** -- so `--chat --persona zero` would
 have overridden her. It is `None` now.
 
 ### AND A SECOND HERETIC WOULD HAVE HIJACKED FOUR'S RUNBOOK LINE
@@ -106,7 +139,7 @@ through bash against a stub `ollama` that lists the Qwen first.
 
 ### Her page
 
-`ui/ada.html`, **his layout verbatim**: her art down the left, a big
+`ui/zero.html`, **his layout verbatim**: her art down the left, a big
 conversation panel down the right, black behind both. **A LOG, NOT A
 BUBBLE** -- she is the one he brings maths and code to, and an answer
 you cannot scroll back to is one you ask for twice. Palette sampled off
@@ -115,7 +148,7 @@ Thinking cue: her picture brightens while she works.
 
 **Her art had the PHONE'S BUTTONS in it** -- a round back arrow and a
 lens icon, from the screenshot he saved it from. Cropped out, not
-painted over (`ui/ada/ART.txt`), with headless Chromium since PIL is
+painted over (`ui/zero/ART.txt`), with headless Chromium since PIL is
 not in the container.
 
 **RENDERED AND LOOKED AT**, thirty-fourth time: 1024x600 with a real
@@ -125,7 +158,7 @@ row with her own spine-and-cables icon.
 
 ### Her persona
 
-`personas/ada.persona`, on the deck body so `/wiki` and the board facts
+`personas/zero.persona`, on the deck body so `/wiki` and the board facts
 reach her. **WORKING NAME -- he has not named her.** Four's measured
 scaffold, re-pointed: answer first then the one step that makes it
 make sense, precise over showy, *"when you are not sure, say so in a
@@ -141,7 +174,7 @@ The exit on a narrow screen, the rail from the roster, the voice fetch
 and "only Four changes colour" each named the pages in a tuple -- so a
 fifth character page would have escaped every one of them.
 `character_pages()` reads them off the files (a page with a rail), and
-**each was verified by breaking Ada's page**: her exit rules deleted,
+**each was verified by breaking her page**: her exit rules deleted,
 her voice asking for Four, a colour cycle added. All red. **Plus a
 property one tag over from the links test: every `<img src>` on every
 page exists.**

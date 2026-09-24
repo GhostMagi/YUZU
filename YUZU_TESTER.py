@@ -521,7 +521,7 @@ def character_pages():
     """Every CHARACTER PAGE in ui/, read off the files rather than typed.
 
     Four tests carried their own hand-typed tuple of pages, and the day
-    Ada arrived each one would have gone on checking the old four while
+    Zero arrived each one would have gone on checking the old four while
     her page -- a copy of one of them -- escaped every rule they guard:
     the way out on a narrow screen, the rail built from the roster, the
     voice fetch. A character page is one with a rail on it; that is the
@@ -719,10 +719,10 @@ class TestBrain(BrainTestCase):
         REQUEST -- a setting the brain reads and never sends is the
         cheque-the-code-does-not-cash shape again. Driven through a real
         request to the stub Ollama."""
-        ada = YuzuBrain(persona="ada", host=self.host)
-        ada.ask("hey")
+        zero = YuzuBrain(persona="zero", host=self.host)
+        zero.ask("hey")
         self.assertEqual(MockOllama.seen["last"]["model"],
-                         ada.persona.settings["model"],
+                         zero.persona.settings["model"],
                          "her own weights never reached Ollama")
         four = YuzuBrain(persona="four", host=self.host)
         four.ask("hey")
@@ -736,15 +736,15 @@ class TestBrain(BrainTestCase):
         environment variable quietly runs a Qwen character on Llama
         weights, and she just seems dimmer. An explicit model= still
         wins over both, so an eval can put anyone on anything."""
-        own = yuzu_personas.load("ada").settings["model"]
+        own = yuzu_personas.load("zero").settings["model"]
         with mock.patch.object(yuzu_brain_module, "DEFAULT_MODEL",
                                "fours-llama"):
             self.assertEqual(YuzuBrain(persona="four").model, "fours-llama")
-            self.assertEqual(YuzuBrain(persona="ada").model, own)
-            self.assertEqual(YuzuBrain(persona="ada", model="x").model, "x")
+            self.assertEqual(YuzuBrain(persona="zero").model, own)
+            self.assertEqual(YuzuBrain(persona="zero", model="x").model, "x")
 
     def test_the_terminal_chat_does_not_force_the_default_on_her(self):
-        """`yuzu_brain --chat --persona ada` must boot her on HER model.
+        """`yuzu_brain --chat --persona zero` must boot her on HER model.
         The flag's own default used to be DEFAULT_MODEL, passed in
         explicitly -- which an explicit model= beats her setting with."""
         import io
@@ -756,7 +756,7 @@ class TestBrain(BrainTestCase):
 
         with mock.patch.object(yuzu_brain_module, "YuzuBrain", record), \
                 contextlib.redirect_stdout(io.StringIO()):
-            yuzu_brain_module._cli(["--persona", "ada"])
+            yuzu_brain_module._cli(["--persona", "zero"])
         self.assertIn("persona", made)
         self.assertIsNone(made.get("model"),
                           "the chat passed a model and overrode hers")
@@ -3652,7 +3652,7 @@ class TestTheCastIsTwo(unittest.TestCase):
         for the roster made concrete: the fastest way to put Saya back
         on the interface by accident is to type her into a page."""
         import yuzu_face
-        self.assertIn("ada.html", character_pages(), "the helper found no pages")
+        self.assertIn("zero.html", character_pages(), "the helper found no pages")
         for page in character_pages():
             text = (Path(__file__).parent / "ui" / page).read_text()
             self.assertIn("characters.json", text, page)
@@ -7266,9 +7266,9 @@ class TestFour(unittest.TestCase):
                       "the wiki gate is not asking about the body")
         # A DECISION TABLE, not a list to keep in step: a character
         # joining or leaving the deck body is a choice somebody has to
-        # make on purpose. Ada joined Sept 24 -- the brainy one wants
+        # make on purpose. Zero joined Sept 24 -- the brainy one wants
         # the encyclopedia.
-        deck = {"four", "saya", "ada"}
+        deck = {"four", "saya", "zero"}
         for who in yuzu_face.CHARACTERS:
             key = yuzu_face.persona_for(who)
             on_deck = yuzu_personas.load(key).hardware == "cyberdeck"
@@ -9924,7 +9924,7 @@ class TestDayOneRunbook(unittest.TestCase):
         self.assertNotIn("YUZU_MODEL=yuzu ", self.doc)
 
     def test_the_model_line_still_finds_FOURS_with_two_heretics(self):
-        """Sept 24: Ada's Qwen is a heretic build too, and `ollama list`
+        """Sept 24: Zero's Qwen is a heretic build too, and `ollama list`
         puts the newest first -- so `grep -i heretic | head -1` would
         start handing Four's chat the Qwen, and she would just seem
         like a different girl. DRIVEN: the runbook's own line, run by
@@ -11873,7 +11873,7 @@ class TestTheVPetIsGone(unittest.TestCase):
         art from a real `src` in the markup, so she is on screen before
         any fetch resolves -- which means a typo in that one attribute
         is a character page with a broken-image icon where she should
-        be, and nothing else on screen to say why. Ada's page added a
+        be, and nothing else on screen to say why. Zero's page added a
         new art folder; the next character will add another."""
         for page in sorted(self.UI.glob("*.html")):
             body = re.sub(r"<!--.*?-->", "", page.read_text(), flags=re.S)

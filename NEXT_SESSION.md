@@ -52,8 +52,8 @@ So:
 
     LIVE_PERSONA   four        (yuzu_personas.py — the MEASUREMENT pointer)
     FRONT          four        (yuzu_face.py     — who GREETS you)
-    roster         Yuzu, Four, Ada  (Cait, Mimi, Saya are `retired: yes`)
-    Ada's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
+    roster         Yuzu, Four, Zero  (Cait, Mimi, Saya are `retired: yes`)
+    Zero's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
     Four's prompt  5446 chars
     tests          774, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main

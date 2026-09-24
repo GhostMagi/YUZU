@@ -578,10 +578,10 @@ def get_state():
 # from scratch.
 CHARACTERS = {
     # name      persona key            page          what she is
-    "yuzu": ("yuzu_avatar",            "yuzu.html",  "gyaru, fully dressed"),
+    "yuzu": ("yuzu_avatar",            "yuzu.html",  "Gyaru"),
     "four": ("four",                   "four.html",  "the deck's own voice"),
     # Her own WEIGHTS as well as her own page -- `model:` in her persona.
-    "ada":  ("ada",                    "ada.html",   "the brainy one"),
+    "zero": ("zero",                   "zero.html",  "the brainy one"),
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A

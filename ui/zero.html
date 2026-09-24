@@ -1,9 +1,9 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ada</title>
+<title>Zero</title>
 <!--
-  ADA — the brainy one, and the first character with her own weights.
+  ZERO — the brainy one, and the first character with her own weights.
 
   Ghost, Sept 24: "Put her on the left side of screen with a large
   chatbox. Black background." So the layout is his, verbatim: her
@@ -18,7 +18,7 @@
 
   HER ART IS A WHOLE ILLUSTRATION, not a cutout: a card on the left,
   its right edge faded into the black so the two halves read as one
-  screen. The phone's own buttons were cropped off it (ui/ada/ART.txt).
+  screen. The phone's own buttons were cropped off it (ui/zero/ART.txt).
 
   HER PALETTE IS SAMPLED OFF HER ART: the bone of her plating (#efe3c8),
   the steel blue of the machine room behind her (#5b6aa8), and the red
@@ -91,7 +91,7 @@ body {
   grid-template-rows: minmax(0, 1fr);
   padding: 6px 24px calc(18px + env(safe-area-inset-bottom));
 }
-#ada {
+#zero {
   height: 100%; width: auto; max-width: 42vw;
   object-fit: cover; object-position: top center;
   border-radius: 3px;
@@ -103,7 +103,7 @@ body {
 }
 /* THE "SHE IS THINKING" CUE, in her idiom: the machine room brightens
    while a reply is being worked out, and settles when it lands. */
-body.thinking #ada { animation: working 1.6s ease-in-out infinite; }
+body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
 @keyframes working {
   0%, 100% { filter: brightness(1) }
   50%      { filter: brightness(1.28) saturate(1.15) }
@@ -171,14 +171,14 @@ body.thinking #ada { animation: working 1.6s ease-in-out infinite; }
      top, small, and the conversation keeps the room. */
   #stage { grid-template-columns: minmax(0, 1fr);
            grid-template-rows: 26vh minmax(0, 1fr); padding: 6px 14px 14px; }
-  #ada { max-width: 100%; width: 100%; height: 100%;
+  #zero { max-width: 100%; width: 100%; height: 100%;
          -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
                  mask-image: linear-gradient(to bottom, #000 70%, transparent); }
 }
 </style>
 
 <div id="top">
-  <div id="who">Ada</div>
+  <div id="who">Zero</div>
   <div id="title">the brainy one</div>
   <div id="rail"></div>
   <div id="home" title="home">⌂</div>
@@ -187,7 +187,7 @@ body.thinking #ada { animation: working 1.6s ease-in-out infinite; }
 <div id="stage">
   <!-- A REAL src, not one JavaScript has to supply: she is on screen
        before any fetch resolves, so a dead server never costs her. -->
-  <img id="ada" src="ada/ada.jpg" alt="Ada">
+  <img id="zero" src="zero/zero.jpg" alt="Zero">
   <div id="chat">
     <div id="log"></div>
     <form id="ask" autocomplete="off">
@@ -208,7 +208,7 @@ document.getElementById('home').onclick = () => {
 };
 
 // ---- who else is here ------------------------------------------------
-const ME = 'ada';
+const ME = 'zero';
 fetch('characters.json', { cache: 'no-store' })
   .then(r => r.json())
   .then(cast => {
@@ -253,7 +253,7 @@ function entry(cls, by, text) {
 function said(pending, text) {
   const words = spoken(text);
   pending.remove();
-  entry('her', 'Ada', words || text.trim());
+  entry('her', 'Zero', words || text.trim());
   hear(words || text.trim());
 }
 
@@ -278,7 +278,7 @@ function hear(words) {
   fetch('voice.wav', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: words, who: 'ada' }),
+    body: JSON.stringify({ text: words, who: 'zero' }),
   })
     .then(r => (r.ok ? r.blob() : null))
     .then(blob => {
@@ -302,7 +302,7 @@ form.onsubmit = (event) => {
   document.body.classList.add('thinking');
   entry('him', 'you', asked);
   // Where her reply will land, saying so while she works it out.
-  const pending = entry('her pending', 'Ada', 'working it out ');
+  const pending = entry('her pending', 'Zero', 'working it out ');
   const dots = document.createElement('span');
   dots.className = 'dots';
   dots.textContent = '...';
@@ -314,7 +314,7 @@ form.onsubmit = (event) => {
   fetch('say', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: asked, who: 'ada' }),
+    body: JSON.stringify({ text: asked, who: 'zero' }),
   })
     .then(r => r.json())
     .then(r => said(pending, r.said || 'She said nothing.'))
