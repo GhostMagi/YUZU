@@ -1,0 +1,331 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ada</title>
+<!--
+  ADA — the brainy one, and the first character with her own weights.
+
+  Ghost, Sept 24: "Put her on the left side of screen with a large
+  chatbox. Black background." So the layout is his, verbatim: her
+  picture down the left, a big conversation panel down the right, and
+  black behind both.
+
+  A LOG, NOT A BUBBLE. Every other page shows her latest reply alone,
+  which suits a character you chat with. She is the one he brings maths
+  and code to, and an answer you cannot scroll back to is an answer you
+  have to ask for twice. So the panel keeps the conversation: his line,
+  her line, newest at the bottom.
+
+  HER ART IS A WHOLE ILLUSTRATION, not a cutout: a card on the left,
+  its right edge faded into the black so the two halves read as one
+  screen. The phone's own buttons were cropped off it (ui/ada/ART.txt).
+
+  HER PALETTE IS SAMPLED OFF HER ART: the bone of her plating (#efe3c8),
+  the steel blue of the machine room behind her (#5b6aa8), and the red
+  of the cables inside her (#c8503f), which is kept for the one thing
+  that must stand out -- Speak.
+
+  No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --black: #000;
+  --panel: #07080f;
+  --edge:  #252c4a;
+  --ink:   #efe3c8;           /* her plating                           */
+  --dim:   #8e96bd;
+  --blue:  #5b6aa8;           /* the room behind her                   */
+  --red:   #c8503f;           /* the cables inside her                 */
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100vh; overflow: hidden; }
+body {
+  background: var(--black);
+  color: var(--ink);
+  font: 16px/1.5 'Segoe UI', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- top ---------------------------------------------------------- */
+#top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 24px 6px;
+}
+#who { font-size: 21px; letter-spacing: .1em; color: var(--ink);
+       font-weight: 700; }
+#title { font-size: 12.5px; color: var(--dim); letter-spacing: .04em; }
+
+/* ---- the rail ------------------------------------------------------
+   Built from /characters.json, ONE roster in yuzu_face.py, so no page
+   holds a list of the cast and none can drift. */
+#rail { display: flex; gap: 6px; margin-left: 18px; }
+#rail a, #rail span {
+  font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
+  padding: 4px 11px; border-radius: 2px;
+  color: var(--dim); border: 1px solid transparent;
+}
+#rail a { cursor: pointer; }
+#rail a:hover { color: var(--ink); border-color: var(--edge); }
+#rail .here {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--blue) 60%, transparent);
+  background: rgba(91,106,168,.12);
+}
+#home {
+  width: 38px; height: 38px; flex: none; margin-left: auto;
+  border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  font-size: 17px; color: var(--ink); background: rgba(91,106,168,.12);
+  border: 1px solid color-mix(in srgb, var(--blue) 55%, transparent);
+}
+
+/* ---- her, and the conversation ------------------------------------
+   Two columns. minmax(0, 1fr) on the ROW is load-bearing: a grid row
+   is `auto` by default and grows to fit a picture, so a percentage
+   height has nothing bounded to resolve against -- measured on Cait's
+   page as a 779px image in a 460px stage. */
+#stage {
+  flex: 1; min-height: 0;
+  display: grid; gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 6px 24px calc(18px + env(safe-area-inset-bottom));
+}
+#ada {
+  height: 100%; width: auto; max-width: 42vw;
+  object-fit: cover; object-position: top center;
+  border-radius: 3px;
+  /* The right edge fades into the black, so the card and the page
+     read as one screen rather than a picture pasted onto it. */
+  -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+          mask-image: linear-gradient(to right, #000 78%, transparent);
+  transition: filter .6s ease;
+}
+/* THE "SHE IS THINKING" CUE, in her idiom: the machine room brightens
+   while a reply is being worked out, and settles when it lands. */
+body.thinking #ada { animation: working 1.6s ease-in-out infinite; }
+@keyframes working {
+  0%, 100% { filter: brightness(1) }
+  50%      { filter: brightness(1.28) saturate(1.15) }
+}
+
+#chat {
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-top: 2px solid var(--blue);
+  border-radius: 3px; padding: 16px;
+}
+#log {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-right: 4px;
+  -webkit-user-select: text; user-select: text;
+}
+#log:empty::before {
+  content: 'Ask her anything. /wiki cats looks something up first.';
+  color: var(--dim); font-size: 15px; margin: auto; text-align: center;
+}
+.turn { font-size: 17px; line-height: 1.55; white-space: pre-wrap;
+        overflow-wrap: anywhere; }
+.turn .by { display: block; font-size: 11.5px; letter-spacing: .12em;
+            text-transform: uppercase; margin-bottom: 2px; }
+.him { color: var(--dim); }
+.him .by { color: var(--blue); }
+.her .by { color: var(--red); }
+.her.pending { color: var(--dim); }
+.her.pending .dots { animation: blink 1.2s steps(4) infinite; }
+@keyframes blink { 0% { opacity: .3 } 50% { opacity: 1 } 100% { opacity: .3 } }
+
+#ask { display: flex; gap: 10px; align-items: center; }
+/* min-width: 0 IS LOAD-BEARING: an <input> carries an intrinsic width
+   and will not shrink below it, which is how Speak got shoved off a
+   phone on Four's page. */
+#text {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink);
+  background: #000; padding: 12px 15px; border-radius: 3px;
+  border: 1px solid var(--edge);
+}
+#text::placeholder { color: var(--dim); opacity: .8; }
+#text:focus { outline: none; border-color: var(--blue); }
+#send {
+  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  color: #140504; background: var(--red); padding: 12px 22px;
+  border: 0; border-radius: 3px;
+}
+#send:disabled { opacity: .5; cursor: default; }
+
+@media (max-width: 760px) {
+  /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
+     412px: the home button sat past the right edge on every character
+     page, because the rail is content-width and pushes it. The rail
+     takes the leftover space and scrolls; the exit keeps its corner.
+     `min-width: 0` is the load-bearing half. */
+  #rail { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  #rail::-webkit-scrollbar { display: none; }
+  #who { flex: none; }
+  #home { flex: none; }
+  #title { display: none; }
+  /* A phone is the stand-in screen, not a designed one: she goes on
+     top, small, and the conversation keeps the room. */
+  #stage { grid-template-columns: minmax(0, 1fr);
+           grid-template-rows: 26vh minmax(0, 1fr); padding: 6px 14px 14px; }
+  #ada { max-width: 100%; width: 100%; height: 100%;
+         -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+                 mask-image: linear-gradient(to bottom, #000 70%, transparent); }
+}
+</style>
+
+<div id="top">
+  <div id="who">Ada</div>
+  <div id="title">the brainy one</div>
+  <div id="rail"></div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<div id="stage">
+  <!-- A REAL src, not one JavaScript has to supply: she is on screen
+       before any fetch resolves, so a dead server never costs her. -->
+  <img id="ada" src="ada/ada.jpg" alt="Ada">
+  <div id="chat">
+    <div id="log"></div>
+    <form id="ask" autocomplete="off">
+      <input id="text" placeholder="Ask her something, or /wiki cats" maxlength="2000">
+      <button id="send" type="submit">Speak</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+const log = document.getElementById('log');
+
+document.getElementById('home').onclick = () => {
+  location.href = 'home.html';
+};
+
+// ---- who else is here ------------------------------------------------
+const ME = 'ada';
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => {
+    const rail = document.getElementById('rail');
+    cast.forEach(c => {
+      const here = c.who === ME;
+      const el = document.createElement(here ? 'span' : 'a');
+      el.textContent = c.name;
+      el.title = c.blurb;
+      if (here) el.className = 'here';
+      else el.href = c.page;
+      rail.appendChild(el);
+    });
+  })
+  .catch(() => {});
+
+// Stage directions are stripped from what she SAID, the same call
+// yuzu_voice makes for the speaker: they are lovely to write and they
+// are not words, and on a small screen they crowd out the ones that are.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/\*[^*]*\*/g, ' ')
+             .replace(/\s{2,}/g, ' ')
+             .trim();
+}
+
+// ONE TURN IN THE LOG. textContent, never innerHTML: what she writes is
+// shown as text, whatever characters are in it.
+function entry(cls, by, text) {
+  const turn = document.createElement('div');
+  turn.className = 'turn ' + cls;
+  const label = document.createElement('span');
+  label.className = 'by';
+  label.textContent = by;
+  turn.appendChild(label);
+  turn.appendChild(document.createTextNode(text));
+  log.appendChild(turn);
+  log.scrollTop = log.scrollHeight;
+  return turn;
+}
+
+function said(pending, text) {
+  const words = spoken(text);
+  pending.remove();
+  entry('her', 'Ada', words || text.trim());
+  hear(words || text.trim());
+}
+
+// ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
+// The board has no speaker on it. Every device that opens this page
+// does -- the Steam Deck, a phone, the panel -- so the server renders
+// the wav and the BROWSER plays it.
+//
+// AUTOPLAY IS ALLOWED HERE because he tapped Speak to get this reply,
+// and that tap is the user gesture browsers require.
+//
+// A MISSING VOICE IS SILENT, NEVER AN ERROR ON SCREEN. The reply is the
+// product; the audio is a nicety.
+//
+// SHE SENDS HER OWN NAME. The server builds one voice PER CHARACTER off
+// her own `piper_length_scale`, so a copied `who` would hand her
+// somebody else's speaking rate. A test drives the name out of the
+// real fetch, and holds this block to the other speaking pages'.
+let sound = null;
+function hear(words) {
+  if (!words) return;
+  fetch('voice.wav', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: words, who: 'ada' }),
+  })
+    .then(r => (r.ok ? r.blob() : null))
+    .then(blob => {
+      if (!blob) return;
+      // The PREVIOUS url is revoked, or a long conversation leaks one
+      // object per reply into a browser on a battery-powered handheld.
+      if (sound) { try { URL.revokeObjectURL(sound.src); } catch (e) {} }
+      sound = new Audio(URL.createObjectURL(blob));
+      sound.play().catch(() => {});
+    })
+    .catch(() => {});
+}
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const asked = input.value.trim();
+  if (!asked) return;
+  input.value = '';
+  send.disabled = true;
+  send.textContent = '...';
+  document.body.classList.add('thinking');
+  entry('him', 'you', asked);
+  // Where her reply will land, saying so while she works it out.
+  const pending = entry('her pending', 'Ada', 'working it out ');
+  const dots = document.createElement('span');
+  dots.className = 'dots';
+  dots.textContent = '...';
+  pending.appendChild(dots);
+
+  // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
+  // and refuses anything that is not in the dict, so nothing typed here
+  // can ever name a file.
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'ada' }),
+  })
+    .then(r => r.json())
+    .then(r => said(pending, r.said || 'She said nothing.'))
+    .catch(() => said(pending, 'No answer from the deck. Is ~/YUZU/face running?'))
+    .then(() => {
+      send.disabled = false;
+      send.textContent = 'Speak';
+      document.body.classList.remove('thinking');
+      input.focus();
+    });
+};
+
+if (location.hash === '#say') input.focus();
+</script>

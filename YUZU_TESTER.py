@@ -517,6 +517,20 @@ class TestEndToEnd(unittest.TestCase):
 # JSON object when stream=false, and newline-delimited JSON when true.
 # =====================================================================
 
+def character_pages():
+    """Every CHARACTER PAGE in ui/, read off the files rather than typed.
+
+    Four tests carried their own hand-typed tuple of pages, and the day
+    Ada arrived each one would have gone on checking the old four while
+    her page -- a copy of one of them -- escaped every rule they guard:
+    the way out on a narrow screen, the rail built from the roster, the
+    voice fetch. A character page is one with a rail on it; that is the
+    property, and a list is how a new one slips past."""
+    ui = Path(__file__).parent / "ui"
+    return sorted(p.name for p in ui.glob("*.html")
+                  if 'id="rail"' in p.read_text(encoding="utf-8"))
+
+
 class MockOllama(BaseHTTPRequestHandler):
     replies = itertools.cycle(["Not much, just vibing! [squats] What's good?"])
     seen = {}
@@ -698,6 +712,54 @@ class TestBrain(BrainTestCase):
                          brain.persona.settings["temperature"])
         self.assertIn("num_predict", options)
         self.assertIn("num_ctx", options)
+
+    def test_a_character_can_bring_her_OWN_model(self):
+        """Ghost, Sept 24: a second, brainier model beside Four's. A
+        `model:` line in her persona names it, and it has to reach the
+        REQUEST -- a setting the brain reads and never sends is the
+        cheque-the-code-does-not-cash shape again. Driven through a real
+        request to the stub Ollama."""
+        ada = YuzuBrain(persona="ada", host=self.host)
+        ada.ask("hey")
+        self.assertEqual(MockOllama.seen["last"]["model"],
+                         ada.persona.settings["model"],
+                         "her own weights never reached Ollama")
+        four = YuzuBrain(persona="four", host=self.host)
+        four.ask("hey")
+        self.assertEqual(MockOllama.seen["last"]["model"],
+                         yuzu_brain_module.DEFAULT_MODEL,
+                         "a character with no model line moved off the default")
+
+    def test_the_deck_wide_model_can_not_put_her_on_FOURS_weights(self):
+        """YUZU_MODEL is how a board points EVERYONE at Four's Llama, so
+        it must not beat a character who names her own -- or the one
+        environment variable quietly runs a Qwen character on Llama
+        weights, and she just seems dimmer. An explicit model= still
+        wins over both, so an eval can put anyone on anything."""
+        own = yuzu_personas.load("ada").settings["model"]
+        with mock.patch.object(yuzu_brain_module, "DEFAULT_MODEL",
+                               "fours-llama"):
+            self.assertEqual(YuzuBrain(persona="four").model, "fours-llama")
+            self.assertEqual(YuzuBrain(persona="ada").model, own)
+            self.assertEqual(YuzuBrain(persona="ada", model="x").model, "x")
+
+    def test_the_terminal_chat_does_not_force_the_default_on_her(self):
+        """`yuzu_brain --chat --persona ada` must boot her on HER model.
+        The flag's own default used to be DEFAULT_MODEL, passed in
+        explicitly -- which an explicit model= beats her setting with."""
+        import io
+        made = {}
+
+        def record(**kw):
+            made.update(kw)
+            raise yuzu_brain_module.BrainError("stop here")
+
+        with mock.patch.object(yuzu_brain_module, "YuzuBrain", record), \
+                contextlib.redirect_stdout(io.StringIO()):
+            yuzu_brain_module._cli(["--persona", "ada"])
+        self.assertIn("persona", made)
+        self.assertIsNone(made.get("model"),
+                          "the chat passed a model and overrode hers")
 
     def test_streaming_reassembles_to_the_same_text(self):
         self.assertEqual("".join(self.brain().ask_stream("hey")).strip(),
@@ -3590,7 +3652,8 @@ class TestTheCastIsTwo(unittest.TestCase):
         for the roster made concrete: the fastest way to put Saya back
         on the interface by accident is to type her into a page."""
         import yuzu_face
-        for page in ("cait.html", "yuzu.html", "four.html", "mimi.html"):
+        self.assertIn("ada.html", character_pages(), "the helper found no pages")
+        for page in character_pages():
             text = (Path(__file__).parent / "ui" / page).read_text()
             self.assertIn("characters.json", text, page)
             # HER OWN NAME IS EXEMPT ON HER OWN PAGE: `<div id="who">`
@@ -3791,11 +3854,22 @@ class TestYuzuAvatar(unittest.TestCase):
         revoke, the `r.ok` check or the silent catch. Only the NAME may
         differ, so that is the one thing normalised away before the
         comparison."""
-        mine = self.voice_block("yuzu.html").replace("who: 'yuzu'", "WHO")
-        hers = self.voice_block("four.html").replace("who: 'four'", "WHO")
-        self.assertEqual(mine, hers,
-                         "the two speaking pages have drifted apart")
-        self.assertIn("WHO", mine, "the name was not where it was expected")
+        speaking = [p for p in character_pages()
+                    if "function hear(words)" in
+                    (Path(__file__).parent / "ui" / p).read_text()]
+        self.assertGreaterEqual(len(speaking), 3, speaking)
+        blocks = {}
+        for page in speaking:
+            me = Path(page).stem
+            block = self.voice_block(page).replace("who: '%s'" % me, "WHO")
+            self.assertIn("WHO", block,
+                          "%s asks for somebody else's voice" % page)
+            blocks[page] = block
+        first = blocks[speaking[0]]
+        for page, block in blocks.items():
+            self.assertEqual(block, first,
+                             "%s hears differently from %s"
+                             % (page, speaking[0]))
 
 
     def test_she_loads_and_is_the_gyaru_on_a_new_body(self):
@@ -7041,8 +7115,8 @@ class TestFour(unittest.TestCase):
         palettes sampled off their own art, and the deck's green on
         black is locked everywhere else -- the colour swap was REMOVED
         from Saya's face for being a settings panel parked on it."""
-        for other in ("cait.html", "yuzu.html", "mimi.html", "face.html",
-                      "home.html"):
+        for other in [p for p in character_pages() if p != "four.html"] + [
+                "face.html", "home.html"]:
             page = (self.PAGE.parent / other).read_text()
             self.assertNotIn("const SKINS", page,
                              "%s grew a colour cycle" % other)
@@ -7190,7 +7264,11 @@ class TestFour(unittest.TestCase):
         source = inspect.getsource(yuzu_face.answer)
         self.assertIn('hardware == "cyberdeck"', source,
                       "the wiki gate is not asking about the body")
-        deck = {"four", "saya"}
+        # A DECISION TABLE, not a list to keep in step: a character
+        # joining or leaving the deck body is a choice somebody has to
+        # make on purpose. Ada joined Sept 24 -- the brainy one wants
+        # the encyclopedia.
+        deck = {"four", "saya", "ada"}
         for who in yuzu_face.CHARACTERS:
             key = yuzu_face.persona_for(who)
             on_deck = yuzu_personas.load(key).hardware == "cyberdeck"
@@ -7810,7 +7888,7 @@ class TestTheWayOutSurvivesANarrowScreen(unittest.TestCase):
     missed. Same guard, same reason, as the two copies of the battery
     renderer and the two copies of the Jetson check."""
 
-    PAGES = ("four", "cait", "yuzu", "mimi")
+    PAGES = tuple(Path(p).stem for p in character_pages())
 
     def block(self, name):
         text = (Path(__file__).parent / "ui" / ("%s.html" % name)).read_text()
@@ -9845,6 +9923,32 @@ class TestDayOneRunbook(unittest.TestCase):
         self.assertIn("grep -i heretic", self.doc)
         self.assertNotIn("YUZU_MODEL=yuzu ", self.doc)
 
+    def test_the_model_line_still_finds_FOURS_with_two_heretics(self):
+        """Sept 24: Ada's Qwen is a heretic build too, and `ollama list`
+        puts the newest first -- so `grep -i heretic | head -1` would
+        start handing Four's chat the Qwen, and she would just seem
+        like a different girl. DRIVEN: the runbook's own line, run by
+        bash against a stub `ollama` listing the Qwen first."""
+        import subprocess
+        line = re.search(r"^MODEL=\$\((.*)\)$", self.doc, re.M)
+        self.assertIsNotNone(line, "the runbook lost its MODEL= line")
+        stub = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, stub, True)
+        with open(os.path.join(stub, "ollama"), "w") as fh:
+            fh.write("#!/bin/sh\ncat <<'EOF'\n"
+                     "NAME  ID  SIZE  MODIFIED\n"
+                     "hf.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF"
+                     ":Q4_K_M  a1  2.5 GB  1 minute ago\n"
+                     "hf.co/mradermacher/Llama-3.2-3B-Instruct-heretic-"
+                     "ablitered-uncensored-GGUF:Q4_K_M  b2  2.0 GB  "
+                     "2 weeks ago\nEOF\n")
+        os.chmod(os.path.join(stub, "ollama"), 0o755)
+        got = subprocess.run(
+            ["bash", "-c", line.group(1)], capture_output=True, text=True,
+            env=dict(os.environ, PATH=stub + ":" + os.environ["PATH"]))
+        self.assertIn("Llama-3.2-3B", got.stdout,
+                      "the runbook's model line picked %r" % got.stdout)
+
     def test_it_is_honest_about_what_is_unverified(self):
         """Two things in it have never run on real hardware: piper on
         arm64, and the doctor's Jetson section. Saying so is what stops
@@ -11762,6 +11866,22 @@ class TestTheVPetIsGone(unittest.TestCase):
                     body):
                 self.assertTrue((self.UI / target).exists(),
                                 "%s opens %s, which is not on the deck"
+                                % (page.name, target))
+
+    def test_every_picture_a_page_shows_is_really_there(self):
+        """The same property one tag over. A character page shows her
+        art from a real `src` in the markup, so she is on screen before
+        any fetch resolves -- which means a typo in that one attribute
+        is a character page with a broken-image icon where she should
+        be, and nothing else on screen to say why. Ada's page added a
+        new art folder; the next character will add another."""
+        for page in sorted(self.UI.glob("*.html")):
+            body = re.sub(r"<!--.*?-->", "", page.read_text(), flags=re.S)
+            for target in re.findall(
+                    r'<img\b[^>]*\bsrc="([\w./-]+\.(?:png|jpe?g|gif|webp))"',
+                    body):
+                self.assertTrue((self.UI / target).exists(),
+                                "%s shows %s, which is not on the deck"
                                 % (page.name, target))
 
     def test_the_server_does_not_answer_for_it_any_more(self):

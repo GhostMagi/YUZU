@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 769 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 774 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,105 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ADA: A SECOND MIND, ON HER OWN WEIGHTS (Sept 24)
+
+Ghost, night owl, one Ghost energy drink in: *"id like to get another
+offline AI LLM on the cyberdeck too... similar one (in the sense its
+abliterated heretic uncensored.) But maybe one thats good for orher
+stuff? ... i already have its art picked if its gunna be a brainiac"*,
+then, with the art: *"Put her on the left side of screen with a large
+chatbox. Black background."*
+
+**THE MODEL: `Qwen3-4B-Instruct-2507` in its heretic build**, pulled as
+`hf.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF:Q4_K_M`
+(2.5GB). **CONFIRMED ON HIS BOARD, 00:21:** it downloaded and answered
+*"17 times 23 is 391."* in one sentence, ~40s for the first load.
+
+- **Why this one**: stronger at maths, logic and code than its size
+  suggests; made by p-e-w, who wrote Heretic; quantised by the same
+  mradermacher whose Llama GGUF already works on the board.
+- **The Instruct-2507 release is NON-THINKING**, which is the deciding
+  detail: the hybrid Qwen3 writes a `<think>` block first, and on this
+  deck that block would go into her bubble and out of her speaker.
+- **Qwen3.5 heretic was the tempting wrong answer.** Newer, but Unsloth's
+  own docs say community Qwen3.5 GGUFs do not run in Ollama (separate
+  vision files), and it thinks by default. It would have pulled and then
+  failed -- the 8BitDo lesson in model form.
+- **No 8B.** ~5GB on 8GB shared with the desktop, at about half the
+  speed. `OLLAMA_MAX_LOADED_MODELS=1` means switching characters swaps
+  models, costing seconds on the first reply, never memory.
+
+**Hugging Face is blocked from this container**, so the name was
+checked by web search, not fetched -- and said so to him. His board
+proved it.
+
+### A CHARACTER CAN BRING HER OWN WEIGHTS
+
+`model:` in a persona's settings. **Until now every character shared
+one model**, which CLAUDE.md said in as many words (*"personas do not
+carry one"*). Precedence, pinned by driven tests: an explicit `model=`
+> her own `model:` > `DEFAULT_MODEL` (`YUZU_MODEL`, else `yuzu`).
+
+**HER LINE BEATS `YUZU_MODEL`, and that is the half worth the test.**
+That variable is how a board points EVERYONE at Four's Llama; if it
+won, Ada would run on Llama weights and simply seem dimmer, with
+nothing anywhere saying why. **And `_cli`'s `--model` default was
+`DEFAULT_MODEL`, passed EXPLICITLY** -- so `--chat --persona ada` would
+have overridden her. It is `None` now.
+
+### AND A SECOND HERETIC WOULD HAVE HIJACKED FOUR'S RUNBOOK LINE
+
+`NANO_DAY_ONE.md` finds Four's model with `ollama list | grep -i
+heretic | head -1` -- and `ollama list` is newest first. The day the
+Qwen landed, that line started handing the terminal chat the wrong
+girl. **Found by reading the diff's blast radius, before he hit it.**
+It is `| grep -i llama` now, and the test runs the doc's OWN line
+through bash against a stub `ollama` that lists the Qwen first.
+
+### Her page
+
+`ui/ada.html`, **his layout verbatim**: her art down the left, a big
+conversation panel down the right, black behind both. **A LOG, NOT A
+BUBBLE** -- she is the one he brings maths and code to, and an answer
+you cannot scroll back to is one you ask for twice. Palette sampled off
+her art (bone plating, the steel-blue room, the red cables for Speak).
+Thinking cue: her picture brightens while she works.
+
+**Her art had the PHONE'S BUTTONS in it** -- a round back arrow and a
+lens icon, from the screenshot he saved it from. Cropped out, not
+painted over (`ui/ada/ART.txt`), with headless Chromium since PIL is
+not in the container.
+
+**RENDERED AND LOOKED AT**, thirty-fourth time: 1024x600 with a real
+exchange in the log, 412 with her stacked on top, the exit at 1000/1024
+and 388/412, no horizontal scroll; the A.I. drawer at three tiles in one
+row with her own spine-and-cables icon.
+
+### Her persona
+
+`personas/ada.persona`, on the deck body so `/wiki` and the board facts
+reach her. **WORKING NAME -- he has not named her.** Four's measured
+scaffold, re-pointed: answer first then the one step that makes it
+make sense, precise over showy, *"when you are not sure, say so in a
+word and say how you would find out"*. Examples carry every measured
+shape plus a sum (`17 x 23`, the one he tested her with). Sampling is
+Qwen's own recommendation for this release, not taste. Sounds `Aha,
+Whoa, Huh` -- the suite refused `Ooh` as Yuzu's. 4561 chars against
+Four's 5446. **UNMEASURED on the page.**
+
+### FOUR TESTS CARRIED THEIR OWN LIST OF PAGES
+
+The exit on a narrow screen, the rail from the roster, the voice fetch
+and "only Four changes colour" each named the pages in a tuple -- so a
+fifth character page would have escaped every one of them.
+`character_pages()` reads them off the files (a page with a rail), and
+**each was verified by breaking Ada's page**: her exit rules deleted,
+her voice asking for Four, a colour cycle added. All red. **Plus a
+property one tag over from the links test: every `<img src>` on every
+page exists.**
+
+**Five new tests, eight breaks, all red. 769 -> 774.**
 
 ## "(laughs)" IS NOT SAID OUT LOUD NOW, AND "(not DHCP)" STILL IS (Sept 23)
 

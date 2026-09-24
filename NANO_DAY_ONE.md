@@ -155,13 +155,13 @@ cd YUZU
 python3 YUZU_TESTER.py
 ```
 
-**769 tests, ~19 seconds.** If they pass, the software made the trip
+**774 tests, ~19 seconds.** If they pass, the software made the trip
 intact. Nothing to install — the whole thing is standard library.
 
 ## 9 — Talk to her
 
 ```bash
-MODEL=$(ollama list | grep -i heretic | awk '{print $1}' | head -1)
+MODEL=$(ollama list | grep -i heretic | grep -i llama | awk '{print $1}' | head -1)
 YUZU_MODEL="$MODEL" python3 yuzu_all_in_one.py
 ```
 

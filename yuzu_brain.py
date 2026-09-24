@@ -244,7 +244,7 @@ def _token_rate(data):
 
 
 class YuzuBrain:
-    def __init__(self, model=DEFAULT_MODEL, host=DEFAULT_HOST,
+    def __init__(self, model=None, host=DEFAULT_HOST,
                  system_prompt=None, options=None,
                  history_turns=8, persona=None, auto_recover=True,
                  timeout=None, keep_alive=None):
@@ -265,8 +265,8 @@ class YuzuBrain:
         # never came up (switch_persona does exactly that when Ollama
         # was down at boot). Leaving it None sent {"model": null} to
         # Ollama and every turn after the switch failed, with nothing
-        # naming the switch as the cause.
-        self.model = model or DEFAULT_MODEL
+        # naming the switch as the cause. Resolved below, once the
+        # persona is known, because a character can bring her own.
         self.host = (host or DEFAULT_HOST).rstrip("/")
         self.persona = None
         persona_options = {}
@@ -282,6 +282,16 @@ class YuzuBrain:
             system_prompt = self.persona.prompt
             persona_options = self.persona.options()
         self.system_prompt = system_prompt
+        # A CHARACTER CAN BRING HER OWN WEIGHTS. Ghost, Sept 24: a
+        # second, brainier model beside Four's. A `model:` line in her
+        # settings names it, and it beats the deck-wide default -- the
+        # YUZU_MODEL environment included, because that variable is how
+        # a board points EVERYONE at Four's weights, and it must not
+        # quietly put a Qwen character on a Llama. An explicit model=
+        # still wins over both, so an eval can put anyone on anything.
+        own = (self.persona.settings.get("model") or "").strip() \
+            if self.persona else ""
+        self.model = model or own or DEFAULT_MODEL
         # Precedence: explicit options > persona settings > defaults.
         # Layered rather than dict(a, **b, **c) -- that form raises
         # TypeError the moment two layers set the same key, which is
@@ -684,7 +694,7 @@ def ground(text):
 
 
 def _cli(argv):
-    model = DEFAULT_MODEL
+    model = None          # the persona's own, else DEFAULT_MODEL
     persona = None
     chat = False
     args = list(argv)
