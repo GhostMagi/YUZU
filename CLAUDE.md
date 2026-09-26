@@ -66,6 +66,19 @@ robot alone with his cat**, so everything in "Before anyone adds vision
 / follow-me" (a watchdog, a hard stop, nothing moving on its own until
 both exist) applies the day it arrives.
 
+**He asked (same night) about taking the arm OFF, for battery and
+ease.** Answer given: a small battery gain, not a big one (the 18 leg
+servos and the Orin are the big draws; a parked arm costs mostly its
+WEIGHT, and bus servos can have their torque switched off in software).
+No software gets easier, since arm code is only written if he wants to
+grab things. **The catch: the listings describe the 3D depth camera
+together with the arm, and it may ride ON the arm** (UNVERIFIED --
+hiwonder.com is blocked from the container). Pull the arm and the
+camera that follow-me and cat-watching need could go with it. Check
+where the camera mounts before removing anything, and check the
+Options tab for a kit without the arm, since removing it from the
+$799.99 kit saves no money.
+
 **SHE TOOK HIS "ME" FOR HERSELF.** His facts store held his own line
 *"Haha please refer to me as Ghost"*, and Four answered *"Oh, and one
 more thing... I'll refer to myself as 'Ghost' from now on. Deal?"* The
