@@ -231,12 +231,13 @@ anything.
 
 **HIS GOAL, in his words, so it outlives the chat:** *"I want it to be
 autonomous spider bot someday with ai intellegence :0 but dor now
-cyber dexk i can get another nano later."* So the deck STAYS the deck,
-and the robot gets **its own Nano** -- which picks the other branch of
-the answer above: her brain rides ON the robot rather than on the
-deck over WiFi, and an autonomous robot cannot depend on a link to a
-handheld anyway. Everything in "Before anyone adds vision / follow-me"
-applies the day that starts: the gaits BLOCK for seconds, a watchdog
+cyber dexk i can get another nano later."* **READ THE CORRECTION
+BELOW THE JETHEXA ENTRY BEFORE ACTING ON "another nano"** -- it was the
+old Nano inside the robot kit, which he took to be his Orin. So the
+deck STAYS the deck and her brain stays on it, talking to the robot
+over WiFi, until an Orin is on the robot itself -- and an autonomous
+robot cannot depend on a link to a handheld forever. Everything in
+"Before anyone adds vision / follow-me" applies the day that starts: the gaits BLOCK for seconds, a watchdog
 and a hard stop before anything moves on its own, and the 2DOF gimbal
 before the legs. Nothing here needs to change for it now.
 
@@ -253,15 +254,29 @@ Orin Nano in it later means leaving Hiwonder's JetPack-4 software
 behind -- a real job, not a swap. Check the listing says "with Jetson
 Nano" before buying; some Hiwonder kits ship without the board.
 
-**He said that last part worried him, so the way round it is written
-down: the swap is never FORCED.** The old Nano can stay in the robot as
-its SPINAL CORD, still running Hiwonder's own gaits untouched, and the
-second Orin rides on top as the MIND, talking to it over a short
-Ethernet cable. That is the "her brain rides on the robot" goal with
-nothing of Hiwonder's rewritten -- what it costs is weight and battery.
-Hiwonder has already moved JetRover, JetAcker, JetAuto and JetArm onto
-the Orin Nano with ROS2, so an Orin JetHexa may exist by then:
-UNCONFIRMED, check or ask them before assuming either way.
+**"JETSON NANO" AND "JETSON ORIN NANO" ARE TWO DIFFERENT BOARDS, AND HE
+THOUGHT THEY WERE ONE.** Ghost, Sept 26: *"Nano orin is the same thing
+brobro. Im only buying the 1 that ive already bought"*, with a photo of
+his own board in its box: **JETSON ORIN NANO Developer Kit**. NVIDIA
+named them almost identically and the mix-up is common:
+
+    Jetson Nano (2019)        4GB, Maxwell GPU, frozen on JetPack 4.6,
+                              Ubuntu 18.04 -- what the JetHexa ships with
+    Jetson Orin Nano Super    8GB, Ampere GPU, JetPack 6, Ubuntu 22.04
+                              -- HIS, the deck's brain
+
+**The only brain board he means to own is the Orin he has.** The kit's
+old Nano is not a second purchase -- it comes IN the box (RobotShop
+lists the Standard kit as "w/ Jetson Nano"). It can run Hiwonder's legs
+and cannot carry her: 4GB and CUDA 10.2 is not a board her Gemma runs
+on. So with only what he owns plus the kit: **his Orin stays her brain,
+the kit's Nano walks, WiFi between them, nothing rewritten.** Moving his
+Orin INTO the spider is the only path that needs Hiwonder's software
+rebuilt, and nothing forces it. An earlier draft of this paragraph
+talked about "a second Orin riding on top" -- that was built on the
+same mix-up, and he never planned a second one. Hiwonder has put other
+robots (JetRover, JetAcker, JetAuto, JetArm) on the Orin Nano with
+ROS2; **no Orin JetHexa was found** in two searches.
 
 **Six new tests, thirteen breaks plus three re-breaks on the rewritten
 page, all red as failures. 840 -> 846.**
