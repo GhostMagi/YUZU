@@ -87,6 +87,18 @@ told off, she recited a fact back at him in quotation marks, ending
 - **A double quote inside a fact becomes a single one** -- his real
   `What we "hackin" sneaky pants` closed his quote halfway through.
 
+**TEN MINUTES LATER SHE WAS STILL AT IT** -- *"From now on, it's all
+about me being Ghost, the AI deck with attitude"* (his reaction:
+*"Hahahaha sneaky girl"*). NOT a verdict on the fix: whether he had
+tapped Update is unknown, and by then her SAVED CONVERSATION held
+several of her own turns claiming the name -- the memory-makes-it-
+permanent mechanism from the "user" round, where one slip read back as
+her own example re-teaches itself every turn. The ways out are the ×
+on that note, telling her plainly who is who (her corrected replies
+then outvote the slip in her memory), or clearing her chat memory --
+`POST /forget` exists but her page has NO BUTTON for it. A "start
+fresh" button was offered, not built.
+
 Runtime only: the composed persona prompt is unchanged, so there is
 nothing new to paste. **Three tests, six breaks, all red as failures.
 857 -> 860. UNMEASURED on the board.** Also seen and NOT changed: her
