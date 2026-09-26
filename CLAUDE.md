@@ -97,7 +97,26 @@ hear (faster-whisper) and speak (Kokoro) in software, so a mic and
 speaker on the robot are enough. That is the USB sound card and speaker
 already on his deck parts list.
 
-**HE IS SAVING FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
+**HE IS BUYING THE JETHEXA2027 STARTER** (Sept 27): sold his PS4 for
+$150, fund at $600. **This SUPERSEDES the ROSpider plan below.** He
+asked whether it can talk and whether the girls will talk well on it.
+Answer given: **the Starter has no mic or speaker** (its voice column
+is "/"), but her voice and ears are ours, not Hiwonder's. The page
+already plays her voice on whatever device he holds, so she talks
+through his phone with nothing added. Out of the spider itself takes a
+speaker on the Orin's USB, which is the sound card and speaker on the
+deck parts list, bought once and used by both. **The same board, the
+same models and the same voices, so the same girls.** Three UNMEASURED
+costs on the robot: Hiwonder's ROS nodes share the 8GB with her model,
+Kokoro and Whisper (a robot with no desktop frees some back); thinking
+at MAXN drains the robot's battery; and a mic on a walking robot hears
+servos, so push-to-talk from his phone stays the way in. **Shiro and
+Kuro were written as six-legged girls whose legs "live on the screen
+until the chassis is built"** -- this is that chassis, and their robot
+persona is the shiro/shiro_deck split.
+
+**(SUPERSEDED Sept 27 by the JetHexa2027 Starter above.) HE IS SAVING
+FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
 spider with the arm"*, after his own screenshot of hiwonder.com said
 **$799.99 for the Starter Kit** -- the one hexapod whose software is
 built for his Orin Nano Super. So the Orin goes INTO the robot on
