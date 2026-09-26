@@ -118,6 +118,17 @@ which no model here has had -- **whether this GGUF brought its vision
 half is UNVERIFIED**, and it would need to before a camera means
 anything.
 
+**HIS GOAL, in his words, so it outlives the chat:** *"I want it to be
+autonomous spider bot someday with ai intellegence :0 but dor now
+cyber dexk i can get another nano later."* So the deck STAYS the deck,
+and the robot gets **its own Nano** -- which picks the other branch of
+the answer above: her brain rides ON the robot rather than on the
+deck over WiFi, and an autonomous robot cannot depend on a link to a
+handheld anyway. Everything in "Before anyone adds vision / follow-me"
+applies the day that starts: the gaits BLOCK for seconds, a watchdog
+and a hard stop before anything moves on its own, and the 2DOF gimbal
+before the legs. Nothing here needs to change for it now.
+
 **Six new tests, thirteen breaks plus three re-breaks on the rewritten
 page, all red as failures. 840 -> 846.**
 
