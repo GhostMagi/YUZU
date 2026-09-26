@@ -560,6 +560,11 @@ CHARACTERS = {
     "four": ("four",                   "four.html",  "the deck's own voice"),
     # Her own WEIGHTS as well as her own page -- `model:` in her persona.
     "zero": ("zero",                   "zero.html",  "the brainy one"),
+    # SISTERS ON SIX LEGS, Sept 26, both on one Gemma 4 model. `shiro` is
+    # a NEW persona under an old name -- the yami kawaii Shiro stays
+    # retired as the record -- so the key says which one this is.
+    "shiro": ("shiro_mk2",             "shiro.html", "field operator, six legs"),
+    "kuro": ("kuro",                   "kuro.html",  "her sister, the menace"),
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A

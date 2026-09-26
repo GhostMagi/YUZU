@@ -1,0 +1,15 @@
+kuro.jpg -- Ghost's picture of Kuro, Sept 26: short black hair, green
+eyes, fangs, cat ears on a headset, a thorny halo, and six black
+blade-tipped mechanical spider legs glowing green at the seams, in the
+rain. 736x977. Shipped exactly as he sent it.
+
+A whole scene with its own stormy background, so it is not cut out.
+Her page is the dark one, and all four edges of the picture FADE into
+it (two mask gradients, intersected). The fades are wide on purpose:
+at 7-10% the bright sky in her top corner stopped at a hard line and she
+read as a photo stuck on the page, and an oval vignette read as a cameo
+frame. Three versions rendered side by side at 1024x600 and looked at;
+16-22% is the one where the storm melts into the room.
+
+Her persona leaves out the red tear streaks: they are the one creepy
+thing in the picture, and "never creepy-cute" was the brief.

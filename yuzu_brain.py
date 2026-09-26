@@ -220,8 +220,60 @@ def load_system_prompt(persona=yuzu_personas.LIVE_PERSONA):
 
 
 # A THINK BLOCK NEVER REACHES HER BUBBLE OR HER VOICE, whichever field
-# Ollama leaves it in.
-_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.S | re.I)
+# Ollama leaves it in -- Qwen's <think>...</think>, and Gemma 4's
+# thought channel, which his board printed as plain text on Sept 26:
+# "<|channel>thought Thinking Process: 1. Analyze the Request..." and
+# only then "<channel|>Hello! I am Gemma 4".
+_THINK_BLOCK = re.compile(r"<think>.*?</think>|<\|channel>.*?<channel\|>",
+                          re.S | re.I)
+
+
+# GEMMA 4 IS LAID OUT HERE, AND SENT RAW. Ghost, Sept 26, the first run
+# of the model Shiro and Kuro live on, with no prompt at all:
+#
+#     <|channel>thought
+#     Thinking Process:
+#     1. **Analyze the Request:** The user asked "hi, who are you?"...
+#     6. **Final Output Generation.** (The resulting response is...)
+#     <channel|>Hello! I am Gemma 4, a Large Language Model...
+#
+# Eight seconds of her thinking out loud, in the model's own markup, on
+# a two-word question -- every turn, on a deck. For every other
+# character the brain sends /api/chat and Ollama lays the turn out with
+# the template inside the GGUF (the Zero entry in CLAUDE.md: "we do not
+# hand-format it"). That rests on the served template being RIGHT, and
+# this one thinks by default with nothing in the request that turns it
+# off. Google's own template turns thinking off by opening her turn with
+# an EMPTY thought channel -- `<|turn>model\n<|channel>thought\n
+# <channel|>` -- and a raw prompt is the one way to put those exact
+# characters in front of her whatever template the GGUF came with. So a
+# `prompt_format: gemma4` character is written out here, byte for byte
+# what Google's template writes with thinking off (verified against it,
+# Sept 26), and sent to /api/generate with raw on. No <bos>: the
+# tokenizer adds it, exactly as it does for a templated turn.
+def _strip_thinking(text):
+    """Her earlier reply with any thought channel taken out -- the
+    template's own strip_thinking(), which history goes through."""
+    kept = []
+    for part in text.split("<channel|>"):
+        kept.append(part.split("<|channel>")[0] if "<|channel>" in part
+                    else part)
+    return "".join(kept).strip()
+
+
+def gemma4_prompt(messages):
+    """The whole turn in Gemma 4's layout, thinking OFF, ending where
+    her words begin."""
+    out = []
+    for message in messages:
+        role = message.get("role") or "user"
+        text = message.get("content") or ""
+        if role == "assistant":
+            out.append("<|turn>model\n" + _strip_thinking(text) + "<turn|>\n")
+        else:
+            out.append("<|turn>%s\n%s<turn|>\n" % (role, text.strip()))
+    out.append("<|turn>model\n<|channel>thought\n<channel|>")
+    return "".join(out)
 
 
 def _plainer(payload):
@@ -283,6 +335,9 @@ def _words(message):
     answer; an empty bubble is never the better outcome."""
     message = message or {}
     said = _THINK_BLOCK.sub("", message.get("content") or "")
+    # A thought channel that never closed ran into the reply ceiling
+    # before she said a word: all of it is thinking, none of it is his.
+    said = said.split("<|channel>")[0]
     if said.strip():
         return said
     return message.get("thinking") or ""
@@ -373,6 +428,11 @@ class YuzuBrain:
         wants = str(self.persona.settings.get("think", "")).strip().lower() \
             if self.persona else ""
         self.think = False if wants in ("no", "false", "off", "0") else None
+        # `prompt_format: gemma4` -- laid out here and sent raw, because
+        # the template her GGUF came with thinks out loud on every turn.
+        # See gemma4_prompt().
+        self.gemma4 = str(self.persona.settings.get("prompt_format", "")
+                          ).strip().lower() == "gemma4" if self.persona else False
         self.exact_maths = wants_exact_maths(self.persona)
         # Precedence: explicit options > persona settings > defaults.
         # Layered rather than dict(a, **b, **c) -- that form raises
@@ -447,6 +507,15 @@ class YuzuBrain:
             # pivot to another main character, or a second robot, makes
             # a hardcoded fix instruction point at the wrong thing at
             # exactly the moment someone is stuck.
+            #
+            # And a character who brings her OWN weights (Zero, Shiro,
+            # Kuro) is not built from a Modelfile here -- her model is
+            # PULLED, so that is the one line to give.
+            if self.persona and (self.persona.settings.get("model") or "").strip():
+                raise BrainError(
+                    f"Ollama is running, but {self.persona.name}'s model is "
+                    f"not on this board yet. Pull it once:\n"
+                    f"  ollama pull {self.model}")
             raise BrainError(
                 f"Ollama is running, but no model named '{self.model}'.\n"
                 f"  Pulled models: {', '.join(models) or '(none)'}\n"
@@ -510,17 +579,53 @@ class YuzuBrain:
         self._check_drift(reply)
         return reply
 
+    def _request(self, payload):
+        """(where this turn goes, what it says). A chat payload in; for
+        a `prompt_format: gemma4` character the same turn laid out by
+        gemma4_prompt() and sent raw to /api/generate, which has no
+        `think` to send and answers in `response` -- see _message()."""
+        if not self.gemma4:
+            return f"{self.host}/api/chat", payload
+        body = {k: v for k, v in payload.items()
+                if k not in ("messages", "think")}
+        body["prompt"] = gemma4_prompt(payload.get("messages") or [])
+        body["raw"] = True
+        return f"{self.host}/api/generate", body
+
+    @staticmethod
+    def _message(data):
+        """The reply's message, from /api/chat or from /api/generate."""
+        if "message" in data or "response" not in data:
+            return data.get("message") or {}
+        return {"content": data.get("response") or "",
+                "thinking": data.get("thinking") or ""}
+
+    def _refused(self, code, body):
+        """What an HTTP refusal from Ollama means, in words he can act
+        on. A model that is not pulled yet is a 404, and the page used
+        to show that as Ollama's own JSON."""
+        text = (body or "")[:300]
+        if code == 404 and "not found" in text.lower():
+            return (f"Her model is not on this board yet. Pull it once "
+                    f"in a terminal:\n  ollama pull {self.model}")
+        if re.search(r"(unknown|unsupported) model architecture", text, re.I):
+            return ("Her model is newer than this board's Ollama. Update "
+                    "Ollama (the install line on ollama.com), then ask "
+                    "her again.")
+        return f"Ollama returned {code} for model '{self.model}': {text}"
+
     def _chat(self, payload):
-        """One /api/chat request, the parsed answer back. BrainError
-        with the dial to turn when it cannot be had."""
+        """One request, the parsed answer back. BrainError with the dial
+        to turn when it cannot be had."""
+        url, body = self._request(payload)
         try:
-            with _post(f"{self.host}/api/chat", payload, self.timeout) as r:
-                return json.load(r)
+            with _post(url, body, self.timeout) as r:
+                data = json.load(r)
+            data["message"] = self._message(data)
+            return data
         except urllib.error.HTTPError as exc:
-            raise BrainError(
-                f"Ollama returned {exc.code} for model '{self.model}': "
-                f"{exc.read().decode('utf-8', 'replace')[:300]}"
-            ) from exc
+            raise BrainError(self._refused(
+                exc.code, exc.read().decode("utf-8", "replace"))) from exc
         except urllib.error.URLError as exc:
             raise BrainError(
                 f"Can't reach Ollama at {self.host} ({exc.reason}). "
@@ -591,8 +696,9 @@ class YuzuBrain:
         self.last_cut = False
         self.last_opening = ""
         rate = None
+        url, body = self._request(payload)
         try:
-            with _post(f"{self.host}/api/chat", payload, self.timeout) as response:
+            with _post(url, body, self.timeout) as response:
                 for line in response:
                     line = line.strip()
                     if not line:
@@ -600,7 +706,7 @@ class YuzuBrain:
                     chunk = json.loads(line)
                     if chunk.get("error"):
                         raise BrainError(f"Ollama error: {chunk['error']}")
-                    message = chunk.get("message") or {}
+                    message = self._message(chunk)
                     thought.append(message.get("thinking") or "")
                     raw += message.get("content", "")
                     # HELD BACK until it cannot be the start of HIS turn,
@@ -628,6 +734,12 @@ class YuzuBrain:
                     if chunk.get("done"):
                         rate = _token_rate(chunk)
                         break
+        except urllib.error.HTTPError as exc:
+            # BEFORE URLError, which it is a kind of: a model that is not
+            # pulled yet used to read "Can't reach Ollama (Not Found).
+            # Start it with: ollama serve" -- the wrong fix, stated as one.
+            raise BrainError(self._refused(
+                exc.code, exc.read().decode("utf-8", "replace"))) from exc
         except urllib.error.URLError as exc:
             raise BrainError(
                 f"Can't reach Ollama at {self.host} ({exc.reason}). "
@@ -865,10 +977,17 @@ def _is_kill_attempt(line):
 # do you know about the Jetson Nano?"): caught with "\n", missed with
 # "\r\n". Every line ending is "\n" before anything is looked for, and
 # a space is anything Python calls one.
+#
+# GEMMA NAMES HER OWN SIDE `model`, and marks a turn <|turn>role ...
+# <turn|> (Gemma 3: <start_of_turn> / <end_of_turn>). Sept 26, for
+# Shiro and Kuro. `model` counts only in lower case, the way the
+# template writes it -- "Model" on a line of its own is a heading in an
+# answer about MVC, and a line is only ever cut for being markup.
 _ROLE_LINE = re.compile(
-    r"^[^\S\n]*(?:user|assistant|system)[^\S\n]*$", re.I | re.M)
+    r"^[^\S\n]*(?:user|assistant|system|(?-i:model))[^\S\n]*$", re.I | re.M)
 _TEMPLATE_TOKEN = re.compile(
-    r"<\|(?:im_start|im_end|endoftext|eot_id|start_header_id|end_header_id)\|>")
+    r"<\|(?:im_start|im_end|endoftext|eot_id|start_header_id|end_header_id)\|>"
+    r"|<\|turn>|<turn\|>|<start_of_turn>|<end_of_turn>")
 _INVISIBLE = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
 
 
@@ -890,7 +1009,8 @@ def _lines(text):
 # answer sitting right under the cut. Before any of her words it can
 # only be hers, so it is taken off and she is read from the line after.
 _OWN_HEADER = re.compile(
-    r"\A\s*(?:<\|im_start\|>)?[^\S\n]*assistant[^\S\n]*(?:\n|\Z)", re.I)
+    r"\A\s*(?:<\|im_start\|>|<\|turn>|<start_of_turn>)?[^\S\n]*"
+    r"(?:assistant|(?-i:model))[^\S\n]*(?:\n|\Z)", re.I)
 
 
 def _without_own_header(text):
@@ -944,7 +1064,8 @@ def _safe_so_far(text, name=""):
     last = text.rsplit("\n", 1)[-1]
     head = last.strip().lower()
     if head and any(w.startswith(head)
-                    for w in ("user:", "assistant", "system", "<|",
+                    for w in ("user:", "assistant", "system", "model", "<|",
+                              "<turn|>", "<start_of_turn>", "<end_of_turn>",
                               (name.lower() + ":") if name else "user:")):
         return text[:len(text) - len(last)], False
     return text, False

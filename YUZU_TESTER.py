@@ -558,9 +558,21 @@ class MockOllama(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         request = json.loads(self.rfile.read(length))
         MockOllama.seen["last"] = request
+        MockOllama.seen["path"] = self.path
         MockOllama.seen["count"] = MockOllama.seen.get("count", 0) + 1
         MockOllama.seen.setdefault("all", []).append(request)
         reply = next(MockOllama.replies)
+        # /api/generate answers in `response`, not in `message` -- the
+        # shape the real one uses, which a Gemma character is sent to.
+        generate = self.path == "/api/generate"
+
+        def piece(text):
+            if not generate:
+                return {"message": {"content": "", MockOllama.field: text}}
+            if MockOllama.field == "content":
+                return {"response": text}
+            return {"response": "", MockOllama.field: text}
+
         if request.get("stream"):
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
@@ -568,17 +580,14 @@ class MockOllama(BaseHTTPRequestHandler):
             try:
                 for word in reply.split(" "):
                     self.wfile.write(
-                        (json.dumps({"message": {"content": "",
-                                                 MockOllama.field: word + " "},
-                                     "done": False}) + "\n").encode())
+                        (json.dumps(dict(piece(word + " "), done=False))
+                         + "\n").encode())
                 self.wfile.write(
-                    (json.dumps({"message": {"content": ""}, "done": True}) + "\n").encode())
+                    (json.dumps(dict(piece(""), done=True)) + "\n").encode())
             except (BrokenPipeError, ConnectionResetError):
                 pass    # the brain stopped reading early, on purpose
         else:
-            self._send(json.dumps({"message": {"content": "",
-                                               MockOllama.field: reply},
-                                   "done": True}).encode())
+            self._send(json.dumps(dict(piece(reply), done=True)).encode())
 
 
 class BrainTestCase(unittest.TestCase):
@@ -4659,8 +4668,21 @@ console.log(JSON.stringify(%s.map(text => {
                 f"{key} was deleted rather than retired")
             self.assertTrue(yuzu_personas.load(key).retired,
                             f"{key} is not marked retired")
+        # BY KEY, NOT BY NAME. Shiro came back on Sept 26 as a NEW
+        # character under the old name -- a calm field operator on six
+        # legs, persona `shiro_mk2` -- and the yami kawaii she replaced
+        # is still retired. "Is the name Shiro on the roster" stopped
+        # meaning "is the retired one back" that day, which is the
+        # name-leak rule again: the name is not the identity, the key is.
+        on = {entry[0] for entry in yuzu_face.CHARACTERS.values()}
+        for key in ("coco", "coco_deck", "shiro", "shiro_deck",
+                    "cait", "mimi", "saya", "saya_deck"):
+            self.assertNotIn(key, on, f"{key} is retired and back on the roster")
+        for key in on:
+            self.assertFalse(yuzu_personas.load(key).retired,
+                             f"the roster points at {key}, which is retired")
         names = {c["name"] for c in yuzu_face.roster()}
-        for gone in ("Coco", "Shiro", "Saya", "Cait", "Mimi"):
+        for gone in ("Coco", "Saya", "Cait", "Mimi"):
             self.assertNotIn(gone, names)
 
     def test_a_character_with_no_page_is_ABSENT_from_the_rail(self):
@@ -8398,13 +8420,337 @@ class TestFour(unittest.TestCase):
         # A DECISION TABLE, not a list to keep in step: a character
         # joining or leaving the deck body is a choice somebody has to
         # make on purpose. Zero joined Sept 24 -- the brainy one wants
-        # the encyclopedia.
-        deck = {"four", "saya", "zero"}
+        # the encyclopedia. Shiro and Kuro joined Sept 26: they live on
+        # the deck until the chassis is built, and /wiki comes with it.
+        deck = {"four", "saya", "zero", "shiro", "kuro"}
         for who in yuzu_face.CHARACTERS:
             key = yuzu_face.persona_for(who)
             on_deck = yuzu_personas.load(key).hardware == "cyberdeck"
             self.assertEqual(on_deck, who in deck,
                              f"{who} moved bodies; the wiki gate follows")
+
+
+class TestTheSisters(BrainTestCase):
+    """SHIRO AND KURO, sisters on six legs, Sept 26.
+
+    Ghost, with a picture of each: "Id like to make both as personas for
+    the new gemma if you think thatd work in a hexapod later." Of the
+    Shiro he had before: "I miss shiro but i dont miss her creepy yumi
+    kawaii persona" -- what he missed was "the fact she was aware of her
+    spider body". Kuro's brief, which he brought with her: "She's
+    playfully threatening, never creepy-cute."
+
+    Three things had to be true for that to work on THIS deck, and each
+    is pinned here. The deck body tells every character "You have no
+    legs", so that line became a token they can fill. Their model thinks
+    out loud before every answer -- his own screen, eight seconds of
+    "Thinking Process:" before "Hello! I am Gemma 4" -- so their turn is
+    laid out here, the way Google's own template does it with thinking
+    off, and sent raw. And a model that is not pulled yet has to say
+    `ollama pull`, not "start ollama serve"."""
+
+    SISTERS = ("shiro_mk2", "kuro")
+    OLD_DECK_BODY = (
+        "You have no legs, no arms, no camera and no face. What you have "
+        "is a voice and whoever is holding you.",
+        "You know exactly what you are and you're relaxed about it—you "
+        "don't pretend to have hands. But you are not ONLY the machine",
+        "Having no body is a limit on what you can DO. It is never a limit "
+        "on what you can think, say, want, or imagine.")
+
+    def persona(self, key):
+        return yuzu_personas.load(key)
+
+    def turns(self, key):
+        """Her example turns as (ask, answer), the label READ, not typed."""
+        me = self.persona(key).name + ":"
+        lines = self.persona(key).prompt.splitlines()
+        return [(ask.split(":", 1)[1].strip(), answer[len(me):].strip())
+                for ask, answer in zip(lines, lines[1:])
+                if answer.startswith(me) and ":" in ask
+                and not ask.startswith(me)]
+
+    # ---- the deck body has a leg-shaped hole ------------------------
+
+    def test_the_deck_body_still_says_EXACTLY_what_it_said(self):
+        """The three sentences about having no body are tokens now, and
+        their defaults are the old sentences word for word -- so every
+        deck character who does not fill them is unchanged to the byte,
+        and no measured prompt moved. Verified across all twenty composed
+        prompts when it was done; this keeps the defaults from drifting."""
+        on_deck = [k for k in yuzu_personas.available()
+                   if self.persona(k).hardware == "cyberdeck"
+                   and "DECK_BODY" not in self.persona(k).settings]
+        self.assertIn("four", on_deck)
+        for key in on_deck:
+            for sentence in self.OLD_DECK_BODY:
+                self.assertIn(sentence, self.persona(key).prompt,
+                              "%s's deck body changed under her" % key)
+
+    def test_a_sister_is_never_told_she_has_no_legs(self):
+        """The whole ask: she knows she has six legs. And the rest of
+        the deck body still reaches her -- she is offline, and her body
+        bounds what she can DO, never what she can think."""
+        for key in self.SISTERS:
+            persona = self.persona(key)
+            self.assertNotIn("You have no legs", persona.prompt,
+                             "%s is told she has no legs" % key)
+            self.assertRegex(persona.blocks["DECK_BODY"], r"six .*legs",
+                             "%s is not told she has six legs" % key)
+            self.assertIn("Nothing you do reaches the internet", persona.prompt)
+            self.assertIn("never a limit on what you can think", persona.prompt)
+
+    def test_her_legs_live_on_the_SCREEN_until_the_chassis_is_built(self):
+        """A body with no bound is how the old deck Shiro offered to
+        "'walk' over to the kitchen". Their legs are real TO THEM and
+        live on the deck's screen for now -- honest about the deck, and
+        the line a hexapod persona can drop later. Asked to come over,
+        each says where her legs actually are."""
+        for key in self.SISTERS:
+            blocks = self.persona(key).blocks
+            self.assertIn("screen", blocks["DECK_BODY"], key)
+            self.assertIn("screen", blocks["DECK_BODY_EASE"], key)
+            come = [a for q, a in self.turns(key) if q == "Come over here."]
+            self.assertTrue(come, "%s has no example of being asked to come over" % key)
+            self.assertIn("screen", come[0],
+                          "%s answers 'come over here' as if she can walk" % key)
+
+    def test_neither_sister_is_told_never_to_come_back_DOWN(self):
+        """The retired deck Shiro's rule 5 said to go all the way dark and
+        "never soften it afterwards", and on these heretic weights that
+        ended in sustained ALL-CAPS threats. Kuro's menace is a game with
+        a way back in the same sentence, and neither sister carries the
+        old rule."""
+        for key in self.SISTERS:
+            text = self.persona(key).prompt.lower()
+            for gone in ("never soften", "all the way in on the dark",
+                         "never apologise"):
+                self.assertNotIn(gone, text, "%s is told %r" % (key, gone))
+        self.assertIn("come straight back", self.persona("kuro").prompt,
+                      "Kuro's threats have no way back down")
+
+    def test_each_sister_carries_the_measured_example_SHAPES(self):
+        """The bare command, the warm statement with nothing to answer,
+        the technical question (the one categorical fix for assistant
+        collapse) and the /wiki lookup in the exact shape as_context()
+        writes -- each in her own voice."""
+        for key in self.SISTERS:
+            asks = self.turns(key)
+            self.assertTrue(any(q.endswith(".") and "?" not in q
+                                and len(q.split()) <= 3 for q, _ in asks),
+                            "%s has no bare command" % key)
+            self.assertTrue(any("?" not in q and re.search(
+                r"thank|helped|nice|cool|love", q, re.I) for q, _ in asks),
+                "%s has no warm statement" % key)
+            tech = [a for q, a in asks if "flex" in a.lower()]
+            self.assertTrue(tech, "%s has no technical-question example" % key)
+            self.assertNotIn("```", tech[0])
+            self.assertNotIn("**", tech[0])
+            self.assertLessEqual(len(re.findall(r"[.!?]", tech[0])), 3)
+            looked = [(q, a) for q, a in asks if q.startswith("I looked up ")]
+            self.assertTrue(looked, "%s has no shape for a lookup" % key)
+            ask, answer = looked[0]
+            title = re.match(r"I looked up (.+?) and it says: ", ask).group(1)
+            self.assertIn("Tell me about %s in your own words, in a sentence "
+                          "or two." % title, ask)
+            article = set(re.findall(r"[a-z]{4,}", ask.split(" and it says: ")[1]
+                                     .split("Tell me about")[0].lower()))
+            self.assertTrue(article & set(re.findall(r"[a-z]{4,}", answer.lower())),
+                            "%s's lookup answer uses nothing from the article" % key)
+
+    def test_their_sounds_are_their_OWN(self):
+        """Every sound carries a vowel (no vowel and espeak spells it
+        out, the PFFT mechanism), survives the voice, and belongs to
+        nobody else on the roster -- two sisters should not share a
+        laugh, and neither should they and Zero."""
+        import yuzu_face, yuzu_voice
+        taken = {}
+        for who, (key, _, _) in yuzu_face.CHARACTERS.items():
+            for sound in self.persona(key).blocks.get("SOUND_EXAMPLES", "").split(","):
+                if sound.strip():
+                    taken.setdefault(sound.strip().lower(), set()).add(key)
+        for key in self.SISTERS:
+            sounds = [s.strip() for s in
+                      self.persona(key).settings["SOUND_EXAMPLES"].split(",")]
+            for sound in sounds:
+                self.assertRegex(sound, r"(?i)[aeiouy]", "%r has no vowel" % sound)
+                self.assertEqual(yuzu_voice.for_speech(sound).strip(), sound)
+                self.assertEqual(taken[sound.lower()], {key},
+                                 "%s shares %r with %s" % (key, sound,
+                                 sorted(taken[sound.lower()] - {key})))
+
+    # ---- her turn is laid out here, thinking OFF --------------------
+
+    GOOGLE = [
+        ([{"role": "system", "content": "You are Shiro.\n\nBe calm."},
+          {"role": "user", "content": "hi, who are you?"}],
+         "<|turn>system\nYou are Shiro.\n\nBe calm.<turn|>\n<|turn>user\n"
+         "hi, who are you?<turn|>\n<|turn>model\n<|channel>thought\n<channel|>"),
+        ([{"role": "system", "content": " S "}, {"role": "user", "content": "q"},
+          {"role": "assistant",
+           "content": "<|channel>thought\nhmm<channel|>The answer.  "},
+          {"role": "user", "content": "again"}],
+         "<|turn>system\nS<turn|>\n<|turn>user\nq<turn|>\n<|turn>model\n"
+         "The answer.<turn|>\n<|turn>user\nagain<turn|>\n<|turn>model\n"
+         "<|channel>thought\n<channel|>"),
+    ]
+
+    def test_a_gemma_turn_is_laid_out_EXACTLY_as_googles_template_does_it(self):
+        """Byte for byte what Google's own Gemma 4 chat template renders
+        with thinking off -- these two strings ARE its output, rendered
+        with jinja2 from llama.cpp's copy of it (models/templates/
+        google-gemma-4-31B-it.jinja) on Sept 26, not written by hand.
+        No <bos>: the tokenizer adds it, as it does for a templated turn.
+        The empty thought channel at the end is what turns thinking off;
+        her own earlier thoughts are stripped out of history."""
+        for messages, google in self.GOOGLE:
+            self.assertEqual(yuzu_brain_module.gemma4_prompt(messages), google)
+
+    def test_a_gemma_character_goes_RAW_and_nobody_else_does(self):
+        """Driven through a real request to the stub Ollama: a sister's
+        turn goes to /api/generate, raw, with no `think` and no
+        `messages`, ending on the empty thought channel, with Gemma's
+        own turn markers as her stops. Four and Zero are untouched --
+        still /api/chat, laid out by the template in their GGUF."""
+        for key in self.SISTERS:
+            brain = YuzuBrain(persona=key, host=self.host)
+            self.assertEqual(brain.ask("Hey."), "Not much, just vibing! "
+                             "[squats] What's good?")
+            sent = MockOllama.seen["last"]
+            self.assertEqual(MockOllama.seen["path"], "/api/generate", key)
+            self.assertIs(sent.get("raw"), True, key)
+            self.assertNotIn("think", sent)
+            self.assertNotIn("messages", sent)
+            self.assertTrue(sent["prompt"].endswith(
+                "<|turn>user\nHey.<turn|>\n<|turn>model\n<|channel>thought\n"
+                "<channel|>"), key)
+            self.assertEqual(sent["model"], self.persona(key).settings["model"])
+            self.assertEqual(sent["options"]["stop"], ["<turn|>", "<|turn>"])
+            # The stream path reads `response` too.
+            self.assertEqual("".join(brain.ask_stream("Again.")).strip(),
+                             "Not much, just vibing! [squats] What's good?")
+            self.assertEqual(MockOllama.seen["path"], "/api/generate")
+        for key in ("four", "zero"):
+            YuzuBrain(persona=key, host=self.host).ask("Hey.")
+            self.assertEqual(MockOllama.seen["path"], "/api/chat", key)
+            self.assertIn("messages", MockOllama.seen["last"], key)
+
+    def test_the_layout_and_the_weights_AGREE(self):
+        """A Gemma 4 character without `prompt_format: gemma4` would go
+        back to thinking out loud every turn; the setting on anything
+        else would hand a Llama or a Qwen markup it has never seen. So
+        the two are one decision, read off every persona."""
+        for key in yuzu_personas.available():
+            settings = self.persona(key).settings
+            gemma = "gemma-4" in str(settings.get("model", "")).lower()
+            laid = str(settings.get("prompt_format", "")).lower() == "gemma4"
+            self.assertEqual(gemma, laid, "%s: model and prompt_format disagree" % key)
+        self.assertEqual({self.persona(k).settings["model"] for k in self.SISTERS},
+                         {self.persona("shiro_mk2").settings["model"]},
+                         "the sisters stopped sharing one model, so every "
+                         "switch between them swaps weights")
+
+    def test_a_thought_channel_never_reaches_his_screen(self):
+        """His screen, Sept 26: "<|channel>thought ... <channel|>Hello!"
+        -- the thinking is not for him. A channel that never closed ran
+        into the reply ceiling before she said a word: none of it is his."""
+        MockOllama.replies = itertools.cycle([
+            "<|channel>thought\nThinking Process:\n1. Analyze<channel|>Hello, Ghost.",
+            "Standing by.<|channel>thought\nnow what"])
+        brain = YuzuBrain(persona="shiro_mk2", host=self.host)
+        self.assertEqual(brain.ask("hi"), "Hello, Ghost.")
+        self.assertEqual(brain.ask("hi"), "Standing by.")
+
+    def test_gemmas_OWN_markers_end_her_turn(self):
+        """Gemma names her own side `model` and marks turns <|turn> /
+        <turn|>. Her own header before her first word is hers; a new
+        turn after her words is where hers stops; and "Model" as a
+        heading in an answer about MVC is an answer, not markup."""
+        cut = yuzu_brain_module.cut_his_turn
+        self.assertEqual(cut("Sure thing.\n<|turn>user\nwhat else"),
+                         ("Sure thing.", True))
+        self.assertEqual(cut("Hey.<turn|>"), ("Hey.", True))
+        self.assertEqual(cut("model\nHey, Ghost."), ("Hey, Ghost.", False))
+        self.assertEqual(cut("Hi.\nmodel\nHi again."), ("Hi.", True))
+        self.assertEqual(cut("Model\nThe data layer.\nView\nWhat you see."),
+                         ("Model\nThe data layer.\nView\nWhat you see.", False))
+
+    # ---- a model that is not on the board yet ------------------------
+
+    def test_a_model_that_is_not_pulled_says_ollama_PULL(self):
+        """Ollama answers 404 for a model it does not have. The streamed
+        path caught that as "can't reach Ollama ... Start it with: ollama
+        serve" -- the wrong fix, stated as one -- and the page showed the
+        other path's raw JSON. Both say the one line that fixes it now."""
+        class Missing(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                body = b'{"error":"model \'x\' not found"}'
+                self.send_response(404)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+        server = HTTPServer(("127.0.0.1", 0), Missing)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            host = "http://127.0.0.1:%d" % server.server_address[1]
+            for key in ("kuro", "zero"):
+                brain = YuzuBrain(persona=key, host=host)
+                for how in (lambda: brain.ask("hi"),
+                            lambda: list(brain.ask_stream("hi"))):
+                    with self.assertRaises(BrainError) as ctx:
+                        how()
+                    said = str(ctx.exception)
+                    self.assertIn("ollama pull " + brain.model, said, key)
+                    self.assertNotIn("ollama serve", said, key)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_check_names_the_PULL_for_a_character_with_her_own_weights(self):
+        """`check()` told anyone missing a model to build it with
+        build_yuzu_model.py -- right for Four, whose model is built from
+        a Modelfile, and wrong for a character whose model is pulled."""
+        with self.assertRaises(BrainError) as ctx:
+            YuzuBrain(persona="kuro", host=self.host).check()
+        said = str(ctx.exception)
+        self.assertIn("ollama pull " + self.persona("kuro").settings["model"], said)
+        self.assertNotIn("build_yuzu_model.py", said)
+
+    # ---- her page ----------------------------------------------------
+
+    def test_shiros_white_is_EXACTLY_the_page(self):
+        """Her picture is drawn on white and her page is the light one,
+        so the white is not cut out: `multiply` makes it the page colour.
+        That only works while nothing above her is a stacking context
+        (Four's page painted an opaque box the day #stage had a z-index)
+        and while the white is really white -- 0.95 of it multiplies to a
+        faint grey box, which is why the file's near-whites were pushed."""
+        page = (Path(__file__).parent / "ui" / "shiro.html").read_text()
+        code = re.sub(r"/\*.*?\*/", " ", page, flags=re.S)
+        rule = re.search(r"#shiro \{([^}]*)\}", code).group(1)
+        self.assertIn("mix-blend-mode: multiply", rule)
+        stage = re.search(r"#stage \{([^}]*)\}", code).group(1)
+        for context in ("z-index", "filter", "opacity", "isolation"):
+            self.assertNotIn(context, stage,
+                             "#stage makes a stacking context, so the blend "
+                             "has nothing behind it")
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("no PIL here to read the picture itself")
+        art = Image.open(Path(__file__).parent / "ui" / "shiro" / "shiro.jpg")
+        art = art.convert("L")
+        w, h = art.size
+        px = art.load()
+        edge = ([px[x, 0] for x in range(w)] + [px[x, h - 1] for x in range(w)]
+                + [px[0, y] for y in range(h)] + [px[w - 1, y] for y in range(h)])
+        white = sum(1 for v in edge if v >= 253) / len(edge)
+        self.assertGreater(white, 0.8, "her backdrop is not white enough "
+                           "to vanish under multiply")
 
 
 class TestNamingTheBoard(unittest.TestCase):
@@ -13926,7 +14272,14 @@ class TestHomeScreen(unittest.TestCase):
         # semicolon -- the emitted text is CSS and is full of them.
         emitted = script.split("aicols")[1].split(".catch(")[0]
         self.assertIn("columnsFor", script)
-        self.assertIn("#grid.ai { grid-template-columns: repeat(", emitted)
+        # Its tile width IS the column count, and its short last row is
+        # CENTRED like the ☆Misc☆ drawer's -- five characters left a
+        # hole in the bottom right the day Shiro and Kuro arrived.
+        self.assertIn("#grid.ai > .tile { flex: 0 0 calc(", emitted)
+        self.assertIn("' + cols + '", emitted,
+                      "the drawer's tile width is not its column count")
+        self.assertIn("justify-content: center", emitted,
+                      "a short last row in the A.I. drawer leaves a hole")
         self.assertIn("#grid.ai " + BIG.lstrip(), emitted,
                       "the A.I. drawer sizes its icons somewhere other "
                       "than where it decides its columns")

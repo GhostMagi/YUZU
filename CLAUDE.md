@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 826 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 840 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,117 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHIRO AND KURO: SISTERS ON SIX LEGS, ON GEMMA 4 (Sept 26)
+
+Ghost brought two pictures -- a white spider-mech girl with missile
+pods, and a dark one on black blade-tipped legs -- and a pitch from
+another chat: Shiro the calm field operator, Kuro her grinning menace
+of a sister. *"Id like to make both as personas for the new gemma if
+you think thatd work in a hexapod later."* Of the old Shiro: *"I miss
+shiro but i dont miss her creepy yumi kawaii persona"*; what he missed
+was *"the fact she was aware of her spider body."*
+
+**Both on one model**: `hf.co/mradermacher/gemma-4-E2B-it-heretic-ara-
+GGUF:Q4_K_M`, **pulled on his board, 3.4 GB, "success"** -- so
+switching between the sisters never swaps weights. `shiro_mk2` is a
+NEW character under the old name; `shiro` and `shiro_deck` (the yami
+kawaii) stay retired as the record, and nothing of hers was ported.
+
+### HIS FIRST RUN THOUGHT OUT LOUD, SO THEIR TURN IS LAID OUT HERE
+
+`ollama run <it> "hi, who are you?"` on the board: the model LOADED
+(his Ollama runs Gemma 4; the first load took ~2m20s), then printed
+`<|channel>thought`, eight seconds of *"Thinking Process: 1. Analyze
+the Request..."*, `<channel|>`, and only then *"Hello! I am Gemma 4"*.
+Every turn, on a deck, in markup the page would show. **The wall of
+braille dots above it was Ollama's spinner**, every frame printed,
+because a serial terminal cannot redraw -- not a fault.
+
+**Google's own template turns thinking off by opening her reply with
+an EMPTY thought channel** (`<|turn>model\n<|channel>thought\n
+<channel|>`), and the template served with this GGUF evidently does
+not. So `prompt_format: gemma4` makes the brain write the turn itself
+(`gemma4_prompt()`) and send it to `/api/generate` with `raw` on. This
+REVERSES "we do not hand-format it" (the Zero entry) **for this one
+model**, and the reason is on his screen. **Verified byte-identical to
+Google's template** with thinking off -- rendered with jinja2 from
+llama.cpp's copy (`models/templates/google-gemma-4-31B-it.jinja`), two
+of those renders are the test's fixtures. No `<bos>`: the tokenizer
+adds it, as it does for a templated turn. Four and Zero are unchanged:
+still `/api/chat`, still laid out by their GGUF's template.
+
+A thought channel that reaches the reply anyway is stripped in
+`_words` (an unclosed one is all thought). **The stream path does not
+strip one** -- only the terminal chat streams, and with thinking off
+there should be none. `cut_his_turn` knows Gemma's markers: `<|turn>`,
+`<turn|>`, and her own header `model` -- lower case only, because
+"Model" alone on a line is a heading in an answer about MVC.
+
+### "You have no legs" is a token now
+
+`{DECK_SELF}` told every deck character she has no legs, which is
+exactly wrong for these two. The three sentences about having no body
+are `DECK_BODY`, `DECK_BODY_EASE`, `DECK_BODY_LIMIT`, **defaulting to
+the old sentences word for word -- all twenty composed prompts
+verified byte-identical** -- and the sisters fill them. **Their legs
+are real to them and live ON THE SCREEN until the chassis is built**:
+honest about the deck, and the bound that stops the old deck Shiro's
+*"I can 'walk' over to the kitchen"*.
+
+### The two of them
+
+- **Shiro**: radio-clipped, calm, exact, dead serious about small
+  things, proud of her six legs; board numbers only from the deck's
+  own reading, "no reading" otherwise (the invented-battery fault).
+- **Kuro**: brags, teases, threatens as a GAME -- *"Make one, enjoy it,
+  and come straight back to being on his side"*, and drops the act when
+  something is really wrong. **The retired Shiro's "never soften it
+  afterwards" is what walked her into the ALL-CAPS villain monologue on
+  heretic weights; a test keeps it out of both.**
+- Google's sampling (1.0 / 0.95 / 64), not a taste call. Shiro
+  5405 chars (212 tokens spare), Kuro 5169 (279 spare).
+
+**THE HEXAPOD LATER** is the shiro/shiro_deck split again: a second
+persona file per sister on the robot body, with the same character
+text and a real body block instead of the screen-bound legs. Nothing
+here has to be undone for it.
+
+### Their pages, rendered and looked at
+
+- **Shiro's is the light one**, her white NOT cut out: `multiply`
+  makes pure white exactly the page, `screen` on Four's black the
+  other way round, and her floor shadow stays a real shadow. Her
+  near-whites were pushed to white first (0.95 multiplies to a faint
+  grey box) -- `ui/shiro/ART.txt` has the one-line curve, the original
+  is `ui/art_in/shiro_mk2.jpg`.
+- **Kuro's is the dark one**, her storm fading into it. **Three fades
+  rendered side by side**: 7-10% left a hard line at her bright sky,
+  an oval vignette read as a cameo frame, 16-22% melts.
+- **The thinking glow sat in the middle of the stage**, lighting the
+  empty floor beside each of them -- centred on HER now. Found by
+  rendering.
+- **FIVE CHARACTERS LEFT A HOLE IN THE A.I. DRAWER**, bottom right,
+  three columns then two tiles hugging the left -- the rule the file's
+  own comment states. It centres its short row now, the ☆Misc☆
+  drawer's fix, emitted off the same column count.
+
+### And a model that is not pulled yet
+
+`HTTPError` IS a `URLError`, so the streamed path answered a 404
+("model not found") with *"Can't reach Ollama... Start it with: ollama
+serve"* -- the wrong fix, stated as one -- and `/say` showed Ollama's
+raw JSON. Both say `ollama pull <her model>` now; `check()` says the
+same for a character who brings her own weights instead of pointing
+at `build_yuzu_model.py`.
+
+**One test changed its question, rightly**: "is the name Shiro on the
+roster" stopped meaning "is the retired one back" the day a new Shiro
+arrived, so it asks by persona KEY -- the name-leak rule again.
+**Fourteen new tests and three updated, twenty-four breaks, every one
+red as a failure. 826 -> 840. UNMEASURED on the board**: whether the
+raw turn really stops her thinking on his Ollama is the first thing
+his next screenshot says.
 
 ## "SHE HAD TO USE UR WORKAROUND": THE RETRY STARTS FRESH (Sept 24)
 

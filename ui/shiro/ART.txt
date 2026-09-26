@@ -1,0 +1,25 @@
+shiro.jpg -- Ghost's picture of Shiro, Sept 26: a small girl in a white
+hood and a black gas mask, riding a white six-legged chassis with a
+missile pod on each shoulder. 736x982, drawn on white.
+
+NOT CUT OUT, and not meant to be. Her page is the light one and shows
+her with `mix-blend-mode: multiply`, which makes pure white EXACTLY the
+page colour -- the same trick as `screen` on Four's black, the other
+way round. Her floor shadow is grey, so it stays on the page as a real
+shadow; a cut-out would have thrown it away or left it as a grey blob.
+
+THE ONE EDIT: near-whites pushed to pure white, or they multiply to a
+faint grey box. Every channel is left alone up to 220, and 220..240 is
+stretched to 220..255, so the backdrop (241..254 in the original) is 255
+and her own greys and darks are untouched:
+
+    lut = [v if v <= 220 else min(255, round(220 + (v - 220) * 35 / 20))
+           for v in range(256)]
+    Image.open(src).convert("RGB").point(lut * 3).save(
+        "shiro.jpg", quality=90, subsampling=0, optimize=True)
+
+The original is ui/art_in/shiro_mk2.jpg, so this can be redone.
+
+Her legs run off the left and right edges of the picture, so the page
+fades both sides rather than cutting them with a straight line.
+Rendered at 1024x600 and 412 and looked at before it shipped.

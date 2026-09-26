@@ -52,10 +52,13 @@ So:
 
     LIVE_PERSONA   four        (yuzu_personas.py — the MEASUREMENT pointer)
     FRONT          four        (yuzu_face.py     — who GREETS you)
-    roster         Yuzu, Four, Zero  (Cait, Mimi, Saya are `retired: yes`)
+    roster         Yuzu, Four, Zero, Shiro, Kuro  (Cait, Mimi, Saya and
+                   the yami kawaii Shiro are `retired: yes`)
     Zero's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
+    the sisters'   one shared `model:` -- Gemma 4 E2B heretic, laid out by
+                   the brain and sent RAW (`prompt_format: gemma4`)
     Four's prompt  5446 chars
-    tests          826, ~95s,  `python YUZU_TESTER.py`
+    tests          840, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -80,7 +83,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 826 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 840 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means

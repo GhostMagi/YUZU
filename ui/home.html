@@ -624,14 +624,21 @@ const FACES = {
   mimi: '<path d="M7.6 9.6 6.2 3.8l3.4 2.6M14.4 9.6l1.4-5.8-3.4 2.6"/><path d="M6.6 20.4V12a4.4 4.4 0 0 1 8.8 0v8.4l-1.5-1.4-1.5 1.4-1.4-1.4-1.5 1.4-1.4-1.4z"/><path d="M9.6 12.4h.01M12.4 12.4h.01"/><circle cx="19.4" cy="9.4" r="1.6"/><path d="M19.4 13.2v.01M17.6 16.4v.01"/>',
   four: '<path d="M4.5 2v20" stroke-dasharray="3 2.2"/><path d="M9.5 2v20" stroke-dasharray="5 2.6" stroke-dashoffset="2"/><path d="M14.5 2v20" stroke-dasharray="2.2 3.4" stroke-dashoffset="4"/><path d="M19.5 2v20" stroke-dasharray="4 2" stroke-dashoffset="5"/>',
   zero: '<circle cx="12" cy="6" r="3.6"/><path d="M12 9.6v11.9"/><path d="M9.4 12.6h5.2M9 15.8h6M9.4 19h5.2"/><path d="M8.6 7.4C5.6 9 4.4 12.6 5 17M15.4 7.4c3 1.6 4.2 5.2 3.6 9.6"/>',
+  // THE SISTERS SIT SIDE BY SIDE IN THIS DRAWER, so their icons must
+  // not be one shape twice -- the collision Mimi's first icon and the
+  // A.I. drawer's second robot head both had. Shiro is her CHASSIS
+  // (six legs, two pods); Kuro is her FACE (ears, halo, fangs).
+  shiro: '<ellipse cx="12" cy="13.6" rx="4.2" ry="3"/><circle cx="12" cy="9.7" r="1.9"/><path d="M8.2 12.5 5 10.7l-2.4 3.8M7.9 14.3l-3.5 1-1 4.4M9 16l-2 2.7.4 3M15.8 12.5l3.2-1.8 2.4 3.8M16.1 14.3l3.5 1 1 4.4M15 16l2 2.7-.4 3"/><path d="M9.6 10.6 6.8 5.8M14.4 10.6l2.8-4.8"/><rect x="3.8" y="2.8" width="4.4" height="3" rx=".8"/><rect x="15.8" y="2.8" width="4.4" height="3" rx=".8"/>',
+  kuro: '<ellipse cx="12" cy="3.2" rx="5.6" ry="1.3"/><path d="M8.4 2.1l-.5-1M12 1.9V.9M15.6 2.1l.5-1"/><path d="M7.8 9.4 6.9 4.7l3.5 3.2M16.2 9.4l.9-4.7-3.5 3.2"/><circle cx="12" cy="13.6" r="6"/><path d="M9.6 12.6h.01M14.4 12.6h.01"/><path d="M10.4 16.2l.6 1.4.6-1.4M12.4 16.2l.6 1.4.6-1.4"/>',
   _: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c0-4.1 3.4-6.5 7.5-6.5s7.5 2.4 7.5 6.5"/>'
 };
 
 // NO VIEW MAY END ON A ROW WITH A HOLE IN IT, and this is the only view
 // whose tile count is unknown when the file is written. Four goes in a
-// 2x2; five goes three-then-two, which is a short row rather than a
-// lone orphan. That orphan is the `auto-fit` bug a screenshot caught on
-// the very first home screen, and that a fifth tile brought back once.
+// 2x2; five goes three-then-two, the two CENTRED under the three (see
+// where this is used), which is a short row rather than a lone orphan.
+// That orphan is the `auto-fit` bug a screenshot caught on the very
+// first home screen, and that a fifth tile brought back once.
 function columnsFor(n) {
   return n % 3 === 0 ? 3 : n % 2 === 0 ? 2 : 3;
 }
@@ -693,9 +700,21 @@ fetch('characters.json', { cache: 'no-store' })
     //
     // So it rides on the number that already decides the layout,
     // emitted in the same breath, rather than on a second list.
+    //
+    // AND THE SHORT LAST ROW IS CENTRED, the way the ☆Misc☆ drawer's
+    // is. Five characters left a hole in the bottom right the day Shiro
+    // and Kuro arrived (Sept 26) -- three columns, then two tiles
+    // hugging the left -- found by rendering the drawer, not by any
+    // assertion. A wrapping row of tiles each 1/cols wide, centred,
+    // keeps every tile the size the grid gave it and turns the short
+    // row into a deliberate one.
     const cols = columnsFor(list.length);
     document.getElementById('aicols').textContent =
-      '#grid.ai { grid-template-columns: repeat(' + cols + ', 1fr); }' +
+      '#grid.ai { display: flex; flex-wrap: wrap; justify-content: center;' +
+      ' align-content: stretch; }' +
+      ' #grid.ai > .tile { flex: 0 0 calc((100% - ' + (cols - 1) +
+      ' * 12px) / ' + cols + '); }' +
+      ' @media (max-width: 560px) { #grid.ai > .tile { flex-basis: 100%; } }' +
       (cols === 2
         ? ' #grid.ai .tile .big svg { width: 76px; height: 76px; }' +
           ' #grid.ai .tile b { font-size: 26px; }' +

@@ -1,0 +1,510 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shiro</title>
+<!--
+  SHIRO — the field operator, and the white sister.
+
+  Ghost, Sept 26, with her art and her sister's: "Id like to make both
+  as personas for the new gemma if you think thatd work in a hexapod
+  later." And of the Shiro he had before: "I miss shiro but i dont miss
+  her creepy yumi kawaii persona" -- what he missed was "the fact she
+  was aware of her spider body". So she is new, calm and exact, and she
+  knows she has six legs.
+
+  THE LIGHT PAGE IS HER. Shiro means white, her sister's page is the
+  dark one, and her picture is drawn on white. The white is NOT cut out:
+  `mix-blend-mode: multiply` makes it EXACTLY the page, the way `screen`
+  makes Four's black vanish into hers -- a backdrop that matches the
+  page does not have to be removed at all. The one thing the file needed
+  was its near-whites pushed to pure white (ui/shiro/ART.txt), or they
+  multiply to a faint grey box. Her floor shadow survives as a real
+  shadow on the page, which a cut-out would have thrown away.
+
+  NOTHING ABOVE HER MAY BE A STACKING CONTEXT (no z-index, no filter,
+  no opacity on #stage): a blend only reaches what is behind it inside
+  its own context, and Four's page painted an opaque black rectangle
+  the day #stage had a z-index.
+
+  Her red is sampled off her own eyes and the lights in her missile
+  pods. No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --paper:  #eef0f3;          /* the white of her picture, a shade down */
+  --floor:  #d9dde3;
+  --edge:   #b8bec7;
+  --ink:    #1d2127;          /* her gas mask and her hair              */
+  --dim:    #5f6772;
+  --red:    #d63c3f;          /* her eyes and the pod lights, sampled   */
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100vh; overflow: hidden; }
+body {
+  background:
+    radial-gradient(120% 90% at 50% 8%, #ffffff 0%, var(--paper) 52%,
+                    var(--floor) 100%);
+  color: var(--ink);
+  font: 16px/1.5 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- the room ------------------------------------------------------
+   A red hairline and two corner brackets: a field display, in her own
+   colour. Thin, because the picture is the loud thing on this screen. */
+#room {
+  position: fixed; inset: 10px; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--red) 22%, transparent);
+  border-radius: 2px;
+}
+#room::before, #room::after {
+  content: ''; position: absolute; width: 26px; height: 26px;
+  border: 2px solid color-mix(in srgb, var(--red) 60%, transparent);
+}
+#room::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+#room::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+/* ---- top ---------------------------------------------------------- */
+#top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 26px 4px;
+}
+#who { font-size: 21px; letter-spacing: .12em; color: var(--red);
+       font-weight: 700; }
+#title { font-size: 12.5px; color: var(--dim); letter-spacing: .06em; }
+
+/* ---- the rail ------------------------------------------------------
+   Built from /characters.json, which comes from ONE roster in
+   yuzu_face.py, so no page holds a list of the cast and none can
+   drift. Always visible rather than a menu: a menu is a mode, and a
+   mode needs a way out. */
+#rail { display: flex; gap: 6px; margin-left: 18px; }
+#rail a, #rail span {
+  font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
+  padding: 4px 11px; border-radius: 2px;
+  color: var(--dim); border: 1px solid transparent;
+}
+#rail a { cursor: pointer; }
+#rail a:hover { color: var(--ink); border-color: var(--edge); }
+#rail .here {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 40%, transparent);
+  background: rgba(255,255,255,.6);
+}
+
+#home {
+  width: 38px; height: 38px; flex: none;
+  border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  font-size: 17px; color: var(--red); background: rgba(255,255,255,.55);
+  border: 1px solid color-mix(in srgb, var(--red) 35%, transparent);
+}
+#top > #home { margin-left: auto; }
+
+/* ---- her ----------------------------------------------------------- */
+/* SHE STANDS ON THE RIGHT, HER WORDS GO ON THE LEFT -- the layout
+   rendering Cait found, kept on every portrait page since. */
+#stage {
+  flex: 1; min-height: 0; position: relative; overflow: hidden;
+  display: grid; align-items: end; justify-items: end;
+  padding-right: 4%;
+  /* minmax(0, 1fr) IS LOAD-BEARING: an `auto` row grows to fit the
+     image and a percentage height has nothing to resolve against. */
+  grid-template-rows: minmax(0, 1fr);
+}
+/* THE "SHE IS THINKING" CUE: a red light behind her that pulses while
+   a reply is coming. Behind a MULTIPLIED picture it shows through every
+   bit of her white, so it reads as her being lit by it. */
+/* CENTRED ON HER, not on the stage: she stands at the right, and a
+   light in the middle of the stage lit the empty floor beside her. */
+#glow {
+  position: absolute; left: 80%; bottom: 2%; transform: translateX(-50%);
+  width: 46%; height: 88%; border-radius: 50%;
+  background: radial-gradient(circle,
+              color-mix(in srgb, var(--red) 34%, transparent) 0%,
+              transparent 68%);
+  opacity: .12; transition: opacity .6s ease;
+}
+body.thinking #glow { animation: scan 1.6s ease-in-out infinite; }
+@keyframes scan {
+  0%, 100% { opacity: .2 }
+  50%      { opacity: .75 }
+}
+/* MULTIPLY: her white becomes the page. Her legs run off the left and
+   right edges of the picture, so both sides FADE rather than stop in a
+   hard vertical cut. 1.2% breath, from the bottom edge. */
+#shiro {
+  max-height: 96%; max-width: 50%; width: auto; height: auto;
+  object-fit: contain; object-position: bottom center;
+  mix-blend-mode: multiply;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+          mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  animation: breathe 6s ease-in-out infinite;
+  position: relative;
+  transform-origin: bottom center;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1)      translateY(0) }
+  50%      { transform: scale(1.012)  translateY(-2px) }
+}
+
+/* ---- what she says -------------------------------------------------- */
+#says {
+  position: absolute; left: 4%; bottom: 7%; width: 42%; max-height: 72%;
+  overflow-y: auto; display: none;
+  background: rgba(255,255,255,.9);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--red);
+  border-radius: 2px; padding: 16px 18px;
+  font-size: 17px; line-height: 1.55;
+  box-shadow: 0 6px 22px rgba(40,46,56,.12);
+}
+#says.on { display: block; }
+/* HIS LINES AND HERS. His are dimmer, smaller and labelled with his
+   name; hers are the bubble's own colour. */
+#says .line + .line { margin-top: 10px; }
+#says .him { color: var(--dim); font-size: 14.5px; }
+#says .by { display: block; font-size: 10.5px; letter-spacing: .14em;
+            text-transform: uppercase; opacity: .85; }
+#says .pending, #says .deck { color: var(--dim); }
+#says::after {                       /* a small tail toward her */
+  content: ''; position: absolute; right: -9px; top: 26px;
+  border: 8px solid transparent;
+  border-left-color: var(--edge);
+}
+
+/* ---- asking --------------------------------------------------------- */
+#ask {
+  /* ABOVE HER, ALWAYS: a positioned picture paints above static
+     siblings whatever the DOM order. */
+  position: relative; z-index: 2;
+  background: linear-gradient(to top, var(--floor) 62%, transparent);
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 26px calc(20px + env(safe-area-inset-bottom));
+}
+#text {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink);
+  background: rgba(255,255,255,.85); padding: 12px 15px; border-radius: 2px;
+  border: 1px solid var(--edge);
+}
+#text::placeholder { color: var(--dim); opacity: .85; }
+#text:focus { outline: none; border-color: var(--red); }
+#send {
+  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  color: #ffffff; background: var(--red); padding: 12px 22px;
+  border: 0; border-radius: 2px;
+}
+#send:disabled { opacity: .5; cursor: default; }
+
+/* THE MIC, the same button as every other page: tap to start, tap to
+   stop. Her red, and it pulses while it is listening. */
+#mic {
+  flex: none; width: 46px; height: 46px; cursor: pointer;
+  display: grid; place-items: center; border-radius: 2px;
+  color: var(--red); background: rgba(255,255,255,.85);
+  border: 1px solid color-mix(in srgb, var(--red) 55%, transparent);
+}
+#mic svg { width: 22px; height: 22px; }
+#mic.on { color: #ffffff; background: var(--red);
+          animation: live 1.1s ease-in-out infinite; }
+@keyframes live {
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--red) 22%, transparent); }
+}
+#mic.busy { opacity: .45; cursor: default; }
+
+@media (max-width: 760px) {
+  /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF: the rail takes
+     the leftover space and scrolls, the exit keeps its corner.
+     `min-width: 0` is the load-bearing half. */
+  #rail { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  #rail::-webkit-scrollbar { display: none; }
+  #who { flex: none; }
+  #home { flex: none; }
+  #title { display: none; }
+  #shiro { max-width: 92%; max-height: 92%; }
+  #glow { left: 50%; width: 90%; }
+  #says { position: static; width: auto; margin: 0 18px 10px;
+          max-height: 34vh; }
+  #says::after { display: none; }
+  #stage { justify-items: center; padding-right: 0; }
+}
+</style>
+
+<div id="room"></div>
+
+<div id="top">
+  <div id="who">Shiro</div>
+  <div id="title">Field operator</div>
+  <div id="rail"></div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<div id="stage">
+  <div id="glow"></div>
+  <!-- A REAL src: she is on screen whatever the server is doing. -->
+  <img id="shiro" src="shiro/shiro.jpg" alt="Shiro">
+  <div id="says"></div>
+</div>
+
+<form id="ask" autocomplete="off">
+  <input id="text" placeholder="Say something to her..." maxlength="2000">
+  <button id="mic" type="button" title="talk to her" aria-label="talk to her">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
+    </svg>
+  </button>
+  <button id="send" type="submit">Speak</button>
+</form>
+
+<script>
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+const says = document.getElementById('says');
+
+document.getElementById('home').onclick = () => {
+  location.href = 'home.html';
+};
+
+// ---- who else is here ------------------------------------------------
+const ME = 'shiro';
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => {
+    const rail = document.getElementById('rail');
+    cast.forEach(c => {
+      const here = c.who === ME;
+      if (here && c.user) HIM = c.user;
+      const el = document.createElement(here ? 'span' : 'a');
+      el.textContent = c.name;
+      el.title = c.blurb;
+      if (here) el.className = 'here';
+      else el.href = c.page;
+      rail.appendChild(el);
+    });
+  })
+  .catch(() => {});
+
+
+// Stage directions are stripped from the BUBBLE, the same call
+// yuzu_voice already makes for the speaker. `[twirls]` is lovely to
+// write and it is not what she SAID -- on a small screen it crowds out
+// the words that are.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/\*[^*]*\*/g, ' ')
+             .replace(/\s{2,}/g, ' ')
+             .trim();
+}
+
+// ---- HIS WORDS AND HERS ----------------------------------------------
+// Ghost, Sept 24: "I cant see my own words on Yuzus page and Fours page
+// like i can on Zeros page. Id like to." The bubble keeps the
+// conversation now, like Zero's log: his line goes up the moment he
+// sends it, hers fills in underneath, and the bubble scrolls to the
+// START of the newest exchange so a long reply is read from its top.
+// textContent only -- whatever anyone typed is shown as text. His label
+// is READ from the roster (her USER_NAME), never typed into this page.
+// ONE COPY on every page that has a bubble; a test holds them equal.
+let HIM = 'you';
+let waiting = null;
+
+function line(cls, by, text) {
+  const el = document.createElement('div');
+  el.className = 'line ' + cls;
+  if (by) {
+    const tag = document.createElement('span');
+    tag.className = 'by';
+    tag.textContent = by;
+    el.appendChild(tag);
+  }
+  el.appendChild(document.createTextNode(text));
+  says.appendChild(el);
+  // A long evening must not grow the page forever.
+  while (says.children.length > 40) says.removeChild(says.firstChild);
+  says.classList.add('on');
+  return el;
+}
+
+function show(el) {
+  says.scrollTop += el.getBoundingClientRect().top
+                    - says.getBoundingClientRect().top - 12;
+}
+
+function his(text) {
+  const mine = line('him', HIM, text);
+  waiting = line('her pending', '', '...');
+  show(mine);
+}
+
+function said(text) {
+  const words = spoken(text);
+  const el = waiting || line('her', '', '');
+  waiting = null;
+  el.className = 'line her';
+  el.textContent = words || text.trim();
+  const before = el.previousElementSibling;
+  show(before && before.classList.contains('him') ? before : el);
+  hear(words || text.trim());
+}
+
+// THE DECK'S OWN WORDS go in the bubble too, and she never says them
+// out loud -- "allow the microphone" in her voice would be her speaking
+// a line she never wrote.
+function note(text) {
+  show(line('deck', '', text));
+}
+
+// ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
+// The board has no speaker on it. Every device that opens this page
+// does -- the Steam Deck, a phone, the panel -- so the server renders
+// the wav and the BROWSER plays it.
+//
+// AUTOPLAY IS ALLOWED HERE because he tapped Speak to get this reply,
+// and that tap is the user gesture browsers require. Audio that arrives
+// unasked, on a page he never touched, is the thing they block -- and
+// it is also the thing nobody wants on a handheld.
+//
+// A MISSING VOICE IS SILENT, NEVER AN ERROR ON SCREEN. The reply is the
+// product; the audio is a nicety, the same promise the face, Piper and
+// the wiki all make. If Kokoro is not installed the page behaves
+// exactly as it did before this existed.
+//
+// SHE SENDS HER OWN NAME. The server builds one voice PER CHARACTER off
+// her own `piper_length_scale`, so a copied `who` would not just
+// mislabel the request -- it would hand her somebody else's speaking
+// rate, which is a character bug wearing a plumbing costume and is
+// inaudible in the code. A test drives the name out of the real fetch.
+let sound = null;
+function hear(words) {
+  if (!words) return;
+  fetch('voice.wav', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: words, who: 'shiro' }),
+  })
+    .then(r => (r.ok ? r.blob() : null))
+    .then(blob => {
+      if (!blob) return;
+      // The PREVIOUS url is revoked, or a long conversation leaks one
+      // object per reply into a browser on a battery-powered handheld.
+      if (sound) { try { URL.revokeObjectURL(sound.src); } catch (e) {} }
+      sound = new Audio(URL.createObjectURL(blob));
+      sound.play().catch(() => {});
+    })
+    .catch(() => {});
+}
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const asked = input.value.trim();
+  if (!asked) return;
+  input.value = '';
+  his(asked);
+  send.disabled = true;
+  send.textContent = '...';
+  document.body.classList.add('thinking');
+
+  // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
+  // and refuses anything that is not in the dict, so nothing typed here
+  // can ever name a file.
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'shiro' }),
+  })
+    .then(r => r.json())
+    .then(r => said(r.said || 'She said nothing.'))
+    .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
+    .then(() => {
+      send.disabled = false;
+      send.textContent = 'Speak';
+      document.body.classList.remove('thinking');
+      input.focus();
+    });
+};
+
+// ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------
+// Ghost: "a button for the touch screen starts listening when i tap it,
+// ends recording when i tap it again and bam". Nothing listens until he
+// taps, and it stops when he taps again -- or after a minute, so a
+// recording he forgot about cannot run forever.
+//
+// THE MICROPHONE IS WHATEVER HE IS HOLDING. This page records on his
+// own device, sends the clip to the board (/listen), and what comes
+// back is sent exactly as if he had typed it. The board has no mic.
+//
+// A BROWSER ONLY HANDS A PAGE THE MIC WHEN IT TRUSTS THE PAGE -- https,
+// or the device's own localhost. His address is plain http on his WiFi,
+// so on his phone or laptop the mic is refused until he tells the
+// browser to trust it, once. The note says exactly how, with this
+// page's own address in it, rather than a mic that silently does
+// nothing.
+const mic = document.getElementById('mic');
+let recorder = null, clip = [], cap = null;
+
+
+mic.onclick = async () => {
+  if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+  // Busy working out the last clip, or she is still answering.
+  if (mic.classList.contains('busy') || send.disabled) return;
+  if (!(window.isSecureContext && navigator.mediaDevices
+        && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
+    note('This browser only lets a page use the microphone once it trusts '
+         + 'the page. One time, in Chrome on this device: open '
+         + 'chrome://flags/#unsafely-treat-insecure-origin-as-secure , '
+         + 'type ' + location.origin + ' in the box, set it to Enabled, '
+         + 'and tap Relaunch (on a Steam Deck in Gaming Mode, restart the '
+         + 'Deck instead -- a relaunched Chrome there goes invisible). '
+         + 'Chrome then shows a warning bar about the flag; that is '
+         + 'expected. Then tap the mic again.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    note('The microphone was blocked. Allow it for this page -- the icon '
+         + 'by the address -- then tap the mic again.');
+    return;
+  }
+  // Her voice must not end up in his recording.
+  if (sound) { try { sound.pause(); } catch (e) {} }
+  clip = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) clip.push(e.data); };
+  recorder.onstop = () => {
+    clearTimeout(cap);
+    stream.getTracks().forEach(t => t.stop());      // the mic goes OFF
+    mic.classList.remove('on');
+    mic.classList.add('busy');
+    mic.title = 'working out what you said';
+    const audio = new Blob(clip, { type: recorder.mimeType || 'audio/webm' });
+    fetch('listen', { method: 'POST',
+                      headers: { 'Content-Type': audio.type },
+                      body: audio })
+      .then(r => r.json())
+      .then(r => {
+        if (r.ok && r.heard) {
+          input.value = r.heard;
+          form.requestSubmit();
+        } else {
+          note(r.said || "I didn't catch that.");
+        }
+      })
+      .catch(() => note('No answer from the deck. Is ~/YUZU/face running?'))
+      .then(() => { mic.classList.remove('busy'); mic.title = 'talk to her'; });
+  };
+  recorder.start();
+  mic.classList.add('on');
+  mic.title = 'listening -- tap again to stop';
+  cap = setTimeout(() => {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+  }, 60000);
+};
+
+if (location.hash === '#say') input.focus();
+</script>
