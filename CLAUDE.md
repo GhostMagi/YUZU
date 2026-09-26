@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 846 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 854 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,70 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SHE THOUGHT OUT LOUD WITHOUT THE MARKER, AND THE SISTERS' OWN VOICES (Sept 26)
+
+**FIRST MEASUREMENT OF THE RAW LAYOUT ON HIS BOARD, and it is half a
+win.** Shiro's first turn came back clean -- *"Um... hi. I'm Shiro. I
+live on this deck with my sister Kuro. I'm not very good at this part,
+but I'm glad you're here."* -- colours, name and chatbox all right, and
+he said it goes hard. Her SECOND turn, with that one in her history:
+
+    Thinking Process:
+    1. Analyze the User Input: The user said, "sweeeet ur awesome..."
+    ...
+    5. Final Output Generation: (Ensure it matches the required format
+    and tone.)<channel|>Oh. Uh-huh. Kuro is my sister. She talks for
+    both of us, and I love her very much.
+
+**THE EMPTY THOUGHT CHANNEL DOES NOT STOP HER THINKING; IT STOPS HER
+OPENING ONE.** Her turn already opens on `<|channel>thought\n<channel|>`,
+so she never writes `<|channel>` -- she thinks anyway in plain text, and
+then CLOSES a channel nobody opened. `_THINK_BLOCK` only knew closed
+pairs, so the whole plan landed in the bubble and in her memory. Why the
+small Gemma thinks with thinking off (the heretic weights, or E2B's own
+template differing from the 31B one the layout was checked against) is
+UNKNOWN; the answer is after the orphan marker either way.
+
+**`strip_thought()` in the brain, and every reader goes through it:**
+her bubble and her voice (`_words`), the history she reads next turn
+(`_strip_thinking`), her SAVED memory (`cut_his_turn`, which
+`load_memory` already runs -- so the thought already on his board is
+cleaned on the first turn after the pull), and the stream, which holds
+back anything that is or could still become "Thinking Process" (this
+SUPERSEDES "the stream path does not strip one" below). What came before
+an orphan `<channel|>` is thought; a reply that OPENS with the header
+and never closes ran into the ceiling and is ALL thought. That gets
+**one more try** (the first-turn shape, which came back clean) and then
+*"(She thought out loud and ran out of room before she answered. Ask
+her again.)"*. Only a reply that OPENS with the header counts: "my
+thinking process is simple" is words.
+
+**THE COST STAYS, and it is time, not correctness.** A thought is a few
+hundred of her 600 tokens, seconds on the board, before the answer
+starts. If she runs out of room often, that is the next thing to look
+at, and it is a `num_ctx` decision first.
+
+### Shiro speaks as Sky, Kuro as Sarah
+
+*"Give sky to shiro and kuro can be sarah maybe?"* -- after being told
+both sisters spoke as Bella. **`kokoro_voice:` is a persona setting**:
+`af_sky` and `af_sarah`, above the `---`, so no composed prompt moved.
+It beats `YUZU_KOKORO_VOICE` the way her own `model:` beats
+`YUZU_MODEL`; nobody else names one, so they keep Bella. **A name the
+voices file does not carry costs the TIMBRE, never the audio**:
+kokoro-onnx raises on an unknown speaker, which would make her silent
+on every line, so she falls back to the default and `swapped` says so.
+`yuzu_all_in_one.py` is untouched -- the suite REFUSED my first draft
+there, because the phone script must never learn the word "kokoro"
+(`test_the_phone_property_survives_a_second_engine`). Right: the voices
+live on the pages. **UNHEARD on the board.**
+
+**Eight new tests, twelve breaks, all red as failures** -- after one of
+mine stayed green: "pick_voice drops her speaker" only broke the path
+nobody takes (an engine forced by name), because Kokoro is never ready
+in the container. The test now makes it ready and drives the path the
+deck actually takes. 846 -> 854.
 
 ## ZERO'S CHATBOX FOR THE SISTERS, SHIRO THE SHY ONE, AND HIS PHONE (Sept 26)
 

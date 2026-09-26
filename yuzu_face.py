@@ -1552,16 +1552,23 @@ def voice_for(key):
     # has been in every persona since the format was written, and
     # KokoroVoice INVERTS it because Piper's is a duration and Kokoro's
     # is a rate -- handled there, not here.
-    scale = None
+    #
+    # AND HER OWN VOICE, when she names one: `kokoro_voice:` -- Shiro is
+    # af_sky and Kuro af_sarah, his picks, so the two sisters never sound
+    # like one girl. Nobody else names one, so they keep Bella.
+    scale = speaker = None
     try:
         import yuzu_personas
-        scale = yuzu_personas.load(key).settings.get("piper_length_scale")
+        settings = yuzu_personas.load(key).settings
+        scale = settings.get("piper_length_scale")
         scale = float(scale) if scale else None
+        speaker = str(settings.get("kokoro_voice") or "").strip() or None
     except Exception:
         pass
     if key not in _VOICES:
         try:
-            _VOICES[key] = yuzu_voice.pick_voice(length_scale=scale)
+            _VOICES[key] = yuzu_voice.pick_voice(length_scale=scale,
+                                                 speaker=speaker)
         except Exception:
             _VOICES[key] = None
     return _VOICES[key]
@@ -1805,6 +1812,14 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
             return ("(She started writing your side of the conversation "
                     "instead of answering%s Ask her again.)"
                     % (began.rstrip(" -,") + "." if began != "," else ".")), None
+        if not reply and getattr(brain, "last_thought", False) is True:
+            # Every word she wrote was THINKING, twice (yuzu_brain.
+            # strip_thought): Gemma's plain-text "Thinking Process" ran
+            # into the reply ceiling before she answered. Say that, not
+            # "She said nothing." -- and never show the thought itself.
+            face("idle")
+            return ("(She thought out loud and ran out of room before "
+                    "she answered. Ask her again.)"), None
         # AND OUT OF HER HISTORY TOO, before it is written to disk.
         # Her own replies outweigh the system prompt within a few turns
         # -- measured, on a real 7-turn chat, which is the whole reason

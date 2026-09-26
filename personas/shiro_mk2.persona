@@ -42,6 +42,10 @@ top_p: 0.95
 top_k: 64
 # Unhurried and a little hesitant: the shy one is never the quick one.
 piper_length_scale: 1.05
+# HER OWN VOICE, his pick, Sept 26: "Give sky to shiro and kuro can be
+# sarah". Kokoro's af_sky; everyone who names none keeps Bella. It is
+# the timbre only -- the speed is piper_length_scale above.
+kokoro_voice: af_sky
 num_predict: 600
 # Vowel-carrying, so the voice says them rather than spelling them, and
 # nobody else's: a shy girl's noises, not a laugh.

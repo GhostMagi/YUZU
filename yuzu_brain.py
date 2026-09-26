@@ -227,6 +227,48 @@ def load_system_prompt(persona=yuzu_personas.LIVE_PERSONA):
 _THINK_BLOCK = re.compile(r"<think>.*?</think>|<\|channel>.*?<channel\|>",
                           re.S | re.I)
 
+# AND A THOUGHT THAT NEVER OPENED. Ghost, Sept 26, Shiro's second turn
+# on the raw layout -- her first was clean -- came back as
+#
+#     Thinking Process:
+#     1. Analyze the User Input: The user said, "sweeeet ur awesome..."
+#     ...
+#     5. Final Output Generation: (Ensure it matches the required format
+#     and tone.)<channel|>Oh. Uh-huh. Kuro is my sister. She talks for
+#     both of us, and I love her very much.
+#
+# Her turn already OPENS on the empty thought channel that turns
+# thinking off, so she never writes `<|channel>` -- she thinks anyway,
+# in plain text, and then CLOSES a channel nobody opened. Everything
+# before that orphan `<channel|>` is thought, and her answer is after
+# it. A plain-text thought that never closes ran into the reply
+# ceiling before she answered: all of it is thought. Only a reply that
+# OPENS with the header counts -- "my thinking process" mid-sentence
+# is words.
+_THOUGHT_HEADER = re.compile(r"\A\s*[*#_]*\s*thinking process\b", re.I)
+
+
+def strip_thought(text):
+    """Her words with every kind of thinking taken out: a closed block
+    (Qwen's or Gemma's), an unclosed channel (the rest is thought), an
+    ORPHAN close (what came before it was thought), and a plain-text
+    "Thinking Process" that never closed (all of it is thought)."""
+    text = _THINK_BLOCK.sub("", text or "")
+    text = text.split("<|channel>")[0]
+    if "<channel|>" in text:
+        return text.split("<channel|>", 1)[1].replace("<channel|>", "")
+    if _THOUGHT_HEADER.match(text):
+        return ""
+    return text
+
+
+def _thought_so_far(text):
+    """While streaming: True while what she has written so far could
+    still be the start of a plain-text thought -- "Thin", "**Thinking
+    Pro" -- so none of it reaches the screen and is then taken back."""
+    head = re.sub(r"\A\s*[*#_]*\s*", "", text).lower()
+    return bool(head) and "thinking process".startswith(head)
+
 
 # GEMMA 4 IS LAID OUT HERE, AND SENT RAW. Ghost, Sept 26, the first run
 # of the model Shiro and Kuro live on, with no prompt at all:
@@ -253,12 +295,10 @@ _THINK_BLOCK = re.compile(r"<think>.*?</think>|<\|channel>.*?<channel\|>",
 # tokenizer adds it, exactly as it does for a templated turn.
 def _strip_thinking(text):
     """Her earlier reply with any thought channel taken out -- the
-    template's own strip_thinking(), which history goes through."""
-    kept = []
-    for part in text.split("<channel|>"):
-        kept.append(part.split("<|channel>")[0] if "<|channel>" in part
-                    else part)
-    return "".join(kept).strip()
+    template's own strip_thinking(), which history goes through, and the
+    plain-text kind too (strip_thought): a thought left in her history
+    is her teaching herself to think out loud again."""
+    return strip_thought(text).strip()
 
 
 def gemma4_prompt(messages):
@@ -334,13 +374,25 @@ def _words(message):
     empty. For a model that never thinks, what is in there is the
     answer; an empty bubble is never the better outcome."""
     message = message or {}
-    said = _THINK_BLOCK.sub("", message.get("content") or "")
-    # A thought channel that never closed ran into the reply ceiling
-    # before she said a word: all of it is thinking, none of it is his.
-    said = said.split("<|channel>")[0]
+    content = message.get("content") or ""
+    # Every kind of thinking, closed, unclosed, orphaned or plain text --
+    # see strip_thought(). None of it is his.
+    said = strip_thought(content)
     if said.strip():
         return said
+    if content.strip():
+        # She wrote something and ALL of it was thought. The thinking
+        # field is not her answer in that case either.
+        return ""
     return message.get("thinking") or ""
+
+
+def _all_thought(message):
+    """True when she wrote something and every word of it was thinking --
+    the plain-text thought that ran into the reply ceiling before she
+    answered. Worth one more try, like writing his side."""
+    content = (message or {}).get("content") or ""
+    return bool(content.strip()) and not strip_thought(content).strip()
 
 
 def _post(url, payload, timeout):
@@ -454,6 +506,7 @@ class YuzuBrain:
         merged.update(options or {})
         self.options = merged
         self.last_cut = False
+        self.last_thought = False   # everything she wrote was thinking
         self.last_opening = ""      # the line the cut took for his
         self.timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
         self.keep_alive = _keep_alive(
@@ -565,12 +618,18 @@ class YuzuBrain:
         # first thing he would do is ask again. So the deck does, once:
         # nothing has been shown yet, and the second draw is a fresh
         # one. Twice in a row is a pattern, and the sentence says so.
+        #
+        # AND WHEN EVERYTHING SHE WROTE WAS THINKING (strip_thought): the
+        # plain-text thought ran into the ceiling before she answered.
+        # Nothing has been shown, and the second draw is her first turn's
+        # shape -- the one that came back clean on his board.
         for attempt in (1, 2):
             data = self._chat(payload)
             said = _words(data.get("message"))
+            self.last_thought = _all_thought(data.get("message"))
             reply, self.last_cut = cut_his_turn(said, self._his_name())
             self.last_opening = cut_opening(said, self._his_name())
-            if reply or not self.last_cut:
+            if reply or not (self.last_cut or self.last_thought):
                 break
             payload = _plainer(payload)
         self._face("talking", reply, _token_rate(data))
@@ -669,11 +728,12 @@ class YuzuBrain:
             collected = []
             thought = []        # see _words(): the answer can land here
             rate = yield from self._stream_once(payload, collected, thought)
-            if "".join(collected).strip() or not self.last_cut:
+            if "".join(collected).strip() or not (self.last_cut
+                                                   or self.last_thought):
                 break
             payload = _plainer(payload)
         if not "".join(collected).strip() and "".join(thought).strip() \
-                and not self.last_cut:
+                and not self.last_cut and not self.last_thought:
             # Nothing came back as the reply and something came back as
             # "thinking": that IS her reply. Handed over whole, at the
             # end -- late, but never an empty bubble.
@@ -694,6 +754,7 @@ class YuzuBrain:
         `collected` and `thought`, returns the token rate."""
         raw = ""                # everything she wrote, for cut_his_turn()
         self.last_cut = False
+        self.last_thought = False
         self.last_opening = ""
         rate = None
         url, body = self._request(payload)
@@ -711,12 +772,16 @@ class YuzuBrain:
                     raw += message.get("content", "")
                     # HELD BACK until it cannot be the start of HIS turn,
                     # so "user" never reaches the screen and is then
-                    # taken back. Stops reading the moment it is.
-                    safe, cut = _safe_so_far(raw, self._his_name())
-                    piece = safe[len("".join(collected)):]
+                    # taken back. Stops reading the moment it is. And
+                    # held back while it is, or could still become, a
+                    # THOUGHT: nothing of it is shown until she closes it.
+                    words = "" if _thought_so_far(raw) else strip_thought(raw)
+                    safe, cut = _safe_so_far(words, self._his_name())
+                    shown = "".join(collected)
+                    piece = safe[len(shown):] if safe.startswith(shown) else ""
                     if cut:
                         self.last_cut = True
-                        self.last_opening = cut_opening(raw, self._his_name())
+                        self.last_opening = cut_opening(words, self._his_name())
                         if piece:
                             if not collected:
                                 self._face("talking")
@@ -750,9 +815,10 @@ class YuzuBrain:
                 f"Stream stalled after {self.timeout}s ({exc}). "
                 f"Try: export YUZU_TIMEOUT=600"
             ) from exc
+        self.last_thought = bool(raw.strip()) and not strip_thought(raw).strip()
         if not self.last_cut:
             # Whatever the hold-back was still keeping when she finished.
-            rest = cut_his_turn(raw, self._his_name())[0]
+            rest = cut_his_turn(strip_thought(raw), self._his_name())[0]
             shown = "".join(collected).lstrip()
             tail = rest[len(shown):] if rest.startswith(shown) else ""
             if tail:
@@ -1032,8 +1098,10 @@ def _his_turn_at(text, name=""):
 
 def cut_his_turn(text, name=""):
     """(her reply up to where she starts writing his turn, whether it
-    had to be cut)."""
-    text = _without_own_header(_lines(text))
+    had to be cut). Thinking goes first (strip_thought), so a saved
+    memory with Gemma's plain-text thought in it is cleaned on load,
+    the same way a memory with his side in it is."""
+    text = _without_own_header(_lines(strip_thought(text)))
     at = _his_turn_at(text, name)
     return (text if at is None else text[:at]).strip(), at is not None
 
@@ -1215,6 +1283,10 @@ def _cli(argv):
             if brain.persona else None
         if scale is not None:
             voice.length_scale = scale
+        own = brain.persona.settings.get("kokoro_voice") \
+            if brain.persona else None
+        if own and hasattr(voice, "speaker"):     # Kokoro's, not Piper's
+            voice.speaker = str(own).strip()
         print(f"voice: piper, {voice.model.name}" if voice.ready
               else f"voice: printing only ({voice.why_not()})")
 

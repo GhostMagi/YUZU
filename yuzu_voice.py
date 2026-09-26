@@ -686,11 +686,12 @@ KOKORO_VOICES = "voices-v1.0.bin"
 # THERE IS NO PITCH KNOB, and it is worth saying here rather than
 # letting the next person hunt for one. kokoro-onnx's `create()` takes
 # a voice, a speed and a language -- that is the whole surface. Timbre
-# comes from WHICH VOICE, so changing voice IS the pitch control:
-#
-#     YUZU_KOKORO_VOICE=af_sarah ~/YUZU/voice
-#
-# and `speed` comes from her own `piper_length_scale`, inverted.
+# comes from WHICH VOICE, so changing voice IS the pitch control, and
+# it is per character: `kokoro_voice: af_sky` in her persona (Ghost,
+# Sept 26: "Give sky to shiro and kuro can be sarah"). A character
+# who names none gets this default, and YUZU_KOKORO_VOICE moves the
+# default for all of them. `speed` comes from her own
+# `piper_length_scale`, inverted.
 KOKORO_SPEAKER = os.environ.get(KOKORO_SPEAKER_ENV, "af_bella")
 
 
@@ -715,6 +716,7 @@ class KokoroVoice:
     def __init__(self, length_scale=None, speaker=None):
         self.length_scale = length_scale
         self.speaker = speaker or KOKORO_SPEAKER
+        self.swapped = ""
         self.player, self.player_args = find_player()
         self.failures = []
         self.model, self.voices = kokoro_files()
@@ -766,6 +768,28 @@ class KokoroVoice:
             self._engine = kokoro_onnx.Kokoro(str(self.model), str(self.voices))
         return self._engine
 
+    def voice_name(self):
+        """The speaker she actually gets: HER OWN when the voices file
+        has it, otherwise the default.
+
+        A character can name her own voice (`kokoro_voice:` in her
+        persona -- Shiro is af_sky, Kuro af_sarah, his picks). A name
+        the file does not carry is a typo or an older voices file, and
+        it must cost her the TIMBRE, never the AUDIO: kokoro-onnx
+        raises on an unknown speaker, so without this she would go
+        silent on every line with nothing on the page to say why.
+        `swapped` says what happened, for --engines and for a person."""
+        try:
+            known = list(self.engine().get_voices())
+        except Exception:                 # noqa: BLE001
+            return self.speaker           # cannot ask; try her own
+        if not known or self.speaker in known:
+            return self.speaker
+        fallback = KOKORO_SPEAKER if KOKORO_SPEAKER in known else known[0]
+        self.swapped = ("no voice %r in %s, so she speaks as %s"
+                        % (self.speaker, KOKORO_VOICES, fallback))
+        return fallback
+
     def render(self, text, clean=True):
         """Synthesise to a WAV path WITHOUT playing it. See Voice.render
         -- the split is what lets audio travel to the device Ghost is
@@ -779,7 +803,8 @@ class KokoroVoice:
         try:
             import soundfile
             samples, rate = self.engine().create(
-                spoken, voice=self.speaker, speed=self.speed, lang="en-us")
+                spoken, voice=self.voice_name(), speed=self.speed,
+                lang="en-us")
             handle, wav = tempfile.mkstemp(suffix=".wav", prefix="yuzu-")
             os.close(handle)
             soundfile.write(wav, samples, rate)
@@ -812,7 +837,7 @@ class KokoroVoice:
             _drop(wav)
 
 
-def pick_voice(engine=None, length_scale=None):
+def pick_voice(engine=None, length_scale=None, speaker=None):
     """The voice to use, best available first.
 
     KOKORO ONLY WHEN IT IS ACTUALLY READY. "Installed" is not the
@@ -824,12 +849,17 @@ def pick_voice(engine=None, length_scale=None):
     engine='kokoro' or YUZU_TTS=kokoro forces it, and then a broken
     Kokoro is returned BROKEN rather than silently swapped -- being
     told why is the point of asking for it by name.
+
+    `speaker` is a character's OWN Kokoro voice. It beats
+    YUZU_KOKORO_VOICE, the way her own `model:` beats YUZU_MODEL: that
+    variable points EVERYONE somewhere, and her line is about her. Piper
+    has one voice per model file, so it does not take one.
     """
     want = (engine or os.environ.get(KOKORO_ENV, "")).strip().lower()
     if want in ("kokoro", "piper"):
-        return (KokoroVoice(length_scale=length_scale) if want == "kokoro"
-                else Voice(length_scale=length_scale))
-    kokoro = KokoroVoice(length_scale=length_scale)
+        return (KokoroVoice(length_scale=length_scale, speaker=speaker)
+                if want == "kokoro" else Voice(length_scale=length_scale))
+    kokoro = KokoroVoice(length_scale=length_scale, speaker=speaker)
     return kokoro if kokoro.ready else Voice(length_scale=length_scale)
 
 

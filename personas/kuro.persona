@@ -26,6 +26,9 @@ top_p: 0.95
 top_k: 64
 # Quick. She is the fast one and she will tell you so.
 piper_length_scale: 0.85
+# HER OWN VOICE, his pick, Sept 26: "Give sky to shiro and kuro can be
+# sarah". Kokoro's af_sarah, so the sisters never sound like one girl.
+kokoro_voice: af_sarah
 num_predict: 600
 # Vowel-carrying, and a gremlin's rather than anybody else's.
 SOUND_EXAMPLES: Kekeke, Nyeh, Oi

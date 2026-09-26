@@ -6635,6 +6635,55 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
                          ["how are you doing?", "Warm and steady."],
                          "the invented turn was loaded back into her memory")
 
+    def test_a_saved_THOUGHT_is_cleaned_on_LOAD(self):
+        """Shiro's second turn on his board went into her memory with the
+        whole plain-text "Thinking Process" in it, before strip_thought
+        existed. Read back, that is her own example of thinking out loud,
+        so the first turn after a pull loads only her answer."""
+        face = self.store()
+        os.makedirs(face.MEMORY_DIR, exist_ok=True)
+        with open(face._memory_file("shiro_mk2"), "w", encoding="utf-8") as fh:
+            json.dump([{"role": "user", "content": "youre aware of kuro?"},
+                       {"role": "assistant", "content":
+                        "Thinking Process:\n1. Analyze.\n5. Final Output."
+                        "<channel|>Oh. Uh-huh. Kuro is my sister."}], fh)
+
+        class Blank:
+            history_turns = 8
+            history = []
+
+        brain = Blank()
+        face.load_memory(brain, "shiro_mk2")
+        self.assertEqual([m["content"] for m in brain.history],
+                         ["youre aware of kuro?",
+                          "Oh. Uh-huh. Kuro is my sister."],
+                         "her saved thought was loaded back into her memory")
+
+    def test_a_reply_that_was_ALL_thought_says_so(self):
+        """Every word she wrote was thinking, twice: the bubble says she
+        thought out loud and ran out of room -- never "She said nothing.",
+        which reads as a dead deck, and never the thought itself."""
+        face = self.store()
+
+        class Thought:
+            system_prompt = "BASE"
+            history_turns = 8
+            last_cut = False
+            last_thought = True
+
+            def __init__(self, **kw):
+                self.history = []
+
+            def ask(self, text):
+                return ""
+
+        import yuzu_brain
+        with mock.patch.object(yuzu_brain, "YuzuBrain", Thought), \
+                mock.patch.dict(face._BRAINS, {}, clear=True):
+            reply, error = face.answer("hi", "shiro")
+        self.assertIsNone(error)
+        self.assertIn("thought out loud", reply)
+
     def test_a_reply_that_was_ALL_his_side_says_so(self):
         """Cut to nothing, the page would say "She said nothing." --
         which reads as a dead deck. It says what happened instead."""
@@ -6956,6 +7005,36 @@ class TestSheSpeaksOutOfThePage(unittest.TestCase):
         self.assertEqual(seen.get("length_scale"), want,
                          "her persona's speed never reached the voice")
 
+    def test_the_sisters_speak_in_their_OWN_voices(self):
+        """Ghost, Sept 26: "Give sky to shiro and kuro can be sarah".
+        `kokoro_voice:` in her persona reaches the voice she is built
+        with, and a character who names none gets the default (Bella).
+        Read off the personas, so the pinned property is that the two
+        sisters never share one, not a spelling."""
+        import yuzu_voice
+        seen = {}
+        self.face._VOICES.clear()
+        original = yuzu_voice.pick_voice
+        yuzu_voice.pick_voice = lambda **kw: (seen.update(kw), None)[1]
+        try:
+            got = {}
+            for who in ("shiro_mk2", "kuro", "four"):
+                seen.clear()
+                self.face.voice_for(who)
+                got[who] = seen.get("speaker")
+        finally:
+            yuzu_voice.pick_voice = original
+            self.face._VOICES.clear()
+        for who in ("shiro_mk2", "kuro"):
+            want = yuzu_personas.load(who).settings.get("kokoro_voice")
+            self.assertTrue(want, "%s names no voice of her own" % who)
+            self.assertEqual(got[who], want,
+                             "%s's own voice never reached the engine" % who)
+        self.assertNotEqual(got["shiro_mk2"], got["kuro"],
+                            "the sisters sound like one girl")
+        self.assertIsNone(got["four"], "a character with no voice of her "
+                          "own was handed somebody else's")
+
     def test_a_missing_voice_costs_the_AUDIO_and_never_the_REPLY(self):
         """The oldest promise on this deck, and the one the face, the
         wiki and Piper all already make. Verified by driving the real
@@ -7033,6 +7112,62 @@ class TestKokoro(unittest.TestCase):
             self.voice.KokoroVoice.ready = real
         # And restored, so the next test sees the real answer.
         self.assertIsInstance(self.voice.pick_voice(), self.voice.Voice)
+
+    def test_her_OWN_voice_beats_the_default_and_a_bad_name_costs_only_TIMBRE(self):
+        """Her `kokoro_voice:` beats YUZU_KOKORO_VOICE, the way her own
+        `model:` beats YUZU_MODEL: the variable moves everyone, her line
+        is about her. And a name the voices file does not carry (a typo,
+        an older file) must cost the timbre and never the audio --
+        kokoro-onnx raises on an unknown speaker, so she would otherwise
+        go silent on every line. Driven through render() with a stand-in
+        engine and a stand-in soundfile."""
+        import sys, types, tempfile
+
+        class Engine:
+            used = []
+
+            def get_voices(self):
+                return ["af_bella", "af_sarah", "af_sky"]
+
+            def create(self, text, voice, speed, lang):
+                self.used.append(voice)
+                return [0.0], 24000
+
+        def built(speaker):
+            v = self.voice.KokoroVoice(speaker=speaker)
+            v._import_error, v.player = "", "aplay"
+            v.model = Path(tempfile.gettempdir())
+            v._engine = Engine()
+            return v
+
+        fake = types.ModuleType("soundfile")
+        fake.write = lambda path, samples, rate: open(path, "wb").write(b"RIFF")
+        with mock.patch.dict(sys.modules, {"soundfile": fake}), \
+                mock.patch.object(self.voice, "KOKORO_SPEAKER", "af_bella"):
+            self.assertEqual(self.voice.pick_voice(
+                engine="kokoro", speaker="af_sky").speaker, "af_sky")
+            # And the path the deck actually takes: nobody forces an
+            # engine, Kokoro is ready, and it is chosen by itself.
+            with mock.patch.object(self.voice.KokoroVoice, "ready",
+                                   new=property(lambda v: True)):
+                self.assertEqual(self.voice.pick_voice(
+                    speaker="af_sky").speaker, "af_sky")
+            self.assertEqual(self.voice.KokoroVoice().speaker, "af_bella")
+            for asked, spoke in (("af_sky", "af_sky"), ("af_sarah", "af_sarah"),
+                                 ("af_skyy", "af_bella")):
+                v = built(asked)
+                wav = v.render("Um... hi.")
+                self.assertTrue(wav, "%s went silent" % asked)
+                os.remove(wav)
+                self.assertEqual(Engine.used[-1], spoke)
+            self.assertIn("af_skyy", v.swapped, "the swap was never said")
+            self.assertEqual(built("af_sky").swapped, "")
+
+    def test_her_voice_is_never_sent_to_ollama(self):
+        """A voice name is for the speaker, not the model."""
+        for key in ("shiro_mk2", "kuro"):
+            self.assertNotIn("kokoro_voice",
+                             yuzu_personas.load(key).options(), key)
 
     def test_length_scale_is_INVERTED_for_kokoro(self):
         """Piper's `piper_length_scale` is a DURATION multiplier --
@@ -8782,6 +8917,66 @@ class TestTheSisters(BrainTestCase):
         brain = YuzuBrain(persona="shiro_mk2", host=self.host)
         self.assertEqual(brain.ask("hi"), "Hello, Ghost.")
         self.assertEqual(brain.ask("hi"), "Standing by.")
+
+    HIS_SCREEN = (
+        "Thinking Process:\n"
+        "1. Analyze the User Input: The user said, \"sweeeet ur awesome. "
+        "youre aware of kuro?\" This is a warm, affectionate question.\n"
+        "2. Recall Shiro's Persona/Rules:\n* Shiro is shy, quiet.\n"
+        "5. Final Output Generation: (Ensure it matches the required "
+        "format and tone.)<channel|>Oh. Uh-huh. Kuro is my sister. She "
+        "talks for both of us, and I love her very much.")
+    HER_ANSWER = ("Oh. Uh-huh. Kuro is my sister. She talks for both of "
+                  "us, and I love her very much.")
+
+    def test_a_thought_that_never_OPENED_never_reaches_his_screen(self):
+        """His screen, Sept 26, Shiro's second turn: a plain-text
+        "Thinking Process", then an ORPHAN <channel|>, then her answer.
+        Her turn opens on the empty channel, so she never writes the
+        opening marker -- she thinks anyway and closes a channel nobody
+        opened. Only what follows it is hers: on the bubble, in the
+        stream (word by word, nothing shown and taken back), and in the
+        history she reads next turn."""
+        MockOllama.replies = itertools.cycle([self.HIS_SCREEN])
+        brain = YuzuBrain(persona="shiro_mk2", host=self.host)
+        self.assertEqual(brain.ask("youre aware of kuro?"), self.HER_ANSWER)
+        self.assertEqual(brain.history[-1]["content"], self.HER_ANSWER,
+                         "the thought went into her history, where it "
+                         "teaches her to think out loud again")
+        pieces = list(brain.ask_stream("again?"))
+        self.assertEqual("".join(pieces).strip(), self.HER_ANSWER)
+        for piece in pieces:
+            self.assertNotIn("Thinking", piece, "the stream showed the thought")
+            self.assertNotIn("channel", piece)
+
+    def test_a_thought_that_never_CLOSED_gets_one_more_try(self):
+        """A plain-text thought that runs into the reply ceiling before
+        she answers is ALL thought -- none of it is his, and none of it
+        is shown. That is worth one more draw, like writing his side:
+        the second try is her first turn's shape, the one that came back
+        clean on his board."""
+        MockOllama.replies = itertools.cycle([
+            "Thinking Process:\n1. Analyze the User Input: hi",
+            "Um... hi, Ghost."])
+        brain = YuzuBrain(persona="shiro_mk2", host=self.host)
+        self.assertEqual(brain.ask("hi"), "Um... hi, Ghost.")
+        MockOllama.replies = itertools.cycle([
+            "Thinking Process:\n1. Analyze the User Input: hi"])
+        self.assertEqual(brain.ask("hi"), "")
+        self.assertIs(brain.last_thought, True)
+        self.assertEqual("".join(brain.ask_stream("hi")), "")
+        self.assertIs(brain.last_thought, True)
+
+    def test_words_ABOUT_a_thinking_process_are_words(self):
+        """Only a reply that OPENS with the header is a thought. Talking
+        about one is an answer, and so is anything with no marker in it."""
+        strip = yuzu_brain_module.strip_thought
+        for said in ("My thinking process is simple: check the cable.",
+                     "Um... thinking process? I just look at it.",
+                     "Standing by."):
+            self.assertEqual(strip(said), said)
+        self.assertEqual(strip("<|channel>thought\nhmm<channel|>Hi."), "Hi.")
+        self.assertEqual(strip("**Thinking Process:**\n1. hmm"), "")
 
     def test_gemmas_OWN_markers_end_her_turn(self):
         """Gemma names her own side `model` and marks turns <|turn> /
