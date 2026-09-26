@@ -51,6 +51,39 @@ her. The rule is about the CHASSIS FINISH, not her taste.
 
 ## THE ROSPIDER, AND FOUR CALLED HERSELF GHOST (Sept 26, ~22:15)
 
+**CORRECTION FROM HIS OWN SCREENSHOTS (Sept 27, ~01:25): THE JETHEXA
+TAKES HIS ORIN.** *"Ummm u sure it dont take my board brobro?"* -- and
+he was right. hiwonder.com now sells **JetHexa2027, "ROS 2 AI
+Hexapod"**, and its Controller menu reads: Without Controller, Pi 5
+4GB/8GB, **Jetson Orin Nano Super 4GB/8GB**, Orin NX Super 8GB, Orin
+Super 16GB. The kit table says the controller "can be omitted if a
+compatible controller is already available", and the upgrades graphic
+says **ROS 2 Humble** -- Ubuntu 22.04, the same OS his JetPack 6 runs.
+Everything below that calls the JetHexa "JetPack 4 on the old Nano"
+describes the OLD model; I had not found the 2027 one and said "no Orin
+JetHexa was found" as if that settled it.
+
+    Starter    monocular camera, no LiDAR, no voice module
+    Standard   + COIN-D6 LiDAR, + AI voice interaction module
+    Advanced   + Aurora930 Pro depth camera
+    Ultimate   RPLIDAR C1 + the depth camera
+
+**No arm on it** -- that is the trade against the ROSpider. For his
+list (follow him, don't bump the cat, watch the house) **Standard is
+the sensible floor**: the LiDAR is what obstacle avoidance and mapping
+stand on. Prices were not on his screenshots and are NOT recorded.
+
+**Two things to ask Hiwonder's Chat BEFORE buying, both unverified:**
+- **Does "Without Controller" include the power lead and mounting
+  plate for an Orin Nano Super devkit?** One listing covers a 5V Pi 5
+  and a 9-20V barrel-jack Orin; the lead that ships may depend on the
+  controller picked.
+- **Is their software an install on Ubuntu 22.04, or only a disk
+  image?** An image flashed onto his NVMe WIPES it: the repo is on
+  GitHub, but her memory, his facts, the 14GB wiki, his ROMs and the
+  Ollama models are not. Back up first, or give their image its own
+  drive.
+
 **HE IS SAVING FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
 spider with the arm"*, after his own screenshot of hiwonder.com said
 **$799.99 for the Starter Kit** -- the one hexapod whose software is
@@ -365,7 +398,8 @@ rebuilt, and nothing forces it. An earlier draft of this paragraph
 talked about "a second Orin riding on top" -- that was built on the
 same mix-up, and he never planned a second one. Hiwonder has put other
 robots (JetRover, JetAcker, JetAuto, JetArm) on the Orin Nano with
-ROS2; **no Orin JetHexa was found** in two searches.
+ROS2; **no Orin JetHexa was found** in two searches. **WRONG -- the
+JetHexa2027 takes his Orin; see the correction at the top.**
 
 **AND THEN: "The one i can afford has no board with it"** -- so the
 plan is HIS ORIN MOVES INTO THE ROBOT, and he asked for a ~$500 robot
@@ -378,7 +412,8 @@ confirmed):
   only hexapod found whose own software is built for his board.
   **$799.99 for the Starter Kit** (his screenshot of hiwonder.com, Sept
   26) -- *"Too much"*. OFF THE LIST unless the budget moves.
-- **JetHexa without a board + his Orin** -- the body is fine (18 x 35kg
+- **(SUPERSEDED by the JetHexa2027, which runs ROS 2 on his Orin.)**
+  **JetHexa without a board + his Orin** -- the body is fine (18 x 35kg
   bus servos, 11.1V LiPo); Hiwonder's software is JetPack 4 and will not
   run. The fix is OURS, not Hiwonder's: skip ROS, talk to their servo
   controller from Python (the bus-servo protocol is short and public),
