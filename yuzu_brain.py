@@ -627,8 +627,10 @@ class YuzuBrain:
             data = self._chat(payload)
             said = _words(data.get("message"))
             self.last_thought = _all_thought(data.get("message"))
-            reply, self.last_cut = cut_his_turn(said, self._his_name())
-            self.last_opening = cut_opening(said, self._his_name())
+            reply, self.last_cut = cut_his_turn(said, self._his_name(),
+                                                self._her_name())
+            self.last_opening = cut_opening(said, self._his_name(),
+                                            self._her_name())
             if reply or not (self.last_cut or self.last_thought):
                 break
             payload = _plainer(payload)
@@ -776,12 +778,14 @@ class YuzuBrain:
                     # held back while it is, or could still become, a
                     # THOUGHT: nothing of it is shown until she closes it.
                     words = "" if _thought_so_far(raw) else strip_thought(raw)
-                    safe, cut = _safe_so_far(words, self._his_name())
+                    safe, cut = _safe_so_far(words, self._his_name(),
+                                             self._her_name())
                     shown = "".join(collected)
                     piece = safe[len(shown):] if safe.startswith(shown) else ""
                     if cut:
                         self.last_cut = True
-                        self.last_opening = cut_opening(words, self._his_name())
+                        self.last_opening = cut_opening(
+                            words, self._his_name(), self._her_name())
                         if piece:
                             if not collected:
                                 self._face("talking")
@@ -818,7 +822,8 @@ class YuzuBrain:
         self.last_thought = bool(raw.strip()) and not strip_thought(raw).strip()
         if not self.last_cut:
             # Whatever the hold-back was still keeping when she finished.
-            rest = cut_his_turn(strip_thought(raw), self._his_name())[0]
+            rest = cut_his_turn(strip_thought(raw), self._his_name(),
+                                self._her_name())[0]
             shown = "".join(collected).lstrip()
             tail = rest[len(shown):] if rest.startswith(shown) else ""
             if tail:
@@ -829,6 +834,12 @@ class YuzuBrain:
     def _his_name(self):
         try:
             return (self.persona.settings.get("USER_NAME") or "").strip()
+        except Exception:
+            return ""
+
+    def _her_name(self):
+        try:
+            return (self.persona.name or "").strip()
         except Exception:
             return ""
 
@@ -1087,6 +1098,21 @@ def _without_own_header(text):
     return text[m.end():] if m else text
 
 
+def _without_own_label(text, her=""):
+    """Her text with HER OWN speaker label taken off the front.
+
+    Ghost's Z Flip, Sept 26: two Kuro replies in a row opened "Kuro:
+    Prove it? Easy." and "Kuro: Good. Now stop...". Every example in
+    her prompt is a `Kuro:` line, and on a raw Gemma turn nothing but
+    her own habit stops her writing the label too -- and a label saved
+    in her memory is her own example of doing it again, which is why it
+    came twice. Only the FRONT: a name mid-reply is a sentence."""
+    if not her:
+        return text
+    m = re.match(r"\A\s*%s[^\S\n]*:[^\S\n]*" % re.escape(her), text, re.I)
+    return text[m.end():] if m else text
+
+
 def _his_turn_at(text, name=""):
     labels = ["User"] + ([name] if name else [])
     label = re.compile(r"^[^\S\n]*(?:%s)[^\S\n]*:" % "|".join(
@@ -1096,21 +1122,23 @@ def _his_turn_at(text, name=""):
     return min(hits) if hits else None
 
 
-def cut_his_turn(text, name=""):
+def cut_his_turn(text, name="", her=""):
     """(her reply up to where she starts writing his turn, whether it
     had to be cut). Thinking goes first (strip_thought), so a saved
     memory with Gemma's plain-text thought in it is cleaned on load,
-    the same way a memory with his side in it is."""
-    text = _without_own_header(_lines(strip_thought(text)))
+    the same way a memory with his side in it is -- and her own label
+    (`her`, see _without_own_label) the same way."""
+    text = _without_own_label(
+        _without_own_header(_lines(strip_thought(text))), her)
     at = _his_turn_at(text, name)
     return (text if at is None else text[:at]).strip(), at is not None
 
 
-def cut_opening(text, name=""):
+def cut_opening(text, name="", her=""):
     """The first line of what was cut -- "user", "Ghost: what's...".
     Short, and only ever the line that was taken to be his, so the
     screen can say what she did instead of guessing at it."""
-    text = _without_own_header(_lines(text))
+    text = _without_own_label(_without_own_header(_lines(text)), her)
     at = _his_turn_at(text, name)
     if at is None:
         return ""
@@ -1121,11 +1149,16 @@ def cut_opening(text, name=""):
     return ""
 
 
-def _safe_so_far(text, name=""):
+def _safe_so_far(text, name="", her=""):
     """While streaming: (what is safe to show, whether his turn began).
     A last line that could still grow into a role name or his label is
-    held back until it cannot."""
+    held back until it cannot -- and so is an opening that could still
+    grow into HER label ("Ku..."), so "Kuro:" never shows and vanishes."""
     text = _without_own_header(_lines(text))
+    opening = text.strip().lower()
+    if her and opening and (her.lower() + ":").startswith(opening):
+        return "", False
+    text = _without_own_label(text, her)
     at = _his_turn_at(text, name)
     if at is not None:
         return text[:at].rstrip(), True

@@ -939,6 +939,11 @@ def load_memory(brain, key):
             # it never ages out while she keeps repeating it. HIS turns
             # are his own words and are never touched.
             name = _his_name(key)
+            try:
+                import yuzu_personas
+                her = yuzu_personas.load(key).name
+            except Exception:
+                her = ""
             # IMPORTED HERE, deliberately: yuzu_brain is imported inside
             # answer(), never at module level, so a bare reference in
             # this function would be a NameError -- and the `except`
@@ -948,7 +953,7 @@ def load_memory(brain, key):
                 import yuzu_brain
                 cut = yuzu_brain.cut_his_turn
             except Exception:
-                cut = lambda text, who="": (text, False)
+                cut = lambda text, who="", her="": (text, False)
             kept = []
             for m in past:
                 if (isinstance(m, dict)
@@ -961,7 +966,7 @@ def load_memory(brain, key):
                         # saved before that existed, and read back it is
                         # the strongest example in her context of doing it
                         # again. Cut to nothing, the whole exchange goes.
-                        said = cut(m["content"], name)[0]
+                        said = cut(m["content"], name, her=her)[0]
                         if not said:
                             if kept and kept[-1].get("role") == "user":
                                 kept.pop()

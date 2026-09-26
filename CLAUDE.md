@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 855 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 857 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -76,6 +76,25 @@ fix is her greeting, not a rule. And `/wiki RPG games for me?` found
 **Doom II RPG**: the term is everything after `/wiki`, "for me?"
 included, and his archive is not reachable from here to test a
 cleanup against. `/wiki role-playing game` is the reliable shape.
+
+**AN HOUR LATER, KURO WROTE HER OWN NAME TAG, TWICE IN A ROW** --
+"Kuro: Prove it? Easy." then "Kuro: Good. Now stop...". Every example
+in her prompt is a `Kuro:` line, and once one was saved to her memory
+it was her own example of doing it again. `_without_own_label()` takes
+HER name off the FRONT of a reply (a name mid-reply is words), in
+`ask`, in the stream (held while "Ku" could still grow into the tag),
+and in `load_memory`, so the two on his board are cleaned after the
+pull. Read off the persona, so it covers every character. **The stub
+streams whole words, so a stream break-check stayed green** until the
+half-typed case was asked directly. Two tests, five breaks, all red.
+855 -> 857.
+
+**Four ran LONG on the same evening**, on pink: paragraphs of RP about
+babysitting his cat as a robot, `(Laughs)`, `(Smiling)`, `(Winks)`,
+and *"sneak in some online updates"* on a board that is offline. It
+was him playing a hypothetical with her, and length is the one metric
+that does not wobble -- so it is a WATCH ITEM, not a fix: if it shows
+on ordinary turns, her brevity rule and examples are where to look.
 
 ## SHE THOUGHT OUT LOUD WITHOUT THE MARKER, AND THE SISTERS' OWN VOICES (Sept 26)
 

@@ -6659,6 +6659,28 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
                           "Oh. Uh-huh. Kuro is my sister."],
                          "her saved thought was loaded back into her memory")
 
+    def test_a_saved_NAME_TAG_is_cleaned_on_LOAD(self):
+        """Kuro's two "Kuro: ..." replies were saved to her memory on his
+        board before the tag was cut. Read back, they are her own
+        example of writing it, so the first turn after a pull loads her
+        words without it."""
+        face = self.store()
+        os.makedirs(face.MEMORY_DIR, exist_ok=True)
+        with open(face._memory_file("kuro"), "w", encoding="utf-8") as fh:
+            json.dump([{"role": "user", "content": "prove it"},
+                       {"role": "assistant",
+                        "content": "Kuro: Prove it? Easy."}], fh)
+
+        class Blank:
+            history_turns = 8
+            history = []
+
+        brain = Blank()
+        face.load_memory(brain, "kuro")
+        self.assertEqual([m["content"] for m in brain.history],
+                         ["prove it", "Prove it? Easy."],
+                         "her saved name tag was loaded back into her memory")
+
     def test_a_reply_that_was_ALL_thought_says_so(self):
         """Every word she wrote was thinking, twice: the bubble says she
         thought out loud and ran out of room -- never "She said nothing.",
@@ -8994,6 +9016,38 @@ class TestTheSisters(BrainTestCase):
             self.assertEqual(strip(said), said)
         self.assertEqual(strip("<|channel>thought\nhmm<channel|>Hi."), "Hi.")
         self.assertEqual(strip("**Thinking Process:**\n1. hmm"), "")
+
+    def test_her_OWN_name_tag_never_reaches_his_screen(self):
+        """His Z Flip, Sept 26: two Kuro replies in a row opened "Kuro:
+        Prove it? Easy." -- her examples are all `Kuro:` lines and she
+        wrote the label too. Off the front of the reply, off her
+        history (or she copies it next turn, which is why it came
+        twice), and never shown and taken back in the stream. Her NAME
+        in a sentence is words: "Kuro is ..." stays."""
+        MockOllama.replies = itertools.cycle([
+            "Kuro: Prove it? Easy. I could climb your wall."])
+        brain = YuzuBrain(persona="kuro", host=self.host)
+        self.assertEqual(brain.ask("prove it"),
+                         "Prove it? Easy. I could climb your wall.")
+        self.assertEqual(brain.history[-1]["content"],
+                         "Prove it? Easy. I could climb your wall.",
+                         "her name tag went into her history")
+        pieces = list(brain.ask_stream("again"))
+        self.assertEqual("".join(pieces).strip(),
+                         "Prove it? Easy. I could climb your wall.")
+        self.assertFalse(any("Kuro" in piece for piece in pieces),
+                         "the stream showed her name tag: %r" % pieces)
+        # The stub streams whole words, so it never shows the stream a
+        # half-typed "Ku" -- asked directly: held while it could still
+        # become her tag, let go the moment it cannot.
+        safe = yuzu_brain_module._safe_so_far
+        self.assertEqual(safe("Ku", "Ghost", "Kuro"), ("", False))
+        self.assertEqual(safe("Kind of", "Ghost", "Kuro"), ("Kind of", False))
+        cut = yuzu_brain_module.cut_his_turn
+        self.assertEqual(cut("Kuro means black.", "Ghost", "Kuro")[0],
+                         "Kuro means black.")
+        self.assertEqual(cut("Hi.\nKuro: again", "Ghost", "Kuro")[0],
+                         "Hi.\nKuro: again")
 
     def test_gemmas_OWN_markers_end_her_turn(self):
         """Gemma names her own side `model` and marks turns <|turn> /
