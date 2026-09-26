@@ -286,9 +286,9 @@ confirmed):
 
 - **Hiwonder ROSpider, "Starter Kit Without Controller"** -- ROS2, and
   listed as compatible with the **Jetson Orin Nano Super** by name. The
-  only hexapod found whose own software is built for his board. Price
-  UNKNOWN from here; the with-board kits ran ~$1100 when this file first
-  mentioned it, so it may be over his number.
+  only hexapod found whose own software is built for his board.
+  **$799.99 for the Starter Kit** (his screenshot of hiwonder.com, Sept
+  26) -- *"Too much"*. OFF THE LIST unless the budget moves.
 - **JetHexa without a board + his Orin** -- the body is fine (18 x 35kg
   bus servos, 11.1V LiPo); Hiwonder's software is JetPack 4 and will not
   run. The fix is OURS, not Hiwonder's: skip ROS, talk to their servo
