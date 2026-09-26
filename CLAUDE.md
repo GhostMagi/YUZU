@@ -253,6 +253,16 @@ Orin Nano in it later means leaving Hiwonder's JetPack-4 software
 behind -- a real job, not a swap. Check the listing says "with Jetson
 Nano" before buying; some Hiwonder kits ship without the board.
 
+**He said that last part worried him, so the way round it is written
+down: the swap is never FORCED.** The old Nano can stay in the robot as
+its SPINAL CORD, still running Hiwonder's own gaits untouched, and the
+second Orin rides on top as the MIND, talking to it over a short
+Ethernet cable. That is the "her brain rides on the robot" goal with
+nothing of Hiwonder's rewritten -- what it costs is weight and battery.
+Hiwonder has already moved JetRover, JetAcker, JetAuto and JetArm onto
+the Orin Nano with ROS2, so an Orin JetHexa may exist by then:
+UNCONFIRMED, check or ask them before assuming either way.
+
 **Six new tests, thirteen breaks plus three re-breaks on the rewritten
 page, all red as failures. 840 -> 846.**
 
