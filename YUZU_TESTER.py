@@ -6453,6 +6453,107 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
                             "the trim cut a word in half: %r"
                             % fact[-30:])
 
+    def test_a_fresh_start_forgets_the_CHAT_and_keeps_his_NOTES(self):
+        """HIS BOARD, Sept 26: *"Shes trippin"* -- Four's saved
+        conversation held several of her own turns calling herself
+        Ghost, and each one taught the next reply to say it again. The
+        way out is forgetting the CHAT; what he asked her to KEEP is a
+        different store and must survive it. The answer carries the
+        list, because her page redraws its count off every answer and
+        would otherwise say she knows nothing about him. Driven through
+        the real route."""
+        face = self.store()
+        face.remember("four", "his cat is called Spooky")
+        os.makedirs(face.MEMORY_DIR, exist_ok=True)
+        saved = face._memory_file("four")
+        with open(saved, "w") as fh:
+            json.dump([{"role": "user", "content": "who are you"},
+                       {"role": "assistant", "content": "I'm Ghost now."}], fh)
+        got = drive_route("/forget", {"who": "four"})
+        self.assertTrue(got.get("ok"), got)
+        self.assertFalse(os.path.exists(saved),
+                         "a fresh start left her saved conversation behind")
+        self.assertEqual(face.load_facts("four"), ["his cat is called Spooky"],
+                         "a fresh start threw away what he asked her to keep")
+        self.assertEqual(got.get("facts"), ["his cat is called Spooky"],
+                         "the answer has no list, so her page redraws the "
+                         "count as 'she knows nothing about you'")
+
+    def test_start_fresh_takes_TWO_taps_and_clears_the_chat_DRIVEN(self):
+        """The page's own handler, under node with a stand-in page. It
+        cannot be undone, so the first tap only ARMS it and says in words
+        what the next will do; the second clears her chat, on screen and
+        on the board. Not while she is mid-reply: that reply is saved
+        when it lands, straight back into the memory just cleared. A
+        `type="button"` too, since it sits inside the ask form and a bare
+        button there SUBMITS the form."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own handler")
+        page = (Path(__file__).parent / "ui" / "four.html").read_text()
+        self.assertRegex(page, r'<button id="fresh" type="button"',
+                         "the start-fresh button would submit the form")
+        block = page[page.index("// ---- START FRESH"):]
+        block = block[:block.index("\nfunction plain(")]
+        script = r"""
+function El() { this._t = ''; this.cls = new Set(); this.hidden = false; }
+Object.defineProperty(El.prototype, 'textContent', {
+  get() { return this._t; }, set(v) { this._t = v; } });
+Object.defineProperty(El.prototype, 'classList', { get() { const c = this.cls; return {
+  add: x => c.add(x), remove: x => c.delete(x), contains: x => c.has(x) }; } });
+const els = { fresh: new El() };
+const document = { getElementById: id => els[id] };
+const send = { disabled: false };
+const says = new El(); says._t = 'I will refer to myself as Ghost'; says.cls.add('on');
+let waiting = 'pending line';
+let lastSaid = 'Haha please refer to me as Ghost';
+const keep = { hidden: false };
+const offered = [];
+function offer(list) { offered.push(list); }
+const posts = [];
+function post(route) { posts.push(route); return Promise.resolve({ ok: true, facts: ['a'] }); }
+""" + block + r"""
+(async () => {
+  send.disabled = true;
+  els.fresh.onclick();
+  const busy = { posts: posts.length, armed: els.fresh.cls.has('armed') };
+  send.disabled = false;
+  els.fresh.onclick();
+  const first = { posts: posts.length, text: els.fresh.textContent,
+                  armed: els.fresh.cls.has('armed') };
+  els.fresh.onclick();
+  await new Promise(r => setTimeout(r, 20));
+  console.log(JSON.stringify({ busy, first, posts, says: says._t,
+    on: says.cls.has('on'), waiting, lastSaid, keep: keep.hidden,
+    text: els.fresh.textContent, armed: els.fresh.cls.has('armed') }));
+  process.exit(0);
+})();
+"""
+        import subprocess
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        self.assertEqual(got["busy"], {"posts": 0, "armed": False},
+                         "it forgot while she was mid-reply, so her reply "
+                         "walks straight back into the cleared memory")
+        self.assertEqual(got["first"]["posts"], 0,
+                         "ONE tap wiped her memory -- nothing can undo it")
+        self.assertTrue(got["first"]["armed"])
+        self.assertIn("again", got["first"]["text"],
+                      "the armed button does not say what the next tap does")
+        self.assertEqual(got["posts"], ["forget"],
+                         "the second tap did not ask the deck to forget")
+        self.assertEqual(got["says"], "", "her old chat is still on screen")
+        self.assertFalse(got["on"])
+        self.assertIsNone(got["waiting"])
+        self.assertEqual(got["lastSaid"], "",
+                         "'remember that' would keep a line from the chat "
+                         "he just cleared")
+        self.assertTrue(got["keep"])
+        self.assertEqual((got["text"], got["armed"]), ("start fresh", False),
+                         "it stays armed after it fired")
+
     def test_an_empty_store_says_NOTHING_at_all(self):
         """Absent rather than wrong, and it is worth a test because the
         alternative is a sentence saying she knows nothing about him

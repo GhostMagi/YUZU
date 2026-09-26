@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 860 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 862 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -95,9 +95,28 @@ several of her own turns claiming the name -- the memory-makes-it-
 permanent mechanism from the "user" round, where one slip read back as
 her own example re-teaches itself every turn. The ways out are the ×
 on that note, telling her plainly who is who (her corrected replies
-then outvote the slip in her memory), or clearing her chat memory --
-`POST /forget` exists but her page has NO BUTTON for it. A "start
-fresh" button was offered, not built.
+then outvote the slip in her memory), or clearing her chat memory.
+
+**THREE MINUTES LATER: *"Shes trippin"*.** Asked *"Who are you. Who am
+i?"* she answered *"You are me... I'm Ghost, but you can think of me
+as 'you'"*. Her saved conversation was past saving by talk, and
+`POST /forget` had existed since Sept 16 with NO BUTTON on her page --
+the only way out was a terminal.
+
+**`start fresh` under her ask bar.** TWO TAPS, because it cannot be
+undone: the first arms it and says *"tap again: she forgets this
+chat"*, and it disarms itself after four seconds; no dialog, since a
+modal is a mode that needs its own way out. It clears her chat on the
+board and on screen, and **her notes about him stay** -- `/forget`
+answers with the facts list now, or the count would redraw as "she
+knows nothing about you" after a start that kept everything. Refused
+while she is mid-reply, because that reply is saved when it lands.
+Rendered at 1024x600 and 412 and driven in a real browser: in the row
+at 1024, its own line at 412, no sideways scroll. **Two tests, six
+breaks, all red as failures. 860 -> 862.** Four's page only; the
+other pages have no memory row, and nobody has asked. (And `pkill -f`
+on the render server's own port matched the shell running it, AGAIN
+-- the Mimi-poses trap. Kill by PID.)
 
 Runtime only: the composed persona prompt is unchanged, so there is
 nothing new to paste. **Three tests, six breaks, all red as failures.

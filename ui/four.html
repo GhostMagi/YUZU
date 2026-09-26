@@ -402,6 +402,9 @@ body.thinking #four { animation-duration: 1.6s; }
 #knows button:hover { color: var(--ink); }
 #keep { color: var(--ink); opacity: .8; }
 #keep[hidden] { display: none; }
+/* Armed, it is the one bright thing in the row: the next tap cannot be
+   undone, and it says so in words rather than in a colour alone. */
+#knows #fresh.armed { color: var(--ink); }
 
 /* WHAT SHE OFFERED TO KEEP. Their own row rather than three things
    across one bar: at 412px "she knows 3 things about you" plus
@@ -535,6 +538,7 @@ body.thinking #four { animation-duration: 1.6s; }
   <div id="knows">
     <button id="count" type="button"></button>
     <button id="keep" type="button" hidden>remember that</button>
+    <button id="fresh" type="button">start fresh</button>
     <span id="offers"></span>
   </div>
 </form>
@@ -975,6 +979,51 @@ keep.onclick = () => {
   post('remember', { text: lastSaid });
 };
 post('facts');
+
+// ---- START FRESH -------------------------------------------------------
+// Ghost, Sept 26: "Shes trippin". His saved line "please refer to me as
+// Ghost" had her calling HERSELF Ghost, and every reply that said so
+// went into her saved conversation, where it taught the next reply to
+// say it again -- a slip that re-teaches itself never ages out. The
+// server could always forget (`/forget`); nothing on her page could
+// ask it to, so the only way out was a terminal he does not have.
+//
+// TWO TAPS, because it cannot be undone: the first arms it and says in
+// words what the second will do, and it disarms itself if he does
+// nothing. No dialog -- a modal is a mode, and a mode needs its own way
+// out. HER NOTES ABOUT HIM STAY: this clears the conversation, not the
+// store, and the server's answer carries the list so the count holds.
+const fresh = document.getElementById('fresh');
+let armed = null;
+
+function disarm() {
+  clearTimeout(armed);
+  armed = null;
+  fresh.textContent = 'start fresh';
+  fresh.classList.remove('armed');
+}
+
+fresh.onclick = () => {
+  // Not while she is answering: that reply is saved when it lands, so
+  // it would walk straight back into the memory just cleared.
+  if (send.disabled) return;
+  if (!armed) {
+    fresh.textContent = 'tap again: she forgets this chat';
+    fresh.classList.add('armed');
+    armed = setTimeout(disarm, 4000);
+    return;
+  }
+  disarm();
+  post('forget').then(data => {
+    if (!data || !data.ok) return;
+    says.textContent = '';
+    says.classList.remove('on');
+    waiting = null;
+    lastSaid = '';
+    keep.hidden = true;
+    offer([]);
+  });
+};
 
 function plain(asked) {
   return fetch('say', {

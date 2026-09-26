@@ -2432,7 +2432,15 @@ class _Handler(SimpleHTTPRequestHandler):
                 self._json({"ok": False, "said": "No character by that name."})
                 return
             forget(key)
-            self._json({"ok": True, "said": "Forgotten."})
+            # HER NOTES STAY. This clears what the two of them SAID, not
+            # what he asked her to KEEP -- and her page redraws its count
+            # off every answer it gets, so this one carries the list the
+            # way every facts route does. Without it, "she knows 4 things
+            # about you" would read "nothing" after a fresh start that
+            # kept all four.
+            self._json({"ok": True,
+                        "said": "Fresh start. Her notes about you stay.",
+                        "facts": load_facts(key)})
             return
         if path == "/icons":
             said, ok = run_deckapps()
