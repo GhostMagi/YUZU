@@ -84,6 +84,19 @@ stand on. Prices were not on his screenshots and are NOT recorded.
   Ollama models are not. Back up first, or give their image its own
   drive.
 
+**He asked about Starter now, parts later. Answer given: yes, with one
+rule.** Walking, calibration and camera-follow need nothing beyond the
+Starter, and that is months of work before a LiDAR matters. Leaving it
+alone with the cat waits for the LiDAR, a watchdog and a hard stop
+anyway. **The rule: add the SAME models later** (COIN-D6 LiDAR,
+Aurora930 Pro), so Hiwonder's software recognises them. Also ask their
+Chat whether the Starter has the mount and cable for the LiDAR, and
+compare the Standard-minus-Starter price with buying the LiDAR alone.
+**Their voice module is the most skippable part:** the girls already
+hear (faster-whisper) and speak (Kokoro) in software, so a mic and
+speaker on the robot are enough. That is the USB sound card and speaker
+already on his deck parts list.
+
 **HE IS SAVING FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
 spider with the arm"*, after his own screenshot of hiwonder.com said
 **$799.99 for the Starter Kit** -- the one hexapod whose software is
