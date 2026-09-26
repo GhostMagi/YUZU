@@ -305,6 +305,26 @@ confirmed):
   Her memory and the whole repo live on its NVMe, so the girls go WITH
   it; she needs a robot-body persona (the shiro/shiro_deck split).
 
+**Then: "Doesnt have to be spider. Dog works im open to everyrhing but
+cars really"**, and *"Tiny bit could mean a bunch"* -- so a lot of code
+help is welcome. What that search turned up:
+
+- **At ~$500, legs that CARRY his Orin are hexapods.** Small robot dogs
+  are Raspberry-Pi sized; Yahboom says outright the Jetson is too big
+  to mount on DOGZILLA ($660, Pi only). Hiwonder's PuppyPi is Pi 5, and
+  its ROSPug carries the OLD Nano. The devkit with its fan is the
+  problem, not the chip.
+- **Petoi Bittle X, $319, a robot dog whose own board takes plain text
+  commands over USB serial (115200), Bluetooth or WiFi, from any
+  computer** -- so it works with his Orin AS IS by leaving the Orin in
+  the deck as her brain and the dog as her body. The smallest code job
+  on the list: her `[brackets]` already map to moves through the
+  whitelist from the Muto era; they would map to Petoi's commands
+  instead. Not autonomous away from the deck, and it is small. His call.
+- **Wheels** (JetAuto, JetRover and others ship Orin Nano versions) are
+  the cheapest way to get the Orin riding on its own. He does not want a
+  car; mentioned once, not pushed.
+
 **Six new tests, thirteen breaks plus three re-breaks on the rewritten
 page, all red as failures. 840 -> 846.**
 
