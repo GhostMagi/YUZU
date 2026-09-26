@@ -6377,6 +6377,82 @@ class TestSheRemembersWhatHeTellsHer(unittest.TestCase):
             self.assertNotIn(markup, line.lstrip("\n"),
                              "her facts line teaches her to answer in lists")
 
+    def test_whose_ME_it_is_is_said_in_WORDS_with_his_name_READ(self):
+        """HIS BOARD, Sept 26: the store held his own line "Haha please
+        refer to me as Ghost", and Four answered *"I'll refer to myself
+        as 'Ghost' from now on."* Quoting him and saying "in his own
+        words" was not enough for a 3B -- the `me` went to her.
+
+        So the line says whose pronouns they are, in words, and names
+        him. The name is READ off her settings: a second fixture name is
+        swapped in, so a line with "Ghost" typed into the code goes red
+        here rather than going stale the day a character has another
+        person holding her. A character with no name gets "him"."""
+        import re
+        import yuzu_personas
+        face = self.store()
+        face.remember("four", "Haha please refer to me as Ghost")
+        name = yuzu_personas.load("four").settings.get("USER_NAME")
+        self.assertTrue(name, "Four lost her USER_NAME; this test needs one")
+        line = face.facts_line("four")
+        self.assertRegex(
+            line, r'"me"[^.:]*mean %s\b' % re.escape(name),
+            "the facts line never says his `me` is him, so a 3B takes "
+            "\"refer to me as Ghost\" as being about HERSELF")
+        self.assertRegex(line, r'"you" means you',
+                         "it never says his `you` is her")
+        self.assertTrue(line.rstrip().endswith("in your own words."),
+                        "she was not asked to use them in her own words, "
+                        "and recited one back to him in quotes")
+        with mock.patch.object(face, "_his_name", lambda key: "Zed"):
+            other = face.facts_line("four")
+        self.assertIn("mean Zed", other,
+                      "his name is typed into the facts line, not read")
+        self.assertNotIn("mean %s" % name, other)
+        with mock.patch.object(face, "_his_name", lambda key: ""):
+            nameless = face.facts_line("four")
+        self.assertIn("mean him", nameless,
+                      "a character with no USER_NAME got a blank name")
+
+    def test_a_quote_INSIDE_a_fact_cannot_close_his_quote(self):
+        """One of his real facts: `What we "hackin" sneaky pants just be
+        100% with me we're a team`. Wrapped in double quotes as it was,
+        his quote CLOSED at "hackin" and the rest of his sentence sat
+        outside it, unattributed -- the exact ambiguity the quotes are
+        there to remove. Inner double quotes become single ones."""
+        face = self.store()
+        face.remember("four", 'What we "hackin" sneaky pants just be '
+                              "100% with me we're a team")
+        line = face.facts_line("four")
+        self.assertIn('"What we \'hackin\' sneaky pants', line,
+                      "a double quote inside his fact closed his quote early")
+
+    def test_a_trim_cuts_BETWEEN_words_and_SAYS_so(self):
+        """HIS BOARD, Sept 26: a fact ended "Youll have a voice on the
+        spid" -- a slice at FACT_MAX through the middle of "spider" --
+        and Four read it back to him inside quotes, "spid" and all. A
+        fact in her prompt is a thing she can quote, so it ends on a
+        whole word and an ellipsis says it was cut. Driven on both
+        paths that trim: his "remember that", and her own offer."""
+        face = self.store()
+        words = ("word%04d" % i for i in range(1000))
+        long = " ".join(words)
+        # Built so that FACT_MAX lands mid-word, which is the case that
+        # went wrong; asserted rather than assumed.
+        self.assertFalse(long[face.FACT_MAX - 1].isspace())
+        kept = face.remember("four", long)[0][-1]
+        offered = face.suggestions("ok\nREMEMBER: " + long[:face.FACT_MAX + 50])[1]
+        for fact in (kept,) + tuple(offered):
+            self.assertLessEqual(len(fact), face.FACT_MAX)
+            self.assertTrue(fact.endswith("\u2026"),
+                            "a trimmed fact does not say it was trimmed: %r"
+                            % fact[-30:])
+            body = fact[:-1]
+            self.assertTrue(long.startswith(body))
+            self.assertTrue(long[len(body)].isspace(),
+                            "the trim cut a word in half: %r"
+                            % fact[-30:])
+
     def test_an_empty_store_says_NOTHING_at_all(self):
         """Absent rather than wrong, and it is worth a test because the
         alternative is a sentence saying she knows nothing about him

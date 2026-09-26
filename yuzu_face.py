@@ -1288,6 +1288,22 @@ def _within_budget(facts):
     return facts, dropped
 
 
+def _clip(said):
+    """At most FACT_MAX characters, CUT BETWEEN WORDS and marked as cut.
+
+    His board, Sept 26: a fact ended "Youll have a voice on the spid",
+    and Four read it back to him in quotes, "spid" and all -- a slice
+    at 200 had cut the word in half, and a fact in her prompt is a
+    thing she can quote. The ellipsis says a trim happened, to her and
+    to him in the list under the ask bar."""
+    if len(said) <= FACT_MAX:
+        return said
+    cut = said[:FACT_MAX - 1]
+    if not said[FACT_MAX - 1].isspace() and " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(" ,;:-") + "\u2026"
+
+
 def remember(key, text):
     """Keep one thing. Returns (facts, dropped, note).
 
@@ -1300,7 +1316,7 @@ def remember(key, text):
 
     note = ""
     if len(said) > FACT_MAX:
-        said = said[:FACT_MAX].rstrip()
+        said = _clip(said)
         note = "Trimmed it to %d characters. " % FACT_MAX
 
     facts = load_facts(key)
@@ -1420,7 +1436,7 @@ def suggestions(reply, key=None):
     her teaching herself to emit more of them."""
     offers = []
     for raw in _SUGGEST_RE.findall(reply or ""):
-        said = " ".join(raw.split())[:FACT_MAX]
+        said = _clip(" ".join(raw.split()))
         if said and said.lower() not in [o.lower() for o in offers]:
             offers.append(said)
     if key is not None:
@@ -1516,14 +1532,33 @@ def facts_line(key):
     fix for is her answering in markdown headings.
 
     And the tail says what to DO with them rather than what not to do,
-    which is the pink-elephant shape measured three times here."""
+    which is the pink-elephant shape measured three times here.
+
+    THE QUOTES WERE NOT ENOUGH FOR A 3B, and his board said so, Sept 26.
+    The "remember that" button keeps his WHOLE LINE, so the store is his
+    chat -- "Haha please refer to me as Ghost" -- and Four answered it
+    with *"I'll refer to myself as 'Ghost' from now on."* The `me` went
+    to her anyway. So the line says in plain words whose pronouns they
+    are, with his name READ off her settings, never typed in here. Her
+    own offers are written about him in the third person ("his cousin
+    Dave..."), so the sentence is true of those too.
+
+    And "in your own words", because the same evening she recited a
+    fact back to him inside quotation marks, word for word. A double
+    quote INSIDE a fact becomes a single one, or `"What we "hackin"
+    sneaky pants"` closes his quote halfway through his sentence."""
     facts = load_facts(key)
     if not facts:
         return ""
-    return ("\n\nTHINGS HE ASKED YOU TO REMEMBER, in his own words: "
-            + "; ".join('"%s"' % f for f in facts)
+    him = _his_name(key)
+    return ("\n\nTHINGS %s ASKED YOU TO REMEMBER, in his own words. He "
+            "said them to you, so inside them \"I\", \"me\" and \"my\" "
+            "mean %s, and \"you\" means you: " % ((him or "HE").upper(),
+                                                    him or "him")
+            + "; ".join('"%s"' % f.replace('"', "'") for f in facts)
             + ". Use them the way you would use anything you know about "
-              "someone -- when they matter, and in passing.")
+              "someone -- when they matter, in passing, and in your own "
+              "words.")
 
 
 # HER VOICE, SENT TO WHATEVER IS LOOKING AT HER.

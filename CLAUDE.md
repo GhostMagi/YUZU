@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 857 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 860 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,50 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE ROSPIDER, AND FOUR CALLED HERSELF GHOST (Sept 26, ~22:15)
+
+**HE IS SAVING FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
+spider with the arm"*, after his own screenshot of hiwonder.com said
+**$799.99 for the Starter Kit** -- the one hexapod whose software is
+built for his Orin Nano Super. So the Orin goes INTO the robot on
+Hiwonder's own ROS2 stack, and the JetHexa / Bittle options below are
+the record, not the plan. Before he buys: the kit he picks carries the
+6DOF arm, and it is the one WITHOUT a controller, since he owns the
+brain. What he wants it to do, in his words to Four: follow him,
+obstacle avoidance, balance, climb stairs, duck under things, grab with
+the arm, a voice on the spider -- and *"watch my house while im gone
+... and hang with my cat safely"*. **That last one is an autonomous
+robot alone with his cat**, so everything in "Before anyone adds vision
+/ follow-me" (a watchdog, a hard stop, nothing moving on its own until
+both exist) applies the day it arrives.
+
+**SHE TOOK HIS "ME" FOR HERSELF.** His facts store held his own line
+*"Haha please refer to me as Ghost"*, and Four answered *"Oh, and one
+more thing... I'll refer to myself as 'Ghost' from now on. Deal?"* The
+quotes and "in his own words" were the Sept 22 guard against exactly
+this, and on a 3B they were not enough. **"remember that" keeps his
+WHOLE LINE**, so the store is his chat, first person throughout. Then,
+told off, she recited a fact back at him in quotation marks, ending
+*"Youll have a voice on the spid"* -- a slice at `FACT_MAX` through
+"spider", which she read back word for word.
+
+- **The facts line says whose pronouns they are**: *"He said them to
+  you, so inside them "I", "me" and "my" mean Ghost, and "you" means
+  you"*, the name READ off her settings (`him` with none). Her own
+  offers are written about him in the third person, so it is true of
+  those too. The tail asks for them **in her own words**.
+- **A trim cuts between words and ends in `…`**, on both paths (his
+  button and her offer). Facts ALREADY on his board keep their old
+  cut; the × under the ask bar is how he drops "spid".
+- **A double quote inside a fact becomes a single one** -- his real
+  `What we "hackin" sneaky pants` closed his quote halfway through.
+
+Runtime only: the composed persona prompt is unchanged, so there is
+nothing new to paste. **Three tests, six breaks, all red as failures.
+857 -> 860. UNMEASURED on the board.** Also seen and NOT changed: her
+reply before the slip ran long and asked four questions -- the length
+watch item again.
 
 ## ON HIS PHONE AND HIS DECK: THE SISTERS WORK (Sept 26, ~17:00)
 
