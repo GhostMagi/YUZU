@@ -8729,6 +8729,23 @@ class TestTheSisters(BrainTestCase):
             self.assertGreaterEqual(len(re.findall(r"[A-Za-z']+", answer)), 5,
                                     "a shy example says almost nothing: %r" % answer)
 
+    def test_asked_his_NAME_the_shy_one_says_it(self):
+        """His Z Flip, Sept 26, the first turn on the new build: "Also
+        whats my name .-." -- and Shiro said "You haven't told me your
+        name yet", with "The person holding this deck is called Ghost"
+        in her own prompt. Being asked his name was a turn shape she had
+        never been shown, and the small model answered it for her: the
+        fault this file has fixed with ONE EXAMPLE eight times. So an
+        example asks it, and her answer carries his name, READ off her
+        settings rather than typed here."""
+        name = self.persona("shiro_mk2").settings["USER_NAME"]
+        asked = [answer for ask, answer in self.turns("shiro_mk2")
+                 if re.search(r"\bmy name\b", ask, re.I)]
+        self.assertTrue(asked, "nothing shows her being asked his name")
+        for answer in asked:
+            self.assertIn(name, answer, "she was asked his name and "
+                          "did not say it: %r" % answer)
+
     PAGES = {"shiro": "shiro.html", "kuro": "kuro.html"}
 
     def page(self, name):

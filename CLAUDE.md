@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 854 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 855 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,34 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ON HIS PHONE AND HIS DECK: THE SISTERS WORK (Sept 26, ~17:00)
+
+Six turns on his Z Flip after the update, *"Thats pretty good yea?"* --
+and **"They have new voices yes"**, on the phone and the Steam Deck.
+**CONFIRMED**: Sky and Sarah heard; the Speak row sits fully above his
+nav bar (the `100dvh` fix, which the container could not reproduce);
+no "Thinking Process" in six turns (it hit on turn 2 last time, so
+n=6 is encouraging, not proof). Kuro is exactly on brief -- *"those
+six legs are itching to move"*, *"they move slow compared to my
+legs"* -- and `/wiki bluegill` came back right and in her voice.
+
+**SHIRO FAILED HIS NAME TEST.** He asked *"whats my name .-."* on the
+first turn and she said *"You haven't told me your name yet"*, with
+"The person holding this deck is called Ghost" in her own prompt.
+Being ASKED his name is a turn shape she had never been shown -- ninth
+instance of this file's most repeated finding. One example, `What's my
+name?` -> `You're {USER_NAME}. Um... of course I know that.`, 5300 ->
+5374 chars; a test reads the name off her settings. Kuro used his name
+unprompted all three turns, so she was not touched. UNMEASURED.
+
+**Watch items, NOT changed:** Kuro opened all three replies with "Oi,
+Ghost!" -- her greeting example plus `Oi` as a taught sound; one
+example's opener is how a 3B learns a tic, so if it wears thin, the
+fix is her greeting, not a rule. And `/wiki RPG games for me?` found
+**Doom II RPG**: the term is everything after `/wiki`, "for me?"
+included, and his archive is not reachable from here to test a
+cleanup against. `/wiki role-playing game` is the reliable shape.
 
 ## SHE THOUGHT OUT LOUD WITHOUT THE MARKER, AND THE SISTERS' OWN VOICES (Sept 26)
 
