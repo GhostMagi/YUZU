@@ -43,7 +43,11 @@
   --her:   #ff2d95;           /* neon pink, hers                       */
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100vh; overflow: hidden; }
+/* 100dvh after 100vh: on a phone, 100vh is the height with the address
+   bar HIDDEN, so while it shows the bottom row sat under the fold (his
+   Z Flip 6, Sept 26). dvh is what is really visible; an older browser
+   keeps the vh line. */
+html, body { height: 100vh; height: 100dvh; overflow: hidden; }
 body {
   background: var(--black);
   color: var(--ink);
@@ -266,6 +270,7 @@ document.getElementById('home').onclick = () => {
 
 // ---- who else is here ------------------------------------------------
 const ME = 'zero';
+const SHE = 'Zero';           // her lines' label -- one place, not two
 // HIS LINES CARRY HIS NAME, the one SHE knows him by: `user` in the
 // roster is USER_NAME off her persona, so the log and her prompt can
 // never disagree about who he is. "you" only if the roster never answers.
@@ -366,7 +371,7 @@ function fill(turn, text) {
 function said(pending, text) {
   const words = spoken(text);
   pending.remove();
-  const turn = entry('her', 'Zero', '');
+  const turn = entry('her', SHE, '');
   fill(turn, text);
   // Everything cleaned away (a reply that was all stage direction):
   // show it as it came rather than an empty line.
@@ -424,7 +429,7 @@ form.onsubmit = (event) => {
   document.body.classList.add('thinking');
   entry('him', HIM, asked);
   // Where her reply will land, saying so while she works it out.
-  const pending = entry('her pending', 'Zero', 'working it out ');
+  const pending = entry('her pending', SHE, 'working it out ');
   const dots = document.createElement('span');
   dots.className = 'dots';
   dots.textContent = '...';

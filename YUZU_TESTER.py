@@ -8579,6 +8579,128 @@ class TestTheSisters(BrainTestCase):
                                  "%s shares %r with %s" % (key, sound,
                                  sorted(taken[sound.lower()] - {key})))
 
+    # ---- the shy one, and the chatbox --------------------------------
+
+    def test_the_shy_one_is_never_SILENT(self):
+        """Ghost: "Shiro as the 2. Dandere". A shy character's failure is
+        the near-empty reply -- deck Shiro's "Hehe~ *silence*" -- so her
+        rules say shy is fine and silent is not (Coco's kuudere lesson),
+        and every example of her is shy AND a real answer. One example
+        that is only "..." would teach the whole habit."""
+        shiro = self.persona("shiro_mk2")
+        self.assertIn("dandere", shiro.prompt.lower())
+        self.assertIn("silent is not", shiro.prompt)
+        for ask, answer in self.turns("shiro_mk2"):
+            self.assertGreaterEqual(len(re.findall(r"[A-Za-z']+", answer)), 5,
+                                    "a shy example says almost nothing: %r" % answer)
+
+    PAGES = {"shiro": "shiro.html", "kuro": "kuro.html"}
+
+    def page(self, name):
+        return (Path(__file__).parent / "ui" / name).read_text()
+
+    def test_both_have_ZEROS_chatbox_and_their_OWN_background(self):
+        """Ghost: "i wouldnt mind giving them Zeros page vibe like the
+        chatbox style. Differwnt backgrounds for them tho". A log, not a
+        bubble; and three backgrounds, not one."""
+        backgrounds = {}
+        for name in ("zero.html",) + tuple(self.PAGES.values()):
+            page = self.page(name)
+            self.assertIn('id="log"', page, "%s is not a chatbox" % name)
+            self.assertNotIn('id="says"', page, "%s still has a bubble" % name)
+            body = re.search(r"\nbody \{(.*?)\n\}", page, re.S).group(1)
+            backgrounds[name] = re.search(r"background:(.*?);", body, re.S).group(1)
+        self.assertEqual(len(set(backgrounds.values())), 3,
+                         "two of them share a background: %s" % backgrounds)
+
+    LOG_MARK = "// ONE TURN IN THE LOG"
+
+    def log_block(self, name, me):
+        """The conversation code: from the log's first function to the end
+        of the page, with her own name for the voice normalised away."""
+        page = self.page(name)
+        self.assertIn(self.LOG_MARK, page, "%s has no conversation log" % name)
+        block = page[page.index(self.LOG_MARK):]
+        self.assertEqual(block.count("who: '%s'" % me), 2,
+                         "%s asks for somebody else's voice or reply" % name)
+        return block.replace("who: '%s'" % me, "who: WHO")
+
+    def test_every_LOG_page_shows_the_conversation_the_SAME_way(self):
+        """Zero's conversation code, copied character for character: the
+        log, the code boxes, her voice, the send, the mic. No build step,
+        so three pages carry three copies -- and a copy that drifts from
+        the one on his board is a page nobody has tested. Each labels her
+        lines with the name the ROSTER gives her."""
+        import yuzu_face
+        names = {c["who"]: c["name"] for c in yuzu_face.roster()}
+        first = self.log_block("zero.html", "zero")
+        for me, name in self.PAGES.items():
+            self.assertEqual(self.log_block(name, me), first,
+                             "%s shows the conversation differently from "
+                             "zero.html" % name)
+            page = self.page(name)
+            self.assertIn("const ME = '%s';" % me, page)
+            self.assertIn("const SHE = '%s';" % names[me], page,
+                          "%s labels her lines with a name the roster "
+                          "does not give her" % name)
+
+    def test_the_sisters_say_their_WORDS_and_not_their_GESTURES(self):
+        """Zero's copy keeps the words inside *asterisks* (Qwen writes
+        emphasis with them). The sisters are role-play characters, and
+        "*twitches her legs*" kept as words would sit in the log as if
+        she said it -- and her voice would read it out. Their copy drops
+        a gesture whole, keeps **bold** words, and keeps Zero's guards:
+        a sum is a sum and a line break is a line break. Run under node."""
+        node = shutil.which("node")
+        cases = {
+            "*twitches her legs* Hi, Ghost.": "Hi, Ghost.",
+            "That was **really** nice.": "That was really nice.",
+            "Oh. *looks away* Thank you.": "Oh. Thank you.",
+            "2 * 3 * 4 is 24.": "2 * 3 * 4 is 24.",
+            "[leans in] Hey.": "Hey.",
+            "Line one.\n\nLine two.": "Line one.\n\nLine two.",
+        }
+        for name in self.PAGES.values():
+            page = self.page(name)
+            fn = page[page.index("function spoken(text)"):]
+            fn = fn[:fn.index("\n}\n") + 3]
+            if not node:
+                self.skipTest("no node here to run the page's own function")
+            import subprocess
+            out = subprocess.run(
+                [node, "-e", fn + "\nconsole.log(JSON.stringify(%s.map(spoken)));"
+                 % json.dumps(list(cases))],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertEqual(json.loads(out.stdout), list(cases.values()), name)
+
+    def test_his_words_are_GREEN_and_each_sister_wears_her_OWN_colour(self):
+        """His notes: "green words=me. Pinks=shiro glow purp=Kuro". His
+        green is the same on every chatbox -- he is the same person -- and
+        each sister's words are hers: pink for Shiro, purple for Kuro,
+        with a glow on both. Read as HUES, so a nicer pink is not a
+        broken test."""
+        import colorsys
+
+        def colour(page, var):
+            hexa = re.search(r"--%s:\s*(#[0-9a-fA-F]{6})" % var, page).group(1)
+            rgb = [int(hexa[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            return hexa.lower(), colorsys.rgb_to_hsv(*rgb)[0] * 360
+
+        him = {colour(self.page(n), "him")[0]
+               for n in ("zero.html",) + tuple(self.PAGES.values())}
+        self.assertEqual(len(him), 1, "his green differs between pages: %s" % him)
+        self.assertTrue(90 <= colour(self.page("zero.html"), "him")[1] <= 150,
+                        "his lines are not green")
+        for name, (low, high) in (("shiro.html", (300, 350)),
+                                  ("kuro.html", (260, 300))):
+            page = self.page(name)
+            hue = colour(page, "her")[1]
+            self.assertTrue(low <= hue <= high,
+                            "%s's words are the wrong colour (hue %d)" % (name, hue))
+            rule = re.search(r"\n\.her \{([^}]*)\}", page).group(1)
+            self.assertIn("text-shadow", rule, "%s's words do not glow" % name)
+
     # ---- her turn is laid out here, thinking OFF --------------------
 
     GOOGLE = [
@@ -8751,6 +8873,40 @@ class TestTheSisters(BrainTestCase):
         white = sum(1 for v in edge if v >= 253) / len(edge)
         self.assertGreater(white, 0.8, "her backdrop is not white enough "
                            "to vanish under multiply")
+
+
+class TestEveryPageFitsAPhone(unittest.TestCase):
+    """Ghost, Sept 26: "my mobile device is a z flip 6 (i noticed those
+    mobile layout u gave me usually is cut off a bit at the bottom tbh".
+
+    `100vh` on a phone is the height with the address bar HIDDEN -- the
+    large viewport -- so while the bar shows, a page sized to 100vh runs
+    past the bottom of the screen by the bar's height. Every page here
+    is `overflow: hidden` and ends in its most important row (Speak, the
+    mic, the home page's Back and Update), so that row is exactly what
+    got cut. `100dvh` is what is really visible; a browser that has never
+    heard of it keeps the `100vh` line before it.
+
+    WHAT IS PINNED IS THE PROPERTY, on every page, including the next
+    one: a headless browser has no address bar to collapse, so this
+    cannot be measured here -- the renders at 412x872 (a Flip with the
+    bar up) are what checked the layouts fit."""
+
+    def test_every_page_fits_what_a_phone_actually_SHOWS(self):
+        ui = Path(__file__).parent / "ui"
+        sized = 0
+        for page in sorted(ui.glob("*.html")):
+            css = re.sub(r"/\*.*?\*/", " ", page.read_text(), flags=re.S)
+            for rule in re.findall(r"\{([^{}]*)\}", css):
+                if not re.search(r"height:\s*100vh", rule):
+                    continue
+                sized += 1
+                heights = re.findall(r"(?<![-\w])height:\s*(100d?vh)", rule)
+                self.assertEqual(heights[-1:], ["100dvh"],
+                                 "%s sizes itself to 100vh with no 100dvh "
+                                 "after it: its bottom row is under the "
+                                 "fold on a phone" % page.name)
+        self.assertGreaterEqual(sized, 5, "the pages stopped sizing to the screen")
 
 
 class TestNamingTheBoard(unittest.TestCase):

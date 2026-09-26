@@ -10,68 +10,66 @@
   both as personas for the new gemma if you think thatd work in a
   hexapod later." The pitch he brought: "She brags about her body and
   teases you with how fast she could scuttle up your wall. She's
-  playfully threatening, never creepy-cute."
+  playfully threatening, never creepy-cute." Then: "i wouldnt mind
+  giving them Zeros page vibe like the chatbox style. Differwnt
+  backgrounds for them tho".
+
+  ZERO'S LAYOUT, HIS WORDS: her picture down the left, a big
+  conversation down the right. The conversation code is ZERO'S, copied
+  character for character, and a test holds the three pages equal.
 
   THE DARK PAGE IS HER. Kuro means black and her sister's page is the
-  light one. Her picture is a whole scene -- rain, a storm, rubble --
-  so it is shown as it is and its four edges FADE into the page rather
-  than stopping at a frame, the way Yuzu's cropped bust does.
+  light one. Her picture is a whole scene -- rain, a storm, rubble -- so
+  its edges FADE into the page rather than stopping at a frame.
 
-  Her green is sampled off the glow in her eyes and the seams of her
-  legs, lifted a step so it reads as a light on a dark screen. No
-  network, no fonts, no libraries.
+  HER WORDS GLOW PURPLE: "green words=me. Pinks=shiro glow purp=Kuro".
+  The purple is the neon one Four already wears (#c04dff), so the deck
+  gains no new taste decision, and it glows harder than the others
+  because he said glow.
+
+  No network, no fonts, no libraries.
 -->
 <style>
 :root {
   --night:  #121310;          /* the darkest tenth of her storm         */
   --storm:  #2a2b27;
-  --edge:   #4a4c45;
+  --panel:  rgba(8,9,7,.9);
+  --edge:   #34362f;
   --ink:    #e8ece2;
-  --dim:    #9aa293;
-  --acid:   #b6f03e;          /* her eyes and her seams, lifted a step  */
+  --dim:    #8d9587;
+  --him:    #39ff5e;          /* neon green, his lines                 */
+  --her:    #c04dff;          /* glowing purple, hers -- his call       */
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100vh; overflow: hidden; }
+/* 100dvh, NOT ONLY 100vh: on a phone, 100vh is the height with the
+   address bar HIDDEN, so while it shows, the bottom of the page -- the
+   Speak row -- sat under the fold. Ghost, on his Z Flip 6: "those
+   mobile layout u gave me usually is cut off a bit at the bottom".
+   dvh follows the real visible height; a browser that has never heard
+   of it keeps the vh line above. */
+html, body { height: 100vh; height: 100dvh; overflow: hidden; }
 body {
   background:
-    radial-gradient(120% 90% at 55% 10%, #3a3b36 0%, var(--storm) 40%,
+    radial-gradient(120% 90% at 30% 10%, #3a3b36 0%, var(--storm) 40%,
                     var(--night) 100%);
   color: var(--ink);
-  font: 16px/1.5 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif;
-  -webkit-user-select: none; user-select: none;
+  font: 16px/1.5 'Segoe UI', system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
   display: flex; flex-direction: column;
 }
 
-/* ---- the room ------------------------------------------------------
-   A green hairline and two corner brackets, the same furniture as her
-   sister's page in her own colour. */
-#room {
-  position: fixed; inset: 10px; pointer-events: none;
-  border: 1px solid color-mix(in srgb, var(--acid) 20%, transparent);
-  border-radius: 2px;
-}
-#room::before, #room::after {
-  content: ''; position: absolute; width: 26px; height: 26px;
-  border: 2px solid color-mix(in srgb, var(--acid) 55%, transparent);
-}
-#room::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
-#room::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
-
 /* ---- top ---------------------------------------------------------- */
 #top {
   display: flex; align-items: center; gap: 12px;
-  padding: 18px 26px 4px;
+  padding: 16px 24px 6px;
 }
-#who { font-size: 21px; letter-spacing: .12em; color: var(--acid);
+#who { font-size: 21px; letter-spacing: .1em; color: var(--ink);
        font-weight: 700; }
-#title { font-size: 12.5px; color: var(--dim); letter-spacing: .06em; }
+#title { font-size: 12.5px; color: var(--dim); letter-spacing: .04em; }
 
 /* ---- the rail ------------------------------------------------------
-   Built from /characters.json, which comes from ONE roster in
-   yuzu_face.py, so no page holds a list of the cast and none can
-   drift. Always visible rather than a menu: a menu is a mode, and a
-   mode needs a way out. */
+   Built from /characters.json, ONE roster in yuzu_face.py, so no page
+   holds a list of the cast and none can drift. */
 #rail { display: flex; gap: 6px; margin-left: 18px; }
 #rail a, #rail span {
   font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
@@ -81,132 +79,127 @@ body {
 #rail a { cursor: pointer; }
 #rail a:hover { color: var(--ink); border-color: var(--edge); }
 #rail .here {
-  color: var(--acid);
-  border-color: color-mix(in srgb, var(--acid) 40%, transparent);
-  background: rgba(0,0,0,.35);
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--her) 55%, transparent);
+  background: rgba(192,77,255,.12);
 }
-
 #home {
-  width: 38px; height: 38px; flex: none;
+  width: 38px; height: 38px; flex: none; margin-left: auto;
   border-radius: 50%; cursor: pointer; display: grid; place-items: center;
-  font-size: 17px; color: var(--acid); background: rgba(0,0,0,.3);
-  border: 1px solid color-mix(in srgb, var(--acid) 35%, transparent);
+  font-size: 17px; color: var(--ink); background: rgba(0,0,0,.3);
+  border: 1px solid #4a4c45;
 }
-#top > #home { margin-left: auto; }
 
-/* ---- her ----------------------------------------------------------- */
-/* SHE STANDS ON THE RIGHT, HER WORDS GO ON THE LEFT. */
+/* ---- her, and the conversation ------------------------------------
+   Two columns. minmax(0, 1fr) on the ROW is load-bearing: a grid row
+   is `auto` by default and grows to fit a picture. */
 #stage {
-  flex: 1; min-height: 0; position: relative; overflow: hidden;
-  display: grid; align-items: end; justify-items: end;
-  padding-right: 4%;
-  /* minmax(0, 1fr) IS LOAD-BEARING: an `auto` row grows to fit the
-     image and a percentage height has nothing to resolve against. */
+  flex: 1; min-height: 0;
+  display: grid; gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
+  padding: 6px 24px calc(18px + env(safe-area-inset-bottom));
 }
-/* THE "SHE IS THINKING" CUE. Her picture is opaque, so a light behind
-   her only shows where her edges fade out -- which is where it is
-   wanted: a green glow creeping in round her while a reply is coming. */
-/* Centred on HER, and wider than her picture, so it shows round it. */
-#glow {
-  position: absolute; left: 80%; bottom: 0; transform: translateX(-50%);
-  width: 50%; height: 100%; border-radius: 50%;
-  background: radial-gradient(circle,
-              color-mix(in srgb, var(--acid) 24%, transparent) 0%,
-              transparent 68%);
-  opacity: .1; transition: opacity .6s ease;
-}
-body.thinking #glow { animation: prowl 1.4s ease-in-out infinite; }
-@keyframes prowl {
-  0%, 100% { opacity: .2 }
-  50%      { opacity: .85 }
-}
-/* ALL FOUR EDGES FADE, two gradients INTERSECTED so a corner fades
-   twice. WIDE fades, and rendering chose them: at 7-10% the bright sky
-   in her top corner stopped at a hard vertical line and she read as a
-   photo on the page; an oval vignette read as a cameo frame. At 16-22%
-   the storm melts into the room. No drop-shadow: a mask clips a shadow
-   to her rectangle, which drew a dark box behind Yuzu until it went. */
+/* All four edges FADE, two gradients intersected, WIDE -- rendering
+   chose them: at 7-10% the bright sky in her corner stopped at a hard
+   line, and an oval vignette read as a cameo frame. */
 #kuro {
-  max-height: 97%; max-width: 50%; width: auto; height: auto;
-  object-fit: contain; object-position: bottom center;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 78%, transparent),
-                      linear-gradient(to right, transparent, #000 22%, #000 78%, transparent);
+  height: 100%; width: auto; max-width: 44vw;
+  object-fit: contain; object-position: center;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 84%, transparent),
+                      linear-gradient(to right, transparent, #000 18%, #000 80%, transparent);
   -webkit-mask-composite: source-in;
-          mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 78%, transparent),
-                      linear-gradient(to right, transparent, #000 22%, #000 78%, transparent);
+          mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 84%, transparent),
+                      linear-gradient(to right, transparent, #000 18%, #000 80%, transparent);
           mask-composite: intersect;
-  animation: breathe 4.6s ease-in-out infinite;
-  position: relative;
-  transform-origin: bottom center;
+  transition: filter .6s ease;
 }
-@keyframes breathe {
-  0%, 100% { transform: scale(1)      translateY(0) }
-  50%      { transform: scale(1.012)  translateY(-2px) }
-}
-
-/* ---- what she says -------------------------------------------------- */
-#says {
-  position: absolute; left: 4%; bottom: 7%; width: 42%; max-height: 72%;
-  overflow-y: auto; display: none;
-  background: rgba(12,13,10,.9);
-  border: 1px solid color-mix(in srgb, var(--acid) 26%, transparent);
-  border-left: 3px solid var(--acid);
-  border-radius: 2px; padding: 16px 18px;
-  font-size: 17px; line-height: 1.55;
-}
-#says.on { display: block; }
-/* HIS LINES AND HERS. His are dimmer, smaller and labelled with his
-   name; hers are the bubble's own colour. */
-#says .line + .line { margin-top: 10px; }
-#says .him { color: var(--dim); font-size: 14.5px; }
-#says .by { display: block; font-size: 10.5px; letter-spacing: .14em;
-            text-transform: uppercase; opacity: .85; }
-#says .pending, #says .deck { color: var(--dim); }
-#says::after {                       /* a small tail toward her */
-  content: ''; position: absolute; right: -9px; top: 26px;
-  border: 8px solid transparent;
-  border-left-color: color-mix(in srgb, var(--acid) 26%, transparent);
+/* THE "SHE IS THINKING" CUE, Zero's: her storm brightens while a reply
+   is coming, with a purple cast, and settles when it lands. */
+body.thinking #kuro { animation: prowl 1.4s ease-in-out infinite; }
+@keyframes prowl {
+  0%, 100% { filter: brightness(1) }
+  50%      { filter: brightness(1.3) drop-shadow(0 0 14px rgba(192,77,255,.5)) }
 }
 
-/* ---- asking --------------------------------------------------------- */
-#ask {
-  /* ABOVE HER, ALWAYS: a positioned picture paints above static
-     siblings whatever the DOM order. */
-  position: relative; z-index: 2;
-  background: linear-gradient(to top, var(--night) 62%, transparent);
-  display: flex; gap: 10px; align-items: center;
-  padding: 10px 26px calc(20px + env(safe-area-inset-bottom));
+#chat {
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-top: 2px solid var(--her);
+  border-radius: 3px; padding: 16px;
+  box-shadow: 0 0 28px rgba(192,77,255,.08);
 }
+#log {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-right: 4px;
+  -webkit-user-select: text; user-select: text;
+  scrollbar-width: thin; scrollbar-color: #3a3a3a transparent;
+}
+#log:empty::before {
+  content: 'Say something to her. /wiki cats looks something up first.';
+  color: var(--dim); font-size: 15px; margin: auto; text-align: center;
+}
+.turn { font-size: 17px; line-height: 1.55; white-space: pre-wrap;
+        overflow-wrap: anywhere; }
+.turn .by { display: block; font-size: 11.5px; letter-spacing: .12em;
+            text-transform: uppercase; margin-bottom: 2px; }
+/* HIS LINES GREEN, HERS PURPLE -- his colours, words and labels alike.
+   Hers glows harder than his: "glow purp", in his words. */
+.him { color: var(--him); text-shadow: 0 0 6px rgba(57,255,94,.3); }
+.her { color: var(--her); text-shadow: 0 0 8px rgba(192,77,255,.6),
+                                       0 0 2px rgba(192,77,255,.4); }
+.turn .by { opacity: .75; }
+.her.pending { color: var(--dim); text-shadow: none; }
+.turn pre.code {
+  display: block; max-width: 100%; margin: 8px 0; padding: 10px 12px;
+  background: #0b0b0b; color: #f3e9f0; text-shadow: none;
+  border: 1px solid var(--edge); border-left: 2px solid var(--her);
+  border-radius: 3px;
+  font: 14.5px/1.5 ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  white-space: pre; overflow-x: auto; overflow-wrap: normal;
+}
+.turn code {
+  font: .92em ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  background: #161616; color: #f3e9f0; text-shadow: none;
+  padding: 1px 5px; border-radius: 3px;
+}
+.her.pending .by { color: var(--her); }
+.her.pending .dots { animation: blink 1.2s steps(4) infinite; }
+@keyframes blink { 0% { opacity: .3 } 50% { opacity: 1 } 100% { opacity: .3 } }
+
+#ask { display: flex; gap: 10px; align-items: center; }
+/* min-width: 0 IS LOAD-BEARING: an <input> will not shrink below its
+   intrinsic width without it, which is how Speak got shoved off a phone. */
 #text {
   flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink);
-  background: rgba(0,0,0,.4); padding: 12px 15px; border-radius: 2px;
+  background: #000; padding: 12px 15px; border-radius: 3px;
   border: 1px solid var(--edge);
 }
 #text::placeholder { color: var(--dim); opacity: .8; }
-#text:focus { outline: none; border-color: var(--acid); }
+#text:focus { outline: none; border-color: var(--him); }
+/* Speak and the mic are GREEN because what they send is HIS line. */
 #send {
   font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-  color: #121310; background: var(--acid); padding: 12px 22px;
-  border: 0; border-radius: 2px;
+  color: #031006; background: var(--him); padding: 12px 22px;
+  border: 0; border-radius: 3px;
 }
 #send:disabled { opacity: .5; cursor: default; }
-
-/* THE MIC, the same button as every other page: tap to start, tap to
-   stop. Her green, and it pulses while it is listening. */
 #mic {
   flex: none; width: 46px; height: 46px; cursor: pointer;
-  display: grid; place-items: center; border-radius: 2px;
-  color: var(--acid); background: rgba(0,0,0,.4);
-  border: 1px solid color-mix(in srgb, var(--acid) 55%, transparent);
+  display: grid; place-items: center; border-radius: 3px;
+  color: var(--him); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--him) 55%, transparent);
 }
 #mic svg { width: 22px; height: 22px; }
-#mic.on { color: #121310; background: var(--acid);
+#mic.on { color: #031006; background: var(--him);
           animation: live 1.1s ease-in-out infinite; }
-@keyframes live {
-  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--acid) 25%, transparent); }
-}
+@keyframes live { 50% { box-shadow: 0 0 0 7px rgba(57,255,94,.22); } }
 #mic.busy { opacity: .45; cursor: default; }
+/* What the DECK says, not her: how to fix the mic, what went wrong. */
+.note { color: var(--dim); font-size: 14.5px; text-shadow: none; }
 
 @media (max-width: 760px) {
   /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF: the rail takes
@@ -217,16 +210,13 @@ body.thinking #glow { animation: prowl 1.4s ease-in-out infinite; }
   #who { flex: none; }
   #home { flex: none; }
   #title { display: none; }
-  #kuro { max-width: 92%; max-height: 92%; }
-  #glow { left: 50%; width: 96%; }
-  #says { position: static; width: auto; margin: 0 18px 10px;
-          max-height: 34vh; }
-  #says::after { display: none; }
-  #stage { justify-items: center; padding-right: 0; }
+  /* A phone is the stand-in screen: she goes on top, the conversation
+     keeps the room. */
+  #stage { grid-template-columns: minmax(0, 1fr);
+           grid-template-rows: 30vh minmax(0, 1fr); padding: 6px 14px 14px; }
+  #kuro { max-width: 100%; justify-self: center; }
 }
 </style>
-
-<div id="room"></div>
 
 <div id="top">
   <div id="who">Kuro</div>
@@ -236,29 +226,29 @@ body.thinking #glow { animation: prowl 1.4s ease-in-out infinite; }
 </div>
 
 <div id="stage">
-  <div id="glow"></div>
-  <!-- A REAL src: she is on screen whatever the server is doing. -->
+  <!-- A REAL src: she is on screen before any fetch resolves. -->
   <img id="kuro" src="kuro/kuro.jpg" alt="Kuro">
-  <div id="says"></div>
+  <div id="chat">
+    <div id="log"></div>
+    <form id="ask" autocomplete="off">
+      <input id="text" placeholder="Say something to her, or /wiki cats" maxlength="2000">
+      <button id="mic" type="button" title="talk to her" aria-label="talk to her">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="3" width="6" height="11" rx="3"/>
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
+        </svg>
+      </button>
+      <button id="send" type="submit">Speak</button>
+    </form>
+  </div>
 </div>
-
-<form id="ask" autocomplete="off">
-  <input id="text" placeholder="Say something to her..." maxlength="2000">
-  <button id="mic" type="button" title="talk to her" aria-label="talk to her">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round">
-      <rect x="9" y="3" width="6" height="11" rx="3"/>
-      <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
-    </svg>
-  </button>
-  <button id="send" type="submit">Speak</button>
-</form>
 
 <script>
 const form = document.getElementById('ask');
 const input = document.getElementById('text');
 const send = document.getElementById('send');
-const says = document.getElementById('says');
+const log = document.getElementById('log');
 
 document.getElementById('home').onclick = () => {
   location.href = 'home.html';
@@ -266,6 +256,11 @@ document.getElementById('home').onclick = () => {
 
 // ---- who else is here ------------------------------------------------
 const ME = 'kuro';
+const SHE = 'Kuro';           // her lines' label -- one place, not two
+// HIS LINES CARRY HIS NAME, the one SHE knows him by: `user` in the
+// roster is USER_NAME off her persona, so the log and her prompt can
+// never disagree about who he is. "you" only if the roster never answers.
+let HIM = 'you';
 fetch('characters.json', { cache: 'no-store' })
   .then(r => r.json())
   .then(cast => {
@@ -283,74 +278,92 @@ fetch('characters.json', { cache: 'no-store' })
   })
   .catch(() => {});
 
-
-// Stage directions are stripped from the BUBBLE, the same call
-// yuzu_voice already makes for the speaker. `[twirls]` is lovely to
-// write and it is not what she SAID -- on a small screen it crowds out
-// the words that are.
+// Stage directions are stripped from what she SAID, the same call
+// yuzu_voice makes for the speaker: they are lovely to write and they
+// are not words, and on a small screen they crowd out the ones that are.
+//
+// ZERO'S COPY WITH ONE CHANGE, on purpose. Zero keeps the words inside
+// *asterisks*, because Qwen writes emphasis with them. The sisters are
+// role-play characters: "*twitches her legs*" is a GESTURE, and with the
+// stars taken off and the words kept it would sit in the log as if she
+// said it -- and her voice would read it out. So a single-star span is
+// dropped whole; **bold** still keeps its words; and Zero's guards stay,
+// so "2 * 3 * 4" is a sum and a line break is a line break.
 function spoken(text) {
   return text.replace(/\[[^\]]*\]/g, ' ')
-             .replace(/\*[^*]*\*/g, ' ')
-             .replace(/\s{2,}/g, ' ')
+             .replace(/(^|[^\w*])\*\*(?=\S)([^*\n]*?\S)\*\*(?!\w)/g, '$1$2')
+             .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1 ')
+             .replace(/[ \t]{2,}/g, ' ')
              .trim();
 }
 
-// ---- HIS WORDS AND HERS ----------------------------------------------
-// Ghost, Sept 24: "I cant see my own words on Yuzus page and Fours page
-// like i can on Zeros page. Id like to." The bubble keeps the
-// conversation now, like Zero's log: his line goes up the moment he
-// sends it, hers fills in underneath, and the bubble scrolls to the
-// START of the newest exchange so a long reply is read from its top.
-// textContent only -- whatever anyone typed is shown as text. His label
-// is READ from the roster (her USER_NAME), never typed into this page.
-// ONE COPY on every page that has a bubble; a test holds them equal.
-let HIM = 'you';
-let waiting = null;
-
-function line(cls, by, text) {
-  const el = document.createElement('div');
-  el.className = 'line ' + cls;
-  if (by) {
-    const tag = document.createElement('span');
-    tag.className = 'by';
-    tag.textContent = by;
-    el.appendChild(tag);
-  }
-  el.appendChild(document.createTextNode(text));
-  says.appendChild(el);
-  // A long evening must not grow the page forever.
-  while (says.children.length > 40) says.removeChild(says.firstChild);
-  says.classList.add('on');
-  return el;
+// ONE TURN IN THE LOG. textContent, never innerHTML: what she writes is
+// shown as text, whatever characters are in it.
+function entry(cls, by, text) {
+  const turn = document.createElement('div');
+  turn.className = 'turn ' + cls;
+  const label = document.createElement('span');
+  label.className = 'by';
+  label.textContent = by;
+  turn.appendChild(label);
+  turn.appendChild(document.createTextNode(text));
+  log.appendChild(turn);
+  log.scrollTop = log.scrollHeight;
+  return turn;
 }
 
-function show(el) {
-  says.scrollTop += el.getBoundingClientRect().top
-                    - says.getBoundingClientRect().top - 12;
+// HER CODE, SHOWN AS CODE. A ``` block becomes a code box holding
+// EXACTLY what she wrote: it skips spoken() entirely, because that
+// strips [brackets] as stage directions -- and `nums = [1, 2, 3]` is
+// Python, not a gesture. The words around it are cleaned as before, and
+// `inline code` gets a small monospace chip. textContent throughout,
+// never innerHTML: what she writes is shown as text, whatever is in it.
+//
+// AN UNCLOSED FENCE IS STILL CODE. Her replies can hit the ceiling
+// mid-block, and the tail of a program shown as prose would lose its
+// indentation and its brackets.
+function fill(turn, text) {
+  text.split('```').forEach((part, i) => {
+    if (i % 2) {
+      const lines = part.replace(/^[ \t]*\n/, '').split('\n');
+      // "```python" -- the language tag is a label, not a line of code.
+      if (lines.length > 1 && /^[\w+#.-]*$/.test(lines[0].trim())) lines.shift();
+      const code = lines.join('\n').replace(/\s+$/, '');
+      if (!code) return;
+      const pre = document.createElement('pre');
+      pre.className = 'code';
+      pre.textContent = code;
+      turn.appendChild(pre);
+      return;
+    }
+    const prose = spoken(part);
+    if (!prose) return;
+    prose.split(/(`[^`\n]+`)/).forEach(bit => {
+      if (/^`[^`\n]+`$/.test(bit)) {
+        const chip = document.createElement('code');
+        chip.textContent = bit.slice(1, -1);
+        turn.appendChild(chip);
+      } else if (bit) {
+        turn.appendChild(document.createTextNode(bit));
+      }
+    });
+  });
 }
 
-function his(text) {
-  const mine = line('him', HIM, text);
-  waiting = line('her pending', '', '...');
-  show(mine);
-}
-
-function said(text) {
+function said(pending, text) {
   const words = spoken(text);
-  const el = waiting || line('her', '', '');
-  waiting = null;
-  el.className = 'line her';
-  el.textContent = words || text.trim();
-  const before = el.previousElementSibling;
-  show(before && before.classList.contains('him') ? before : el);
+  pending.remove();
+  const turn = entry('her', SHE, '');
+  fill(turn, text);
+  // Everything cleaned away (a reply that was all stage direction):
+  // show it as it came rather than an empty line.
+  if (turn.childNodes.length <= 2 && !turn.lastChild.textContent.trim()) {
+    turn.appendChild(document.createTextNode(text.trim()));
+  }
+  log.scrollTop = log.scrollHeight;
+  // The server drops ``` blocks before her voice says anything, so the
+  // same text as before goes to it -- she never reads code aloud.
   hear(words || text.trim());
-}
-
-// THE DECK'S OWN WORDS go in the bubble too, and she never says them
-// out loud -- "allow the microphone" in her voice would be her speaking
-// a line she never wrote.
-function note(text) {
-  show(line('deck', '', text));
 }
 
 // ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
@@ -359,20 +372,15 @@ function note(text) {
 // the wav and the BROWSER plays it.
 //
 // AUTOPLAY IS ALLOWED HERE because he tapped Speak to get this reply,
-// and that tap is the user gesture browsers require. Audio that arrives
-// unasked, on a page he never touched, is the thing they block -- and
-// it is also the thing nobody wants on a handheld.
+// and that tap is the user gesture browsers require.
 //
 // A MISSING VOICE IS SILENT, NEVER AN ERROR ON SCREEN. The reply is the
-// product; the audio is a nicety, the same promise the face, Piper and
-// the wiki all make. If Kokoro is not installed the page behaves
-// exactly as it did before this existed.
+// product; the audio is a nicety.
 //
 // SHE SENDS HER OWN NAME. The server builds one voice PER CHARACTER off
-// her own `piper_length_scale`, so a copied `who` would not just
-// mislabel the request -- it would hand her somebody else's speaking
-// rate, which is a character bug wearing a plumbing costume and is
-// inaudible in the code. A test drives the name out of the real fetch.
+// her own `piper_length_scale`, so a copied `who` would hand her
+// somebody else's speaking rate. A test drives the name out of the
+// real fetch, and holds this block to the other speaking pages'.
 let sound = null;
 function hear(words) {
   if (!words) return;
@@ -398,10 +406,16 @@ form.onsubmit = (event) => {
   const asked = input.value.trim();
   if (!asked) return;
   input.value = '';
-  his(asked);
   send.disabled = true;
   send.textContent = '...';
   document.body.classList.add('thinking');
+  entry('him', HIM, asked);
+  // Where her reply will land, saying so while she works it out.
+  const pending = entry('her pending', SHE, 'working it out ');
+  const dots = document.createElement('span');
+  dots.className = 'dots';
+  dots.textContent = '...';
+  pending.appendChild(dots);
 
   // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
   // and refuses anything that is not in the dict, so nothing typed here
@@ -412,8 +426,8 @@ form.onsubmit = (event) => {
     body: JSON.stringify({ text: asked, who: 'kuro' }),
   })
     .then(r => r.json())
-    .then(r => said(r.said || 'She said nothing.'))
-    .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
+    .then(r => said(pending, r.said || 'She said nothing.'))
+    .catch(() => said(pending, 'No answer from the deck. Is ~/YUZU/face running?'))
     .then(() => {
       send.disabled = false;
       send.textContent = 'Speak';
@@ -441,6 +455,7 @@ form.onsubmit = (event) => {
 const mic = document.getElementById('mic');
 let recorder = null, clip = [], cap = null;
 
+function note(text) { entry('note', 'deck', text); }
 
 mic.onclick = async () => {
   if (recorder && recorder.state === 'recording') { recorder.stop(); return; }

@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 840 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 846 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,78 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ZERO'S CHATBOX FOR THE SISTERS, SHIRO THE SHY ONE, AND HIS PHONE (Sept 26)
+
+The same afternoon, with the sisters live: *"Oh / Its working"* --
+the first Gemma turns on the board, raw layout and all. What he saw
+before the thinking was switched off is not yet in a screenshot.
+
+Then: *"i wouldnt mind giving them Zeros page vibe like the chatbox
+style. Differwnt backgrounds for them tho"*, *"Shiro as the 2.
+Dandere"*, *"Make sure theyre aware of my name like usual. ♡"*, and
+for the chatbox: *"green words=me. Pinks=shiro glow purp=Kuro"*.
+
+- **Their pages are Zero's layout** -- picture down the left, a big
+  log down the right -- **generated from zero.html**, so the log, code
+  boxes, voice, send and mic are Zero's code character for character.
+  A test holds the three log pages equal (her own `who` normalised),
+  and each labels her lines with `const SHE`, which Zero's page gained
+  so her name is written once rather than twice.
+- **Three backgrounds**: Zero's black; **Shiro's white page**, her
+  picture still made the page by `multiply`, **with a DARK GLASS
+  chatbox** -- neon green on white is unreadable, and his colours are
+  neon; Kuro's storm, her picture fading in. His lines `#39ff5e` on
+  all three, Shiro's hot pink `#ff2d95`, **Kuro's purple `#c04dff`**
+  (Four's neon purple, so no new taste call) glowing harder than the
+  others, because he said glow. Pinned as HUES, not hex.
+- **THE SISTERS' `spoken()` IS ZERO'S WITH ONE CHANGE.** Zero keeps
+  the words inside `*asterisks*` because Qwen writes emphasis with
+  them; the sisters are role-play characters, and `*twitches her
+  legs*` unwrapped would sit in the log as speech and then be READ
+  ALOUD by her voice. A single-star span is dropped whole, `**bold**`
+  keeps its words, and Zero's guards stay: `2 * 3 * 4` is a sum and a
+  line break is a line break. Driven under node.
+- **Shiro is a dandere now** (SUPERSEDES "radio-clipped, calm, exact"
+  in the entry below): shy, soft, slow to open up, sweet when she
+  does, and the radio-report voice is where she HIDES when talking
+  gets hard -- *"All six legs nominal. Um... standing by."* **A shy
+  character's failure is the near-empty reply** (deck Shiro's
+  *"Hehe~ \*silence\*"*), so her rule 2 says **"Shy is fine; silent is
+  not"** -- Coco's kuudere lesson -- and a test holds every example of
+  her to five words or more. Sounds `Um, Eep, Uh-huh`; 5300 chars,
+  242 tokens spare. Kuro's lines about her follow: *she* does the
+  talking for both of them.
+- **His name**: `USER_NAME: Ghost` in both, told and shown, and the log
+  labels his lines from the roster -- GHOST, not "you".
+
+### "cut off a bit at the bottom", on his Z Flip 6 -- EVERY page
+
+**`100vh` on a phone is the height with the address bar HIDDEN.**
+Every page here was `html, body { height: 100vh; overflow: hidden }`,
+so whenever Chrome's bar showed, the page ran that far past the bottom
+of the screen -- and every page ENDS in its most important row: Speak
+and the mic, and on the home screen **Back and Update, the way out**.
+`height: 100dvh` after it, on all of them (a browser that has never
+heard of dvh keeps the vh line). **A headless browser has no address
+bar to collapse**, so this cannot be reproduced here; the renders at
+412x872 (a Flip with the bar up) show the new pages fit, and a test
+pins the property on every page, the next one included.
+
+**He also asked how easy Kuro as a hexapod would be, "as a gemma".**
+The answer given, for the record: the SOFTWARE is the easy half and
+most of it exists (the bracket action layer, the whitelist, the
+hexapod gaits and bring-up, the robot-body persona pattern); the deck
+can stay her brain and talk to a controller on the robot over WiFi;
+the real work is the kit, power and calibration; and **Gemma's
+movement has never been measured** -- the action-format numbers here
+are Llama 3B's. Gemma 4's own template has image and audio slots,
+which no model here has had -- **whether this GGUF brought its vision
+half is UNVERIFIED**, and it would need to before a camera means
+anything.
+
+**Six new tests, thirteen breaks plus three re-breaks on the rewritten
+page, all red as failures. 840 -> 846.**
 
 ## SHIRO AND KURO: SISTERS ON SIX LEGS, ON GEMMA 4 (Sept 26)
 

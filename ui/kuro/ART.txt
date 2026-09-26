@@ -9,7 +9,8 @@ it (two mask gradients, intersected). The fades are wide on purpose:
 at 7-10% the bright sky in her top corner stopped at a hard line and she
 read as a photo stuck on the page, and an oval vignette read as a cameo
 frame. Three versions rendered side by side at 1024x600 and looked at;
-16-22% is the one where the storm melts into the room.
+wide fades are the ones where the storm melts into the room (12-18% on
+her chatbox page, where she stands beside the conversation).
 
 Her persona leaves out the red tear streaks: they are the one creepy
 thing in the picture, and "never creepy-cute" was the brief.

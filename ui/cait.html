@@ -45,7 +45,11 @@
   --ember:  #c0392f;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100vh; overflow: hidden; }
+/* 100dvh after 100vh: on a phone, 100vh is the height with the address
+   bar HIDDEN, so while it shows the bottom row sat under the fold (his
+   Z Flip 6, Sept 26). dvh is what is really visible; an older browser
+   keeps the vh line. */
+html, body { height: 100vh; height: 100dvh; overflow: hidden; }
 body {
   background:
     radial-gradient(120% 90% at 50% 8%, #241f36 0%, var(--night) 45%,

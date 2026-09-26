@@ -563,7 +563,7 @@ CHARACTERS = {
     # SISTERS ON SIX LEGS, Sept 26, both on one Gemma 4 model. `shiro` is
     # a NEW persona under an old name -- the yami kawaii Shiro stays
     # retired as the record -- so the key says which one this is.
-    "shiro": ("shiro_mk2",             "shiro.html", "field operator, six legs"),
+    "shiro": ("shiro_mk2",             "shiro.html", "the shy one, six legs"),
     "kuro": ("kuro",                   "kuro.html",  "her sister, the menace"),
 }
 
