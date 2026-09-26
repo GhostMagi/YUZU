@@ -114,7 +114,8 @@ while she is mid-reply, because that reply is saved when it lands.
 Rendered at 1024x600 and 412 and driven in a real browser: in the row
 at 1024, its own line at 412, no sideways scroll. **Two tests, six
 breaks, all red as failures. 860 -> 862.** Four's page only; the
-other pages have no memory row, and nobody has asked. (And `pkill -f`
+other pages have no memory row, and nobody has asked. **CONFIRMED on
+his board: *"It worked bro hell ya"*** -- she is Four again. (And `pkill -f`
 on the render server's own port matched the shell running it, AGAIN
 -- the Mimi-poses trap. Kill by PID.)
 
