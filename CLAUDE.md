@@ -240,6 +240,19 @@ applies the day that starts: the gaits BLOCK for seconds, a watchdog
 and a hard stop before anything moves on its own, and the 2DOF gimbal
 before the legs. Nothing here needs to change for it now.
 
+**THE KIT HE WANTS FIRST: Hiwonder JetHexa, STANDARD kit, ~$499** (his
+number, Sept 26; not confirmed from here -- hiwonder.com is blocked from
+the container). Web search says it is 18 HX-35H serial bus servos
+(35kg), an 11.1V 3500mAh LiPo, a monocular camera, and **Ubuntu 18.04 +
+ROS Melodic on the ORIGINAL Jetson Nano** -- JetPack 4, far weaker than
+his Orin, and not a board the Ollama setup here targets. So the likely
+first shape is the Sept 26 answer's OTHER branch: **the Orin stays her
+brain and talks to the robot over WiFi**, driving Hiwonder's own ROS
+gaits (not `muto_leg_control`, which is the Muto S2's API). Putting an
+Orin Nano in it later means leaving Hiwonder's JetPack-4 software
+behind -- a real job, not a swap. Check the listing says "with Jetson
+Nano" before buying; some Hiwonder kits ship without the board.
+
 **Six new tests, thirteen breaks plus three re-breaks on the rewritten
 page, all red as failures. 840 -> 846.**
 
