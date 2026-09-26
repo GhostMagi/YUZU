@@ -278,6 +278,33 @@ same mix-up, and he never planned a second one. Hiwonder has put other
 robots (JetRover, JetAcker, JetAuto, JetArm) on the Orin Nano with
 ROS2; **no Orin JetHexa was found** in two searches.
 
+**AND THEN: "The one i can afford has no board with it"** -- so the
+plan is HIS ORIN MOVES INTO THE ROBOT, and he asked for a ~$500 robot
+that takes it as is. What four searches found (hiwonder.com, openelab
+and the Amazon pages are blocked from the container, so NO PRICES were
+confirmed):
+
+- **Hiwonder ROSpider, "Starter Kit Without Controller"** -- ROS2, and
+  listed as compatible with the **Jetson Orin Nano Super** by name. The
+  only hexapod found whose own software is built for his board. Price
+  UNKNOWN from here; the with-board kits ran ~$1100 when this file first
+  mentioned it, so it may be over his number.
+- **JetHexa without a board + his Orin** -- the body is fine (18 x 35kg
+  bus servos, 11.1V LiPo); Hiwonder's software is JetPack 4 and will not
+  run. The fix is OURS, not Hiwonder's: skip ROS, talk to their servo
+  controller from Python (the bus-servo protocol is short and public),
+  and walk it with our own gait code. A real software project across a
+  few sessions, not "a tiny bit" -- said to him in those words.
+- **Yahboom Muto S2 does NOT support the Orin** (its own listing, via
+  search) -- so `muto_leg_control.py` is not a reason to buy one.
+- **The Orin's barrel jack takes 9-20V** (NVIDIA carrier spec). A 3S
+  LiPo is ~12.6V full and ~10V near empty, so it is in range -- but the
+  old Nano ran on 5V, so a JetHexa's own board-power lead is probably
+  the WRONG voltage for the Orin. Check before plugging anything in.
+- Moving the Orin means the deck has no brain while it rides the robot.
+  Her memory and the whole repo live on its NVMe, so the girls go WITH
+  it; she needs a robot-body persona (the shiro/shiro_deck split).
+
 **Six new tests, thirteen breaks plus three re-breaks on the rewritten
 page, all red as failures. 840 -> 846.**
 
