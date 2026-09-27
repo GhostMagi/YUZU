@@ -8781,9 +8781,45 @@ class TestTheSisters(BrainTestCase):
     "Thinking Process:" before "Hello! I am Gemma 4" -- so their turn is
     laid out here, the way Google's own template does it with thinking
     off, and sent raw. And a model that is not pulled yet has to say
-    `ollama pull`, not "start ollama serve"."""
+    `ollama pull`, not "start ollama serve".
+
+    THEY MOVED TO FOUR'S LLAMA ON SEPT 27 -- "Honestly the gemmas arent
+    keeping my attention. I seem to prefer llama." The characters and
+    their prompts are unchanged. The Gemma path in the brain stays, so a
+    Gemma character is STAGED for the tests that drive it
+    (`gemma_character`): a real one gone quiet would leave those tests
+    looping over nobody and passing about nothing."""
 
     SISTERS = ("shiro_mk2", "kuro")
+    GEMMA = "gemma_stand_in"
+    GEMMA_SETTINGS = (
+        "model: hf.co/mradermacher/gemma-4-E2B-it-heretic-ara-GGUF:Q4_K_M\n"
+        "prompt_format: gemma4\n"
+        "stop: <turn|>, <|turn>\n"
+        "temperature: 1.0\n"
+        "top_p: 0.95\n"
+        "top_k: 64\n")
+
+    @contextlib.contextmanager
+    def gemma_character(self):
+        """Kuro as she shipped on Sept 26: her own persona with the Gemma
+        settings put back, in a staged copy of the persona folder."""
+        with tempfile.TemporaryDirectory() as tmp:
+            real = yuzu_personas.PERSONA_DIR
+            staged = Path(tmp) / "personas"
+            shutil.copytree(real, staged)
+            head, body = (staged / "kuro.persona").read_text(
+                encoding="utf-8").split("\n---\n", 1)
+            head = "\n".join(line for line in head.splitlines()
+                             if not line.startswith("temperature:"))
+            (staged / (self.GEMMA + ".persona")).write_text(
+                head + "\n" + self.GEMMA_SETTINGS + "---\n" + body,
+                encoding="utf-8")
+            yuzu_personas.PERSONA_DIR = staged
+            try:
+                yield self.GEMMA
+            finally:
+                yuzu_personas.PERSONA_DIR = real
     OLD_DECK_BODY = (
         "You have no legs, no arms, no camera and no face. What you have "
         "is a voice and whoever is holding you.",
@@ -9080,12 +9116,13 @@ class TestTheSisters(BrainTestCase):
             self.assertEqual(yuzu_brain_module.gemma4_prompt(messages), google)
 
     def test_a_gemma_character_goes_RAW_and_nobody_else_does(self):
-        """Driven through a real request to the stub Ollama: a sister's
-        turn goes to /api/generate, raw, with no `think` and no
-        `messages`, ending on the empty thought channel, with Gemma's
-        own turn markers as her stops. Four and Zero are untouched --
-        still /api/chat, laid out by the template in their GGUF."""
-        for key in self.SISTERS:
+        """Driven through a real request to the stub Ollama: a Gemma
+        character's turn goes to /api/generate, raw, with no `think` and
+        no `messages`, ending on the empty thought channel, with Gemma's
+        own turn markers as her stops. Everyone else -- the sisters too,
+        since Sept 27 -- is still /api/chat, laid out by the template in
+        their GGUF."""
+        with self.gemma_character() as key:
             brain = YuzuBrain(persona=key, host=self.host)
             self.assertEqual(brain.ask("Hey."), "Not much, just vibing! "
                              "[squats] What's good?")
@@ -9103,7 +9140,7 @@ class TestTheSisters(BrainTestCase):
             self.assertEqual("".join(brain.ask_stream("Again.")).strip(),
                              "Not much, just vibing! [squats] What's good?")
             self.assertEqual(MockOllama.seen["path"], "/api/generate")
-        for key in ("four", "zero"):
+        for key in ("four", "zero") + self.SISTERS:
             YuzuBrain(persona=key, host=self.host).ask("Hey.")
             self.assertEqual(MockOllama.seen["path"], "/api/chat", key)
             self.assertIn("messages", MockOllama.seen["last"], key)
@@ -9112,16 +9149,31 @@ class TestTheSisters(BrainTestCase):
         """A Gemma 4 character without `prompt_format: gemma4` would go
         back to thinking out loud every turn; the setting on anything
         else would hand a Llama or a Qwen markup it has never seen. So
-        the two are one decision, read off every persona."""
-        for key in yuzu_personas.available():
-            settings = self.persona(key).settings
-            gemma = "gemma-4" in str(settings.get("model", "")).lower()
-            laid = str(settings.get("prompt_format", "")).lower() == "gemma4"
-            self.assertEqual(gemma, laid, "%s: model and prompt_format disagree" % key)
-        self.assertEqual({self.persona(k).settings["model"] for k in self.SISTERS},
-                         {self.persona("shiro_mk2").settings["model"]},
-                         "the sisters stopped sharing one model, so every "
-                         "switch between them swaps weights")
+        the two are one decision, read off every persona -- the staged
+        Gemma one included, so the rule is checked in both directions
+        and not only on a deck that happens to have no Gemma on it."""
+        with self.gemma_character():
+            for key in yuzu_personas.available():
+                settings = self.persona(key).settings
+                gemma = "gemma-4" in str(settings.get("model", "")).lower()
+                laid = str(settings.get("prompt_format", "")).lower() == "gemma4"
+                self.assertEqual(gemma, laid,
+                                 "%s: model and prompt_format disagree" % key)
+            self.assertTrue(self.persona(self.GEMMA).settings.get("prompt_format"))
+
+    def test_the_sisters_think_with_FOURS_model(self):
+        """His call, Sept 27: "I seem to prefer llama", and the sisters
+        moved rather than retired. One model for the front character and
+        both sisters means switching girls never swaps weights, and on
+        the robot it is the memory Hiwonder's software gets instead. It
+        is also the model the bracket-move format was measured on. Read
+        through the brain, so a `model:` line creeping back into either
+        sister, pointed anywhere else, is caught."""
+        fours = YuzuBrain(persona="four", host=self.host).model
+        for key in self.SISTERS:
+            self.assertEqual(YuzuBrain(persona=key, host=self.host).model,
+                             fours, "%s left Four's model" % key)
+            self.assertNotIn("prompt_format", self.persona(key).settings, key)
 
     def test_a_thought_channel_never_reaches_his_screen(self):
         """His screen, Sept 26: "<|channel>thought ... <channel|>Hello!"
@@ -9262,15 +9314,18 @@ class TestTheSisters(BrainTestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
             host = "http://127.0.0.1:%d" % server.server_address[1]
-            for key in ("kuro", "zero"):
-                brain = YuzuBrain(persona=key, host=host)
-                for how in (lambda: brain.ask("hi"),
-                            lambda: list(brain.ask_stream("hi"))):
-                    with self.assertRaises(BrainError) as ctx:
-                        how()
-                    said = str(ctx.exception)
-                    self.assertIn("ollama pull " + brain.model, said, key)
-                    self.assertNotIn("ollama serve", said, key)
+            # Zero asks /api/chat and a Gemma character /api/generate: two
+            # routes, and a 404 has to say the same thing on both.
+            with self.gemma_character() as gemma:
+                for key in (gemma, "zero"):
+                    brain = YuzuBrain(persona=key, host=host)
+                    for how in (lambda: brain.ask("hi"),
+                                lambda: list(brain.ask_stream("hi"))):
+                        with self.assertRaises(BrainError) as ctx:
+                            how()
+                        said = str(ctx.exception)
+                        self.assertIn("ollama pull " + brain.model, said, key)
+                        self.assertNotIn("ollama serve", said, key)
         finally:
             server.shutdown()
             server.server_close()
@@ -9278,11 +9333,13 @@ class TestTheSisters(BrainTestCase):
     def test_check_names_the_PULL_for_a_character_with_her_own_weights(self):
         """`check()` told anyone missing a model to build it with
         build_yuzu_model.py -- right for Four, whose model is built from
-        a Modelfile, and wrong for a character whose model is pulled."""
+        a Modelfile, and wrong for a character whose model is pulled.
+        Zero is the one who brings her own weights since the sisters
+        moved onto Four's."""
         with self.assertRaises(BrainError) as ctx:
-            YuzuBrain(persona="kuro", host=self.host).check()
+            YuzuBrain(persona="zero", host=self.host).check()
         said = str(ctx.exception)
-        self.assertIn("ollama pull " + self.persona("kuro").settings["model"], said)
+        self.assertIn("ollama pull " + self.persona("zero").settings["model"], said)
         self.assertNotIn("build_yuzu_model.py", said)
 
     # ---- her page ----------------------------------------------------

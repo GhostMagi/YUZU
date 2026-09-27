@@ -561,9 +561,9 @@ class YuzuBrain:
             # a hardcoded fix instruction point at the wrong thing at
             # exactly the moment someone is stuck.
             #
-            # And a character who brings her OWN weights (Zero, Shiro,
-            # Kuro) is not built from a Modelfile here -- her model is
-            # PULLED, so that is the one line to give.
+            # And a character who brings her OWN weights (Zero, or
+            # anyone with a `model:` line) is not built from a Modelfile
+            # here -- her model is PULLED, so that is the one line to give.
             if self.persona and (self.persona.settings.get("model") or "").strip():
                 raise BrainError(
                     f"Ollama is running, but {self.persona.name}'s model is "

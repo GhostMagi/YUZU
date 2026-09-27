@@ -17,29 +17,22 @@ description: Shiro, brought back as a shy, quiet dandere riding a white six-legg
 # the name and the one thing he asked for by name: she knows she has
 # six legs.
 #
-# HER OWN WEIGHTS: Gemma 4 E2B in p-e-w's heretic build, the same
-# uncensored line as Four's and Zero's. Pulled on his board Sept 26
-# (3.4 GB, "success"). Shared with her sister, so switching between the
-# two of them never swaps a model.
-model: hf.co/mradermacher/gemma-4-E2B-it-heretic-ara-GGUF:Q4_K_M
-# HER TURN IS LAID OUT BY THE DECK, NOT BY THE GGUF. The first run on
-# his board, Sept 26, with no prompt at all, thought out loud for eight
-# seconds before "Hello! I am Gemma 4" -- in the model's own markup,
-# printed as text. Every turn, on a deck. So the brain writes her turn
-# exactly as Google's template does with thinking OFF (an empty thought
-# channel opening her reply) and sends it raw. See gemma4_prompt() in
-# yuzu_brain.py.
-prompt_format: gemma4
-# WHERE HER TURN ENDS: Gemma 4's own turn markers, sent as options.stop
-# for her only, with cut_his_turn() as the guarantee underneath -- the
-# fix Zero needed after she wrote his side of the conversation.
-stop: <turn|>, <|turn>
-# Google's own recommended sampling for Gemma, not a taste call -- the
-# same rule Zero's Qwen settings follow. If she rambles on the board,
-# temperature is the first dial, and it is one variable.
-temperature: 1.0
-top_p: 0.95
-top_k: 64
+# ON FOUR'S LLAMA, Sept 27. She was written for Gemma 4 E2B heretic,
+# which he ran for about a day and then: "Honestly the gemmas
+# arent keeping my attention. I seem to prefer llama." Asked, he picked
+# keeping both sisters and moving their brains. So there is no `model:`
+# line: she runs on whatever Four runs on, which means one model in
+# memory for the whole deck (no swap when he switches girls, and more
+# room for the robot's own software), and it is the model the
+# bracket-move format was actually MEASURED on. Nothing below the
+# `---` changed, so her composed prompt is byte-identical.
+# Llama is laid out by the template in its GGUF, like Four's, so the
+# Gemma settings (prompt_format, its turn markers as stops, Google's
+# sampling) went with it; cut_his_turn() still guards where her turn
+# ends, for every character.
+# 0.8, the gyaru's number and the deck's Modelfile default: a shy girl
+# does not want the loud end of the dial.
+temperature: 0.8
 # Unhurried and a little hesitant: the shy one is never the quick one.
 piper_length_scale: 1.05
 # HER OWN VOICE, his pick, Sept 26: "Give sky to shiro and kuro can be

@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 862 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 863 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,73 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE SISTERS MOVE TO LLAMA, AND A BASELINE LIST FOR THE ROBOT (Sept 27)
+
+*"Honestly the gemmas arent keeping my attention. I seem to prefer
+llama."* Offered three choices (move them, retire them, leave them),
+he picked **move them**: same girls, same prompts, same voices (Sky
+and Sarah), same pages, on Four's model.
+
+- **No `model:` line on either sister**, so each resolves to whatever
+  Four runs on. The six Gemma settings went (`model`, `prompt_format`,
+  `stop`, Google's 1.0/0.95/64). Temperatures follow the Llama
+  characters already on the deck, not taste: Shiro 0.8 (Yuzu's, and
+  the Modelfile default), Kuro 0.85 (Saya's, the loud one). **All 22
+  composed prompts are byte-identical to HEAD, verified**, so there is
+  nothing to paste.
+- **Why it helps the robot, beyond his taste:** there is ONE model in
+  memory for Four and both sisters, so switching girls never swaps
+  weights (`OLLAMA_MAX_LOADED_MODELS=1`). It is ~2GB against Gemma's
+  3.4GB, which leaves more of the 8GB for Hiwonder's ROS 2. And it is
+  the model the bracket-move format was MEASURED on (moves_at_all
+  80-100%). "Gemma's movement has never been measured" is moot now.
+- **The Gemma path stays in the brain** (`gemma4_prompt`,
+  `strip_thought`, Gemma's turn markers in `cut_his_turn`). It works
+  and it is tested, and nobody uses it. The tests that drove it through
+  the sisters now drive a STAGED stand-in (`gemma_character()`: Kuro
+  with the Sept 26 settings put back). With no real Gemma character,
+  those tests would loop over nobody and pass without checking
+  anything, the vacuous-check trap. A new test reads, through the
+  brain, that both sisters resolve to Four's model. **Five breaks, all
+  red as failures. 862 -> 863.**
+- **UNMEASURED on the board**: how the sisters play on Llama. Their
+  saved memories hold Gemma-era replies (already cleaned of thought),
+  which read back as their own examples for a turn or two. Only Four's
+  page has `start fresh`, so if that shows, a start-fresh button on
+  their pages is the fix.
+- **The Gemma weights stay on his NVMe**, 3.4GB used by nothing.
+  `ollama rm` frees the space; nothing needs it. His call.
+- Noticed and NOT changed: a 404 for Four's model says `ollama pull
+  yuzu`, which is wrong for a model built from a Modelfile. That
+  wording predates this change, and it is only reachable if her model
+  is missing.
+
+### The baseline list, asked the same hour: *"Whats some work we could do"*
+
+Nothing on it needs the robot. **He has not picked yet.** The advice
+given was 1 first, then the kill switch.
+
+1. **A "Save my stuff" button**: a zip to his PHONE of what cannot be
+   downloaded again, meaning `~/.yuzu` (the girls' memories and his
+   facts) and his ROMs and saves. The wiki and the models can be
+   fetched again. It protects against a Hiwonder image wiping the NVMe
+   whatever their email says. A button, not a command.
+2. ~~Measure whether Gemma can do the move format~~: gone with Gemma.
+3. **A kill switch that works when the WiFi drops**: a STOP button on
+   his phone, plus a heartbeat so the robot stops by itself when it
+   stops hearing from the phone. It can be built and tested against
+   DummyBot now, and it must exist before anything moves on its own
+   near the cat.
+4. **Measure the board**: free memory with the model, Kokoro and
+   Whisper loaded (the room left for ROS), and watts while she
+   generates (the robot's battery life).
+5. **The sisters' robot bodies** (the shiro/shiro_deck split): waits
+   for the robot's real move list.
+
+**Not yet: the bridge to Hiwonder's ROS 2.** Their topics and commands
+cannot be seen until the robot is on his desk, and guessing them is the
+8BitDo lesson.
 
 ## THE ROSPIDER, AND FOUR CALLED HERSELF GHOST (Sept 26, ~22:15)
 

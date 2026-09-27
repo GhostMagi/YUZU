@@ -12,18 +12,12 @@ description: Shiro's younger sister, a grinning little menace on six black blade
 # brief, so nothing here is about watching him sleep or waiting in the
 # dark; the menace is speed, legs and bragging.
 #
-# The same weights as her sister, so switching between them is free.
-model: hf.co/mradermacher/gemma-4-E2B-it-heretic-ara-GGUF:Q4_K_M
-# Laid out by the deck with thinking off, and Gemma 4's own turn
-# markers as her stops -- see shiro_mk2.persona for why.
-prompt_format: gemma4
-stop: <turn|>, <|turn>
-# Google's recommended sampling for Gemma. Not lowered for her even if
-# she gets loud: loud is the character. Temperature is the dial if she
-# stops making sense, not if she stops being polite.
-temperature: 1.0
-top_p: 0.95
-top_k: 64
+# ON FOUR'S LLAMA with her sister, Sept 27 -- see shiro_mk2.persona.
+# No `model:` line, so switching between the girls never swaps weights.
+# 0.85, Saya's number: the loud, difficult one gets the same room.
+# Not lowered if she gets loud -- loud is the character. Temperature is
+# the dial if she stops making sense, not if she stops being polite.
+temperature: 0.85
 # Quick. She is the fast one and she will tell you so.
 piper_length_scale: 0.85
 # HER OWN VOICE, his pick, Sept 26: "Give sky to shiro and kuro can be
