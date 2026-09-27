@@ -115,6 +115,40 @@ Kuro were written as six-legged girls whose legs "live on the screen
 until the chassis is built"** -- this is that chassis, and their robot
 persona is the shiro/shiro_deck split.
 
+**THE PRODUCT PAGE, FOURTEEN IMAGES (Sept 27). What was new:**
+- **Two brains, and one is theirs.** The hardware diagram puts an
+  **STM32 robot controller** under the deck, driving the servos. The
+  "ROS controller" (the Orin) sits on top. "Without Controller" leaves
+  out the Orin, not the STM32: the Orin plans and the STM32 moves.
+- **The Starter's camera is on a 2DOF pan-tilt** ("35kg Feedback Bus
+  Servo | 2DOF Camera Pan-Tilt"). That is the gimbal "Before anyone
+  adds vision" says to track with FIRST, and the cheapest kit has it.
+- **Its charger is 12.6V 2A on a 5.5x2.5 barrel.** So the battery is a
+  3S LiPo, and the plug is the SAME SIZE as the Orin devkit's own 19V
+  supply. Two bricks with one plug and two voltages: label both and
+  never swap them. What sits behind the robot's charge port is UNKNOWN,
+  and the wrong brick is not how to find out.
+- **Every kit ships a card reader.** That is a clue, NOT an answer, that
+  their software comes as an image on a memory card. If it does, that is
+  the SAFE version: their system on its own card, his NVMe untouched.
+  It goes on a NEW card, never the microSD rescue image. This sharpens
+  question 2 above.
+- **A small screen on its chest** looks like it shows IP, camera, LiDAR
+  and a **Battery** line, and the servos are "feedback" servos that
+  report back. On the deck nothing can read a battery (the "82%" she
+  invented). On the robot something evidently can, so a REAL battery
+  and leg reading in her robot prompt is possible, in the board_now()
+  shape. UNVERIFIED until it is on his desk.
+- **The talking demos ("Hello Hiwonder, what's in front of you?") and
+  OpenClaw are Hiwonder's AI stack, and are PROBABLY cloud models**
+  (unverified). The girls stay offline and push-to-talk; a wake word is
+  exactly what he turned down. The demos that measure distance need the
+  depth camera, which the Starter does not have.
+- **Day one needs no code or typing**: their phone app, or the wireless
+  controller in the box, drives it.
+- **Size, standing**: 43 x 40 cm across the legs. The body is ~15 cm
+  high, and 22.6 cm with a LiDAR on top.
+
 **(SUPERSEDED Sept 27 by the JetHexa2027 Starter above.) HE IS SAVING
 FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
 spider with the arm"*, after his own screenshot of hiwonder.com said
