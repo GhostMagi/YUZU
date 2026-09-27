@@ -764,6 +764,18 @@ class TestBrain(BrainTestCase):
             self.assertEqual(YuzuBrain(persona="zero").model, own)
             self.assertEqual(YuzuBrain(persona="zero", model="x").model, "x")
 
+    def test_zero_STAYS_on_qwen(self):
+        """His call, Sept 27, the same hour the sisters moved onto Four's
+        Llama: "Remember thad zero stays a qwen tho". Every other test
+        here reads her model off her own file, so a sweep that moved
+        everyone onto one model would pass them all. This one pins the
+        decision, and her ChatML stops with it -- Qwen's turn markers on
+        anything else are markup that model has never seen."""
+        zero = yuzu_personas.load("zero").settings
+        self.assertIn("qwen", str(zero.get("model", "")).lower(),
+                      "Zero left Qwen; he asked for her to stay on it")
+        self.assertIn("<|im_end|>", str(zero.get("stop", "")))
+
     def test_the_terminal_chat_does_not_force_the_default_on_her(self):
         """`yuzu_brain --chat --persona zero` must boot her on HER model.
         The flag's own default used to be DEFAULT_MODEL, passed in

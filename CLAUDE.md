@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 863 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 864 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -109,8 +109,32 @@ given was 1 first, then the kill switch.
 4. **Measure the board**: free memory with the model, Kokoro and
    Whisper loaded (the room left for ROS), and watts while she
    generates (the robot's battery life).
-5. **The sisters' robot bodies** (the shiro/shiro_deck split): waits
-   for the robot's real move list.
+5. ~~The sisters' robot bodies~~ -> **Yuzu's and Four's robot bodies**
+   (the yuzu4-on-muto_s2 pattern: same character, a real body block):
+   waits for the robot's real move list. See below.
+
+**THE PILOTS ARE YUZU AND FOUR**, same hour: *"I think Yuzu may be the
+pilot alongside Four"* -- "may be", so this is his lean, not a lock.
+It is the best-founded pick on the cast. **Yuzu is the only character
+this repo has ever MEASURED on a hexapod**: yuzu4 on the muto_s2 body,
+moves_at_all 75-100% and 12/12 in one run, with the bare-command
+example already written (the `Stop.` example is yuzu5's, and the stop
+aliases are in the parser). Four has never had a body. Both run on
+the deck's Llama, so the robot keeps ONE model resident for both
+pilots. **NOT changed, and worth raising when the bodies get built:**
+the sisters' `DECK_BODY` still says Ghost *"means to build you a real
+chassis one day"*. If the chassis goes to the pilots, that line is
+promising them something that is not coming.
+
+**ZERO STAYS ON QWEN**, his words the same hour: *"Remember thad zero
+stays a qwen tho"*. Every Zero test read her model off her own file,
+so a sweep like the sisters' move would have passed them all.
+`test_zero_STAYS_on_qwen` pins the model AND her ChatML stops.
+Verified by pointing her at Four's model in a copy: red. 863 -> 864.
+Worth knowing for the robot: a Qwen next to a Llama is a model SWAP
+whenever he switches to her, and on the robot that swap competes with
+ROS for the 8GB. So she stays a deck character, which is what the
+pilot choice already says.
 
 **Not yet: the bridge to Hiwonder's ROS 2.** Their topics and commands
 cannot be seen until the robot is on his desk, and guessing them is the
