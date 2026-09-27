@@ -149,6 +149,23 @@ persona is the shiro/shiro_deck split.
 - **Size, standing**: 43 x 40 cm across the legs. The body is ~15 cm
   high, and 22.6 cm with a LiDAR on top.
 
+**THEN THE STANDARD, $620 (Sept 27, same day).** He cleared a family
+debt, so after bills he has $620, *"The exact price of the standard"*,
+maybe more if his dad pays him for odd jobs. $620 is HIS number, not
+confirmed from here. This is the kit "Standard is the sensible floor"
+above recommends, and it ends the Starter-now-parts-later plan. If the
+money falls short, the Starter is still the fallback, with the
+same-models rule. **Three things said to him before he pays:**
+- **Pick "Without Controller"** in the Controller menu, or he pays for
+  a second Orin.
+- **The listed price is probably not the checkout total.** Shipping
+  and tax (import charges included) come on top, and he is budgeting to
+  the dollar. Read the final total before paying.
+- **The two questions to Hiwonder still stand**: the Orin power lead,
+  and install vs disk image. The Standard adds a THIRD: whether its AI
+  voice box works offline. It is not needed either way, because the
+  girls' ears and voice are ours.
+
 **(SUPERSEDED Sept 27 by the JetHexa2027 Starter above.) HE IS SAVING
 FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
 spider with the arm"*, after his own screenshot of hiwonder.com said
