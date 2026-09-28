@@ -109,9 +109,9 @@ given was 1 first, then the kill switch.
 4. **Measure the board**: free memory with the model, Kokoro and
    Whisper loaded (the room left for ROS), and watts while she
    generates (the robot's battery life).
-5. ~~The sisters' robot bodies~~ -> **Yuzu's and Four's robot bodies**
-   (the yuzu4-on-muto_s2 pattern: same character, a real body block):
-   waits for the robot's real move list. See below.
+5. **The pilots' robot bodies** -- Yuzu, Four, Shiro and Kuro (the
+   yuzu4-on-muto_s2 pattern: same character, a real body block).
+   These wait for the robot's real move list. See below.
 
 **THE PILOTS ARE YUZU AND FOUR**, same hour: *"I think Yuzu may be the
 pilot alongside Four"* -- "may be", so this is his lean, not a lock.
@@ -121,10 +121,45 @@ moves_at_all 75-100% and 12/12 in one run, with the bare-command
 example already written (the `Stop.` example is yuzu5's, and the stop
 aliases are in the parser). Four has never had a body. Both run on
 the deck's Llama, so the robot keeps ONE model resident for both
-pilots. **NOT changed, and worth raising when the bodies get built:**
-the sisters' `DECK_BODY` still says Ghost *"means to build you a real
-chassis one day"*. If the chassis goes to the pilots, that line is
-promising them something that is not coming.
+pilots.
+
+**THEN THE SISTERS TOO, Sept 28:** *"Shiro and kuro can go in the bot
+too, ill wamt it set up to where i can switch personas on the fly."* So
+there are FOUR pilots, all on the deck's Llama, which is the payoff of
+moving the sisters off Gemma: **switching girls on the robot swaps a
+system prompt, never the weights** (seconds for the first reply, no
+reload, and nothing extra taken from ROS's share of the 8GB). The loose
+end is closed: the sisters' `DECK_BODY` promises them *"a real chassis
+one day"*, and now it is true.
+
+**The switching design, as told to him, for whoever builds it:**
+- **Whoever he is talking to is the one driving.** There is one body
+  and one pilot at a time, and the page he is on decides.
+- **A switch STOPS the robot first**, then hands over. A move half-done
+  by one girl and finished by another is the cross-talk trap with legs.
+- **Every pilot's moves go through the SAME whitelist.** Kuro's menace
+  stays in her words: the list is the guarantee, the prompt only reduces
+  (the oldest split in this file).
+- Each girl keeps her own chat memory, as on the deck already.
+
+**THE KILL SWITCH, explained to him the same message** (*"Whats a
+killswitch for in my case and how would i use it"*). The answer rests on
+one number: **saying "stop" to a girl goes through the model, which is
+10-30 seconds on the board.** That is fine for "stop walking, let's
+talk" and useless when the cat steps in front of 18 servos. The kill
+switch does NOT go through the model. Three layers:
+- **A big STOP on every pilot's page.** One tap, the legs stop now,
+  whatever she is saying or thinking.
+- **A heartbeat.** The page tells the robot "still here" every second
+  or so, and silence for ~2 seconds (WiFi drop, dead phone, closed tab)
+  stops it by itself. This covers the case where he cannot reach the
+  button.
+- **The robot's own power switch** as the last resort. Whether it has
+  one and where it is gets checked when it arrives; UNVERIFIED.
+
+Why it is not optional, from this repo's own record: yuzu4 once
+answered *"Walk forward"* with `[walks backward]`. A wrong move is a
+MEASURED fault of these models, not a hypothetical.
 
 **ZERO STAYS ON QWEN**, his words the same hour: *"Remember thad zero
 stays a qwen tho"*. Every Zero test read her model off her own file,
