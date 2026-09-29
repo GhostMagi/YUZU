@@ -49,6 +49,80 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## THE JETHEXA2027 PAGE, FROM HIS SCREENSHOTS (Sept 29)
+
+hiwonder.com is blocked from the container, so he sent thirteen
+screenshots of the product page instead of starting a new session with
+the domain allowed. (That is the environment's NETWORK setting, reached
+from claude.ai/code in a phone BROWSER; the phone app's menu has no such
+option, and I first sent him to the wrong place.) **All of this is
+Hiwonder's own page, which is not the same as the robot on his desk.**
+Nothing here changed a prompt or a line of code. What it settles:
+
+- **The Standard's voice box IS the WonderEcho Pro.** The spec table
+  lists it under audio, and the Standard's packing list has the robot
+  "with monocular camera, COIN-D6 LiDAR and AI voice module". USB-C,
+  5V, its own NPU doing "command wake-up" on up to 255 fixed phrases,
+  5m in a quiet room, 1m in a noisy one. **So the third question to
+  Hiwonder is answered**: its own recognition runs on the module, with
+  no internet. The girls still do not use it (push-to-talk and Whisper
+  stay the way in). That it shows up on the Orin as a plain USB sound
+  card is still their text via web search: UNVERIFIED until plugged in.
+- **The robot's own board powers the Orin.** The STM32 expansion board
+  (STM32F407VET6, 7-12V in, a 5V 5A rail, a 6-axis IMU, a power switch,
+  a USB serial port on Type-C, a USB host for the controller's
+  receiver) has a pin labelled "Jetson Orin Nano / Orin NX power port
+  and robotic arm servo port". **But the packing list shows no Orin
+  lead**, so whether "Without Controller" includes the cable from that
+  port to the Orin's barrel jack is STILL the question for their Chat.
+- **Their software ships ON THEIR SSD.** The Orin Nano Super option
+  reads "128G SSD" and "ROS2 system: Preinstalled in the Jetson system
+  (Ubuntu 22.04)", and the tutorials list a "system image". **That
+  explains the card reader**, and it was a red herring for him: the 64GB
+  TF card is for the old Nano and the Pi 5; an Orin gets an SSD. So
+  without their controller the likely path is THEIR IMAGE on an SSD,
+  and flashed over his NVMe it wipes her memory, his notes, the wiki,
+  his ROMs and the models. Said to him: **tap Save my stuff before
+  anything of theirs touches the board**, and ask their Chat whether
+  their system can go on a SECOND SSD, or be installed onto his Ubuntu
+  22.04 (the same OS), rather than over his. The devkit carrier has a
+  second M.2 Key M slot by NVIDIA's spec; which one is free on his board
+  is UNVERIFIED. Which system the girls then run on is a decision for
+  that day.
+- **The chest screen shows the IP and the battery** (1.9", 170x320,
+  over Type-C: Product, Memory, Storage, Version, IP, Camera, Lidar,
+  Battery 12.6V). At the garage on his hotspot, if `ghostnano.local`
+  does not answer, the numbers are on her chest. **And the voltage line
+  on the go-live checklist has a source**: the screen reads it and the
+  servos report it too.
+- **Battery**: 11.1V 3500mAh 5C, 18650 cells behind a protection board
+  (~800 cycles), full at 12.6V, an SM plug plus a DC socket. **Their
+  battery life is 60 minutes**, with their software; the Orin thinking
+  at MAXN on top is UNMEASURED and will take some of it. The charger is
+  12.6V 2A on the 5.5x2.5 barrel, the same plug as the Orin's own 19V
+  brick: label both, never swap them (said before, still true).
+- **The servos are HX-35H bus servos**: 9-12.6V, UART at 115200,
+  position 0-1000 over 0-240 degrees, and they report temperature,
+  voltage and position. Same family as the old JetHexa's. The Orin
+  talks to the STM32, not to them, so this is for whoever writes the
+  bridge, not something he wires.
+- **The wireless controller's receiver plugs into the STM32 board**, not
+  the Orin, so it probably drives her with the Orin off. Whether it can
+  override what the Orin sends is UNVERIFIED. **There is a real power
+  switch on that board**, so his "chase her down and push the power"
+  has a switch to push. That is his plan confirmed, not the kill switch
+  coming back.
+- **Also on the page**: COIN-D6 LiDAR (360 degrees, 10Hz, 0.06-12m, UART
+  230400, 5V 800mA); the 2DOF pan-tilt camera (640x480, 120 degree
+  view, USB); Ubuntu 22.04.5 + ROS 2 Humble over WiFi or Ethernet; a
+  phone app, Windows software and the controller; "custom action group
+  editing" (the old ActionSets, which is where the bridge will map her
+  thirteen phrases); 430x400x226mm and 2.57kg for the Standard. Their
+  comparison table says **offline large AI models run on the Orin** and
+  their stack takes **55s to start** on an Orin Nano. Their offline model
+  does not replace the girls, and on 8GB it would compete with Four's
+  Llama the way Zero's Qwen does.
+
 ## SAVE MY STUFF, AND HER PAGE IN A GARAGE WITH NO INTERNET (Sept 29)
 
 *"But also do your save button."* Built, as the answer to his own
@@ -324,8 +398,8 @@ not the software.
   wont need a speaker yea?"*): Hiwonder's "AI Voice Interaction Box"
   is their WonderEcho Pro, a noise-cancelling mic AND a speaker in one
   box that plugs in by USB as a plain sound card, no drivers (their
-  own product text, found by web search). UNVERIFIED that the 2027
-  Standard ships that exact box; the search found no 2027 page. Used
+  own product text, found by web search). **CONFIRMED from his
+  screenshots of the 2027 page (see the top): the Standard ships it.** Used
   that way it is only a speaker and a mic: the girls' ears and voice
   stay ours (Whisper, Kokoro), and Hiwonder's wake words are not used.
   **Her voice coming OUT of the robot needs a small change later**:
@@ -587,7 +661,9 @@ persona is the shiro/shiro_deck split.
   their software comes as an image on a memory card. If it does, that is
   the SAFE version: their system on its own card, his NVMe untouched.
   It goes on a NEW card, never the microSD rescue image. This sharpens
-  question 2 above.
+  question 2 above. **EXPLAINED Sept 29: the TF card is for the Nano
+  and the Pi 5. An Orin gets their system on a 128GB SSD** (see "THE
+  JETHEXA2027 PAGE" at the top).
 - **A small screen on its chest** looks like it shows IP, camera, LiDAR
   and a **Battery** line, and the servos are "feedback" servos that
   report back. On the deck nothing can read a battery (the "82%" she
@@ -619,7 +695,8 @@ same-models rule. **Three things said to him before he pays:**
 - **The two questions to Hiwonder still stand**: the Orin power lead,
   and install vs disk image. The Standard adds a THIRD: whether its AI
   voice box works offline. It is not needed either way, because the
-  girls' ears and voice are ours.
+  girls' ears and voice are ours. **The third is ANSWERED (Sept 29,
+  his screenshots): its recognition runs on its own chip.**
 
 **(SUPERSEDED Sept 27 by the JetHexa2027 Starter above.) HE IS SAVING
 FOR THE ROSPIDER WITH THE ARM.** *"Gunna save for ros
