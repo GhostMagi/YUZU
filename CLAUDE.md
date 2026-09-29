@@ -189,6 +189,32 @@ walked through with him on robot day. **Still UNVERIFIED: that it
 reaches Complete** -- a multi-GB download finishing on his phone is
 the last half of the check.
 
+### HIS BOARD MAY BE ON HIWONDER'S IMAGE WHEN THE NEXT SESSION STARTS
+
+*"i may run out of usage with you until tuesday, (ill have ordered the
+robot on thursday.) ... can i safely use their stuff and overwrite the
+board to have fun with it ... or should i wait for ya"*. **Told him he
+does not have to wait**: their image going over his drive is the
+confirmed plan anyway (image only, no second SSD), so doing it
+without me changes nothing, AS LONG AS the Save download says
+Complete first. The checklist he got: Save says Complete and is never
+deleted; tap it again right before flashing if he chats with the
+girls after today; the ROMs are not in it, so keep them on the phone;
+the microSD rescue card stays in the drawer (any card their guide
+wants is a different one); follow their QR-card guide, his laptop if
+it wants a PC; no Orin lead in the box means the Orin's own wall
+brick, never a made-up cable; label the 12.6V and 19V chargers (same
+plug); drive with their app or controller; `sudo nvpmodel -m 0` if it
+feels slow. And what to expect: the girls, the pages and
+`ghostnano.local` will not be there on their system, which is normal;
+the chest screen shows the IP.
+
+**So if he comes back and nothing of ours answers, check whether their
+image is on the board BEFORE debugging anything.** Getting the girls
+back is going-live step 5 in "Hiwonder has not answered his email"
+below: `drop.py`, `tar xf`, `restore.sh`, the repo from GitHub, and
+`~/YUZU/name ghostnano` -- walked through with him, never assumed.
+
 ## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
 
 Ghost, the same morning: *"Browser button, Calculator button, and D20
