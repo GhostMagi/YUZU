@@ -1075,7 +1075,7 @@ _SYSTEMS = {
 # has twice the library he has.
 #
 # ONE LIST FOR TWO JOBS: the saves are also exactly what "Save my stuff"
-# keeps (see backup() below), because they are the one thing in ~/ROMs
+# keeps (see save_plan() below), because they are the one thing in ~/ROMs
 # that nothing can download again. mGBA writes its states as .ss0 to
 # .ss9 beside the game, and this list used to stop at .ss1 -- so a third
 # save state was counted as a third GAME. Found by writing the backup,
@@ -1203,45 +1203,61 @@ def board_has():
     return _HAS
 
 
-# "SAVE MY STUFF" -- a zip to his PHONE of what cannot be downloaded
-# again. Ghost, Sept 29, on the robot's arrival: "I dont wana hit it and
-# auto fill my phones memory lol. Just make it save whats important i
-# guess? ... I dont wana fill my phone with wikipedia files and stuff."
-#
-# WHAT IS IMPORTANT IS SMALL, and that is the whole design:
+# "SAVE MY STUFF" -- one file to his PHONE of what matters on this board.
+# Ghost, Sept 29, on the robot's arrival: "I dont wana hit it and auto
+# fill my phones memory lol. Just make it save whats important i guess?"
+# And the next morning, once Hiwonder said their system is an IMAGE that
+# goes over his only drive: "can you make the save button save the ai
+# models too? (I got space was just overly concerned bout it for some
+# reason)".
 #
 #     the girls' chat memories     ~/.yuzu/history      kilobytes
 #     what they know about him     ~/.yuzu/facts        kilobytes
 #     his game saves               ~/ROMs/*/ saves      kilobytes each
 #                                  ~/.mednafen/sav, mcs (NES/SNES)
+#     THE GIRLS' BRAINS            Ollama's own copy    ~2 GB each
 #
-# NOT the wiki (14GB, and `wiki --get` fetches it again), NOT the models
-# (`ollama pull`), NOT the ROMs (they came FROM his phone, by drop.py),
-# NOT the repo (it is on GitHub). A backup of things he can download
-# again is how a phone fills up.
+# THE BRAINS ARE THE ONE BIG THING, AND THEY ARE IN BECAUSE HE ASKED. Every
+# one of them can be pulled again today -- but they are heretic builds on
+# a stranger's Hugging Face page, and a page like that can be gone by the
+# day he needs it. Only the weights the ROSTER talks on are kept: one copy
+# of each, however many girls share it (Four, Yuzu and both sisters are
+# one Llama). A model nobody on the roster uses -- the Gemma the sisters
+# left -- is not kept, because nobody would miss it.
 #
-# WHY IT EXISTS AT ALL: an image flashed onto the NVMe wipes it, and
-# whether Hiwonder's software is an install or an image is still an open
-# question to them. This is the one tap before that day.
+# STILL NOT the wiki (14GB, and `wiki --get` fetches it again), NOT the
+# ROMs (they came FROM his phone, by drop.py), NOT the repo (GitHub --
+# which is also where every girl's PROMPT lives, so a girl is her
+# prompt from GitHub plus her brain from here).
 #
-# THE ZIP IS LAID OUT RELATIVE TO HIS HOME FOLDER (.yuzu/history/...,
-# ROMs/gba/...), so putting it back is unzipping it in the home folder on
-# the board -- nothing to remember about where anything lives.
+# IT IS A .tar, NOT A .zip, AND THE REASON IS THE SIZE. A zip was built
+# in memory, and a 4GB file cannot be. A tar can be WRITTEN AS IT GOES,
+# straight from Ollama's files to his phone, and its length is known to
+# the byte before the first byte leaves -- which matters, because a
+# download that stops at 3GB with no length on it looks exactly like a
+# finished one. With Content-Length, Chrome says "Failed" instead.
 #
-# TWO CAPS, for the reason he gave. A file over SAVE_FILE_MAX is not a
-# save (a GBA save is 128KB and a state well under a megabyte), and the
-# whole zip stops at SAVE_MAX. Anything left out is SAID, by name, never
-# dropped quietly -- a backup that silently skipped a save is worse than
-# one that says it did.
+# LAID OUT RELATIVE TO HIS HOME FOLDER (.yuzu/history/..., ROMs/gba/...,
+# yuzu-models/...), so putting it back is one `tar xf` in the home folder
+# on the board, then `sh yuzu-models/restore.sh` for the brains. Walked
+# through with him on the day; README.txt inside says it too.
+#
+# TWO CAPS ON THE SMALL STUFF, for the reason he gave. A file over
+# SAVE_FILE_MAX is not a save (a GBA save is 128KB and a state well under
+# a megabyte), and memories, notes and saves together stop at SAVE_MAX.
+# The brains are outside both caps -- he asked for them by name -- and
+# the first tap says how big they are before anything is saved. Anything
+# left out is SAID, by name, never dropped quietly: a backup that silently
+# skipped a save is worse than one that says it did.
 SAVE_FILE_MAX = 16 << 20
 SAVE_MAX = 64 << 20
 
 
 def _save_sources():
-    """(path on the board, name in the zip, kind) for everything worth
-    keeping, in the order it is kept -- memories and notes first, because
-    they are the tiny irreplaceable ones and must never lose a cap race
-    to a save state.
+    """(path on the board, name in the save, kind) for the small things
+    worth keeping, in the order they are kept -- memories and notes first,
+    because they are the tiny irreplaceable ones and must never lose a
+    cap race to a save state.
 
     Read, never written: nothing here opens a file for writing."""
     home = os.path.expanduser("~")
@@ -1286,89 +1302,372 @@ def _save_name():
     thinks it is 1969, and a backup named for 1969 is a confident lie."""
     now = time.localtime()
     if now.tm_year < 2024:
-        return "yuzu-save.zip"
-    return time.strftime("yuzu-save-%Y-%m-%d.zip", now)
+        return "yuzu-save.tar"
+    return time.strftime("yuzu-save-%Y-%m-%d.tar", now)
 
 
 def _human(n):
-    """A size he can read at a glance: 812 bytes, 48 KB, 3.2 MB."""
+    """A size he can read at a glance: 812 bytes, 48 KB, 3.2 MB, 2.3 GB."""
     if n < 1024:
         return "%d bytes" % n
     if n < 1 << 20:
         return "%d KB" % max(1, round(n / 1024))
-    return "%.1f MB" % (n / (1 << 20))
+    if n < 1 << 30:
+        return "%.1f MB" % (n / (1 << 20))
+    return "%.1f GB" % (n / (1 << 30))
 
 
-def backup():
-    """(zip bytes, manifest). Never raises: a backup that throws on a
-    board he is about to wipe is the worst moment to find out.
+def _ollama_show(model):
+    """What Ollama says about one model: its Modelfile, whose FROM line
+    is the path of the weights on this board. Raises when Ollama does
+    not answer. Its OWN function so the suite can stand in for it: the
+    suite runs on his board too, and must never read his real 2GB
+    models into a test."""
+    import urllib.request
+    import yuzu_brain
+    req = urllib.request.Request(
+        yuzu_brain.DEFAULT_HOST.rstrip("/") + "/api/show",
+        data=json.dumps({"model": model, "name": model}).encode(),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+# A line of a Modelfile that points at a FILE on this board. Only FROM
+# and ADAPTER carry weights; a TEMPLATE body never starts a line with
+# "FROM /", and the path has to be absolute to count.
+_WEIGHTS_LINE = re.compile(r"^(FROM|ADAPTER)[ \t]+(/\S[^\r\n]*?)[ \t]*$", re.M)
+# Ollama names every blob after the sha256 of what is in it, so the
+# checksum that proves it came back whole is IN THE NAME -- nothing has
+# to read 2GB at save time to know it. Older Ollama wrote a colon.
+_BLOB_DIGEST = re.compile(r"sha256[-:]([0-9a-f]{64})$")
+
+
+def _brains():
+    """([brain], [left out]) -- one brain per model the ROSTER talks on.
+
+    A brain is {"model", "who" (the girls on it), "slug", "modelfile"
+    (rewritten to point at its files inside the save), "files" [(path on
+    the board, name in the save, size, sha256)], "bytes"}.
+
+    Never raises. Ollama not answering, or its folder not readable by
+    the user this server runs as, costs the brains and is SAID -- it
+    never costs his chats."""
+    import yuzu_brain
+    import yuzu_personas
+    order, who = [], {}
+    for name, (key, _page, _blurb) in CHARACTERS.items():
+        try:
+            model = yuzu_brain.YuzuBrain(persona=key).model
+            her = yuzu_personas.load(key).name or name.title()
+        except Exception:
+            continue
+        if model not in who:
+            order.append(model)
+            who[model] = (name, [])
+        who[model][1].append(her)
+    brains, left_out = [], []
+    for model in order:
+        slug, girls = who[model]
+        label = "the brain " + _and_list(girls) + (" share" if len(girls) > 1
+                                                   else " runs on")
+        try:
+            shown = _ollama_show(model)
+        except Exception as exc:
+            if getattr(exc, "code", None) is not None:
+                # Ollama answered, and not with this model.
+                left_out.append("%s (%s: Ollama does not have it)"
+                                % (label, model))
+                continue
+            # Ollama is not there at all. Said ONCE, not once per girl.
+            left_out.append("the girls' brains (Ollama is not answering, "
+                            "so none are in this save)")
+            return brains, left_out
+        text = (shown.get("modelfile") if isinstance(shown, dict)
+                else "") or ""
+        files, missing = [], None
+        for match in _WEIGHTS_LINE.finditer(text):
+            path = match.group(2)
+            digest = _BLOB_DIGEST.search(os.path.basename(path))
+            # ONLY A FILE NAMED LIKE ONE OF OLLAMA'S OWN BLOBS IS EVER
+            # SENT. This route answers anyone on his WiFi, so what it
+            # streams must never be "whatever path a reply named".
+            if not digest:
+                missing = "Ollama named %s, which is not one of its blobs" \
+                    % path
+                break
+            inside = "blobs/" + digest.group(1) + ".gguf"
+            try:
+                size = os.stat(path).st_size
+                with open(path, "rb"):
+                    pass
+            except OSError as exc:
+                missing = exc.strerror or str(exc)
+                break
+            files.append((path, "yuzu-models/" + inside, size,
+                          digest.group(1), match))
+        if missing or not files:
+            left_out.append("%s (%s: %s)" % (
+                label, model, missing or "Ollama named no weights for it"))
+            continue
+        # The Modelfile Ollama printed, with every weights line pointing
+        # INSIDE the save. Relative to the Modelfile itself, which is
+        # where `ollama create` reads a relative FROM from.
+        rewritten = text
+        for path, inside, _size, _digest, match in reversed(files):
+            rewritten = (rewritten[:match.start(2)] + "./"
+                         + inside[len("yuzu-models/"):]
+                         + rewritten[match.end(2):])
+        brains.append({"model": model, "who": girls, "slug": slug,
+                       "modelfile": rewritten,
+                       "files": [f[:4] for f in files],
+                       "bytes": sum(f[2] for f in files)})
+    return brains, left_out
+
+
+def _restore_script(brains):
+    """sh, not bash, and every name quoted: a model name comes from a
+    persona file and the environment, and nothing in it may run."""
+    import shlex
+    lines = [
+        "#!/bin/sh",
+        "# THE GIRLS' BRAINS, back into Ollama. Written by Save my stuff.",
+        "# Once the save is unpacked in your home folder on the board:",
+        "#     sh ~/yuzu-models/restore.sh",
+        "# It checks every file came through whole FIRST, and changes",
+        "# nothing if one did not.",
+        'cd "$(dirname "$0")" || exit 1',
+        "if ! command -v ollama >/dev/null 2>&1; then",
+        '    echo "NO OLLAMA on this board yet. Install it, then run this again."',
+        "    exit 1",
+        "fi",
+        "if [ -s SHA256SUMS ]; then",
+        '    echo "Checking the brains came through whole (a minute or two)..."',
+        "    if ! sha256sum -c --quiet SHA256SUMS; then",
+        '        echo "BROKEN: a file above did not come through whole."',
+        '        echo "Nothing was changed. Copy the save over again."',
+        "        exit 1",
+        "    fi",
+        "fi",
+        "failed=0",
+        "back() {",
+        '    echo "Putting back the brain for $3 ($1)..."',
+        '    if ollama create "$1" -f "$2"; then',
+        '        echo "  back."',
+        "    else",
+        '        echo "  FAILED: $1"',
+        "        failed=1",
+        "    fi",
+        "}",
+    ]
+    for brain in brains:
+        lines.append("back %s %s %s" % (
+            shlex.quote(brain["model"]),
+            shlex.quote(brain["slug"] + ".Modelfile"),
+            shlex.quote(_and_list(brain["who"]))))
+    lines += [
+        'if [ "$failed" = 0 ]; then',
+        '    echo "DONE. Every brain is back in Ollama."',
+        '    echo "This folder can be deleted now: rm -r ~/yuzu-models"',
+        "else",
+        '    echo "SOME DID NOT GO BACK -- see above. The files are still here."',
+        "    exit 1",
+        "fi",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def save_plan():
+    """(entries, manifest). Never raises: a backup that throws on a board
+    he is about to wipe is the worst moment to find out.
+
+    An entry is (name in the save, bytes to write or None, path to copy
+    from or None, size, mode). The small things are READ here, so what
+    he agreed to on the first tap cannot change under the save; the
+    brains are copied from Ollama's files as the save goes out, which is
+    safe because Ollama never rewrites a blob -- its name IS its content.
 
     The manifest is what the page shows BEFORE he saves -- the size and
     what is in it -- so the number he agrees to is the number he gets."""
-    import io
-    import zipfile
-    buf = io.BytesIO()
+    entries = []
     counts = {"memory": 0, "note": 0, "save": 0}
     left_out = []
     total = 0
     try:
-        # strict_timestamps=False, AND IT IS LOAD-BEARING: the board has
-        # no RTC, so anything written before NTP answered carries a 1969
-        # or 1970 date, and a zip refuses timestamps before 1980 unless
-        # told to clamp them. His saves from a garage with no network are
-        # exactly those files.
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED,
-                             strict_timestamps=False) as zf:
-            for path, name, kind in _save_sources():
-                try:
-                    size = os.path.getsize(path)
-                except OSError:
-                    continue
-                if size > SAVE_FILE_MAX:
-                    left_out.append("%s (%s, too big to be a save)"
-                                    % (name, _human(size)))
-                    continue
-                if total + size > SAVE_MAX:
-                    left_out.append("%s (%s, over the cap)"
-                                    % (name, _human(size)))
-                    continue
-                try:
-                    zf.write(path, name)
-                except (OSError, ValueError):
-                    left_out.append("%s (could not be read)" % name)
-                    continue
-                total += size
-                counts[kind] += 1
-            zf.writestr("README.txt", (
-                "Saved off the YUZU board%s.\n\n"
-                "In here: the girls' chat memories (.yuzu/history), what "
-                "they know about you (.yuzu/facts) and your game saves.\n"
-                "Not in here, on purpose: the wiki, the models and your "
-                "ROMs -- those can all be downloaded again.\n\n"
-                "To put it back: copy this zip to your home folder on the "
-                "board and unzip it there.\n"
-            ) % ("" if time.localtime().tm_year < 2024
-                 else time.strftime(" on %Y-%m-%d")))
+        for path, name, kind in _save_sources():
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                continue
+            if size > SAVE_FILE_MAX:
+                left_out.append("%s (%s, too big to be a save)"
+                                % (name, _human(size)))
+                continue
+            if total + size > SAVE_MAX:
+                left_out.append("%s (%s, over the cap)"
+                                % (name, _human(size)))
+                continue
+            try:
+                with open(path, "rb") as fh:
+                    data = fh.read()
+            except OSError:
+                left_out.append("%s (could not be read)" % name)
+                continue
+            entries.append((name, data, None, len(data), 0o644))
+            total += len(data)
+            counts[kind] += 1
+        # Belt and braces: _brains() is written never to raise, and if
+        # it ever does, it costs the brains -- never his chats.
+        try:
+            brains, missed = _brains()
+        except Exception as exc:
+            brains, missed = [], ["the girls' brains (%s)" % exc]
+        left_out += missed
+        if brains:
+            sums, seen = [], set()
+            models = [("yuzu-models/restore.sh",
+                       _restore_script(brains).encode(), 0o755)]
+            for brain in brains:
+                models.append(("yuzu-models/%s.Modelfile" % brain["slug"],
+                               brain["modelfile"].encode(), 0o644))
+            blobs = []
+            for brain in brains:
+                for path, inside, size, digest in brain["files"]:
+                    if inside in seen:
+                        continue
+                    seen.add(inside)
+                    blobs.append((inside, None, path, size, 0o644))
+                    sums.append("%s  %s" % (
+                        digest, inside[len("yuzu-models/"):]))
+            models.append(("yuzu-models/SHA256SUMS",
+                           "".join(s + "\n" for s in sums).encode(), 0o644))
+        dated = ("" if time.localtime().tm_year < 2024
+                 else time.strftime(" on %Y-%m-%d"))
+        readme = (
+            "Saved off the YUZU board%s.\n\n"
+            "In here: the girls' chat memories (.yuzu/history), what they "
+            "know about you (.yuzu/facts), your game saves%s.\n"
+            "Not in here, on purpose: the wiki and your ROMs -- the wiki "
+            "downloads again, and the ROMs came from your phone. Every "
+            "girl's prompt is on GitHub with the rest of the repo.\n\n"
+            "To put it back: copy this file to your home folder on the "
+            "board and unpack it there:\n"
+            "    tar xf %s\n%s"
+        ) % (dated, ", and the girls' brains (yuzu-models)" if brains else "",
+             _save_name(),
+             "then put the brains back into Ollama:\n"
+             "    sh yuzu-models/restore.sh\n" if brains else "")
+        entries.append(("README.txt", readme.encode(), None,
+                        len(readme.encode()), 0o644))
+        if brains:
+            entries += [(n, d, None, len(d), m) for n, d, m in models]
+            entries += blobs
     except Exception as exc:
-        return b"", {"ok": False,
-                     "said": "It could not build the save: %s" % exc}
-    data = buf.getvalue()
+        return [], {"ok": False,
+                    "said": "It could not build the save: %s" % exc}
     words = {"memory": ("chat memory", "chat memories"),
              "note": ("note about you", "notes about you"),
              "save": ("game save", "game saves")}
     bits = ["%d %s" % (counts[kind], words[kind][counts[kind] != 1])
             for kind in ("memory", "note", "save") if counts[kind]]
+    if brains:
+        bits.append("%d %s (%s)" % (
+            len(brains), "brain" if len(brains) == 1 else "brains",
+            "; ".join("one for %s, %s" % (_and_list(b["who"]),
+                                          _human(b["bytes"]))
+                      for b in brains)))
     if not bits:
-        return data, {"ok": False, "left_out": left_out,
-                      "said": "Nothing to save yet: no chat memories, "
-                              "notes or game saves on the board."}
-    what = _and_list(bits) + ". No wiki, no models, no ROMs."
+        return [], {"ok": False, "left_out": left_out,
+                    "said": "Nothing to save yet: no chat memories, notes, "
+                            "game saves or brains on the board."
+                            + (" Left out: " + "; ".join(left_out) + "."
+                               if left_out else "")}
+    size = save_size(entries)
+    # THE TOTAL LEADS, not only on the tile: on a small phone this
+    # sentence is tall enough to scroll the tile's own "4.3 GB" out of
+    # sight, and the size is the one thing he agrees to. Found by
+    # rendering it at 360.
+    what = "%s in all: %s. No wiki, no ROMs." % (_human(size),
+                                                 _and_list(bits))
+    if brains:
+        what += " Takes a few minutes on WiFi."
     if left_out:
         what += " Left out: " + "; ".join(left_out) + "."
-    return data, {"ok": True, "name": _save_name(), "bytes": len(data),
-                  "size": _human(len(data)), "what": what,
-                  "memories": counts["memory"], "notes": counts["note"],
-                  "saves": counts["save"], "left_out": left_out}
+    return entries, {"ok": True, "name": _save_name(), "bytes": size,
+                     "size": _human(size), "what": what,
+                     "memories": counts["memory"], "notes": counts["note"],
+                     "saves": counts["save"],
+                     "brains": [{"model": b["model"], "who": b["who"],
+                                 "bytes": b["bytes"]} for b in brains],
+                     "left_out": left_out}
+
+
+def _tar_header(name, size, mode):
+    """One tar header, GNU format so a long name or a big file still
+    fits. Owned by whoever runs this server -- him -- so a `sudo tar`
+    on the day does not leave root's files in his home. Dated now,
+    never from the file: the board's clock may say 1969, and nothing on
+    the way back needs to know what it said."""
+    import tarfile
+    info = tarfile.TarInfo(name)
+    info.size = size
+    info.mode = mode
+    info.mtime = max(0, int(time.time()))
+    info.uid, info.gid = os.getuid(), os.getgid()
+    info.uname = info.gname = ""
+    return info.tobuf(tarfile.GNU_FORMAT, "utf-8", "surrogateescape")
+
+
+# The end of a tar: two empty blocks, then padding to a whole record --
+# exactly what Python's own tarfile and GNU tar write, and what `tar xf`
+# expects to find.
+_TAR_BLOCK = 512
+_TAR_RECORD = 20 * _TAR_BLOCK
+
+
+def save_size(entries):
+    """The length of the save, to the byte, before a byte of it is
+    written. The phone is told this number, so it can tell a save that
+    stopped at 3GB from one that finished."""
+    total = 0
+    for name, _data, _path, size, mode in entries:
+        total += len(_tar_header(name, size, mode))
+        total += size + (-size % _TAR_BLOCK)
+    total += 2 * _TAR_BLOCK
+    return total + (-total % _TAR_RECORD)
+
+
+def write_save(entries, out, chunk=1 << 20):
+    """Write the save to `out` as it goes -- a 4GB brain is never held
+    in memory. Returns how many bytes were written.
+
+    A brain that comes up SHORT raises rather than padding the gap: a
+    tar with a hole in a model is a broken brain that looks whole, and a
+    connection that stops early makes his phone say "Failed" instead."""
+    written = 0
+    for name, data, path, size, mode in entries:
+        head = _tar_header(name, size, mode)
+        out.write(head)
+        written += len(head)
+        if data is not None:
+            out.write(data)
+        else:
+            left = size
+            with open(path, "rb") as fh:
+                while left:
+                    piece = fh.read(min(chunk, left))
+                    if not piece:
+                        raise OSError("%s got shorter while it was being "
+                                      "saved" % name)
+                    out.write(piece)
+                    left -= len(piece)
+        pad = -size % _TAR_BLOCK
+        out.write(b"\0" * pad)
+        written += size + pad
+    tail = 2 * _TAR_BLOCK
+    tail += -(written + tail) % _TAR_RECORD
+    out.write(b"\0" * tail)
+    return written + tail
 
 
 # SHE REMEMBERS WHAT HE TELLS HER TO, AND THAT IS NOT THE HISTORY.
@@ -2372,30 +2671,38 @@ class _Handler(SimpleHTTPRequestHandler):
         if self.path.split("?")[0].rstrip("/") == "/boot.json":
             self._json({"boot": BOOT})
             return
-        # SAVE MY STUFF -- see backup(). TWO ROUTES AND NEITHER READS THE
-        # QUERY STRING: what is saved is decided on the board, never by
-        # the request, the same discipline as /pull and /launch/. The
+        # SAVE MY STUFF -- see save_plan(). TWO ROUTES AND NEITHER READS
+        # THE QUERY STRING: what is saved is decided on the board, never
+        # by the request, the same discipline as /pull and /launch/. The
         # .json is what the first tap shows him (the size, and what is
-        # in it); the .zip is the second tap.
+        # in it); the .tar is the second tap.
         if self.path.split("?")[0].rstrip("/") == "/save.json":
-            self._json(backup()[1])
+            self._json(save_plan()[1])
             return
-        if self.path.split("?")[0].rstrip("/") == "/save.zip":
-            data, made = backup()
+        if self.path.split("?")[0].rstrip("/") == "/save.tar":
+            entries, made = save_plan()
             if not made.get("ok"):
                 # A 503 with a sentence, never a 200: a sad sentence
-                # saved as a .zip is a broken file on his phone that
+                # saved as a .tar is a broken file on his phone that
                 # looks exactly like a backup.
                 self._json(made, 503)
                 return
             self.send_response(200)
-            self.send_header("Content-Type", "application/zip")
-            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Type", "application/x-tar")
+            # The length TO THE BYTE, before the first byte -- see
+            # save_size(). It is what lets his phone say "Failed" about
+            # a save that stopped at 3GB, instead of keeping it.
+            self.send_header("Content-Length", str(made["bytes"]))
             self.send_header("Content-Disposition",
                              'attachment; filename="%s"' % made["name"])
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(data)
+            try:
+                write_save(entries, self.wfile)
+            except (OSError, ValueError):
+                # He cancelled, the WiFi went, or a brain vanished mid-
+                # copy. The length already promised says it is short.
+                self.close_connection = True
             return
         # Regenerated per request like the rest. `who` is a NAME and it
         # is looked up in POSES, so nothing in the query string can ever

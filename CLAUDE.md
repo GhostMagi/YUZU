@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 884 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 895 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,90 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SAVE MY STUFF KEEPS THEIR BRAINS NOW (Sept 30)
+
+*"can you make the save button save the ai models too? (I got space
+was just overly concerned bout it for some reason) i dont mind it
+saving whats important. And tbh i dont mind if they start fresh as long
+as you have the prompts memorized or retreievable."* The morning after
+Hiwonder said their system is an IMAGE that goes over his only drive.
+
+**THE PROMPTS ARE ALREADY SAFE, and he was told so:** every girl's
+persona is in this repo on GitHub. A girl is her prompt from GitHub
+plus her brain from the Save file, plus (optionally) her memory.
+
+**WHY SAVE WEIGHTS THAT `ollama pull` FETCHES AGAIN:** they are heretic
+builds on a stranger's Hugging Face page, and a page like that can be
+gone the day he needs it. Only the models the ROSTER talks on: ONE copy
+each, whoever shares it (Yuzu, Four, Shiro and Kuro are one Llama;
+Zero is her Qwen). The Gemma nobody uses is not kept. Which model a
+girl runs on is asked of `YuzuBrain` itself, and where its weights are
+is asked of OLLAMA (`POST /api/show`, the FROM line of its Modelfile),
+never typed in. **Only a file named like one of Ollama's own blobs
+(`sha256-<hex>`) is ever sent**: the route answers anyone on his WiFi,
+so what it streams is never "whatever path a reply named".
+
+**IT IS A .tar NOW, NOT A .zip, BECAUSE OF THE SIZE.** The zip was
+built in memory, and a 4GB file on an 8GB board cannot be. The tar is
+written AS IT GOES, straight from Ollama's blobs to his phone, and its
+length is worked out TO THE BYTE before the first byte leaves
+(`save_size()`: GNU headers, 512-byte padding, two end blocks, a whole
+10240-byte record). That length goes out as Content-Length, so a save
+the WiFi cuts at 3GB makes his phone say "Failed" instead of keeping a
+broken file that looks whole. A brain that comes up SHORT mid-copy
+raises rather than padding the gap, for the same reason.
+
+**THE SECOND TAP IS A PLAIN LINK, NOT A FETCH.** A fetch holds the whole
+file in the page, and a 4GB save does not fit in a phone browser's
+memory. A link hands it to the phone's own downloader. Why it could not
+build one is answered by the first tap, which is where he reads.
+
+    yuzu-models/restore.sh       sh, checks SHA256SUMS FIRST, then
+                                 `ollama create <name> -f <Modelfile>`
+    yuzu-models/SHA256SUMS       free: Ollama names a blob after its
+                                 own sha256, so nothing reads 2GB to
+                                 know the checksum
+    yuzu-models/<girl>.Modelfile Ollama's own, FROM ./blobs/<sha>.gguf
+    yuzu-models/blobs/*.gguf
+
+**`drop.py` STREAMS NOW, and it had to**: it read the whole POST into
+memory, which with a 4GB save is the board falling over on exactly the
+day it mattered. One chunk at a time into `<name>.part`, renamed only
+when whole (a board that loses power at 3GB keeps nothing that looks
+finished), and a free-space check BEFORE a byte lands. The page says
+"Room on the board: N GB" before he picks the file.
+
+**Rendering found one, again**: at 360 the list of what is in it
+scrolled the tile's own "4.3 GB" out of sight, so the sentence LEADS
+with the total now ("4.3 GB in all: ...").
+
+**AND A BREAK-CHECK OF MINE OVERWROTE THIS CONTAINER'S /etc/passwd.**
+The new filename test aimed `../../../../etc/passwd` and `/etc/shadow`
+at a folder two deep in /tmp, and it WROTE to disk -- so breaking the
+basename on purpose, as this file demands of every test, sent the
+hostile name exactly where it said, as root. The old test only parsed.
+Contained to the throwaway container (`whoami` stopped knowing root);
+on his board, as him, it would have been refused -- but a test must
+never be able to escape even when the code it guards is broken. It
+lands six folders deep now, so every `..` stays inside its own
+folder, and the absolute name points INTO it. **A test that drives a
+path-escape must be built so the escape it is hunting lands inside its
+own sandbox.** Read the hostile input before running the break.
+
+**Twenty-three breaks, every one red.** The suite never reads his real
+models: every save test stands in for Ollama with a tiny fake store,
+and one test drives the real `/api/show` question against a stand-in
+server. **884 -> 895.**
+
+**UNVERIFIED, all of it on his board:** that the user the face server
+runs as can READ Ollama's blobs (Ollama's install adds him to the
+`ollama` group, which should cover it -- the first tap NAMES any brain
+it cannot read, and still saves the chats); that `ollama create`
+accepts an `hf.co/...` name, which is what Zero's `model:` line asks
+for; and that Chrome on the Z Flip finishes a multi-GB download.
+**The check before the robot arrives is the same one, just bigger:
+tap it twice and wait for Complete.**
 
 ## THE JETHEXA2027 PAGE, FROM HIS SCREENSHOTS (Sept 29)
 
@@ -162,27 +246,34 @@ turns out to be:
    current drive**, since a second SSD is not in the budget. That makes
    step 2 the whole backup, so **the Save download has to be checked on
    his phone BEFORE the robot arrives** (it is still UNVERIFIED on the
-   Z Flip): tap it, and the zip must be in his Downloads. **His ROMs are
+   Z Flip): tap it, and the .tar must be in his Downloads, with the
+   phone saying Complete. **Since Sept 30 it carries the girls' brains
+   too** (see "SAVE MY STUFF KEEPS THEIR BRAINS" at the top), so it is
+   several GB and takes minutes. **His ROMs are
    not in it on purpose** (they came from his phone), so they must still
    be on the phone. **The microSD rescue card stays in its drawer**: it
-   is a bootable copy of his Sept 9 setup, older than the Save zip but a
+   is a bootable copy of his Sept 9 setup, older than the Save file but a
    whole working system, and it costs nothing to keep. If their flashing
    needs a PC, his laptop runs Ubuntu 22.04 on x86, which is what
    NVIDIA's own Jetson flashing tools want (UNVERIFIED for theirs).
 4. **Drive it with their app or controller first.** Day one needs no code.
 5. **Then the girls move onto whatever system is running**: the repo
-   is on GitHub, the model and voices re-download (`pull` fetches the
-   voices), the wiki re-downloads with `wiki --get`, and `~/.yuzu` is the
-   Save zip, unzipped in the home folder. That is exactly why the Save
-   button keeps only what cannot be downloaded again. **Getting the zip
-   back onto the board** is `drop.py` (it already exists) plus one
-   unzip, walked through with him on the day; a restore ROUTE stays
-   unbuilt, per the Save entry. **And the board must be named
+   is on GitHub (every girl's PROMPT with it), the voices re-download
+   (`pull` fetches them), the wiki re-downloads with `wiki --get`, and
+   `~/.yuzu` and the brains are the Save file. **Getting it back onto
+   the board** is `drop.py` from the home folder (it streams big files
+   to disk since Sept 30), then `tar xf yuzu-save-<date>.tar`, then
+   `sh yuzu-models/restore.sh` once Ollama is installed -- walked
+   through with him on the day; a restore ROUTE stays unbuilt, per the
+   Save entry. **And the board must be named
    `ghostnano` again** (`~/YUZU/name ghostnano`): their image will
    carry its own hostname and user, and the Chrome flag that gives his
    phone's pages a mic trusts exactly `ghostnano.local:8081`.
 
 ## SAVE MY STUFF, AND HER PAGE IN A GARAGE WITH NO INTERNET (Sept 29)
+
+**(Sept 30: it is a .tar with the girls' brains in it now -- see the
+entry at the top. The zip described below is the record.)**
 
 *"But also do your save button."* Built, as the answer to his own
 worry: *"I dont wana hit it and auto fill my phones memory lol. Just

@@ -454,9 +454,10 @@ body {
   </div>
   <!-- SAVE MY STUFF. Ghost, Sept 29: "I dont wana hit it and auto fill
        my phones memory lol. Just make it save whats important". So it
-       saves only what cannot be downloaded again (the girls' memories,
-       his notes, his game saves), and the FIRST tap only says how big
-       that is -- the second tap saves it. See backup() in yuzu_face.py.
+       saves the girls' memories, his notes and his game saves -- and,
+       since Sept 30, when he asked, the girls' brains -- and the FIRST
+       tap only says how big that is; the second tap saves it. See
+       save_plan() in yuzu_face.py.
        A tile rather than a bar button: the bar already carries Back,
        Desktop and Update, and on a phone one more button there is the
        fault that once put Update 2px off a 412px screen. And six tiles
@@ -464,7 +465,7 @@ body {
   <div class="tile" id="save" data-view="misc" data-save="">
     <div class="big"><svg viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 15.5v4h16v-4"/></svg></div>
     <b>Save my stuff</b>
-    <span>chats, notes &amp; game saves</span>
+    <span>chats, saves &amp; brains</span>
   </div>
 </div>
 
@@ -610,11 +611,17 @@ function roll(tile, sides) {
 // because he has a size and a list to read first. No dialog: a modal is
 // a mode, and a mode needs its own way out.
 //
-// The zip comes back through fetch and is handed to the browser as a
-// download, rather than by pointing the page at it, so a deck that
-// cannot build one says WHY in the bar instead of saving a broken file.
-let saveArmed = null, saveAs = 'yuzu-save.zip';
-const SAVE_IDLE = 'chats, notes & game saves';
+// THE SECOND TAP IS A PLAIN LINK, NOT A FETCH, since the girls' brains
+// went in (Sept 30: "can you make the save button save the ai models
+// too?"). A fetch holds the whole file in the page before handing it
+// over, and a 4GB save does not fit in a phone browser's memory. A link
+// hands it straight to the phone's own downloader, which shows progress,
+// keeps going with the page closed, and says "Failed" if the WiFi drops
+// -- the server sends the exact length, so a save cut short can never
+// pass for a whole one. Why it could not build one is already answered
+// by the FIRST tap, which is where he reads.
+let saveArmed = null, saveAs = 'yuzu-save.tar';
+const SAVE_IDLE = 'chats, saves & brains';
 
 function unarm(tile) {
   clearTimeout(saveArmed);
@@ -626,39 +633,31 @@ function unarm(tile) {
 function saveMyStuff(tile) {
   if (tile.classList.contains('busy')) return;
   const out = tile.querySelector('span');
-  tile.classList.add('busy');
   if (!saveArmed) {
+    tile.classList.add('busy');
     fetch('save.json', { cache: 'no-store' })
       .then(r => r.json())
       .then(m => {
-        if (!m.ok) { say(m.said || 'Nothing to save yet.', 8000); return; }
+        if (!m.ok) { say(m.said || 'Nothing to save yet.', 12000); return; }
         saveAs = m.name || saveAs;
         out.textContent = m.size + ' · tap again to save';
         tile.classList.add('armed');
-        say(m.what, 10000);
-        saveArmed = setTimeout(() => unarm(tile), 10000);
+        say(m.what, 15000);
+        saveArmed = setTimeout(() => unarm(tile), 15000);
       })
       .catch(() => say('No answer from the deck. Is ~/YUZU/face running?', 9000))
       .then(() => tile.classList.remove('busy'));
     return;
   }
   unarm(tile);
-  say('Saving...');
-  fetch('save.zip', { cache: 'no-store' })
-    .then(r => r.ok ? r.blob()
-                    : r.json().then(j => { throw new Error(j.said); }))
-    .then(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = saveAs;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-      say('Saved ' + saveAs + ' -- it is in your Downloads.', 10000);
-    })
-    .catch(e => say((e && e.message) || 'It would not save.', 10000))
-    .then(() => tile.classList.remove('busy'));
+  const a = document.createElement('a');
+  a.href = 'save.tar';
+  a.download = saveAs;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  say('Saving ' + saveAs + ' -- your phone shows it downloading. It is '
+      + 'only safe once it says Complete.', 15000);
 }
 
 // Wiring is a FUNCTION, not a one-shot loop over what is in the
