@@ -252,7 +252,7 @@ real board:
 - **Zero hears him -- CONFIRMED on the board** (Sept 24): installed,
   Steam Deck mic, first try word for word. Open: she invented "battery
   at 82%" from the board line (no battery level is readable), and runs
-  long. See CLAUDE.md, top.
+  long (NOT a fault: he likes them chatty, Sept 30). See CLAUDE.md, top.
 - **Zero's sums are exact** (Sept 24): `maths: exact`, worked out in
   `yuzu_maths` and handed to her beside what he typed.
 

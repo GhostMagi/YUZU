@@ -126,10 +126,19 @@ through the real parser here:
   was MEASURED to do nothing (yuzu3). And on the robot `_canonicalise`
   writes them back as brackets in her history, which PocketPal cannot
   do -- turn 1 was brackets, turn 2 was all stars, the snowball.
-- **LENGTH, the watch item**: 60 and 59 spoken words against yuzu4's
-  measured 24 on the laptop. Different sampling in PocketPal, n=2, so
-  NOT acted on; `python3 YUZU_AB.py yuzu4 yuzu_bot` on the laptop is
-  the honest check before anything moves.
+- **LENGTH IS NOT A FAULT, his call:** *"Well i dont mind if shes
+  chatty. I only put the 3 semtence thing in place for the old muto
+  idea ... (My reason was to 'not fry the board') ... Shes fine."* She
+  ran 60 and 59 spoken words against yuzu4's measured 24. **Stop
+  flagging length as a watch item on any girl** -- every "ran long"
+  note in this file predates this. Told him plainly: a long reply
+  costs SECONDS (and robot battery), never the board's health; the
+  Orin throttles itself when hot, and `test_the_reply_ceiling_and_the
+  _CONTEXT_agree` keeps replies inside memory. **The brevity rule
+  STAYS in the prompts anyway**, said to him in one line: it is what
+  holds her near 60 words instead of running into the 600-token
+  cutoff mid-word, which is the thing he DID complain about (Sept
+  16-21). It is also a measured win the tests hold every girl to.
 - **"Stop" did not land on `[stands]`**, and since the kill switch is
   dropped, saying stop to her is the only software stop. **For the
   bridge (going-live step 1): his own typed stop should halt the legs
