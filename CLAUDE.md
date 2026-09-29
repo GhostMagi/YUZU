@@ -126,10 +126,11 @@ Nothing here changed a prompt or a line of code. What it settles:
 ### Hiwonder has not answered his email, so the plan does not wait on them
 
 *"hiwonder wont reply to me so far since i sent that email. Just use
-what we got i spose"* (Sept 29). **Their website chat is no way round
-it**: it only tells him to message support, which had not answered
-either, so stop suggesting "ask their Chat". **Nothing is blocked by
-their silence**: the box ships QR code cards, which almost certainly point at
+what we got i spose"* (Sept 29). **Their website chat first only said
+"message support"**, which had not answered either; tried again at
+~02:05 on Sept 30, **a live person said "Hi"**, with both questions
+already sent above it. Whatever they answer goes here. **Nothing is
+blocked by their silence**: the box ships QR code cards, which almost certainly point at
 their own setup guide (UNVERIFIED), and that guide answers the same two
 questions on the day. The plan given to him works whichever answer it
 turns out to be:
