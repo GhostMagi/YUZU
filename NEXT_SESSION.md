@@ -56,15 +56,18 @@ So:
 
 ## The state of the board today
 
-    LIVE_PERSONA   four        (yuzu_personas.py — the MEASUREMENT pointer)
-    FRONT          four        (yuzu_face.py     — who GREETS you)
+    LIVE_PERSONA   yuzu_bot    (yuzu_personas.py — the MEASUREMENT pointer;
+                   robot Yuzu since Sept 30, "Yuzu the main default robot")
+    FRONT          yuzu        (yuzu_face.py     — who GREETS you)
     roster         Yuzu, Four, Zero, Shiro, Kuro  (Cait, Mimi, Saya and
-                   the yami kawaii Shiro are `retired: yes`)
+                   the yami kawaii Shiro are `retired: yes`), all still on
+                   their deck bodies; each has a `_bot` twin waiting for
+                   the robot's legs to be driven
     Zero's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
     the sisters'   Four's Llama since Sept 27 (no `model:` line); the
                    Gemma path in the brain stays, used by nobody
     Four's prompt  5446 chars
-    tests          887, ~95s,  `python YUZU_TESTER.py`
+    tests          888, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -89,7 +92,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 887 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 888 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means

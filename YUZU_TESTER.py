@@ -3595,6 +3595,22 @@ class TestSpiderBodies(unittest.TestCase):
         self.assertNotIn("JSAUX-BANK-HOURS", said["four_bot"],
                          "the robot was told the deck's battery")
 
+    def test_they_know_it_is_a_METAL_SPIDER_and_Yuzu_still_wants_her_PEDI(self):
+        """Ghost, Sept 30: "Yea i spose we can let the girls know they
+        inhabit the metal spider. (Yuzu should still be interested in
+        'geting a pedi or going to the mall' though)". His words in the
+        body every pilot shares -- and Yuzu's wants SHOWN in an example,
+        not only stated, because examples beat rules here: a want that
+        lives in a rule alone is how a 3B stops mentioning it."""
+        for key, bot in self.pilots().items():
+            self.assertIn("metal spider", bot.prompt,
+                          "%s does not know she is in the metal spider" % key)
+        yuzu = yuzu_personas.load("yuzu_bot")
+        shown = " ".join(reply for _ask, reply in self.turns(yuzu)).lower()
+        for want in ("pedi", "mall"):
+            self.assertIn(want, shown,
+                          "robot Yuzu never shows wanting the %s" % want)
+
     def test_nothing_on_the_roster_moves_into_a_VOID(self):
         """A girl on a page with legs and no controller emits brackets
         that go nowhere, every turn -- the '[strikes a pose]' drop at
@@ -9546,11 +9562,18 @@ class TestFour(unittest.TestCase):
         self.assertIn("front", self.rail_builder(),
                       "her rail does not consult `front` -- so it is "
                       "either always on, or gated on a hardcoded name")
+        # The roster marks EXACTLY the one FRONT names -- Yuzu since
+        # Sept 30 -- so Four's page lists everybody again by itself, and
+        # hides them again the day she is front. Nothing names her here.
         import yuzu_face
-        mine = [c for c in yuzu_face.roster() if c["who"] == "four"]
-        self.assertEqual([c["front"] for c in mine], [True],
-                         "the roster no longer tells her page she is "
-                         "the front door")
+        marked = [c["who"] for c in yuzu_face.roster() if c["front"]]
+        self.assertEqual(marked, [yuzu_face.FRONT],
+                         "the roster no longer tells a page it is the "
+                         "front door")
+        with mock.patch.object(yuzu_face, "FRONT", "four"):
+            mine = [c for c in yuzu_face.roster() if c["who"] == "four"]
+            self.assertEqual([c["front"] for c in mine], [True],
+                             "her page would not know she is front")
 
     def test_an_empty_rail_can_never_cost_the_way_out(self):
         """EVERY SCREEN ON THIS DECK HAS A WAY OFF IT -- two power
@@ -9571,11 +9594,20 @@ class TestFour(unittest.TestCase):
         self.assertEqual(bar[rail:home].count("</div>"), 1,
                          "the way out is nested inside the rail")
 
-    def test_she_is_the_front_door_and_still_in_the_drawer(self):
+    def test_YUZU_is_the_front_door_now_and_four_is_still_in_the_drawer(self):
+        """Ghost, Sept 30: "Can we make Yuzu the main default robot
+        instead of 4." The front tile and the pointer that is measured
+        and pasted both name her -- the ROBOT her for the pointer, since
+        that is the prompt worth testing before the robot comes -- and
+        Four is still two taps away: stepping down is not leaving."""
         import yuzu_face
-        self.assertEqual(yuzu_face.FRONT, "four")
+        self.assertEqual(yuzu_face.FRONT, "yuzu")
+        self.assertEqual(yuzu_personas.LIVE_PERSONA, "yuzu_bot")
+        self.assertEqual(yuzu_personas.load("yuzu_bot").settings[
+            "same_girl_as"], yuzu_face.persona_for("yuzu"),
+            "the front door and the live pointer are two different girls")
         front = [c for c in yuzu_face.roster() if c["front"]]
-        self.assertEqual([c["who"] for c in front], ["four"])
+        self.assertEqual([c["who"] for c in front], ["yuzu"])
         # Being the front tile is a shortcut, not a filing cabinet.
         self.assertIn("four", {c["who"] for c in yuzu_face.roster()})
 
@@ -9592,7 +9624,7 @@ class TestFour(unittest.TestCase):
         character who has never heard of one."""
         import yuzu_face, yuzu_personas
         source = inspect.getsource(yuzu_face.answer)
-        self.assertIn('hardware == "cyberdeck"', source,
+        self.assertIn("has_wiki = persona.looks_up", source,
                       "the wiki gate is not asking about the body")
         # A DECISION TABLE, not a list to keep in step: a character
         # joining or leaving the deck body is a choice somebody has to
@@ -15858,9 +15890,10 @@ class TestHomeScreen(unittest.TestCase):
                          "something other than ☆Stuff☆ is typed onto the "
                          "front page")
         self.assertEqual(len(views["stuff"]), 2, "☆Stuff☆ is not two")
-        # THREE since the robot (Sept 30): the d20, the calculator and
-        # the browser went -- "fairly useless on a metal spider".
-        self.assertEqual(len(views["misc"]), 3, "the drawer is not three")
+        # TWO since the robot (Sept 30): the d20, the calculator and the
+        # browser went -- "fairly useless on a metal spider" -- and then
+        # the Game Boy, "Cuz robot".
+        self.assertEqual(len(views["misc"]), 2, "the drawer is not two")
         for css in ("#grid.main { grid-template-columns: repeat(2, 1fr); }",
                     "#grid.stuff { grid-template-columns: repeat(2, 1fr); }"):
             self.assertIn(css, page)
@@ -16062,15 +16095,19 @@ class TestHomeScreen(unittest.TestCase):
         code = re.sub(r"<!--.*?-->|/\*.*?\*/", "", page, flags=re.S)
         code = re.sub(r"(?m)^\s*//.*$", "", code)
         for gone in ('data-roll=', 'data-show="calc"', 'data-launch="browser"',
-                     'id="pad"', "function roll(", "function evaluate(",
-                     "getRandomValues", "#grid.calc", "calc:"):
+                     'data-launch="gba"', 'id="pad"', "function roll(",
+                     "function evaluate(", "getRandomValues", "#grid.calc",
+                     "calc:"):
             self.assertNotIn(gone, code, "%s is still on the deck" % gone)
-        ok, said, _ = self.face.launch("browser")
-        self.assertFalse(ok, "the browser can still be launched")
-        self.assertNotIn("browser", self.face.launchers())
-        # What STAYS: the wiki (his words, "Smart spider"), the Game Boy
-        # he did not name, and Save my stuff.
-        for stays in ('data-launch="wiki"', 'data-launch="gba"', 'id="save"'):
+        # And the Game Boy, the same morning: "can we remove the gameboy
+        # ... Cuz robot." Its launcher went with its tile.
+        for name in ("browser", "gba"):
+            ok, said, _ = self.face.launch(name)
+            self.assertFalse(ok, "%s can still be launched" % name)
+            self.assertNotIn(name, self.face.launchers())
+        # What STAYS: the wiki (his words, "Smart spider") and Save my
+        # stuff.
+        for stays in ('data-launch="wiki"', 'id="save"'):
             self.assertIn(stays, code, "%s went with them" % stays)
 
     def test_the_icons_are_line_art_and_not_emoji(self):

@@ -369,9 +369,11 @@ def launchers():
     up without a restart -- and so a MISSING one is reported as missing
     rather than silently doing nothing."""
     here = HERE
+    # NO GAME BOY. Ghost, Sept 30: "can we remove the gameboy ... Cuz
+    # robot." It started mGBA on the deck's OWN screen, and the robot has
+    # none. The `gba` script stays on disk, unused, like the rest of the
+    # deck's tools; nothing on a page reaches it now.
     plans = {
-        "gba": ([os.path.join(here, "gba")],
-                "Game Boy is starting on the deck's screen.", None),
         "wiki": ([os.path.join(here, "wiki")],
                  "Wikipedia is starting.", "http://127.0.0.1:8080"),
     }
@@ -601,7 +603,13 @@ POSES = {
 # character is still two taps away under Stuff -> A.I. If the ask ever
 # becomes "my mother must not find Saya", that is a different feature
 # and this is not it.
-FRONT = "four"
+#
+# YUZU, since Sept 30: "Can we make Yuzu the main default robot instead
+# of 4." A roster NAME, not a persona key, so the day the roster points
+# `yuzu` at yuzu_bot she is the front door on six legs with nothing here
+# moving. Four's page hides its rail only while SHE is front (the gate
+# reads `front`, never a name), so it lists everybody again by itself.
+FRONT = "yuzu"
 
 # YUZU HAS ONE PICTURE NOW. Sept 24, Ghost: "Remove her old art and
 # clothes switch feature". The wardrobe folder, /outfits.json and her

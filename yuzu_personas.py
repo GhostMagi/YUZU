@@ -60,7 +60,12 @@ DEFAULT_PERSONA = "yuzu"
 # It is separate from DEFAULT_PERSONA on purpose: booting the frozen 20%
 # archive because it happens to own the short name is how the lineage
 # quietly regresses.
-LIVE_PERSONA = "four"
+#
+# YUZU ON SIX LEGS, since Sept 30: "Can we make Yuzu the main default
+# robot instead of 4." Her ROBOT persona, because this pointer is what
+# gets MEASURED and pasted into PocketPal -- and the robot prompt is the
+# one still unmeasured, and the one worth testing before the robot comes.
+LIVE_PERSONA = "yuzu_bot"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",

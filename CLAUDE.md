@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 887 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 888 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,40 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## YUZU IS THE MAIN, THE GAME BOY GOES, AND THEY KNOW IT IS A METAL SPIDER (Sept 30)
+
+Ghost, straight after the bot round: *"can we remove the gameboy ...
+Cuz robot."*, *"Yea i spose we can let the girls know they inhabit the
+metal spider. (Yuzu should still be interested in 'geting a pedi or
+going to the mall' though)"* and *"Can we make Yuzu the main default
+robot instead of 4."*
+
+- **The Game Boy tile and its `/launch/gba` are gone.** ☆Misc☆ is
+  Wikipedia and Save my stuff, rendered at 1024, 412 and 360. The `gba`
+  script, ES-DE and his game saves stay (dormant; the saves are in Save
+  my stuff).
+- **`FRONT = "yuzu"` and `LIVE_PERSONA = "yuzu_bot"`.** The front tile is
+  Yuzu (her drawn page today, her spider the day the roster flips), and
+  the pointer that gets MEASURED and PASTED is robot Yuzu, because that
+  is the prompt worth testing in PocketPal before the robot comes. Four
+  stays two taps away, and her page lists everybody again by itself
+  (its rail gate reads `front`, never a name). Two tests that pinned
+  Four as front now follow the pointer. **The composed live prompt was
+  pasted to him.**
+- **"A metal spider" is in the body every pilot shares**, his words.
+  **What was NOT done, and said to him:** putting the robot twins on the
+  roster TODAY. Until something drives the legs, she would answer
+  "Walk forward." with "Walking." and nothing would move -- the void
+  rule. They go live the day the bridge exists; offered to flip early
+  if he wants it anyway.
+- **Robot Yuzu wants her pedi again**: the avatar Yuzu's rule about her
+  look (nails, a pedi, her hair) is back as rule 9, and one example
+  ("Want to go to the mall later?") shows the mall AND the pedi, moving
+  -- "Six feet is a lot of toes, so you're paying." A test pins both
+  wants in her EXAMPLES and "metal spider" in every pilot.
+
+**Seven breaks, all red. 887 -> 888.**
 
 ## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
 
@@ -556,8 +590,9 @@ examples cost yuzu4 any movement?).
    separately). What is left of this step: the robot's VOLTAGE, read
    into her turn in the board_now() shape, with its arithmetic in the
    context guard.
-4. **Decide `LIVE_PERSONA`** (the terminal chat and the eval) and
-   paste the live prompt when it moves.
+4. ~~**Decide `LIVE_PERSONA`**~~ **DECIDED Sept 30, his call**: Yuzu.
+   `LIVE_PERSONA` is `yuzu_bot` already and `FRONT` is `yuzu`; going
+   live only points the roster's `yuzu` at `yuzu_bot`.
 
 ### He also asked whether he needs the Save button (#1)
 
