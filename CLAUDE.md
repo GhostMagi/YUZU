@@ -83,6 +83,30 @@ robot instead of 4."*
 
 **Seven breaks, all red. 887 -> 888.**
 
+### First PocketPal test of robot Yuzu: "Walk forwards fail lol"
+
+His screenshot, same day. Asked `Walk forward`, she said no
+brackets and recited a line of her own body rules back at him ("If
+the movement you feel like making isn't on it, pick the closest
+phrase that is...") in a flat system-message voice. 85s to first
+token, 7 tok/s.
+
+**NOT a verdict, and NO PROMPT CHANGE on it.** The chat's first
+"reply" from her was PocketPal's own error, *"Model not loaded.
+Please initialize the model."* -- saved as HER turn. Her own earlier
+replies outweigh the system prompt (measured here many times), so she
+answered in that error's register, and the recital is the
+pink-elephant shape it produces. That sentence is word for word in
+the muto_s2 menu yuzu4 was measured with at 75-100% moves, so it is
+not new. n=1, contaminated. **Asked him to retest in a clean chat
+with the model already loaded**: `Walk forward.`, `Stop.`,
+`What do you see?`, `wanna go to the mall?`. If a CLEAN chat fails,
+the next suspect is PocketPal's context size (her prompt is ~1,400
+tokens; under 2048 would cut it), then the prompt.
+
+**On the robot this cannot happen**: the face server writes her
+history, so an app's error never becomes her turn.
+
 ## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
 
 Ghost, the same morning: *"Browser button, Calculator button, and D20
