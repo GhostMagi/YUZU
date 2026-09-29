@@ -134,8 +134,21 @@ already sent above it. **Their answer to the power lead, 02:07**:
 *"Yes, if you order the kit without Jetson controller, the necessary
 accessories will be included in the kit so you can apply your own
 Jetson controller."* A general "accessories", not the word "cable", so
-step 1 below stays as the fallback. The system question was asked
-again the same minute; its answer goes here. **Nothing is
+step 1 below stays as the fallback. **And the system, 02:09**:
+*"Please note that you must flash our custom system image onto your
+Jetson to operate the robot."* **IMAGE ONLY, no install onto his
+Ubuntu.** So step 3 is no longer an if: their image wipes whatever
+drive it lands on, and **the plan given to him is a second SSD**, the
+same kind as the one in there now (256GB or more, room for the wiki
+and the girls beside their system), with his current drive kept in a
+drawer. The fallback, if money is tight: Save my stuff, then flash
+over the current drive; everything else re-downloads. How their image
+is written (from a PC through a USB-to-SSD adapter, or otherwise) and
+what size it needs were NOT answered; he was given those two to ask
+while the person was live. **Also UNVERIFIED: which JetPack their image
+is.** His board is on JetPack 6 with Super mode, and a Jetson's
+firmware has to match the system it boots; their own Orin option says
+Ubuntu 22.04, which is JetPack 6, so it probably matches. **Nothing is
 blocked by their silence**: the box ships QR code cards, which almost certainly point at
 their own setup guide (UNVERIFIED), and that guide answers the same two
 questions on the day. The plan given to him works whichever answer it
@@ -145,12 +158,11 @@ turns out to be:
    the desk until the right lead is sorted. Never a cable made up from a
    guess at that port.
 2. **Tap Save my stuff** before anything of theirs touches the board.
-3. **If their guide says to flash their system image, it goes on a NEW
-   small SSD, never his current one.** Swap the drives (one screw); his
+3. **Their system image (confirmed image-only, Sept 30) goes on a NEW
+   SSD, never his current one.** Swap the drives (one screw); his
    old drive goes in a drawer as a complete backup, better than any zip.
    Swapping rather than running both is the simple version: booting the
-   right one of two drives is a fiddle he does not need. Do not buy that
-   SSD until their guide actually says "image".
+   right one of two drives is a fiddle he does not need.
 4. **Drive it with their app or controller first.** Day one needs no code.
 5. **Then the girls move onto whatever system is running**: the repo
    is on GitHub, the model and voices re-download (`pull` fetches the
