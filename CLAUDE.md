@@ -75,6 +75,7 @@ Nothing here changed a prompt or a line of code. What it settles:
   and robotic arm servo port". **But the packing list shows no Orin
   lead**, so whether "Without Controller" includes the cable from that
   port to the Orin's barrel jack is STILL the question for their Chat.
+  **ANSWERED Sept 30 (below): yes, the accessories are included.**
 - **Their software ships ON THEIR SSD.** The Orin Nano Super option
   reads "128G SSD" and "ROS2 system: Preinstalled in the Jetson system
   (Ubuntu 22.04)", and the tutorials list a "system image". **That
@@ -129,13 +130,18 @@ Nothing here changed a prompt or a line of code. What it settles:
 what we got i spose"* (Sept 29). **Their website chat first only said
 "message support"**, which had not answered either; tried again at
 ~02:05 on Sept 30, **a live person said "Hi"**, with both questions
-already sent above it. Whatever they answer goes here. **Nothing is
+already sent above it. **Their answer to the power lead, 02:07**:
+*"Yes, if you order the kit without Jetson controller, the necessary
+accessories will be included in the kit so you can apply your own
+Jetson controller."* A general "accessories", not the word "cable", so
+step 1 below stays as the fallback. The system question was asked
+again the same minute; its answer goes here. **Nothing is
 blocked by their silence**: the box ships QR code cards, which almost certainly point at
 their own setup guide (UNVERIFIED), and that guide answers the same two
 questions on the day. The plan given to him works whichever answer it
 turns out to be:
 
-1. **No Orin lead in the box?** The Orin runs off its OWN wall brick on
+1. **No Orin lead in the box?** (Hiwonder says it is included.) The Orin runs off its OWN wall brick on
    the desk until the right lead is sorted. Never a cable made up from a
    guess at that port.
 2. **Tap Save my stuff** before anything of theirs touches the board.
