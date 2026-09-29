@@ -175,6 +175,20 @@ script survives. **Six breaks, all red as failures. 888 -> 885.**
 He was **about to try Save my stuff**, the one check that has to pass
 before the robot arrives -- see the top entry's UNVERIFIED list.
 
+**THE SAVE DOWNLOAD STARTS ON HIS Z FLIP, same day** (*"Its working"*).
+His first try "didnt start any downloads" because he tapped ONCE: the
+first tap only asks the size, and his screenshot showed it working on
+the real board -- **4.2 GB, both brains readable, no read error**, so
+the `ollama`-group question in the UNVERIFIED list is answered. He
+had to ask *"Am i sposed to tap it twice"* although the tile said
+"tap again to save", so if the two-tap flow trips him again, the
+first tap's wording is the thing to make plainer. He also did not know
+what a .tar is: told him it is a box file like a .zip, his phone does
+not need to open it (it may say "unknown file"), and unpacking it is
+walked through with him on robot day. **Still UNVERIFIED: that it
+reaches Complete** -- a multi-GB download finishing on his phone is
+the last half of the check.
+
 ## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
 
 Ghost, the same morning: *"Browser button, Calculator button, and D20
