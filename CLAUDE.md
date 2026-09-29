@@ -138,11 +138,11 @@ step 1 below stays as the fallback. **And the system, 02:09**:
 *"Please note that you must flash our custom system image onto your
 Jetson to operate the robot."* **IMAGE ONLY, no install onto his
 Ubuntu.** So step 3 is no longer an if: their image wipes whatever
-drive it lands on, and **the plan given to him is a second SSD**, the
-same kind as the one in there now (256GB or more, room for the wiki
-and the girls beside their system), with his current drive kept in a
-drawer. The fallback, if money is tight: Save my stuff, then flash
-over the current drive; everything else re-downloads. How their image
+drive it lands on. A second SSD was offered and **he cannot afford
+one** (*"Keep in mind i cant afford another ssd"*), so **THEIR IMAGE
+GOES OVER HIS CURRENT DRIVE, and the Save zip is the only copy of
+what cannot be downloaded again.** Do not suggest buying parts again;
+plan inside what he owns. How their image
 is written (from a PC through a USB-to-SSD adapter, or otherwise) and
 what size it needs were NOT answered; he was given those two to ask
 while the person was live. **Also UNVERIFIED: which JetPack their image
@@ -158,17 +158,29 @@ turns out to be:
    the desk until the right lead is sorted. Never a cable made up from a
    guess at that port.
 2. **Tap Save my stuff** before anything of theirs touches the board.
-3. **Their system image (confirmed image-only, Sept 30) goes on a NEW
-   SSD, never his current one.** Swap the drives (one screw); his
-   old drive goes in a drawer as a complete backup, better than any zip.
-   Swapping rather than running both is the simple version: booting the
-   right one of two drives is a fiddle he does not need.
+3. **Their system image (confirmed image-only, Sept 30) goes over his
+   current drive**, since a second SSD is not in the budget. That makes
+   step 2 the whole backup, so **the Save download has to be checked on
+   his phone BEFORE the robot arrives** (it is still UNVERIFIED on the
+   Z Flip): tap it, and the zip must be in his Downloads. **His ROMs are
+   not in it on purpose** (they came from his phone), so they must still
+   be on the phone. **The microSD rescue card stays in its drawer**: it
+   is a bootable copy of his Sept 9 setup, older than the Save zip but a
+   whole working system, and it costs nothing to keep. If their flashing
+   needs a PC, his laptop runs Ubuntu 22.04 on x86, which is what
+   NVIDIA's own Jetson flashing tools want (UNVERIFIED for theirs).
 4. **Drive it with their app or controller first.** Day one needs no code.
 5. **Then the girls move onto whatever system is running**: the repo
    is on GitHub, the model and voices re-download (`pull` fetches the
    voices), the wiki re-downloads with `wiki --get`, and `~/.yuzu` is the
    Save zip, unzipped in the home folder. That is exactly why the Save
-   button keeps only what cannot be downloaded again.
+   button keeps only what cannot be downloaded again. **Getting the zip
+   back onto the board** is `drop.py` (it already exists) plus one
+   unzip, walked through with him on the day; a restore ROUTE stays
+   unbuilt, per the Save entry. **And the board must be named
+   `ghostnano` again** (`~/YUZU/name ghostnano`): their image will
+   carry its own hostname and user, and the Chrome flag that gives his
+   phone's pages a mic trusts exactly `ghostnano.local:8081`.
 
 ## SAVE MY STUFF, AND HER PAGE IN A GARAGE WITH NO INTERNET (Sept 29)
 
