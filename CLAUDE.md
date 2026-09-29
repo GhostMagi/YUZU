@@ -123,6 +123,32 @@ Nothing here changed a prompt or a line of code. What it settles:
   does not replace the girls, and on 8GB it would compete with Four's
   Llama the way Zero's Qwen does.
 
+### Hiwonder has not answered his email, so the plan does not wait on them
+
+*"hiwonder wont reply to me so far since i sent that email. Just use
+what we got i spose"* (Sept 29). **Nothing is blocked by their
+silence**: the box ships QR code cards, which almost certainly point at
+their own setup guide (UNVERIFIED), and that guide answers the same two
+questions on the day. The plan given to him works whichever answer it
+turns out to be:
+
+1. **No Orin lead in the box?** The Orin runs off its OWN wall brick on
+   the desk until the right lead is sorted. Never a cable made up from a
+   guess at that port.
+2. **Tap Save my stuff** before anything of theirs touches the board.
+3. **If their guide says to flash their system image, it goes on a NEW
+   small SSD, never his current one.** Swap the drives (one screw); his
+   old drive goes in a drawer as a complete backup, better than any zip.
+   Swapping rather than running both is the simple version: booting the
+   right one of two drives is a fiddle he does not need. Do not buy that
+   SSD until their guide actually says "image".
+4. **Drive it with their app or controller first.** Day one needs no code.
+5. **Then the girls move onto whatever system is running**: the repo
+   is on GitHub, the model and voices re-download (`pull` fetches the
+   voices), the wiki re-downloads with `wiki --get`, and `~/.yuzu` is the
+   Save zip, unzipped in the home folder. That is exactly why the Save
+   button keeps only what cannot be downloaded again.
+
 ## SAVE MY STUFF, AND HER PAGE IN A GARAGE WITH NO INTERNET (Sept 29)
 
 *"But also do your save button."* Built, as the answer to his own
