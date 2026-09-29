@@ -319,6 +319,17 @@ not the software.
 - **The deck parts list is dead except one line**: the USB sound card
   and speaker are how she talks out of the robot itself (his phone
   works without them). Whether he bought any deck parts is UNKNOWN.
+  **And the Standard kit probably covers it** (asked Sept 29, *"that
+  wont need a speaker yea?"*): Hiwonder's "AI Voice Interaction Box"
+  is their WonderEcho Pro, a noise-cancelling mic AND a speaker in one
+  box that plugs in by USB as a plain sound card, no drivers (their
+  own product text, found by web search). UNVERIFIED that the 2027
+  Standard ships that exact box; the search found no 2027 page. Used
+  that way it is only a speaker and a mic: the girls' ears and voice
+  stay ours (Whisper, Kokoro), and Hiwonder's wake words are not used.
+  **Her voice coming OUT of the robot needs a small change later**:
+  today the page plays it on whatever he is holding, and the board
+  would have to play each reply on its own speaker as well.
 
 **THE KILL SWITCH IS DROPPED, his call:** *"Kill switch not needed ilp
 just chase her down and push the power if needed haha"*. Not
