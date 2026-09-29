@@ -117,8 +117,9 @@ had to be tightened first: the cap-order check passed with memories and
 saves in the wrong order until its cap was chosen so the first save
 fits alone and not beside his notes). **873 -> 884.**
 
-**UNVERIFIED on his phone**: that Chrome on the Z Flip saves the
-download where he can find it. Headless Chromium saved the right file
+**CONFIRMED on his board, same night**: *"Hit update, save button
+showed up"* -- the Update delivered it. **Still UNVERIFIED**: that
+Chrome on the Z Flip saves the download where he can find it. Headless Chromium saved the right file
 under the right name at all three widths; his phone is the check. Restoring is a manual unzip for now,
 and deliberately not a route: a route that writes files from the
 network onto the board is the one thing this server must not grow
