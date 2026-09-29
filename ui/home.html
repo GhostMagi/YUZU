@@ -172,98 +172,21 @@ body {
 }
 #grid:not(.main) ~ #bar #back { display: block; }
 
-/* ---- the d20 ------------------------------------------------------
-   Ghost: "add a D20 dice button somewhere with that black and neon
-   green crt effects that rolls it randomly."
-
-   It rolls IN PLACE. A dice roller that needs a page of its own is a
-   dice roller nobody taps, and this deck already has enough screens
-   with exits to get right. */
-#d20 .roll {
-  font-size: 46px; font-weight: 800; line-height: 1;
-  letter-spacing: .02em; font-variant-numeric: tabular-nums;
-}
-#d20.rolling .roll { opacity: .55; }
-/* Before the first roll that span holds WORDS, not a number, and the
-   46px result styling made "tap to roll" the loudest thing on the
-   screen. Caught by rendering the drawer and looking at it -- the
-   assertion that the label exists passed perfectly well. */
-#d20.hint .roll {
-  font-size: 12.5px; font-weight: 400; opacity: .6; letter-spacing: 0;
-}
-/* The CRT flourish, and it is only ever on the two numbers that
-   deserve one. A glow on every result is just a bright tile. */
-#d20.nat20 { border-color: var(--ink); }
-#d20.nat20 .roll { text-shadow: 0 0 10px var(--ink), 0 0 26px var(--ink); }
-#d20.nat1 { border-color: #ff4d6a; }
-#d20.nat1 .roll { color: #ff4d6a;
-                  text-shadow: 0 0 10px #ff4d6a, 0 0 26px #ff4d6a; }
-@keyframes crt {
-  0%   { transform: scaleY(1);    filter: brightness(1) }
-  18%  { transform: scaleY(1.06); filter: brightness(2.2) }
-  34%  { transform: scaleY(.97);  filter: brightness(.7) }
-  60%  { transform: scaleY(1.02); filter: brightness(1.5) }
-  100% { transform: scaleY(1);    filter: brightness(1) }
-}
-#d20.settled .roll { animation: crt .42s ease-out; }
+/* THE d20, THE CALCULATOR AND THE BROWSER ARE GONE. Ghost, Sept 30:
+   "Browser button, Calculator button, and D20 can go away now cuz we
+   makin a bot now. Those will be fairly useless on a metal spider."
+   `git show 1f42a38:ui/home.html` has all three. */
 /* ON A PHONE THE DRAWER IS TWO ACROSS, and the grid SCROLLS rather than
    run under the bar. It was one tile per row, and the sixth tile ("Save
    my stuff", Sept 29) rendered at 412px sat BEHIND Back / Desktop /
    Update, where no tap could reach it -- found by rendering it, not by
-   any assertion. Three rows of two keep every tile a thumb target; the
-   scroll is the guarantee for the next tile, and for a shorter phone. */
+   any assertion. Two across keeps every tile a thumb target; the scroll
+   is the guarantee for the next tile, and for a shorter phone. */
 @media (max-width: 560px) { #grid { grid-template-columns: 1fr;
                                     overflow-y: auto; }
                             #grid.misc > .tile {
                               flex-basis: calc((100% - 12px) / 2); } }
 
-/* ---- the calculator -----------------------------------------------
-   Ghost: "wana toss a working calculator in the same style into the
-   misc drawer? (i suck at math)".
-
-   That parenthesis is the spec. A normal calculator shows one number
-   and hides what you typed, so a slip is invisible until the answer is
-   wrong. This one keeps the WHOLE SUM on screen above the result, so
-   the thing you check is the thing you typed. */
-#grid.calc { display: none; }
-#pad { display: none; }
-#grid.calc ~ #pad {
-  display: grid; flex: 1; min-height: 0;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: auto repeat(5, 1fr);
-  gap: 10px; padding: 4px 20px 12px;
-}
-#screen {
-  grid-column: span 4; text-align: right;
-  background: var(--tile); border: 2px solid var(--edge);
-  border-radius: 4px; padding: 10px 16px; overflow: hidden;
-}
-/* NOT direction: rtl. That was the first thing tried, to keep the END
-   of a long sum on screen -- and it rendered "12 x 3.5 + 7 =" as
-   "= 7 + 3.5 x 12", because rtl reverses the ORDER OF RUNS in mixed
-   text, not just the overflow. It would have flipped a minus sign off
-   the front of a negative answer too. Caught by rendering the page and
-   looking at it, which is the only check that sees this class of bug.
-   Scrolling the box in draw() is what actually keeps the tail visible. */
-#sum {
-  font-size: 15px; opacity: .7; min-height: 1.3em;
-  white-space: nowrap; overflow-x: auto;
-}
-#out {
-  font-size: 40px; font-weight: 800; line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap; overflow-x: auto;
-}
-#out.bad { font-size: 20px; color: #ff4d6a; }
-#pad button {
-  font: inherit; font-size: 24px; font-weight: 700;
-  color: var(--ink); background: var(--tile); cursor: pointer;
-  border: 2px solid var(--edge); border-radius: 4px;
-}
-#pad button:active { transform: scale(.97); }
-#pad .op   { color: var(--ink); border-color: var(--ink); opacity: .85; }
-#pad .warm { color: #ffcf5c; border-color: rgba(255,207,92,.45); }
-#pad .go   { background: var(--ink); color: #06080a; border-color: var(--ink); }
 .tile {
   background: var(--tile);
   border: 2px solid var(--edge);
@@ -393,7 +316,7 @@ body {
 
            home     <the front character>   ☆Stuff☆
            ☆Stuff☆  A.I.                    ☆Misc☆
-           ☆Misc☆   Wikipedia Game Boy d20 Browser Calculator Save
+           ☆Misc☆   Wikipedia  Game Boy  Save my stuff
            A.I.     built from the roster
 
        THE FRONT TILE IS NOT IN THIS FILE, and that is the whole
@@ -437,21 +360,6 @@ body {
     <b>Game Boy</b>
     <span>newest ROM</span>
   </div>
-  <div class="tile hint" id="d20" data-view="misc" data-roll="20">
-    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z"/><path d="m12 2.2 5 7.3-5 8-5-8z"/><path d="M7 9.5 3.5 7M17 9.5 20.5 7M12 17.5V21.8"/></svg></div>
-    <b>d20</b>
-    <span class="roll">tap to roll</span>
-  </div>
-  <div class="tile" data-view="misc" data-launch="browser">
-    <div class="big"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3.5 9h17M3.5 15h17"/></svg></div>
-    <b>Browser</b>
-    <span>YouTube &amp; the web</span>
-  </div>
-  <div class="tile" id="calc" data-view="misc" data-show="calc">
-    <div class="big"><svg viewBox="0 0 24 24"><rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><path d="M7.5 6.5h9"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h.01M16 18h.01"/></svg></div>
-    <b>Calculator</b>
-    <span>sums, out loud</span>
-  </div>
   <!-- SAVE MY STUFF. Ghost, Sept 29: "I dont wana hit it and auto fill
        my phones memory lol. Just make it save whats important". So it
        saves the girls' memories, his notes and his game saves -- and,
@@ -460,29 +368,12 @@ body {
        save_plan() in yuzu_face.py.
        A tile rather than a bar button: the bar already carries Back,
        Desktop and Update, and on a phone one more button there is the
-       fault that once put Update 2px off a 412px screen. And six tiles
-       fill the drawer's two rows exactly. -->
+       fault that once put Update 2px off a 412px screen. -->
   <div class="tile" id="save" data-view="misc" data-save="">
     <div class="big"><svg viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 15.5v4h16v-4"/></svg></div>
     <b>Save my stuff</b>
     <span>chats, saves &amp; brains</span>
   </div>
-</div>
-
-<div id="pad">
-  <div id="screen"><div id="sum"></div><div id="out">0</div></div>
-  <button class="warm" data-k="C">C</button>
-  <button class="warm" data-k="back">⌫</button>
-  <button class="warm" data-k="%">%</button>
-  <button class="op" data-k="÷">÷</button>
-  <button data-k="7">7</button><button data-k="8">8</button>
-  <button data-k="9">9</button><button class="op" data-k="×">×</button>
-  <button data-k="4">4</button><button data-k="5">5</button>
-  <button data-k="6">6</button><button class="op" data-k="−">−</button>
-  <button data-k="1">1</button><button data-k="2">2</button>
-  <button data-k="3">3</button><button class="op" data-k="+">+</button>
-  <button data-k="neg">±</button><button data-k="0">0</button>
-  <button data-k=".">.</button><button class="go" data-k="=">=</button>
 </div>
 
 <div id="bar">
@@ -567,42 +458,6 @@ function say(text, ms) {
 
 const grid = document.getElementById('grid');
 
-// ---- the d20 --------------------------------------------------------
-// FAIR, not just random-looking. crypto.getRandomValues with the top of
-// the range thrown away removes the modulo bias you get from
-// `random() % 20` -- it costs nothing and a loaded die is a bad joke to
-// leave in a thing somebody rolls for fun.
-function d(sides) {
-  const limit = 256 - (256 % sides);
-  const byte = new Uint8Array(1);
-  do { crypto.getRandomValues(byte); } while (byte[0] >= limit);
-  return (byte[0] % sides) + 1;
-}
-
-function roll(tile, sides) {
-  if (tile.classList.contains('rolling')) return;
-  const out = tile.querySelector('.roll');
-  tile.className = tile.className.replace(/ (nat20|nat1|settled|rolling|hint)/g, '');
-  tile.classList.add('rolling');
-  // Tumble first. A number that simply appears has not been ROLLED,
-  // and the whole point of a dice button is the half-second of not
-  // knowing yet.
-  let left = 9;
-  const tumble = setInterval(() => {
-    out.textContent = d(sides);
-    if (--left) return;
-    clearInterval(tumble);
-    const got = d(sides);
-    out.textContent = got;
-    tile.classList.remove('rolling');
-    tile.classList.add('settled');
-    if (got === sides) tile.classList.add('nat20');
-    if (got === 1) tile.classList.add('nat1');
-    say(got === sides ? 'NAT ' + sides + '.'
-        : got === 1 ? 'Critical fail.' : '', 4000);
-  }, 55);
-}
-
 // ---- SAVE MY STUFF ---------------------------------------------------
 // Ghost, Sept 29: "I dont wana hit it and auto fill my phones memory
 // lol." So the FIRST tap only asks the deck what it would save and how
@@ -670,9 +525,6 @@ function wire(tile) {
     // A view swap is not a launch and not a link -- it is the drawer
     // opening. Kept as its own verb so `data-launch` stays exactly the
     // allowlisted-name-crosses-the-wire thing it has always been.
-    const sides = tile.dataset.roll;
-    if (sides) { roll(tile, parseInt(sides, 10)); return; }
-
     const view = tile.dataset.show;
     if (view) { grid.className = view; say(''); return; }
 
@@ -836,167 +688,6 @@ fetch('characters.json', { cache: 'no-store' })
       '#grid.main { grid-template-columns: 1fr; }';
   });
 
-// ---- the calculator -------------------------------------------------
-// Ghost: "i suck at math". So this one does NOT hide what you typed.
-// The whole sum sits above the answer and stays there, because the
-// failure mode of a pocket calculator is a slip you cannot see -- one
-// wrong digit looks exactly like a right one once the display has
-// moved on.
-//
-// THERE IS NO eval() IN HERE, and that is not paranoia about a page
-// this deck serves to itself: eval turns a typo into a javascript
-// error instead of an answer, and "SyntaxError" on screen is the same
-// dead end as a tap that does nothing. A four-line shunting pass costs
-// less and can only ever produce a number or a sentence. A test pins
-// the absence.
-const sumBox = document.getElementById('sum');
-const outBox = document.getElementById('out');
-
-let expr = [];      // committed tokens: numbers, and operator strings
-let cur = '';       // the number being typed right now
-let answer = null;  // what = last produced, so it can be built on
-let bad = '';       // a sentence instead of a number
-let last = '';      // the sum that produced `answer`, kept ON SCREEN
-
-// TEN SIGNIFICANT DIGITS, because binary floating point cannot hold
-// 0.1 + 0.2 and shows 0.30000000000000004 if you let it. Rounding at
-// 10 digits removes that entirely and touches nothing a person would
-// ever actually type into a deck.
-function fmt(n) {
-  if (!isFinite(n)) return '-';
-  return Number(n.toPrecision(10)).toString();
-}
-
-function draw() {
-  const parts = expr.map(t => typeof t === 'number' ? fmt(t) : t);
-  if (cur !== '') parts.push(cur);
-  sumBox.textContent = parts.length ? parts.join(' ') : last;
-
-  let big = '0';
-  if (cur !== '') big = cur;
-  else {
-    for (let i = expr.length - 1; i >= 0; i--) {
-      if (typeof expr[i] === 'number') { big = fmt(expr[i]); break; }
-    }
-    if (big === '0' && answer !== null && !expr.length) big = fmt(answer);
-  }
-  outBox.classList.toggle('bad', bad !== '');
-  outBox.textContent = bad !== '' ? bad : big;
-
-  // Show the END of a long sum -- that is where you are typing, and it
-  // is the digit you just pressed that you want to check.
-  sumBox.scrollLeft = sumBox.scrollWidth;
-  outBox.scrollLeft = outBox.scrollWidth;
-}
-
-// Real precedence, in two passes: × and ÷ collapse first, then + and −
-// left to right. "2 + 3 × 4" is 14 here, which is what it is on paper.
-// A calculator that answers 20 is a calculator you cannot trust with
-// the sum you could not do yourself.
-function evaluate(tokens) {
-  const t = tokens.slice();
-  if (typeof t[t.length - 1] === 'string') t.pop();   // "5 +" means 5
-  if (!t.length) return null;
-
-  const rest = [t[0]];
-  for (let i = 1; i < t.length; i += 2) {
-    const op = t[i], n = t[i + 1];
-    if (op === '\u00d7') rest[rest.length - 1] *= n;
-    else if (op === '\u00f7') {
-      // Not Infinity. Infinity is a number that looks like an answer.
-      if (n === 0) return { err: 'cannot divide by zero' };
-      rest[rest.length - 1] /= n;
-    } else rest.push(op, n);
-  }
-
-  let r = rest[0];
-  for (let i = 1; i < rest.length; i += 2) {
-    r = rest[i] === '+' ? r + rest[i + 1] : r - rest[i + 1];
-  }
-  return r;
-}
-
-function clear() { expr = []; cur = ''; answer = null; bad = ''; last = ''; }
-
-function key(k) {
-  if (k === 'C') { clear(); draw(); return; }
-  if (bad !== '') clear();   // any key after an error starts clean
-
-  if (k >= '0' && k <= '9') {
-    if (answer !== null && !expr.length && cur === '') { answer = null; last = ''; }
-    cur = cur === '0' ? k : cur + k;
-    draw(); return;
-  }
-
-  if (k === '.') {
-    if (answer !== null && !expr.length && cur === '') { answer = null; last = ''; }
-    if (cur.indexOf('.') < 0) cur = (cur === '' ? '0' : cur) + '.';
-    draw(); return;
-  }
-
-  if (k === 'neg') {
-    if (cur !== '') cur = cur.charAt(0) === '-' ? cur.slice(1) : '-' + cur;
-    else if (answer !== null && !expr.length) { cur = fmt(-answer); answer = null; }
-    draw(); return;
-  }
-
-  if (k === '%') {
-    // Percent of the number in front of you. Predictable beats clever:
-    // every calculator disagrees about what % means next to + and −,
-    // and a rule you cannot guess is worse than no button.
-    if (cur !== '') cur = fmt(Number(cur) / 100);
-    draw(); return;
-  }
-
-  if (k === 'back') {
-    if (cur !== '') cur = cur.slice(0, -1);
-    else if (expr.length) expr.pop();
-    else answer = null;
-    draw(); return;
-  }
-
-  if (k === '+' || k === '\u2212' || k === '\u00d7' || k === '\u00f7') {
-    if (cur !== '') { expr.push(Number(cur)); cur = ''; }
-    else if (!expr.length) {
-      if (answer === null) return;            // nothing to operate on
-      expr.push(answer); answer = null; last = '';   // build on the answer
-    }
-    if (typeof expr[expr.length - 1] === 'string') expr.pop();  // swap it
-    expr.push(k);
-    draw(); return;
-  }
-
-  if (k === '=') {
-    if (cur !== '') { expr.push(Number(cur)); cur = ''; }
-    const shown = expr.map(t => typeof t === 'number' ? fmt(t) : t).join(' ');
-    const got = evaluate(expr);
-    if (got === null) { draw(); return; }
-    if (got && got.err) { expr = []; last = shown; bad = got.err; draw(); return; }
-    expr = []; answer = got; last = shown + ' =';
-    draw(); return;
-  }
-}
-
-document.querySelectorAll('#pad button').forEach(b => {
-  b.onclick = () => key(b.dataset.k);
-});
-
-// The Bluetooth keyboard exists on the laptop and may end up on the
-// deck. Free to support, and only while the calculator is on screen --
-// a stray keypress must never reach the launcher tiles.
-document.addEventListener('keydown', e => {
-  if (grid.className !== 'calc') return;
-  const map = { '*': '\u00d7', 'x': '\u00d7', '/': '\u00f7',
-                '-': '\u2212', 'Enter': '=', '=': '=',
-                'Backspace': 'back', 'Escape': 'C', 'c': 'C' };
-  const k = map[e.key] || e.key;
-  const keys = ['0','1','2','3','4','5','6','7','8','9','.','+','%',
-                'C', 'back', '=', '\u00d7', '\u00f7', '\u2212'];
-  if (keys.indexOf(k) >= 0) { e.preventDefault(); key(k); }
-});
-
-draw();
-
 // ---- updating, without the cable -------------------------------------
 // Ghost, Sept 15: "And can i make her pull the current that way? Idk
 // how to use my phone wirelessly with it."
@@ -1113,11 +804,11 @@ desktop.onclick = () => {
 // IT IS A MAP NOW BECAUSE THE DECK IS THREE DEEP. The old ternary read
 // "calc goes to misc, everything else goes home", which was true while
 // home was one hop from everywhere. With ☆Stuff☆ in between, "go home"
-// from the calculator would skip two levels he walked down on purpose.
-// Every view names its parent, `main` is its own, so repeated taps
-// always land at the front and can never loop.
-const PARENT = { calc: 'misc', misc: 'stuff', ai: 'stuff',
-                 stuff: 'main', main: 'main' };
+// from the drawer would skip a level he walked down on purpose. Every
+// view names its parent, `main` is its own, so repeated taps always
+// land at the front and can never loop. (The calculator was the fourth
+// level; it went with the robot, Sept 30.)
+const PARENT = { misc: 'stuff', ai: 'stuff', stuff: 'main', main: 'main' };
 document.getElementById('back').onclick = () => {
   grid.className = PARENT[grid.className] || 'main';
   say('');

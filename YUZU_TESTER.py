@@ -3365,11 +3365,13 @@ class TestSpiderBodies(unittest.TestCase):
     class holds them to the parser anyway: the parser is the contract
     the bridge implements."""
 
-    # Zero stays a deck character, his call: "Remember thad zero stays a
-    # qwen tho" (Sept 27). A Qwen beside the pilots' Llama is a model
-    # SWAP every time he switches to her, and on the robot that swap
-    # competes with ROS for the 8GB.
-    STAYS_ON_THE_DECK = {"zero"}
+    # NOBODY STAYS HOME NOW. Zero was kept on the deck (Sept 27), because
+    # a Qwen beside the pilots' Llama is a model SWAP every time he
+    # switches to her. Then, Sept 30: "Also as far as Zero the Qwen
+    # variant goes. Can she go in spider too?" -- so she has legs too, on
+    # her own Qwen, and the swap is the price, said to him. The set stays
+    # so the next girl he keeps home is one line.
+    STAYS_ON_THE_DECK = set()
 
     @staticmethod
     def pilots():
@@ -3425,15 +3427,26 @@ class TestSpiderBodies(unittest.TestCase):
                              twin.blocks["SOUND_EXAMPLES"],
                              "%s makes different sounds" % key)
 
-    def test_the_pilots_think_with_FOURS_model(self):
-        """One model resident for all four, so switching girls on the
-        robot swaps a prompt, never the weights -- read through the
-        brain, so a `model:` line creeping into one of them is caught."""
-        fours = YuzuBrain(persona="four", host="http://127.0.0.1:9").model
-        for key in self.pilots():
-            self.assertEqual(YuzuBrain(persona=key,
-                                       host="http://127.0.0.1:9").model,
-                             fours, "%s left Four's model" % key)
+    def test_a_robot_body_never_changes_HER_BRAIN(self):
+        """Read through the brain, so a `model:` line creeping in or
+        going missing is caught. Four, Yuzu and the sisters share one
+        Llama, so switching between them swaps a prompt, never the
+        weights. Zero keeps her own Qwen on the robot as on the deck --
+        "zero stays a qwen" -- and is the ONE pilot who costs a swap."""
+        def model(key):
+            return YuzuBrain(persona=key, host="http://127.0.0.1:9").model
+        fours = model("four")
+        own = {}
+        for key, bot in self.pilots().items():
+            twin = bot.settings["same_girl_as"]
+            self.assertEqual(model(key), model(twin),
+                             "%s thinks with a different brain from %s"
+                             % (key, twin))
+            own.setdefault(model(key), []).append(twin)
+        self.assertEqual(sorted(own), sorted({fours, model("zero")}),
+                         "the robot needs a brain beyond Four's and Zero's")
+        self.assertEqual(own[model("zero")], ["zero"],
+                         "someone besides Zero left Four's Llama")
 
     def test_no_pilot_still_thinks_she_lives_in_the_HANDHELD(self):
         """The deck is abandoned, and CLAUDE.md said it in as many
@@ -3518,6 +3531,69 @@ class TestSpiderBodies(unittest.TestCase):
                 self.assertGreaterEqual(
                     len(re.findall(r"[A-Za-z']+", spoken)), 5,
                     "a shy example says almost nothing: %r" % reply)
+
+    def test_the_spider_LOOKS_THINGS_UP_and_keeps_the_deck_battery_off_DRIVEN(self):
+        """Ghost, Sept 30: "Keep the wiki function intact as well. Smart
+        spider". Driven through the face server's real answer(), with
+        each pilot put on a stand-in roster the way going live will:
+
+        /wiki reaches every body that DECLARES the encyclopedia -- the
+        deck and the robot -- and Zero's exact maths come with her; a
+        body that does not (Yuzu's drawn one) never gets a lookup. And
+        the deck's board line -- watts and "hours from a full bank", the
+        JSAUX bank's -- stays OFF the robot, where it would be a
+        confident wrong fact about her own battery."""
+        import yuzu_face
+        for key in list(self.pilots()) + ["four", "zero"]:
+            self.assertTrue(yuzu_personas.load(key).looks_up,
+                            "%s has no encyclopedia" % key)
+        for key in ("yuzu_avatar", "cait"):
+            self.assertFalse(yuzu_personas.load(key).looks_up,
+                             "%s was handed an encyclopedia" % key)
+        roster = {"fourbot": ("four_bot", "four.html", "x"),
+                  "zerobot": ("zero_bot", "zero.html", "x")}
+        seen = {}
+
+        def record(text, maths=False):
+            seen[text] = maths
+            return text, "stopped here"
+
+        with mock.patch.dict(yuzu_face.CHARACTERS, roster), \
+                mock.patch.object(yuzu_brain, "ground", record):
+            for who in ("fourbot", "zerobot", "four", "yuzu"):
+                yuzu_face.answer("/wiki spiders " + who, who)
+        self.assertEqual(seen, {"/wiki spiders fourbot": False,
+                                "/wiki spiders zerobot": True,
+                                "/wiki spiders four": False},
+                         "the encyclopedia went to the wrong bodies")
+
+        class Brain:
+            def __init__(self, persona=None, **kw):
+                self.persona = yuzu_personas.load(persona)
+                self.system_prompt = self.persona.prompt
+                self.history = []
+
+            def ask(self, text):
+                return "Fine."
+
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        with mock.patch.dict(yuzu_face.CHARACTERS, roster), \
+                mock.patch.dict(yuzu_face._BRAINS, clear=True), \
+                mock.patch.object(yuzu_brain, "YuzuBrain", Brain), \
+                mock.patch.object(yuzu_brain, "ground",
+                                  lambda text, maths=False: (text, None)), \
+                mock.patch.object(yuzu_face, "MEMORY_DIR", tmp + "/m"), \
+                mock.patch.object(yuzu_face, "FACTS_DIR", tmp + "/f"), \
+                mock.patch.object(yuzu_face, "board_now",
+                                  lambda: " JSAUX-BANK-HOURS."):
+            for who in ("fourbot", "four"):
+                yuzu_face.answer("hi", who)
+            said = {k: b.system_prompt for k, b in yuzu_face._BRAINS.items()}
+        self.assertIn("JSAUX-BANK-HOURS", said["four"],
+                      "the deck lost its own board line")
+        self.assertNotIn("JSAUX-BANK-HOURS", said["four_bot"],
+                         "the robot was told the deck's battery")
 
     def test_nothing_on_the_roster_moves_into_a_VOID(self):
         """A girl on a page with legs and no controller emits brackets
@@ -4676,12 +4752,18 @@ class TestExactMaths(unittest.TestCase):
         one she has already been shown. Derived from the code, so a
         change to either spelling goes red here."""
         import yuzu_brain, yuzu_personas
-        prompt = yuzu_personas.load("zero").prompt
         asked = "What's 17 times 23?"
         turn, _ = yuzu_brain.ground(asked, maths=True)
         self.assertNotEqual(turn, asked, "no note was written at all")
-        self.assertIn("Ghost: %s\n" % turn, prompt,
-                      "her example and the code disagree about the note")
+        # EVERY body she has, found by the setting, not by name: the
+        # deck and, since Sept 30, the robot.
+        exact = [k for k in yuzu_personas.available()
+                 if yuzu_brain.wants_exact_maths(yuzu_personas.load(k))]
+        self.assertIn("zero", exact)
+        for key in exact:
+            self.assertIn("Ghost: %s\n" % turn, yuzu_personas.load(key).prompt,
+                          "%s's example and the code disagree about the "
+                          "note" % key)
 
     def test_a_wiki_turn_never_gets_a_maths_note(self):
         """An encyclopedia paragraph is full of numbers nobody asked to
@@ -15762,9 +15844,9 @@ class TestHomeScreen(unittest.TestCase):
         his new main."""
         page = self.PAGE.read_text()
         views = {}
-        # `class="tile ..."`, not `class="tile"`: the d20 carries a
+        # `class="tile ..."`, not `class="tile"`: the d20 carried a
         # second class before its first roll, and a literal match
-        # silently dropped it from the count.
+        # silently dropped it from the count. Kept for the next one.
         for tile in re.findall(r'<div class="tile[ "][^>]*>', page):
             views.setdefault(
                 re.search(r'data-view="(\w+)"', tile).group(1), []).append(tile)
@@ -15776,9 +15858,9 @@ class TestHomeScreen(unittest.TestCase):
                          "something other than ☆Stuff☆ is typed onto the "
                          "front page")
         self.assertEqual(len(views["stuff"]), 2, "☆Stuff☆ is not two")
-        # SIX since "Save my stuff" (Sept 29), which also fills the
-        # drawer's two rows of three exactly.
-        self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
+        # THREE since the robot (Sept 30): the d20, the calculator and
+        # the browser went -- "fairly useless on a metal spider".
+        self.assertEqual(len(views["misc"]), 3, "the drawer is not three")
         for css in ("#grid.main { grid-template-columns: repeat(2, 1fr); }",
                     "#grid.stuff { grid-template-columns: repeat(2, 1fr); }"):
             self.assertIn(css, page)
@@ -15804,11 +15886,11 @@ class TestHomeScreen(unittest.TestCase):
                                r"calc\(\(100% - 2 \* 12px\) / 3\); \}",
                          "the drawer's tiles are not a third each")
         # The rule is about the TILE grid: a wide tile forced an odd row
-        # and orphaned two others. The calculator's display spanning its
-        # own keypad is not that, so pin WHICH selector may span rather
-        # than banning the string and catching the wrong one.
+        # and orphaned two others. The calculator's display was the one
+        # thing allowed to span, and it went with the robot -- so nothing
+        # may now.
         spans = re.findall(r"([#.][\w-]+)[^{}]*\{[^}]*grid-column:\s*span", page)
-        self.assertEqual(spans, ["#screen"],
+        self.assertEqual(spans, [],
                          "a spanning tile is back, and an odd row with it")
         # EVERY LEVEL HAS A WAY DOWN INTO THE NEXT ONE.
         self.assertIn('data-show="stuff"', "".join(views["main"]),
@@ -15816,8 +15898,6 @@ class TestHomeScreen(unittest.TestCase):
         self.assertEqual(
             sorted(re.findall(r'data-show="(\w+)"', "".join(views["stuff"]))),
             ["ai", "misc"], "☆Stuff☆ does not hold exactly A.I. and ☆Misc☆")
-        self.assertIn('data-launch="browser"', "".join(views["misc"]),
-                      "there is no way to the web from her screen")
         # TALK IS NOT A TERMINAL. It used to POST /launch/chat, which
         # starts an xterm ON THE DECK'S SCREEN -- from the phone that is
         # a window nobody can see, and on the panel it lands him in a
@@ -15960,11 +16040,9 @@ class TestHomeScreen(unittest.TestCase):
         block = re.search(r"const PARENT = \{(.*?)\};", page, re.S)
         self.assertTrue(block, "Back has no map of the deck")
         parent = dict(re.findall(r"(\w+):\s*'(\w+)'", block.group(1)))
-        self.assertEqual(parent.get("calc"), "misc",
-                         "Back out of the calculator does not reach the drawer")
         self.assertEqual(parent.get("main"), "main",
                          "the front page has a parent")
-        for view in set(re.findall(r'data-show="(\w+)"', page)) | {"calc"}:
+        for view in set(re.findall(r'data-show="(\w+)"', page)):
             seen, at = [], view
             while at != "main":
                 self.assertNotIn(at, seen, f"Back loops forever from {view}")
@@ -15972,25 +16050,28 @@ class TestHomeScreen(unittest.TestCase):
                 self.assertIn(at, parent, f"{at} has no way back")
                 at = parent[at]
             self.assertLessEqual(len(seen), 3, f"{view} is buried too deep")
-        self.assertNotIn('data-view="calc"', page,
-                         "the calculator became a tile that needs a view")
 
-    def test_the_d20_is_FAIR_and_rolls_in_place(self):
-        """Ghost: "add a D20 dice button somewhere with that black and
-        neon green crt effects that rolls it randomly."
-
-        `random() % 20` is biased -- 256 does not divide by 20, so some
-        faces come up more often. A loaded die is a bad joke to leave
-        in a thing somebody rolls for fun, and rejection sampling costs
-        nothing."""
+    def test_the_drawer_holds_NOTHING_a_metal_spider_cannot_use(self):
+        """Ghost, Sept 30: "Browser button, Calculator button, and D20 can
+        go away now cuz we makin a bot now. Those will be fairly useless
+        on a metal spider." Gone, not hidden -- no tile, no view, no code
+        left behind to read around, and the browser's launcher refused
+        like any name the deck does not know. Read with the comments
+        stripped, because the note saying they left names them."""
         page = self.PAGE.read_text()
-        self.assertIn('data-roll="20"', page, "there is no d20")
-        self.assertIn("getRandomValues", page, "the roll is not fair")
-        self.assertIn("256 % sides", page, "no rejection sampling")
-        self.assertNotIn("d20.html", page, "the dice grew a page")
-        # the flourish belongs to the two results that earn one
-        self.assertIn("nat20", page)
-        self.assertIn("nat1", page)
+        code = re.sub(r"<!--.*?-->|/\*.*?\*/", "", page, flags=re.S)
+        code = re.sub(r"(?m)^\s*//.*$", "", code)
+        for gone in ('data-roll=', 'data-show="calc"', 'data-launch="browser"',
+                     'id="pad"', "function roll(", "function evaluate(",
+                     "getRandomValues", "#grid.calc", "calc:"):
+            self.assertNotIn(gone, code, "%s is still on the deck" % gone)
+        ok, said, _ = self.face.launch("browser")
+        self.assertFalse(ok, "the browser can still be launched")
+        self.assertNotIn("browser", self.face.launchers())
+        # What STAYS: the wiki (his words, "Smart spider"), the Game Boy
+        # he did not name, and Save my stuff.
+        for stays in ('data-launch="wiki"', 'data-launch="gba"', 'id="save"'):
+            self.assertIn(stays, code, "%s went with them" % stays)
 
     def test_the_icons_are_line_art_and_not_emoji(self):
         """Ghost wanted "clean single-color line icons... rather than
@@ -16060,139 +16141,6 @@ class TestHomeScreen(unittest.TestCase):
         body = (Path(__file__).parent / "yuzu_face.py").read_text()
         popen = body.split("subprocess.Popen(")[1].split(")")[0]
         self.assertIn("start_new_session=True", popen)
-
-
-class TestCalculator(unittest.TestCase):
-    """The calculator in the drawer. Ghost, Sept 11: "wana toss a
-    working calculator in the same style into the misc drawer? (i suck
-    at math)".
-
-    THAT PARENTHESIS IS THE SPEC. If he could check the answer he would
-    not need the tool, so the tool has to be checkable a different way:
-    the whole sum stays on screen above the result. A normal calculator
-    shows one number and hides what you typed, which makes a slipped
-    digit invisible until the answer is already wrong.
-
-    WHAT IS VERIFIED WHERE. The arithmetic is JavaScript and this suite
-    is stdlib Python, so the sums themselves were driven in a real
-    browser -- precedence, division by zero, 0.1 + 0.2, backspace,
-    negation, chaining off an answer, and a twelve-digit product -- and
-    the screen was rendered at the panel's real 1024x600 and LOOKED at,
-    which is what caught the one bug this round had. What is pinned HERE
-    is every structural property whose loss would bring a fault back."""
-
-    PAGE = Path(__file__).parent / "ui" / "home.html"
-
-    def code(self):
-        """The page with its comments removed. Every rule worth pinning
-        here is about what the page DOES, and a comment explaining why
-        something is absent must never read as that thing being
-        present."""
-        body = self.PAGE.read_text()
-        body = re.sub(r"/\*.*?\*/", " ", body, flags=re.S)
-        return "\n".join(ln.split("//")[0] for ln in body.splitlines())
-
-    def test_it_lives_in_the_drawer_and_is_not_another_page(self):
-        page = self.PAGE.read_text()
-        self.assertIn('id="calc"', page, "there is no calculator")
-        self.assertIn('data-show="calc"', page, "nothing opens it")
-        self.assertNotIn("calc.html", page, "the calculator grew a page")
-
-    def test_there_is_no_eval_anywhere_near_it(self):
-        """Not paranoia about a page the deck serves to itself. eval
-        turns a typo into a JavaScript error instead of an answer, and
-        "SyntaxError" on screen is the same dead end as a tap that does
-        nothing -- on a deck with no keyboard to debug it with."""
-        # CODE, not prose. Two false positives on the way to this line:
-        # a bare "eval(" matches evaluate() -- the function that exists
-        # SO THAT there is no eval -- and it also matches the COMMENT
-        # saying there is no eval. Grepping source text is a proxy, and
-        # this repo has now been bitten by that exact shape four times.
-        code = self.code()
-        self.assertIsNone(re.search(r"\beval\s*\(", code),
-                          "eval() is in the calculator page")
-        # NOT innerHTML: the battery cell writes a fixed string through
-        # it and has since before there was a calculator. Banning it
-        # here would fail a line this page is REQUIRED to keep byte for
-        # byte identical to face.html.
-        for hole in ("new Function", "setTimeout('"):
-            self.assertNotIn(hole, code, f"{hole} is in the calculator page")
-
-    def test_it_does_real_precedence_rather_than_left_to_right(self):
-        """"2 + 3 x 4" is 14, which is what it is on paper. A calculator
-        that answers 20 is a calculator you cannot trust with the sum
-        you could not do yourself -- and he told us he cannot.
-
-        Two passes: x and \u00f7 collapse first, then + and \u2212 left to
-        right. Verified in a browser; pinned here so a rewrite cannot
-        quietly flatten it."""
-        body = self.code().split("function evaluate(")[1].split("\nfunction ")[0]
-        # the multiply/divide pass has to come BEFORE the add/subtract one
-        self.assertLess(body.index("\\u00d7"), body.index("'+' ?"),
-                        "the precedence passes are the wrong way round")
-
-    def test_dividing_by_zero_is_a_sentence_and_never_Infinity(self):
-        """Infinity is a number that LOOKS like an answer. This project
-        keeps refusing to print things it made up, and a wrong answer
-        wearing a right answer's clothes is the worst version of it."""
-        code = self.code()
-        self.assertIn("cannot divide by zero", code)
-        self.assertIn("n === 0", code, "nothing checks the divisor")
-        # ...and again on the comment that explains why it is absent.
-        self.assertNotIn("Infinity", code)
-
-    def test_the_answer_is_rounded_so_binary_float_never_shows(self):
-        """0.1 + 0.2 is 0.30000000000000004 if you let it. Ten
-        significant digits removes that entirely and touches nothing a
-        person would ever type into a deck."""
-        self.assertIn("toPrecision(10)", self.code(),
-                      "the answers are not rounded")
-
-    def test_the_sum_is_NOT_laid_out_right_to_left(self):
-        """THE BUG THIS ROUND HAD, and only rendering the page found it.
-        `direction: rtl` was there to keep the END of a long sum on
-        screen -- and it drew "12 x 3.5 + 7 =" as "= 7 + 3.5 x 12",
-        because rtl reverses the ORDER OF RUNS in mixed text, not just
-        the overflow. It would have flipped the minus off the front of a
-        negative answer too, which is a wrong number rather than a
-        scrambled one.
-
-        Scrolling the box in draw() is what actually keeps the tail
-        visible, and it cannot reorder anything."""
-        code = self.code()
-        self.assertNotIn("direction: rtl", code,
-                         "the sum reads backwards again")
-        self.assertIn("scrollLeft = ", code,
-                      "nothing keeps the end of a long sum on screen")
-
-    def test_the_whole_sum_stays_on_screen_next_to_the_answer(self):
-        """The one thing he asked for, stated as structure: two boxes,
-        the sum above the result, and the sum still there AFTER '='."""
-        code = self.code()
-        self.assertIn('id="sum"', code)
-        self.assertIn('id="out"', code)
-        self.assertLess(code.index('id="sum"'), code.index('id="out"'),
-                        "the answer is above the sum")
-        self.assertIn("last = shown + ' ='", code,
-                      "the sum is thrown away the moment it is answered")
-
-    def test_every_key_a_calculator_needs_is_on_the_pad(self):
-        page = self.PAGE.read_text()
-        keys = set(re.findall(r'data-k="([^"]+)"', page))
-        wanted = set("0123456789") | {".", "+", "=", "%", "C", "back",
-                                      "neg", "\u00d7", "\u00f7", "\u2212"}
-        self.assertEqual(wanted - keys, set(), "keys missing from the pad")
-        self.assertEqual(len(keys), 20, "the pad is not twenty keys")
-
-    def test_a_stray_keypress_can_never_reach_the_launcher(self):
-        """The Bluetooth keyboard exists and may end up on the deck, so
-        typing a sum is free to support. But the tiles POST to the
-        allowlist, and a keypress that reaches one of those is a tap he
-        never made."""
-        guard = self.code().split("addEventListener('keydown'")[1][:400]
-        self.assertIn("grid.className !== 'calc'", guard,
-                      "keys are handled outside the calculator")
-        self.assertIn("return", guard)
 
 
 class TestDeckAutostart(unittest.TestCase):

@@ -13,7 +13,7 @@ This does the same for a sum. When his message has one in it, the deck
 works it out here, exactly, and the answer rides into her turn beside
 what he typed:
 
-    What's 17 times 23? (The deck worked it out exactly: 17 × 23 = 391.)
+    What's 17 times 23? (Worked out exactly in code: 17 × 23 = 391.)
 
 She never has to produce the number, only explain it -- and copying a
 number is the one thing a small model does not get wrong.
@@ -243,7 +243,10 @@ def note(text):
         "%s = %s" % (shown, answer) if not answer.startswith("no answer")
         else "%s has %s" % (shown, answer)
         for shown, answer in found)
-    return "(The deck worked it out exactly: %s.)" % worked
+    # "Worked out ... in code", not "The deck worked it out": she is
+    # going into a robot (Sept 30), and a note naming the deck would be
+    # the one line in her turn that says she lives in a handheld.
+    return "(Worked out exactly in code: %s.)" % worked
 
 
 if __name__ == "__main__":

@@ -347,25 +347,11 @@ def write_rgba(path, w, h, px):
 TERMINALS = ("xfce4-terminal", "lxterminal", "mate-terminal",
              "gnome-terminal", "xterm")
 
-# A PLAIN browser -- url bar, tabs, the lot. Deliberately the opposite
-# of how every other page on this deck is opened.
-#
-# Ghost, Sept 11: "can i set it up to have youtube,browsing, etc on the
-# same screen?" Yes, and it needs a door. Her home screen fills the
-# panel now (`deckapps` opens it with --app= --start-fullscreen), so
-# without this there is no way from her face to the web at all -- a
-# deck that locks out the browser it is built on is a worse computer
-# than the bare board.
-BROWSERS = ("chromium", "chromium-browser", "google-chrome",
-            "brave-browser", "firefox")
-
-
-def _browser():
-    for name in BROWSERS:
-        found = shutil.which(name)
-        if found:
-            return found
-    return None
+# THE BROWSER TILE IS GONE, and its launcher with it. Ghost, Sept 30:
+# "Browser button, Calculator button, and D20 can go away now cuz we
+# makin a bot now. Those will be fairly useless on a metal spider." It
+# opened a browser on the deck's OWN screen, and the robot has none; his
+# phone already is the browser. `git show 1f42a38:yuzu_face.py` has it.
 
 
 def _terminal():
@@ -389,15 +375,6 @@ def launchers():
         "wiki": ([os.path.join(here, "wiki")],
                  "Wikipedia is starting.", "http://127.0.0.1:8080"),
     }
-    web = _browser()
-    if web:
-        # NO URL ARGUMENT. It opens on whatever homepage the browser
-        # already has, which means not one character from the request
-        # reaches the command line -- the allowlist stays a list of
-        # NAMES, which is the only reason this route is safe on a
-        # server bound to 0.0.0.0.
-        plans["browser"] = ([web], "Browser is opening on the deck's "
-                                   "screen.", None)
     term = _terminal()
     if term:
         plans["chat"] = (
@@ -415,9 +392,6 @@ def launch(name):
         if name == "chat":
             return (False, "No terminal emulator on this board -- "
                            "install one: sudo apt install -y xterm", None)
-        if name == "browser":
-            return (False, "No browser on this board -- install one: "
-                           "sudo apt install -y chromium-browser", None)
         return (False, "Not a thing this deck knows how to open.", None)
     argv, said, opens = plans[name]
     if not os.path.exists(argv[0]) and not shutil.which(argv[0]):
@@ -2196,11 +2170,22 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
     # shape as every "reported healthy while broken" entry in
     # CLAUDE.md, and the reason the test below drives the real
     # function rather than reading it.
+    #
+    # THE ROBOT CARRIES IT TOO, since Sept 30 ("Keep the wiki function
+    # intact as well. Smart spider"), so the gate is a PROPERTY the body
+    # file declares -- `[ENCYCLOPEDIA] yes`, read as `looks_up` -- and no
+    # longer the name of one body. The board line is a DIFFERENT question
+    # and stays on the deck: its watts and "hours from a full bank" are
+    # the deck's JSAUX bank, and on the robot they would be a confident
+    # wrong fact about her own battery. The robot's voltage replaces it
+    # the day it can be read (CLAUDE.md, "GOING LIVE", step 3).
     import yuzu_personas
     try:
-        has_wiki = yuzu_personas.load(key).hardware == "cyberdeck"
+        persona = yuzu_personas.load(key)
+        has_wiki = persona.looks_up
+        on_deck = persona.hardware == "cyberdeck"
     except Exception:
-        has_wiki = drives_face
+        has_wiki = on_deck = drives_face
     # EXACT SUMS, for a character whose settings ask for them (Zero).
     # Worked out in code inside ground(), beside the /wiki lookup, so
     # the page and the terminal chat get the same thing.
@@ -2269,7 +2254,7 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
         try:
             if not hasattr(brain, "_base_prompt"):
                 brain._base_prompt = brain.system_prompt
-            board = (board_specs() + board_now() + board_has()) if has_wiki else ""
+            board = (board_specs() + board_now() + board_has()) if on_deck else ""
             brain.system_prompt = brain._base_prompt + board + facts_line(key)
         except Exception:
             pass

@@ -60,3 +60,6 @@ Always say something real out loud in every reply. A reply with nothing actually
 
 [MOVES]
 no
+
+[ENCYCLOPEDIA]
+yes

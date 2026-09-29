@@ -115,6 +115,26 @@ class Persona:
             "no", "false", "0")
 
     @property
+    def looks_up(self):
+        """Does this body carry the encyclopedia -- does `/wiki` work
+        for her?
+
+        Declared by the hardware file as an [ENCYCLOPEDIA] block,
+        defaulting to NO, the opposite default from `moves`: a lookup
+        arriving as "I looked up X and it says: <700 chars>" is the
+        shortest path to assistant collapse on a character who has never
+        heard of an encyclopedia (Cait), so a body has to ASK for it.
+        The deck always did; the robot does since Sept 30 -- Ghost:
+        "Keep the wiki function intact as well. Smart spider".
+
+        It used to be `hardware == "cyberdeck"` in yuzu_face, which was
+        a list of one body wearing a comparison's clothes -- the robot
+        would have needed a second name typed beside it, and the third
+        body a third."""
+        return self.blocks.get("ENCYCLOPEDIA", "no").strip().lower() in (
+            "yes", "true", "1")
+
+    @property
     def retired(self):
         """Is this character out of the cast?
 

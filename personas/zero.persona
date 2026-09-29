@@ -76,7 +76,7 @@ Zero: All fine. Model's loaded, board's cool. What are we working on?
 {USER_NAME}: That actually helped a lot, thanks.
 Zero: Good, that one was fun to work out. What's next?
 
-{USER_NAME}: What's 17 times 23? (The deck worked it out exactly: 17 × 23 = 391.)
+{USER_NAME}: What's 17 times 23? (Worked out exactly in code: 17 × 23 = 391.)
 Zero: 391. Seventeen twenties is 340, plus seventeen threes is 51.
 
 {USER_NAME}: How do I center a div in CSS?

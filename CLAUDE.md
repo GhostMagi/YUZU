@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 895 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 887 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,59 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
+
+Ghost, the same morning: *"Browser button, Calculator button, and D20
+can go away now cuz we makin a bot now. Those will be fairly useless on
+a metal spider"*, *"Also as far as Zero the Qwen variant goes. Can she
+go in spider too?"*, *"And the custom art pages stay of course. Keep
+the wiki function intact as well. Smart spider"*, and *"I do like your
+idea of still being able to use the phone/steam deck for interacting w
+the robot tho"*. And of the models in the save: *"I just dont wana have
+to look for em again tbh"* -- which is exactly what it is for.
+
+**THE THREE ARE DELETED, NOT HIDDEN** (the V-Pet's call, his words):
+the tiles, the calculator's view, keypad and code, the d20's roll, and
+`/launch/browser` with `_browser()`. `git show 1f42a38:ui/home.html`
+and `:yuzu_face.py` bring them back. ☆Misc☆ is Wikipedia, Game Boy and
+Save my stuff (he did not name the Game Boy, so it stays); Back's map
+lost its fourth level. Rendered at 1024, 412 and 360: one row of three
+on the panel, two-and-one centred on a phone, nothing under the bar.
+`TestCalculator` and the d20 test went with them; a test now holds the
+drawer to nothing a spider cannot use, read with comments stripped.
+
+**`zero_bot`, ON HER OWN QWEN.** The four_bot pattern (`same_girl_as:
+zero`, every setting equal, the robot body, every example moving, the
+three robot turns), and the one pilot who does NOT share Four's Llama
+-- `test_a_robot_body_never_changes_HER_BRAIN` holds each pilot to her
+twin's model through the brain, and Zero alone to the Qwen. **Said to
+him: switching to or from her on the robot is a model swap** (one model
+in memory at a time), so her first reply after a switch is the slow
+one; the robot never holds both. Her prompt is 5760 chars, under
+four_bot's. **How the bracket format plays on Qwen is UNMEASURED** --
+every movement number here is Llama 3B's.
+
+**HER MATHS NOTE SAID "The deck worked it out"**, and it rides in her
+turn on any body. It is `(Worked out exactly in code: ...)` now, and
+the example test derives the note from the code for EVERY persona with
+`maths: exact`, found by the setting -- so zero.persona's composed
+prompt moved by those words (Four, the live one, did not).
+
+**/wiki IS OPEN TO THE ROBOT BODY** -- going-live step 3, done early
+because he asked. The gate was `hardware == "cyberdeck"`, a list of one
+body; it is `persona.looks_up` now, declared by `[ENCYCLOPEDIA] yes` in
+`_hardware_cyberdeck.txt` and `_hardware_jethexa.txt` (default NO, so a
+body has to ask -- Cait's reason). **The board line is a separate gate
+and stays on the deck**: its watts and "hours from a full bank" are the
+JSAUX bank's, a confident wrong fact about the robot's battery. The
+robot body tells her in one clause that an encyclopedia rides with her.
+Five off-roster bot prompts grew ~52 chars; four_bot is 6047, about 165
+tokens spare, counted pessimistically.
+
+**Eleven breaks, all red. 884 -> 887** over the two rounds (the
+calculator's nine tests and the d20's went; the save, drop, spider and
+drawer tests came in).
 
 ## SAVE MY STUFF KEEPS THEIR BRAINS NOW (Sept 30)
 
@@ -122,7 +175,7 @@ own sandbox.** Read the hostile input before running the break.
 **Twenty-three breaks, every one red.** The suite never reads his real
 models: every save test stands in for Ollama with a tiny fake store,
 and one test drives the real `/api/show` question against a stand-in
-server. **884 -> 895.**
+server. **884 -> 895** (887 after the bot round below).
 
 **UNVERIFIED, all of it on his board:** that the user the face server
 runs as can READ Ollama's blobs (Ollama's install adds him to the
@@ -466,7 +519,8 @@ win yuzu4 carries (the body-protocol ones too) plus the sounds-
 enforcement line whose absence lost yuzu5; the three robot turns; the
 shy one's five-word bar; one model; no "deck", "handheld" or "screen"
 left in any of them; and **every roster girl has a robot body unless
-she stays home**. Zero is the one who stays, by his words.
+she stays home**. Zero was the one who stayed, by his words -- until
+Sept 30, when he asked for her too (`zero_bot`, see the top).
 
 **The bare-command win is a TURN SHAPE, not a label**: third
 instance. It matched the literal `User: Walk forward.`, and the pilots
@@ -495,10 +549,13 @@ examples cost yuzu4 any movement?).
    2027 first). Then `[BUILT] yes` in `_hardware_jethexa.txt`.
 2. **Point the roster** (`CHARACTERS` in `yuzu_face.py`) at the `_bot`
    keys: `same_girl_as` says which is which.
-3. **Open `/wiki` to the robot body** (the gate is `hardware ==
-   "cyberdeck"` in `answer()`), and keep `board_now()`'s JSAUX-bank
-   hours OFF it. Its replacement is the robot's voltage, read into her
-   turn in the same shape, with its arithmetic in the context guard.
+3. ~~**Open `/wiki` to the robot body**~~ **DONE Sept 30** ("Smart
+   spider"): the gate is `persona.looks_up`, declared by
+   `[ENCYCLOPEDIA] yes` in the body file, and `board_now()`'s JSAUX-bank
+   hours stay OFF the robot (gated on `hardware == "cyberdeck"` now,
+   separately). What is left of this step: the robot's VOLTAGE, read
+   into her turn in the board_now() shape, with its arithmetic in the
+   context guard.
 4. **Decide `LIVE_PERSONA`** (the terminal chat and the eval) and
    paste the live prompt when it moves.
 
@@ -531,8 +588,9 @@ was abandoned is the HARDWARE (case, 10" panel, the handheld idea),
 not the software.
 
 - **Deck-only features go dormant, NOT deleted**: the Game Boy / ES-DE
-  tiles, calculator, d20, desktop icons, `tile`, `gba`, `deckapps`.
-  Nobody asked to remove them. Deleting is his call; offer, never do.
+  tiles, desktop icons, `tile`, `gba`, `deckapps`. Deleting is his
+  call; offer, never do. **He made that call for three, Sept 30**: the
+  calculator, the d20 and the Browser tile are DELETED (see the top).
 - **The girls still THINK they live in a handheld.**
   `_hardware_cyberdeck.txt` says so, and `board_now()` counts hours
   from the JSAUX bank. On the robot both are wrong: the robot bodies
