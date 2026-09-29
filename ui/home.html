@@ -206,8 +206,16 @@ body {
   100% { transform: scaleY(1);    filter: brightness(1) }
 }
 #d20.settled .roll { animation: crt .42s ease-out; }
-@media (max-width: 560px) { #grid { grid-template-columns: 1fr; }
-                            #grid.misc > .tile { flex-basis: 100%; } }
+/* ON A PHONE THE DRAWER IS TWO ACROSS, and the grid SCROLLS rather than
+   run under the bar. It was one tile per row, and the sixth tile ("Save
+   my stuff", Sept 29) rendered at 412px sat BEHIND Back / Desktop /
+   Update, where no tap could reach it -- found by rendering it, not by
+   any assertion. Three rows of two keep every tile a thumb target; the
+   scroll is the guarantee for the next tile, and for a shorter phone. */
+@media (max-width: 560px) { #grid { grid-template-columns: 1fr;
+                                    overflow-y: auto; }
+                            #grid.misc > .tile {
+                              flex-basis: calc((100% - 12px) / 2); } }
 
 /* ---- the calculator -----------------------------------------------
    Ghost: "wana toss a working calculator in the same style into the
@@ -296,6 +304,9 @@ body {
 .tile b { font-size: 17px; font-weight: 700; }
 .tile span { font-size: 12.5px; opacity: .6; text-align: center; }
 .tile.busy { opacity: .55; }
+/* Armed: the first tap said how big the save is, and the next one
+   saves it. Lit like the front tile so the state reads at a glance. */
+#save.armed { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 
 /* THE FRONT CHARACTER IS THE BRIGHT TILE -- by ROLE, never by name.
    This used to be `#saya`, which is the hardcoded-cast bug in
@@ -339,6 +350,22 @@ body {
    character pages. */
 #desktop { margin-left: auto; }
 #update:disabled, #desktop:disabled { opacity: .5; cursor: default; }
+/* ON A PHONE THE MESSAGE GETS ITS OWN LINE, above the buttons. Side by
+   side it was squeezed to one word wide and half the screen tall -- the
+   fault the rule above records -- and "Save my stuff" says a whole
+   sentence (what is in the save), which at 360px made the bar so tall
+   it pushed the drawer's last row out of sight and wrapped ⌂ Back onto
+   two lines. Found by rendering, Sept 29. An empty message takes no
+   line at all, so the bar is its old height until something is said. */
+/* And the gaps shrink to fit a 360px phone: Back, Desktop and Update
+   side by side came to 368px there, so in a drawer Update used to sit
+   off the edge, and with wrapping it fell to a third row instead. */
+@media (max-width: 560px) {
+  #bar { flex-wrap: wrap; row-gap: 8px; column-gap: 8px;
+         padding-left: 16px; padding-right: 16px; }
+  #note { flex: 0 0 100%; order: -1; }
+  #note:empty { display: none; }
+}
 
 /* Pure #000 also kills glare on a panel and hides the bezel edge,
    which is the practical half of why green on black is worth having on
@@ -366,7 +393,7 @@ body {
 
            home     <the front character>   ☆Stuff☆
            ☆Stuff☆  A.I.                    ☆Misc☆
-           ☆Misc☆   Wikipedia Game Boy d20 Browser Calculator
+           ☆Misc☆   Wikipedia Game Boy d20 Browser Calculator Save
            A.I.     built from the roster
 
        THE FRONT TILE IS NOT IN THIS FILE, and that is the whole
@@ -424,6 +451,20 @@ body {
     <div class="big"><svg viewBox="0 0 24 24"><rect x="4.5" y="2.5" width="15" height="19" rx="2.5"/><path d="M7.5 6.5h9"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h.01M16 18h.01"/></svg></div>
     <b>Calculator</b>
     <span>sums, out loud</span>
+  </div>
+  <!-- SAVE MY STUFF. Ghost, Sept 29: "I dont wana hit it and auto fill
+       my phones memory lol. Just make it save whats important". So it
+       saves only what cannot be downloaded again (the girls' memories,
+       his notes, his game saves), and the FIRST tap only says how big
+       that is -- the second tap saves it. See backup() in yuzu_face.py.
+       A tile rather than a bar button: the bar already carries Back,
+       Desktop and Update, and on a phone one more button there is the
+       fault that once put Update 2px off a 412px screen. And six tiles
+       fill the drawer's two rows exactly. -->
+  <div class="tile" id="save" data-view="misc" data-save="">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 15.5v4h16v-4"/></svg></div>
+    <b>Save my stuff</b>
+    <span>chats, notes &amp; game saves</span>
   </div>
 </div>
 
@@ -561,12 +602,72 @@ function roll(tile, sides) {
   }, 55);
 }
 
+// ---- SAVE MY STUFF ---------------------------------------------------
+// Ghost, Sept 29: "I dont wana hit it and auto fill my phones memory
+// lol." So the FIRST tap only asks the deck what it would save and how
+// big that is, and says so; the SECOND tap saves it. It disarms itself
+// if he does nothing, like start fresh on Four's page -- slower here,
+// because he has a size and a list to read first. No dialog: a modal is
+// a mode, and a mode needs its own way out.
+//
+// The zip comes back through fetch and is handed to the browser as a
+// download, rather than by pointing the page at it, so a deck that
+// cannot build one says WHY in the bar instead of saving a broken file.
+let saveArmed = null, saveAs = 'yuzu-save.zip';
+const SAVE_IDLE = 'chats, notes & game saves';
+
+function unarm(tile) {
+  clearTimeout(saveArmed);
+  saveArmed = null;
+  tile.classList.remove('armed');
+  tile.querySelector('span').textContent = SAVE_IDLE;
+}
+
+function saveMyStuff(tile) {
+  if (tile.classList.contains('busy')) return;
+  const out = tile.querySelector('span');
+  tile.classList.add('busy');
+  if (!saveArmed) {
+    fetch('save.json', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(m => {
+        if (!m.ok) { say(m.said || 'Nothing to save yet.', 8000); return; }
+        saveAs = m.name || saveAs;
+        out.textContent = m.size + ' · tap again to save';
+        tile.classList.add('armed');
+        say(m.what, 10000);
+        saveArmed = setTimeout(() => unarm(tile), 10000);
+      })
+      .catch(() => say('No answer from the deck. Is ~/YUZU/face running?', 9000))
+      .then(() => tile.classList.remove('busy'));
+    return;
+  }
+  unarm(tile);
+  say('Saving...');
+  fetch('save.zip', { cache: 'no-store' })
+    .then(r => r.ok ? r.blob()
+                    : r.json().then(j => { throw new Error(j.said); }))
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = saveAs;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      say('Saved ' + saveAs + ' -- it is in your Downloads.', 10000);
+    })
+    .catch(e => say((e && e.message) || 'It would not save.', 10000))
+    .then(() => tile.classList.remove('busy'));
+}
+
 // Wiring is a FUNCTION, not a one-shot loop over what is in the
 // markup: the A.I. tiles are built from the roster after this runs, and
 // a tile nobody wired is a tap that does nothing -- which reads as a
 // broken deck.
 function wire(tile) {
   tile.onclick = () => {
+    if ('save' in tile.dataset) { saveMyStuff(tile); return; }
     // A view swap is not a launch and not a link -- it is the drawer
     // opening. Kept as its own verb so `data-launch` stays exactly the
     // allowlisted-name-crosses-the-wire thing it has always been.

@@ -1073,7 +1073,15 @@ _SYSTEMS = {
 
 # Saves and states are not games, and counting them would tell him he
 # has twice the library he has.
-_NOT_A_GAME = (".sav", ".srm", ".state", ".ss0", ".ss1", ".png", ".txt")
+#
+# ONE LIST FOR TWO JOBS: the saves are also exactly what "Save my stuff"
+# keeps (see backup() below), because they are the one thing in ~/ROMs
+# that nothing can download again. mGBA writes its states as .ss0 to
+# .ss9 beside the game, and this list used to stop at .ss1 -- so a third
+# save state was counted as a third GAME. Found by writing the backup,
+# which had to ask the same question from the other side.
+_SAVES = (".sav", ".srm", ".state") + tuple(".ss%d" % n for n in range(10))
+_NOT_A_GAME = _SAVES + (".png", ".txt")
 
 
 def _archives():
@@ -1193,6 +1201,174 @@ def board_has():
         line = render()
     _HAS = line
     return _HAS
+
+
+# "SAVE MY STUFF" -- a zip to his PHONE of what cannot be downloaded
+# again. Ghost, Sept 29, on the robot's arrival: "I dont wana hit it and
+# auto fill my phones memory lol. Just make it save whats important i
+# guess? ... I dont wana fill my phone with wikipedia files and stuff."
+#
+# WHAT IS IMPORTANT IS SMALL, and that is the whole design:
+#
+#     the girls' chat memories     ~/.yuzu/history      kilobytes
+#     what they know about him     ~/.yuzu/facts        kilobytes
+#     his game saves               ~/ROMs/*/ saves      kilobytes each
+#                                  ~/.mednafen/sav, mcs (NES/SNES)
+#
+# NOT the wiki (14GB, and `wiki --get` fetches it again), NOT the models
+# (`ollama pull`), NOT the ROMs (they came FROM his phone, by drop.py),
+# NOT the repo (it is on GitHub). A backup of things he can download
+# again is how a phone fills up.
+#
+# WHY IT EXISTS AT ALL: an image flashed onto the NVMe wipes it, and
+# whether Hiwonder's software is an install or an image is still an open
+# question to them. This is the one tap before that day.
+#
+# THE ZIP IS LAID OUT RELATIVE TO HIS HOME FOLDER (.yuzu/history/...,
+# ROMs/gba/...), so putting it back is unzipping it in the home folder on
+# the board -- nothing to remember about where anything lives.
+#
+# TWO CAPS, for the reason he gave. A file over SAVE_FILE_MAX is not a
+# save (a GBA save is 128KB and a state well under a megabyte), and the
+# whole zip stops at SAVE_MAX. Anything left out is SAID, by name, never
+# dropped quietly -- a backup that silently skipped a save is worse than
+# one that says it did.
+SAVE_FILE_MAX = 16 << 20
+SAVE_MAX = 64 << 20
+
+
+def _save_sources():
+    """(path on the board, name in the zip, kind) for everything worth
+    keeping, in the order it is kept -- memories and notes first, because
+    they are the tiny irreplaceable ones and must never lose a cap race
+    to a save state.
+
+    Read, never written: nothing here opens a file for writing."""
+    home = os.path.expanduser("~")
+    found = []
+
+    def folder(path, zip_dir, kind, keep):
+        try:
+            names = sorted(os.listdir(path))
+        except OSError:
+            return
+        for name in names:
+            full = os.path.join(path, name)
+            if name.startswith(".") or not os.path.isfile(full):
+                continue
+            if keep(name.lower()):
+                found.append((full, zip_dir + "/" + name, kind))
+
+    # A `.part` is a write that did not finish (save_memory writes beside
+    # the file and renames), so only whole .json files count.
+    folder(MEMORY_DIR, ".yuzu/history", "memory", lambda n: n.endswith(".json"))
+    folder(FACTS_DIR, ".yuzu/facts", "note", lambda n: n.endswith(".json"))
+    roms = os.path.join(home, "ROMs")
+    try:
+        systems = sorted(os.listdir(roms))
+    except OSError:
+        systems = []
+    for system in systems:
+        if os.path.isdir(os.path.join(roms, system)):
+            folder(os.path.join(roms, system), "ROMs/" + system, "save",
+                   lambda n: n.endswith(_SAVES))
+    # mednafen keeps NES/SNES saves and states in its own folders, not
+    # beside the game: every file in them is a save.
+    for sub in ("sav", "mcs"):
+        folder(os.path.join(home, ".mednafen", sub), ".mednafen/" + sub,
+               "save", lambda n: True)
+    return found
+
+
+def _save_name():
+    """The file name on his phone. Dated only when the clock is real:
+    the board has no RTC, so at his dad's garage with no network it
+    thinks it is 1969, and a backup named for 1969 is a confident lie."""
+    now = time.localtime()
+    if now.tm_year < 2024:
+        return "yuzu-save.zip"
+    return time.strftime("yuzu-save-%Y-%m-%d.zip", now)
+
+
+def _human(n):
+    """A size he can read at a glance: 812 bytes, 48 KB, 3.2 MB."""
+    if n < 1024:
+        return "%d bytes" % n
+    if n < 1 << 20:
+        return "%d KB" % max(1, round(n / 1024))
+    return "%.1f MB" % (n / (1 << 20))
+
+
+def backup():
+    """(zip bytes, manifest). Never raises: a backup that throws on a
+    board he is about to wipe is the worst moment to find out.
+
+    The manifest is what the page shows BEFORE he saves -- the size and
+    what is in it -- so the number he agrees to is the number he gets."""
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    counts = {"memory": 0, "note": 0, "save": 0}
+    left_out = []
+    total = 0
+    try:
+        # strict_timestamps=False, AND IT IS LOAD-BEARING: the board has
+        # no RTC, so anything written before NTP answered carries a 1969
+        # or 1970 date, and a zip refuses timestamps before 1980 unless
+        # told to clamp them. His saves from a garage with no network are
+        # exactly those files.
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED,
+                             strict_timestamps=False) as zf:
+            for path, name, kind in _save_sources():
+                try:
+                    size = os.path.getsize(path)
+                except OSError:
+                    continue
+                if size > SAVE_FILE_MAX:
+                    left_out.append("%s (%s, too big to be a save)"
+                                    % (name, _human(size)))
+                    continue
+                if total + size > SAVE_MAX:
+                    left_out.append("%s (%s, over the cap)"
+                                    % (name, _human(size)))
+                    continue
+                try:
+                    zf.write(path, name)
+                except (OSError, ValueError):
+                    left_out.append("%s (could not be read)" % name)
+                    continue
+                total += size
+                counts[kind] += 1
+            zf.writestr("README.txt", (
+                "Saved off the YUZU board%s.\n\n"
+                "In here: the girls' chat memories (.yuzu/history), what "
+                "they know about you (.yuzu/facts) and your game saves.\n"
+                "Not in here, on purpose: the wiki, the models and your "
+                "ROMs -- those can all be downloaded again.\n\n"
+                "To put it back: copy this zip to your home folder on the "
+                "board and unzip it there.\n"
+            ) % ("" if time.localtime().tm_year < 2024
+                 else time.strftime(" on %Y-%m-%d")))
+    except Exception as exc:
+        return b"", {"ok": False,
+                     "said": "It could not build the save: %s" % exc}
+    data = buf.getvalue()
+    words = {"memory": ("chat memory", "chat memories"),
+             "note": ("note about you", "notes about you"),
+             "save": ("game save", "game saves")}
+    bits = ["%d %s" % (counts[kind], words[kind][counts[kind] != 1])
+            for kind in ("memory", "note", "save") if counts[kind]]
+    if not bits:
+        return data, {"ok": False, "left_out": left_out,
+                      "said": "Nothing to save yet: no chat memories, "
+                              "notes or game saves on the board."}
+    what = _and_list(bits) + ". No wiki, no models, no ROMs."
+    if left_out:
+        what += " Left out: " + "; ".join(left_out) + "."
+    return data, {"ok": True, "name": _save_name(), "bytes": len(data),
+                  "size": _human(len(data)), "what": what,
+                  "memories": counts["memory"], "notes": counts["note"],
+                  "saves": counts["save"], "left_out": left_out}
 
 
 # SHE REMEMBERS WHAT HE TELLS HER TO, AND THAT IS NOT THE HISTORY.
@@ -2195,6 +2371,31 @@ class _Handler(SimpleHTTPRequestHandler):
         # update and reloads only once a DIFFERENT one does -- see BOOT.
         if self.path.split("?")[0].rstrip("/") == "/boot.json":
             self._json({"boot": BOOT})
+            return
+        # SAVE MY STUFF -- see backup(). TWO ROUTES AND NEITHER READS THE
+        # QUERY STRING: what is saved is decided on the board, never by
+        # the request, the same discipline as /pull and /launch/. The
+        # .json is what the first tap shows him (the size, and what is
+        # in it); the .zip is the second tap.
+        if self.path.split("?")[0].rstrip("/") == "/save.json":
+            self._json(backup()[1])
+            return
+        if self.path.split("?")[0].rstrip("/") == "/save.zip":
+            data, made = backup()
+            if not made.get("ok"):
+                # A 503 with a sentence, never a 200: a sad sentence
+                # saved as a .zip is a broken file on his phone that
+                # looks exactly like a backup.
+                self._json(made, 503)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition",
+                             'attachment; filename="%s"' % made["name"])
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
             return
         # Regenerated per request like the rest. `who` is a NAME and it
         # is looked up in POSES, so nothing in the query string can ever

@@ -8,7 +8,9 @@ there, and where the two disagree, CLAUDE.md wins.
 
 **Sept 29: the handheld deck is ABANDONED for the JetHexa2027 robot.**
 Read the top of CLAUDE.md first; anything below that calls this a
-deck describes the old plan.
+deck describes the old plan. The four pilots have robot personas
+(`*_bot`, body `jethexa`, `BUILT: no`) that stay OFF the roster until
+the robot's legs are driven; the go-live checklist is in CLAUDE.md.
 
 Do not grow this file. A second long doc that goes stale is the exact
 fault this repo keeps deleting (`--show shiro_deck` sat wrong in a doc
@@ -62,7 +64,7 @@ So:
     the sisters'   Four's Llama since Sept 27 (no `model:` line); the
                    Gemma path in the brain stays, used by nobody
     Four's prompt  5446 chars
-    tests          864, ~95s,  `python YUZU_TESTER.py`
+    tests          884, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -87,7 +89,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 864 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 884 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means

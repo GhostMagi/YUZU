@@ -2198,6 +2198,15 @@ class TestYuzu5(unittest.TestCase):
     ANSWER_FIRST_RE = re.compile(
         r"answer (?:it|the question)(?: \w+){0,2} first", re.I)
 
+    # AND THE BARE-COMMAND WIN IS A TURN SHAPE, NOT A LABEL -- third
+    # instance. yuzu4 was measured with `User:` in front of it, and the
+    # robot pilots say `Ghost:` there, because Four called him "User"
+    # to his face when her examples did (Sept 22). The measured thing is
+    # a flat "Walk forward." with nothing social around it; who is
+    # labelled as saying it was never the variable.
+    BARE_COMMAND_WIN = "bare-command example, 4/4 moved"
+    BARE_COMMAND_RE = re.compile(r"^[^\s:]+: Walk forward\.$", re.M)
+
     @staticmethod
     def carries(name, text):
         """Does this prompt carry that measured win?
@@ -2211,6 +2220,8 @@ class TestYuzu5(unittest.TestCase):
             return bool(TestYuzu5.BREVITY_RE.search(text))
         if name == TestYuzu5.ANSWER_FIRST_WIN:
             return bool(TestYuzu5.ANSWER_FIRST_RE.search(text))
+        if name == TestYuzu5.BARE_COMMAND_WIN:
+            return bool(TestYuzu5.BARE_COMMAND_RE.search(text))
         return TestYuzu5.MEASURED_WINS[name] in text
 
     BODY_PROTOCOL_WINS = {
@@ -3338,6 +3349,458 @@ class TestMovementRule(unittest.TestCase):
                 self.assertEqual(
                     yuzu.extract_actions(yuzu.normalize_actions(reply)), [],
                     f"{key} has no body, but an example acts: {reply!r}")
+
+
+class TestSpiderBodies(unittest.TestCase):
+    """Ghost, Sept 29: "Spider bodies for everyone." The deck is
+    abandoned for the JetHexa2027, his Orin goes into it, and the four
+    pilots -- Yuzu, Four, Shiro and Kuro -- each get a persona on the
+    robot's body (`_hardware_jethexa.txt`): the same girl, a real body.
+
+    THE BODY IS `BUILT: no`, SO EVERY GENERAL TEST THAT HOLDS A PERSONA
+    TO THE WHITELIST SKIPS THESE FOUR -- which is right for saya_quad,
+    whose moves nobody wrote, and wrong here. The robot's menu is the
+    thirteen phrases the bracket format was MEASURED on, and the bridge
+    to Hiwonder's ROS 2 will be written to run exactly those. So this
+    class holds them to the parser anyway: the parser is the contract
+    the bridge implements."""
+
+    # Zero stays a deck character, his call: "Remember thad zero stays a
+    # qwen tho" (Sept 27). A Qwen beside the pilots' Llama is a model
+    # SWAP every time he switches to her, and on the robot that swap
+    # competes with ROS for the 8GB.
+    STAYS_ON_THE_DECK = {"zero"}
+
+    @staticmethod
+    def pilots():
+        """Every girl with a robot body, found by her BODY, not listed."""
+        return {k: yuzu_personas.load(k) for k in yuzu_personas.available()
+                if yuzu_personas.load(k).hardware == "jethexa"}
+
+    @staticmethod
+    def turns(persona):
+        """Her example turns as (ask, answer), the label read, not typed."""
+        me = persona.name + ":"
+        lines = persona.prompt.splitlines()
+        return [(ask.split(":", 1)[1].strip(), answer[len(me):].strip())
+                for ask, answer in zip(lines, lines[1:])
+                if answer.startswith(me) and ":" in ask
+                and not ask.startswith(me)]
+
+    def test_every_girl_on_the_roster_has_a_robot_body_unless_he_kept_her_home(self):
+        """Read off the ROSTER, so the next character he adds has to
+        answer for it: a robot body, or a line here saying she stays."""
+        import yuzu_face
+        girls = {key for key, _page, _what in yuzu_face.CHARACTERS.values()}
+        self.assertTrue(self.STAYS_ON_THE_DECK <= girls,
+                        "a girl kept on the deck is no longer on the roster")
+        bodied = {p.settings.get("same_girl_as")
+                  for p in self.pilots().values()}
+        for key in sorted(girls - self.STAYS_ON_THE_DECK):
+            # Either she has a robot twin, or -- the day the pilots go
+            # live -- the roster already points at the robot one.
+            on_legs = yuzu_personas.load(key).hardware == "jethexa"
+            self.assertTrue(key in bodied or on_legs,
+                            "%s has no robot body" % key)
+        for key in self.STAYS_ON_THE_DECK:
+            self.assertNotIn(key, bodied, "%s was meant to stay on the deck"
+                             % key)
+
+    def test_a_robot_body_does_not_change_WHO_SHE_IS(self):
+        """Same name, same voice, same speed, same sampling, same sounds,
+        same name for him. Everything that differs is the body's: the
+        body file's own tokens, which body, and the description."""
+        for key, bot in self.pilots().items():
+            self.assertIn("same_girl_as", bot.settings,
+                          "%s does not say which girl she is" % key)
+            twin = yuzu_personas.load(bot.settings["same_girl_as"])
+            body = set(yuzu_personas._parse_hardware(twin.hardware))
+            body.discard("SOUND_EXAMPLES")      # a character setting
+            skip = body | {"hardware", "description", "same_girl_as"}
+            hers = {k: v for k, v in twin.settings.items() if k not in skip}
+            mine = {k: v for k, v in bot.settings.items() if k not in skip}
+            self.assertEqual(mine, hers, "%s is not the same girl as %s"
+                             % (key, twin.key))
+            self.assertEqual(bot.blocks["SOUND_EXAMPLES"],
+                             twin.blocks["SOUND_EXAMPLES"],
+                             "%s makes different sounds" % key)
+
+    def test_the_pilots_think_with_FOURS_model(self):
+        """One model resident for all four, so switching girls on the
+        robot swaps a prompt, never the weights -- read through the
+        brain, so a `model:` line creeping into one of them is caught."""
+        fours = YuzuBrain(persona="four", host="http://127.0.0.1:9").model
+        for key in self.pilots():
+            self.assertEqual(YuzuBrain(persona=key,
+                                       host="http://127.0.0.1:9").model,
+                             fours, "%s left Four's model" % key)
+
+    def test_no_pilot_still_thinks_she_lives_in_the_HANDHELD(self):
+        """The deck is abandoned, and CLAUDE.md said it in as many
+        words: "The girls still THINK they live in a handheld." On the
+        robot that is a confident-wrong fact about her own body, the
+        palmtop fault. The deck's legs-on-a-screen lines go with it."""
+        for key, bot in self.pilots().items():
+            lowered = bot.prompt.lower()
+            for deck in ("handheld", "deck", "screen", "keyboard",
+                         "no legs", "whoever is holding"):
+                self.assertNotIn(deck, lowered,
+                                 "%s still says '%s'" % (key, deck))
+
+    def test_every_move_she_is_offered_or_shown_RUNS(self):
+        """The menu, every example's brackets, and every compliance
+        check including the movement ones -- what the general tests
+        skip for a body with no controller yet."""
+        menu = yuzu_personas._parse_hardware("jethexa")["HEXA_SELF"]
+        offered = re.findall(r"\[([a-z][a-z ]*)\]", menu)
+        self.assertEqual(len(offered), len(yuzu.ACTION_WHITELIST),
+                         "the robot's menu and the whitelist disagree")
+        for phrase in offered:
+            self.assertTrue(yuzu.lookup_actions(phrase),
+                            "the menu offers [%s] and nothing runs it" % phrase)
+        for key, bot in self.pilots().items():
+            for _ask, reply in self.turns(bot):
+                for check in prompt_eval.CHECKS:
+                    self.assertTrue(check.fn(reply), "%s example fails %s: %r"
+                                    % (key, check.name, reply))
+                for action in yuzu.extract_actions(
+                        yuzu.normalize_actions(reply)):
+                    self.assertTrue(yuzu.lookup_actions(action),
+                                    "%s shows [%s], which nothing runs"
+                                    % (key, action))
+
+    def test_she_carries_every_win_MEASURED_ON_A_HEXAPOD(self):
+        """yuzu4 is the one character ever scored on six legs. Every win
+        she carries, a pilot carries -- the body-protocol ones included,
+        because this body has brackets to protect."""
+        measured = yuzu_personas.load("yuzu4").prompt
+        for key, bot in self.pilots().items():
+            for name in TestYuzu5.MEASURED_WINS:
+                if TestYuzu5.carries(name, measured):
+                    self.assertTrue(TestYuzu5.carries(name, bot.prompt),
+                                    "%s lacks: %s" % (key, name))
+            self.assertIn(TestYuzu5.SOUNDS_ENFORCEMENT, bot.prompt,
+                          "%s lost the line whose absence lost yuzu5" % key)
+
+    def test_the_three_turns_a_robot_is_SURE_to_get(self):
+        """"Walk forward." -- walked FORWARD, because yuzu4 once went
+        [walks backward] and a wrong move is a measured fault.
+        "Stop." -- the kill switch is dropped (his call, Sept 29), so
+        saying stop to her is the only software stop there is, and her
+        example has to land on standing still.
+        "What do you see?" -- this model has no eyes, and a turn shape
+        with no data is answered by inventing some: the Windows CE
+        palmtop. Her example asks him instead."""
+        for key, bot in self.pilots().items():
+            said = dict(self.turns(bot))
+            for ask, move in (("Walk forward.", "walk forward"),
+                              ("Stop.", "stand")):
+                self.assertIn(ask, said, "%s is never told '%s'" % (key, ask))
+                ran = [fn for a in
+                       yuzu.extract_actions(yuzu.normalize_actions(said[ask]))
+                       for fn, _pause in yuzu.lookup_actions(a)]
+                self.assertEqual(ran, [yuzu.ACTION_WHITELIST[move][0]],
+                                 "%s answers '%s' with the wrong move: %r"
+                                 % (key, ask, said[ask]))
+            self.assertIn("What do you see?", said, key)
+            self.assertRegex(said["What do you see?"].lower(),
+                             r"\b(tell|describe)\b",
+                             "%s describes a room she cannot see" % key)
+
+    def test_the_shy_one_is_never_SILENT_on_six_legs_either(self):
+        """Shiro's dandere bar, carried with her: five words or more out
+        loud in every example, brackets not counted."""
+        for key, bot in self.pilots().items():
+            if bot.settings.get("same_girl_as") != "shiro_mk2":
+                continue
+            for _ask, reply in self.turns(bot):
+                spoken = re.sub(r"\[[^\]]*\]", " ", reply)
+                self.assertGreaterEqual(
+                    len(re.findall(r"[A-Za-z']+", spoken)), 5,
+                    "a shy example says almost nothing: %r" % reply)
+
+    def test_nothing_on_the_roster_moves_into_a_VOID(self):
+        """A girl on a page with legs and no controller emits brackets
+        that go nowhere, every turn -- the '[strikes a pose]' drop at
+        100%. So the pilots stay off the roster until their body is
+        BUILT, and flipping that is the day her moves reach real legs.
+        A property, so it holds for any body, not a list of keys."""
+        import yuzu_face
+        for name, (key, _page, _what) in yuzu_face.CHARACTERS.items():
+            persona = yuzu_personas.load(key)
+            self.assertTrue(not persona.moves or persona.built,
+                            "%s is on the roster with legs nothing drives"
+                            % name)
+
+
+class TestSaveMyStuff(unittest.TestCase):
+    """Ghost, Sept 29, asked whether he needs a save button before the
+    robot: "I dont wana hit it and auto fill my phones memory lol. Just
+    make it save whats important i guess? ... I dont wana fill my phone
+    with wikipedia files and stuff." Then: "But also do your save
+    button."
+
+    So it keeps ONLY what cannot be downloaded again -- the girls' chat
+    memories, his notes, his game saves -- and the first tap says how
+    big that is before the second saves it. Every test here builds a
+    FAKE home folder: the suite must never read, let alone zip, his
+    real ~/.yuzu (it once shredded five real memory files)."""
+
+    import yuzu_face as face
+
+    def home(self):
+        """A board's home folder, with everything a real one has in it:
+        what must be saved, and what must not."""
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        files = {
+            ".yuzu/history/four.json": b'[{"role": "user", "content": "hi"}]',
+            ".yuzu/history/kuro.json": b"[]",
+            ".yuzu/history/four.json.part": b"half a write",
+            ".yuzu/facts/four.json": b'["his cousin is Dave"]',
+            "ROMs/gba/Pokemon - Emerald.gba": b"R" * 4096,
+            "ROMs/gba/Pokemon - Emerald.sav": b"S" * 1024,
+            "ROMs/gba/Pokemon - Emerald.ss1": b"T" * 2048,
+            "ROMs/gba/Pokemon - Emerald.ss7": b"U" * 2048,
+            "ROMs/snes/Zelda.sfc": b"R" * 4096,
+            ".mednafen/sav/Zelda.1a2b.srm": b"V" * 512,
+            ".mednafen/mcs/Zelda.1a2b.mc0": b"W" * 512,
+            "wikipedia_en_all_mini_2026-09.zim": b"Z" * 8192,
+            "YUZU/yuzu_face.py": b"# the repo is on GitHub",
+        }
+        for name, data in files.items():
+            path = os.path.join(tmp, name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "wb") as fh:
+                fh.write(data)
+        patcher = mock.patch.dict(os.environ, {"HOME": tmp})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        for attr, sub in (("MEMORY_DIR", ".yuzu/history"),
+                          ("FACTS_DIR", ".yuzu/facts")):
+            patcher = mock.patch.object(self.face, attr,
+                                        os.path.join(tmp, sub))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        return tmp
+
+    @staticmethod
+    def unzip(data):
+        import io, zipfile
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            return {n: zf.read(n) for n in zf.namelist()}
+
+    def test_it_keeps_what_cannot_be_downloaded_AGAIN_and_nothing_else(self):
+        """His words: "I dont wana fill my phone with wikipedia files and
+        stuff". The ROMs came FROM his phone, the wiki and the models
+        download again, the repo is on GitHub, and a `.part` is a write
+        that never finished. Laid out relative to his home folder, so
+        putting it back is one unzip in the right place."""
+        home = self.home()
+        before = sorted((p, os.path.getmtime(p)) for p in
+                        (os.path.join(d, f) for d, _, fs in os.walk(home)
+                         for f in fs))
+        data, made = self.face.backup()
+        got = self.unzip(data)
+        self.assertEqual(sorted(got), sorted([
+            ".yuzu/history/four.json", ".yuzu/history/kuro.json",
+            ".yuzu/facts/four.json",
+            "ROMs/gba/Pokemon - Emerald.sav",
+            "ROMs/gba/Pokemon - Emerald.ss1",
+            "ROMs/gba/Pokemon - Emerald.ss7",
+            ".mednafen/sav/Zelda.1a2b.srm", ".mednafen/mcs/Zelda.1a2b.mc0",
+            "README.txt"]))
+        self.assertEqual(got[".yuzu/facts/four.json"], b'["his cousin is Dave"]')
+        self.assertTrue(made["ok"])
+        self.assertEqual((made["memories"], made["notes"], made["saves"]),
+                         (2, 1, 5))
+        for said in ("No wiki", "no ROMs"):
+            self.assertIn(said, made["what"],
+                          "the first tap does not say what it leaves out")
+        after = sorted((p, os.path.getmtime(p)) for p in
+                       (os.path.join(d, f) for d, _, fs in os.walk(home)
+                        for f in fs))
+        self.assertEqual(before, after, "saving changed the board")
+
+    def test_the_size_it_SHOWS_is_the_size_it_SAVES(self):
+        """The first tap says a size and he agrees to it; the second tap
+        must hand him that, not something else."""
+        self.home()
+        data, made = self.face.backup()
+        self.assertEqual(made["bytes"], len(data))
+        self.assertEqual(made["size"], self.face._human(len(data)))
+
+    def test_a_file_too_big_to_be_a_save_is_LEFT_OUT_and_SAID(self):
+        """Two caps, for the reason he gave, and nothing dropped quietly:
+        a backup that silently skipped a save is worse than one that
+        says so."""
+        home = self.home()
+        with open(os.path.join(home, "ROMs/gba/huge.state"), "wb") as fh:
+            fh.write(b"X" * 3000)
+        with mock.patch.object(self.face, "SAVE_FILE_MAX", 2500):
+            data, made = self.face.backup()
+        self.assertNotIn("ROMs/gba/huge.state", self.unzip(data))
+        self.assertIn("huge.state", made["what"])
+        self.assertTrue(any("huge.state" in x for x in made["left_out"]))
+        # AND THE WHOLE ZIP HAS A CEILING, with the memories and notes
+        # kept first: they are the tiny irreplaceable ones and must never
+        # lose a cap race to a save state.
+        # 1070 is chosen so the first save (1024 bytes) fits on its own
+        # but not beside the notes: kept in the wrong order, his notes
+        # are what gets cut.
+        with mock.patch.object(self.face, "SAVE_MAX", 1070):
+            data, made = self.face.backup()
+        got = self.unzip(data)
+        for must in (".yuzu/history/four.json", ".yuzu/history/kuro.json",
+                     ".yuzu/facts/four.json"):
+            self.assertIn(must, got)
+        self.assertLessEqual(sum(len(v) for k, v in got.items()
+                                 if k != "README.txt"), 1070)
+        self.assertTrue(made["left_out"], "the cap dropped files silently")
+
+    def test_the_caps_protect_HIS_PHONE_and_still_fit_a_real_save(self):
+        """Absolute numbers, never measured against themselves. A GBA
+        save is 128KB and a state under a megabyte, so a real one must
+        fit; and the worst case must stay far from filling a phone."""
+        self.assertGreaterEqual(self.face.SAVE_FILE_MAX, 4 << 20)
+        self.assertLessEqual(self.face.SAVE_MAX, 100 << 20)
+        self.assertLessEqual(self.face.SAVE_FILE_MAX, self.face.SAVE_MAX)
+
+    def test_a_save_the_clock_dated_1969_STILL_SAVES(self):
+        """The board has no RTC, so anything written before NTP answered
+        -- a save made in a garage with no network -- carries a 1970
+        date, and a zip refuses anything before 1980 unless told to
+        clamp it. That save must not be the one that goes missing."""
+        home = self.home()
+        sav = os.path.join(home, "ROMs/gba/Pokemon - Emerald.sav")
+        os.utime(sav, (0, 0))
+        data, made = self.face.backup()
+        self.assertTrue(made["ok"], made)
+        self.assertIn("ROMs/gba/Pokemon - Emerald.sav", self.unzip(data))
+
+    def test_the_name_is_dated_only_when_the_clock_is_REAL(self):
+        """A backup named for 1969 is a confident lie on his phone."""
+        with mock.patch.object(self.face.time, "localtime",
+                               return_value=time.localtime(0)):
+            self.assertEqual(self.face._save_name(), "yuzu-save.zip")
+        real = time.struct_time((2026, 9, 29, 12, 0, 0, 1, 272, 0))
+        with mock.patch.object(self.face.time, "localtime", return_value=real):
+            self.assertEqual(self.face._save_name(),
+                             "yuzu-save-2026-09-29.zip")
+
+    def test_nothing_to_save_says_so_and_saves_NOTHING(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        with mock.patch.dict(os.environ, {"HOME": tmp}), \
+                mock.patch.object(self.face, "MEMORY_DIR", tmp + "/m"), \
+                mock.patch.object(self.face, "FACTS_DIR", tmp + "/f"):
+            data, made = self.face.backup()
+        self.assertFalse(made["ok"])
+        self.assertIn("Nothing to save", made["said"])
+
+    def test_the_saves_it_keeps_are_what_the_inventory_does_NOT_count(self):
+        """ONE list for both jobs. A save is never a game, and mGBA's
+        .ss2 to .ss9 used to be counted as games because the list
+        stopped at .ss1 -- a third save state became a third game."""
+        for ext in self.face._SAVES:
+            self.assertIn(ext, self.face._NOT_A_GAME)
+        self.home()
+        self.assertEqual(dict(self.face._games()).get("Game Boy Advance"), 1,
+                         "a save state was counted as a game")
+
+    def test_the_routes_take_NOTHING_from_the_request_DRIVEN(self):
+        """What is saved is decided on the board, never by the request --
+        the /pull and /launch/ discipline. Driven through the real
+        server: a query naming another path changes nothing, the zip
+        arrives as a download, and a board with nothing to save answers
+        503 with a sentence, never a 200 that would sit on his phone as
+        a broken zip."""
+        import threading, urllib.request, urllib.error
+        from http.server import ThreadingHTTPServer
+        self.home()
+        server = ThreadingHTTPServer(("127.0.0.1", 0), self.face._Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        base = "http://127.0.0.1:%d" % server.server_address[1]
+        plain = urllib.request.urlopen(base + "/save.zip", timeout=10)
+        self.assertEqual(plain.headers["Content-Type"], "application/zip")
+        self.assertIn("attachment", plain.headers["Content-Disposition"])
+        names = sorted(self.unzip(plain.read()))
+        poked = urllib.request.urlopen(
+            base + "/save.zip?path=/etc&dir=..%2F..&who=zero", timeout=10)
+        self.assertEqual(sorted(self.unzip(poked.read())), names)
+        made = json.loads(urllib.request.urlopen(
+            base + "/save.json?path=/etc", timeout=10).read())
+        self.assertTrue(made["ok"])
+        with mock.patch.object(self.face, "backup",
+                               lambda: (b"", {"ok": False, "said": "no"})):
+            with self.assertRaises(urllib.error.HTTPError) as got:
+                urllib.request.urlopen(base + "/save.zip", timeout=10)
+        self.assertEqual(got.exception.code, 503)
+
+    def test_the_tile_takes_TWO_taps_DRIVEN(self):
+        """The page's own handler, under node with a stand-in page. The
+        first tap only asks what it would save and shows the size; the
+        second saves it. His worry was a tap that fills his phone."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own handler")
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        self.assertRegex(page, r'<div class="tile" id="save" data-view="misc"'
+                               r' data-save="">')
+        block = page[page.index("// ---- SAVE MY STUFF"):]
+        block = block[:block.index("\n// Wiring is a FUNCTION")]
+        script = r"""
+function El() { this._t = ''; this.cls = new Set(); }
+Object.defineProperty(El.prototype, 'textContent', {
+  get() { return this._t; }, set(v) { this._t = v; } });
+Object.defineProperty(El.prototype, 'classList', { get() { const c = this.cls; return {
+  add: x => c.add(x), remove: x => c.delete(x), contains: x => c.has(x) }; } });
+const span = new El(); span._t = 'chats, notes & game saves';
+const tile = new El(); tile.querySelector = () => span;
+const said = [];
+function say(t) { said.push(t); }
+const fetched = [], clicked = [];
+function fetch(url) {
+  fetched.push(url);
+  if (url === 'save.json') return Promise.resolve({ json: () => Promise.resolve(
+    { ok: true, name: 'yuzu-save-2026-09-29.zip', size: '48 KB',
+      what: '2 chat memories. No wiki, no models, no ROMs.' }) });
+  return Promise.resolve({ ok: true, blob: () => Promise.resolve('ZIP') });
+}
+const URL = { createObjectURL: () => 'blob:1', revokeObjectURL: () => {} };
+const document = { body: { appendChild() {} }, createElement: () => ({
+  click() { clicked.push(this.download); }, remove() {} }) };
+""" + block + r"""
+(async () => {
+  saveMyStuff(tile);
+  await new Promise(r => setTimeout(r, 20));
+  const first = { fetched: fetched.slice(), text: span._t,
+                  armed: tile.cls.has('armed'), said: said.slice() };
+  saveMyStuff(tile);
+  await new Promise(r => setTimeout(r, 20));
+  console.log(JSON.stringify({ first, fetched, clicked, text: span._t,
+    armed: tile.cls.has('armed'), said }));
+  process.exit(0);
+})();
+"""
+        import subprocess
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        self.assertEqual(got["first"]["fetched"], ["save.json"],
+                         "ONE tap saved to his phone before saying how big")
+        self.assertIn("48 KB", got["first"]["text"])
+        self.assertIn("again", got["first"]["text"])
+        self.assertTrue(got["first"]["armed"])
+        self.assertIn("No wiki", " ".join(got["first"]["said"]))
+        self.assertEqual(got["fetched"], ["save.json", "save.zip"])
+        self.assertEqual(got["clicked"], ["yuzu-save-2026-09-29.zip"],
+                         "the second tap did not hand him the file")
+        self.assertFalse(got["armed"], "it stays armed after it saved")
+        self.assertEqual(got["text"], "chats, notes & game saves")
 
 
 class TestBootBanner(unittest.TestCase):
@@ -10008,6 +10471,35 @@ class TestTheDeckPutsItselfOnTheDesktop(unittest.TestCase):
         self.assertIn("flex: none", buttons,
                       "the buttons shrink instead of the message")
 
+    def test_on_a_PHONE_the_message_gets_its_own_line_and_the_tiles_SCROLL(self):
+        """Rendered Sept 29 at 412 and 360, with "Save my stuff" as the
+        drawer's sixth tile. One column of six ran UNDER the bar, where
+        no tap could reach the last tile; and the save's sentence,
+        squeezed beside three buttons, made the bar tall enough to push
+        the drawer's last row out of sight. So on a phone the drawer is
+        two across, the tile area scrolls rather than hiding anything,
+        and the message takes a line of its own above the buttons."""
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        phone = ""
+        for start in [m.end() for m in
+                      re.finditer(r"@media \(max-width: 560px\) \{", page)]:
+            depth, i = 1, start
+            while depth:
+                depth += {"{": 1, "}": -1}.get(page[i], 0)
+                i += 1
+            phone += page[start:i]
+        rules = dict((sel.strip(), body) for sel, body in
+                     re.findall(r"([^{}]+)\{([^{}]*)\}", phone))
+        self.assertIn("overflow-y: auto", rules.get("#grid", ""),
+                      "on a phone a tile can sit under the bar, untappable")
+        self.assertIn("(100% - 12px) / 2", rules.get("#grid.misc > .tile", ""),
+                      "the drawer is not two across on a phone")
+        self.assertIn("flex-wrap: wrap", rules.get("#bar", ""))
+        self.assertIn("flex: 0 0 100%", rules.get("#note", ""),
+                      "the message is squeezed beside the buttons again")
+        self.assertIn("display: none", rules.get("#note:empty", ""),
+                      "an empty message costs a line on every phone view")
+
 
 class TestTheAppIconFollowsTheFrontDoor(unittest.TestCase):
     """Ghost, Sept 17: "Change it to say Four instead of sayas face."
@@ -14835,7 +15327,9 @@ class TestHomeScreen(unittest.TestCase):
                          "something other than ☆Stuff☆ is typed onto the "
                          "front page")
         self.assertEqual(len(views["stuff"]), 2, "☆Stuff☆ is not two")
-        self.assertEqual(len(views["misc"]), 5, "the drawer is not five")
+        # SIX since "Save my stuff" (Sept 29), which also fills the
+        # drawer's two rows of three exactly.
+        self.assertEqual(len(views["misc"]), 6, "the drawer is not six")
         for css in ("#grid.main { grid-template-columns: repeat(2, 1fr); }",
                     "#grid.stuff { grid-template-columns: repeat(2, 1fr); }"):
             self.assertIn(css, page)

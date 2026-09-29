@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 864 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 884 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,6 +49,245 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## SAVE MY STUFF, AND HER PAGE IN A GARAGE WITH NO INTERNET (Sept 29)
+
+*"But also do your save button."* Built, as the answer to his own
+worry: *"I dont wana hit it and auto fill my phones memory lol. Just
+make it save whats important"*.
+
+**A ☆Misc☆ TILE, `Save my stuff`, TWO TAPS.** The first asks
+`/save.json` and shows the size on the tile (*"48 KB · tap again to
+save"*) and what is in it in the bar (*"2 chat memories, 1 note about
+you and 3 game saves. No wiki, no models, no ROMs."*). The second
+fetches `/save.zip` and hands it to the browser as a download. It
+disarms after ten seconds, slower than start fresh because there is a
+size and a list to read first. **A tile, not a bar button**: the bar
+already carries Back, Desktop and Update, and one more there is the
+fault that once put Update 2px off a 412px screen. Six tiles also fill
+the drawer's two rows of three exactly.
+
+**ONLY WHAT CANNOT BE DOWNLOADED AGAIN** (`backup()` in
+`yuzu_face.py`): `~/.yuzu/history` (the girls' chat memories),
+`~/.yuzu/facts` (his notes), game saves beside the ROMs (`_SAVES`),
+and `~/.mednafen/sav` and `mcs` (NES/SNES keep theirs there). NOT the
+wiki, the models, the ROMs (they came FROM his phone) or the repo.
+**Laid out relative to his home folder**, so putting it back is one
+unzip in the home folder on the board; a `README.txt` inside says so.
+Two caps: a file over 16MB is not a save, and the zip stops at 64MB.
+Anything left out is NAMED on screen, never dropped quietly, and the
+memories and notes go in first so they never lose a cap race to a save
+state.
+
+**TWO THINGS WRITING IT FOUND:**
+- **The board has no RTC, so a save made before NTP answered is dated
+  1970, and a zip REFUSES timestamps before 1980** unless told to clamp
+  them (`strict_timestamps=False`). His saves from a garage with no
+  network are exactly those files, and without the flag the whole
+  backup fails on them. And the file is named `yuzu-save.zip`, undated,
+  when the clock says it is before 2024: a backup named for 1969 is a
+  confident lie.
+- **mGBA's third save state was counted as a GAME.** `_NOT_A_GAME`
+  stopped at `.ss1` and mGBA writes `.ss0` to `.ss9`. One list now,
+  `_SAVES`, for both jobs: what the inventory never counts and what the
+  backup keeps.
+
+**RENDERING FOUND THE ONE THING THE ASSERTIONS COULD NOT, and it was
+mine.** At 1024x600 the drawer came out two rows of three, exactly
+right. At 412 it was one tile per row, and the sixth sat BEHIND the
+bar where no tap could reach it (Playwright: "`#desktop` intercepts
+pointer events"). Then the save's sentence, squeezed beside three
+buttons, went one word wide and half the screen tall, the fault the
+bar's own comment records; and at 360 Update fell to a third row (it
+had in fact sat off the edge in every drawer there before today, since
+Back, Desktop and Update came to 368px). On a phone now: the drawer is
+two across, the tile area SCROLLS rather than hide anything, the
+message gets its own line above the buttons (and none when empty), and
+the gaps shrink. Re-rendered at 1024, 412 and 360 with two taps and a
+real download each time, and the A.I. drawer checked at 412.
+
+**Neither route reads the query string**: what is saved is decided on
+the board, the `/pull` discipline, driven with `?path=/etc` and
+compared. A board that cannot build a zip answers 503 with a sentence,
+never a 200 that would sit on his phone as a broken file. Like every
+route on this server, it answers anything on the same WiFi; at home
+that is his network and at the garage it is his phone's.
+
+**Eleven tests, nineteen breaks, all red as FAILURES** (one of them
+had to be tightened first: the cap-order check passed with memories and
+saves in the wrong order until its cap was chosen so the first save
+fits alone and not beside his notes). **873 -> 884.**
+
+**UNVERIFIED on his phone**: that Chrome on the Z Flip saves the
+download where he can find it. Headless Chromium saved the right file
+under the right name at all three widths; his phone is the check. Restoring is a manual unzip for now,
+and deliberately not a route: a route that writes files from the
+network onto the board is the one thing this server must not grow
+casually.
+
+### "Can i connect to Fours page at say my dads garage with no internet?"
+
+**Yes, and it was already done once.** The pages never touch the
+internet. The Orin SERVES them; his phone ASKS for them over WiFi, a
+radio link between two devices in the same place. What that needs is
+a shared WiFi NETWORK, not internet: the router at home, and anywhere
+else **his phone's own hotspot**, which works with no signal and no
+data. The Sept 22 round was exactly that (*"on a phone hotspot with no
+service behind it"*), so the board already knows his hotspot and
+rejoins it by itself when it powers on near it.
+
+- **Keep using `ghostnano.local:8081`**, because the mic's Chrome flag
+  trusts that exact address. On the numbers instead, the mic is
+  refused until they are added to the flag too. Whether `.local`
+  resolves over his phone's hotspot is UNVERIFIED; the numbers always
+  work.
+- **Offline, only two things stop**: Update (`git pull`) and
+  `wiki --get`. The model, both voices, the ears and the wiki all live
+  on the board. The clock reads 1969 until a network with internet
+  answers, which the home screen already says.
+- **The robot could make its own WiFi** (the Orin as a hotspot), so it
+  needs nothing from his phone but a browser. Offered, not built; his
+  phone's hotspot already covers it.
+
+## SPIDER BODIES FOR THE FOUR PILOTS (Sept 29)
+
+Ghost, handed a list of what to do for the robot: *"Im more interested
+in number 2. Spider bodies for everyone."* So Yuzu, Four, Shiro and
+Kuro each have a robot persona now, on one new shared body:
+
+    personas/_hardware_jethexa.txt   the robot's body, BUILT: no
+    four_bot    same_girl_as: four
+    yuzu_bot    same_girl_as: yuzu_avatar  (built on yuzu4)
+    shiro_bot   same_girl_as: shiro_mk2
+    kuro_bot    same_girl_as: kuro
+
+**SAME GIRL, REAL BODY, the shiro/shiro_deck split.** Every setting of
+each deck girl is carried over and a test holds them EQUAL (name,
+voice, speed, sampling, sounds, his name), with only the body's own
+tokens, `hardware` and `description` exempt, derived from the twin's
+body file. `same_girl_as` says which girl a robot persona is: the tests
+read it, and going live is pointing each roster entry at the persona
+that names it. No `model:` line on any of them, so all four stay on
+Four's Llama and switching girls swaps a prompt, never the weights.
+
+**THE MOVE MENU IS THE MEASURED ONE, NOT HIWONDER'S.** The thirteen
+phrases the bracket format was scored on (yuzu4 on the muto_s2,
+moves_at_all 75-100%), every one already in ACTION_WHITELIST. The old
+JetHexa's wave/clap/twist are NOT added: guessing the 2027's move names
+is the 8BitDo lesson. The bridge will map these phrases onto whatever
+the robot really does, and a new move later is one line in the shared
+body file, landing on all four at once.
+
+**WHAT THE BODY TELLS THEM, and what it does not.** Six legs, a camera
+on a swivel head, no hands, no arms, no face; her mind rides inside
+it; nothing reaches the internet. And, new: **the camera turns but
+what it sees does not reach her mind**, so she knows the room from
+what he tells her. Llama 3B has no eyes, and "what do you see?" is the
+one question a robot is sure to get, which unanswered is the Windows
+CE palmtop fault. Deliberately LEFT OUT, each a cheque the code cannot
+cash yet: the LiDAR and chest screen (wired to nothing she reads), the
+battery (Four invented "82%"; the voltage line comes first), and the
+encyclopedia (`/wiki` is gated on the deck body).
+
+**Every example moves**, and every pilot carries three robot turns as
+examples: **"Walk forward."** walks FORWARD (yuzu4 once went `[walks
+backward]`), **"Stop."** lands on `[stands]` (**the kill switch is
+dropped, so saying stop to her is the only software stop there is**),
+and **"What do you see?"** asks him instead of inventing a room. The
+sisters' "Come over here." now WALKS: the chassis their deck selves
+were promised is real. Kuro's threats changed shape for the same
+reason: this robot cannot climb a wall, so "up your wall in two
+seconds" became chasing him down the hall and winning a race. A bluff
+about what the legs can do is the one she must not make once they are
+real.
+
+**Yuzu is built on yuzu4, not the avatar**: yuzu4's eight examples are
+the only ones in this repo scored on six legs, kept shape for shape,
+with his name on the labels and her Sept 24 look (twin tails, pink
+eyes). Plus Stop, the thank-you, the CSS question and "what do you
+see?".
+
+**THE CONTEXT WINDOW CUT THREE EXAMPLES.** Measured with the facts
+store full, Four's first draft had **43 tokens spare**. The robot menu
+costs about what the deck body plus board line did. Out: entropy from
+Four, Shiro and Kuro, and "is this deck any good" from Four. CSS, the
+lookup and the broken wifi still carry the outward-facing shape. Now:
+
+    four_bot 5995 chars, 180 spare     shiro_bot 5994, 181 spare
+    kuro_bot 5864, 218 spare           yuzu_bot  4916, 489 spare
+
+(Deck Four, with her board line and inventory, is at 169.) **The
+robot's voltage line will ride on every turn, so it is a num_ctx
+question before it is a wording one**, the same as on the deck.
+
+### THEY ARE OFF THE ROSTER, AND A PROPERTY KEEPS THEM THERE
+
+A girl on a page with legs and nothing driving them emits brackets into
+a void every turn: the `[strikes a pose]` drop at 100%. So
+`test_nothing_on_the_roster_moves_into_a_VOID` holds that every roster
+character is bodiless or on a BUILT body: a PROPERTY, not a list of
+keys. Verified both ways in a copy: `four_bot` put on the roster goes
+red, and the same with `[BUILT] yes` (the go-live shape) goes green.
+**His pages are unchanged today.** `LIVE_PERSONA` is still `four`, so
+**no composed prompt he uses moved and there is nothing to paste**.
+
+### Nine tests, and the general ones had to be done by hand
+
+`BUILT: no` makes every general whitelist test skip a body, which is
+right for saya_quad (nobody wrote its moves) and wrong here. So
+`TestSpiderBodies` holds the pilots to the parser anyway: the menu
+offers exactly the whitelist, every example bracket runs, every
+compliance check passes, movement rows included. It also holds every
+win yuzu4 carries (the body-protocol ones too) plus the sounds-
+enforcement line whose absence lost yuzu5; the three robot turns; the
+shy one's five-word bar; one model; no "deck", "handheld" or "screen"
+left in any of them; and **every roster girl has a robot body unless
+she stays home**. Zero is the one who stays, by his words.
+
+**The bare-command win is a TURN SHAPE, not a label**: third
+instance. It matched the literal `User: Walk forward.`, and the pilots
+say `Ghost:` there because Four called him "User" when her labels did.
+`carries()` reads any label now. The measured variable was a flat
+command with nothing social around it, never who said it.
+
+**Every test broken on purpose in a copy: sixteen breaks, all red.**
+Two first came back as ERROR rather than FAIL: a missing
+`same_girl_as` raised a KeyError, and a `[waves]` in the walk example
+raised an IndexError. Read the failure KIND. Both assert cleanly now.
+**And the roster test would have fought the go-live**: once the roster
+points at `four_bot`, "four_bot has no robot twin" went red. It
+accepts a roster girl who IS on the robot body now. 864 -> 873.
+
+**UNMEASURED, all of it.** No model has read these prompts. They can
+be measured on the LAPTOP before the robot arrives, since the eval
+scores text, not servos: `python3 YUZU_AB.py yuzu4 yuzu_bot` is the
+honest first check (does his name on the labels and four more
+examples cost yuzu4 any movement?).
+
+### GOING LIVE, when the robot is on his desk, in this order
+
+1. **The bridge** that runs the thirteen phrases on the real robot
+   (rosbridge on 9090 is the likely shape; check every name on the
+   2027 first). Then `[BUILT] yes` in `_hardware_jethexa.txt`.
+2. **Point the roster** (`CHARACTERS` in `yuzu_face.py`) at the `_bot`
+   keys: `same_girl_as` says which is which.
+3. **Open `/wiki` to the robot body** (the gate is `hardware ==
+   "cyberdeck"` in `answer()`), and keep `board_now()`'s JSAUX-bank
+   hours OFF it. Its replacement is the robot's voltage, read into her
+   turn in the same shape, with its arithmetic in the context guard.
+4. **Decide `LIVE_PERSONA`** (the terminal chat and the eval) and
+   paste the live prompt when it moves.
+
+### He also asked whether he needs the Save button (#1)
+
+*"Honestly do i need a save button? I dont wana fill my phone with
+wikipedia files and stuff."* **Answer given: not yet, and it would be
+tiny.** It only matters before Hiwonder's software touches his NVMe.
+What cannot be downloaded again is small: `~/.yuzu` (the girls'
+memories and his notes, kilobytes) and his game saves. The wiki and
+the models can be fetched again, and the ROMs came FROM his phone.
+Offered for when the robot arrives, before anything is installed.
+**The Orin is already unthrottled**, his words.
+
 ## THE DECK IS ABANDONED; THE ROBOT IS THE PROJECT (Sept 29)
 
 *"2 seperate projects i abandoned the 1of1 cyber deck for the jethexa
@@ -74,7 +313,9 @@ not the software.
   from the JSAUX bank. On the robot both are wrong: the robot bodies
   (baseline item 5, the shiro/shiro_deck split) replace the body, and
   the battery line should read the robot's own voltage (the Hiwonder
-  repo notes above). Both wait for the robot to be on his desk.
+  repo notes above). **The bodies are BUILT now (Sept 29, "SPIDER
+  BODIES" above) and wait off the roster**; the voltage line waits
+  for the robot to be on his desk.
 - **The deck parts list is dead except one line**: the USB sound card
   and speaker are how she talks out of the robot itself (his phone
   works without them). Whether he bought any deck parts is UNKNOWN.
@@ -153,6 +394,9 @@ given was 1 first, then the kill switch.
 5. **The pilots' robot bodies** -- Yuzu, Four, Shiro and Kuro (the
    yuzu4-on-muto_s2 pattern: same character, a real body block).
    These wait for the robot's real move list. See below.
+   **BUILT Sept 29 on the measured move menu**, his pick ("Spider
+   bodies for everyone"); see the top. Off the roster until the legs
+   are driven.
 
 **THE PILOTS ARE YUZU AND FOUR**, same hour: *"I think Yuzu may be the
 pilot alongside Four"* -- "may be", so this is his lean, not a lock.
