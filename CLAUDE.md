@@ -175,6 +175,38 @@ pilot choice already says.
 cannot be seen until the robot is on his desk, and guessing them is the
 8BitDo lesson.
 
+**TWO REPOS HE FOUND, BOTH THE OLD JETHEXA (Sept 28-29).**
+`ArghyaChatterjee/jethexa_ros` (a 2024 class project, licence "TODO")
+and **`Hiwonder/JetHexa`**, their own. The latter is ONE commit, dated
+2026-03-21 -- the "updated 6 months ago" he saw is a code DUMP, not an
+update. It is **ROS 1 (catkin) on the original Jetson Nano**, set up by
+flashing their image to an SD card; its licence is only "educational
+and research purposes". So it is NOT his 2027 robot's code. Read it as
+a preview of how Hiwonder builds things, copy nothing, and check every
+name on the real robot. What it shows, all UNVERIFIED on the 2027:
+
+- **Walking is `cmd_vel`, and ONE command walks FOREVER.** Their
+  `CmdVelGenerator` is a `while True`: nothing times a walk out, it
+  runs until a zero command or `stop_running()` replaces it. That is
+  the strongest argument yet for the heartbeat above: if the phone dies
+  mid-walk, their code keeps walking.
+- **Stand is a named pose** (`set_pose_1` with `"DEFAULT_POSE"`), and
+  **pre-recorded moves are files** (`run_actionset`, 35 in
+  `ActionSets/`): `wave`, `clap`, `kick`, `twist`, `stepping`,
+  `attack`, `stand_high/low`. Her `[waves]` and `[dances]` could map
+  onto those through the SAME whitelist, the muto_s2 pattern.
+- **Battery voltage is published** (a `voltage` topic, read off a
+  servo every 30 s, with a low alarm under 9.8 V). That is the REAL
+  battery reading the robot persona can have, in the `board_now()`
+  shape, instead of the invented "82%". Volts, not a percentage.
+- **`base.launch` starts rosbridge on port 9090**: a websocket that
+  takes plain JSON ("publish this to that topic"). If the 2027 ships
+  it too, the face server can drive the robot without ROS installed in
+  its own process. That is the likeliest shape of the bridge.
+- **The old board talks to the servos itself** (`/dev/ttyTHS1`, GPIO
+  17/27). The 2027 has an STM32 in between, so that layer will differ;
+  the topic names are what may carry over.
+
 ## THE ROSPIDER, AND FOUR CALLED HERSELF GHOST (Sept 26, ~22:15)
 
 **CORRECTION FROM HIS OWN SCREENSHOTS (Sept 27, ~01:25): THE JETHEXA
