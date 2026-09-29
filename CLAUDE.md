@@ -107,6 +107,37 @@ tokens; under 2048 would cut it), then the prompt.
 **On the robot this cannot happen**: the face server writes her
 history, so an app's error never becomes her turn.
 
+**RETEST IN A CLEAN CHAT, same day: *"Ayyyyye!"*** Two turns, run
+through the real parser here:
+
+    "Hi yuzu! Walk forward."
+        [walks forward] -- right direction, first try. His name, the
+        mall and hot pink, unprompted. So the first test WAS the
+        contamination.
+    "okay stop walking, what do you see?"
+        *stretches* *shakes legs* (both run on the robot); "I don't see
+        anything in particular", and "it's weird being a robot". NO
+        invented room. But NO [stands] either.
+
+- **The italics are asterisks** (he flagged it: `*winks*`; PocketPal
+  hides the markers). Nothing to fix: `normalize_actions` turns
+  `*shakes legs*` into a move that runs, drops `*winks*` and
+  `*giggles*` silently, and none of them is spoken. Rewording the rule
+  was MEASURED to do nothing (yuzu3). And on the robot `_canonicalise`
+  writes them back as brackets in her history, which PocketPal cannot
+  do -- turn 1 was brackets, turn 2 was all stars, the snowball.
+- **LENGTH, the watch item**: 60 and 59 spoken words against yuzu4's
+  measured 24 on the laptop. Different sampling in PocketPal, n=2, so
+  NOT acted on; `python3 YUZU_AB.py yuzu4 yuzu_bot` on the laptop is
+  the honest check before anything moves.
+- **"Stop" did not land on `[stands]`**, and since the kill switch is
+  dropped, saying stop to her is the only software stop. **For the
+  bridge (going-live step 1): his own typed stop should halt the legs
+  BEFORE she is asked**, the prompt-reduces/code-guarantees split --
+  she answers in 10-30s and may pick the wrong move, and a new move
+  should end any walk first (Hiwonder's `cmd_vel` walks forever).
+  Recorded, not built: nothing drives the legs yet.
+
 ## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
 
 Ghost, the same morning: *"Browser button, Calculator button, and D20
