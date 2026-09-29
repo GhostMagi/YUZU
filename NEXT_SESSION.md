@@ -6,6 +6,10 @@ minutes instead of forty. **`CLAUDE.md` is the real record** — every
 finding, every measurement, every thing that went wrong and why, is in
 there, and where the two disagree, CLAUDE.md wins.
 
+**Sept 29: the handheld deck is ABANDONED for the JetHexa2027 robot.**
+Read the top of CLAUDE.md first; anything below that calls this a
+deck describes the old plan.
+
 Do not grow this file. A second long doc that goes stale is the exact
 fault this repo keeps deleting (`--show shiro_deck` sat wrong in a doc
 for eleven days; a hardcoded cast in a doc is worse than one in a page,

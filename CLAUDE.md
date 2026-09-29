@@ -49,6 +49,46 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## THE DECK IS ABANDONED; THE ROBOT IS THE PROJECT (Sept 29)
+
+*"2 seperate projects i abandoned the 1of1 cyber deck for the jethexa
+2027 standard kit."* **The handheld deck is off.** His Orin goes into
+the JetHexa2027 Standard, and every "deck" section below is the
+record of that era, not the plan. He asked, confused, whether the
+girls' pages *"will be a thing when i swap them to the bot"*, since
+he took them to be the deck's.
+
+**Answer given: yes, and nothing about them changes.** The pages were
+never the deck's screen. The Orin SERVES them over WiFi and he opens
+them on his PHONE, which is how he has used them all along (Z Flip,
+Steam Deck). With the Orin in the robot, the robot serves the same
+pages and **his phone is the remote**: chat, her voice, the mic. What
+was abandoned is the HARDWARE (case, 10" panel, the handheld idea),
+not the software.
+
+- **Deck-only features go dormant, NOT deleted**: the Game Boy / ES-DE
+  tiles, calculator, d20, desktop icons, `tile`, `gba`, `deckapps`.
+  Nobody asked to remove them. Deleting is his call; offer, never do.
+- **The girls still THINK they live in a handheld.**
+  `_hardware_cyberdeck.txt` says so, and `board_now()` counts hours
+  from the JSAUX bank. On the robot both are wrong: the robot bodies
+  (baseline item 5, the shiro/shiro_deck split) replace the body, and
+  the battery line should read the robot's own voltage (the Hiwonder
+  repo notes above). Both wait for the robot to be on his desk.
+- **The deck parts list is dead except one line**: the USB sound card
+  and speaker are how she talks out of the robot itself (his phone
+  works without them). Whether he bought any deck parts is UNKNOWN.
+
+**THE KILL SWITCH IS DROPPED, his call:** *"Kill switch not needed ilp
+just chase her down and push the power if needed haha"*. Not
+re-litigated. Said once, in a line: the wireless controller in the
+box may stop her too (UNVERIFIED), and if she is ever left running
+alone with the cat -- his own "watch my house while im gone" goal --
+chasing does not reach, so that is the day to revisit it. The note
+below stays because the finding in it (one `cmd_vel` walks forever in
+Hiwonder's old code) is still true of what he is buying, as far as
+anyone knows.
+
 ## THE SISTERS MOVE TO LLAMA, AND A BASELINE LIST FOR THE ROBOT (Sept 27)
 
 *"Honestly the gemmas arent keeping my attention. I seem to prefer
@@ -101,7 +141,8 @@ given was 1 first, then the kill switch.
    fetched again. It protects against a Hiwonder image wiping the NVMe
    whatever their email says. A button, not a command.
 2. ~~Measure whether Gemma can do the move format~~: gone with Gemma.
-3. **A kill switch that works when the WiFi drops**: a STOP button on
+3. ~~**A kill switch that works when the WiFi drops**~~: DROPPED Sept 29,
+   his call (see the top). What it was: a STOP button on
    his phone, plus a heartbeat so the robot stops by itself when it
    stops hearing from the phone. It can be built and tested against
    DummyBot now, and it must exist before anything moves on its own
@@ -142,7 +183,7 @@ one day"*, and now it is true.
   (the oldest split in this file).
 - Each girl keeps her own chat memory, as on the deck already.
 
-**THE KILL SWITCH, explained to him the same message** (*"Whats a
+**(DROPPED Sept 29, his call -- see the top.)** **THE KILL SWITCH, explained to him the same message** (*"Whats a
 killswitch for in my case and how would i use it"*). The answer rests on
 one number: **saying "stop" to a girl goes through the model, which is
 10-30 seconds on the board.** That is fine for "stop walking, let's
@@ -3447,6 +3488,9 @@ icon opens the home screen, which is built from the roster and is the
 right way in for every character. One variable at a time.
 
 ## THE BUILD IS A CYBERDECK NOW (Sept 8)
+
+**SUPERSEDED Sept 29: the deck is abandoned for the JetHexa2027;
+see the top of this file.**
 
 Ghost, plainly: **"shes not going to control anything. resident ai."**
 
@@ -8667,6 +8711,9 @@ Check the request body before the environment. That is the general
 lesson and it is not specific to Ollama.
 
 ## CYBERDECK PARTS — LOCKED SPEC, still NOT BOUGHT (Sept 9, v2)
+
+**SUPERSEDED Sept 29: the deck is abandoned. Only the USB sound card
+and speaker still matter, as the robot's voice.**
 
 Big parts ~20 days out. **The only hardware actually owned is the Orin
 Nano Super devkit, its 512GB NVMe, and the keyboard.** Do not write
