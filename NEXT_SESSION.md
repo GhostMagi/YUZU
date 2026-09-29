@@ -67,7 +67,7 @@ So:
     the sisters'   Four's Llama since Sept 27 (no `model:` line); the
                    Gemma path in the brain stays, used by nobody
     Four's prompt  5446 chars
-    tests          888, ~95s,  `python YUZU_TESTER.py`
+    tests          885, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
 
 **Context headroom is the number to know before you build anything
@@ -92,7 +92,7 @@ comes back having forgotten the start of the conversation.
 ## The working loop
 
 1. Build it.
-2. `python YUZU_TESTER.py` — 888 tests, ~19s on his board, ~95s here.
+2. `python YUZU_TESTER.py` — 885 tests, ~19s on his board, ~95s here.
 3. **Break-verify every new or changed test.** Break the thing it
    guards and watch it go red. A test that has not been broken is a
    test you are guessing about. Read the failure KIND: `errors=1` means
@@ -128,7 +128,8 @@ a phone, so a file path is useless to him.
 
 ## The rules that are not negotiable
 
-- **`/launch/`, `/pull`, `/icons` take no arguments, ever.**
+- **`/launch/` and `/pull` take no arguments, ever.** (`/icons` went
+  with the Desktop button, Sept 30.)
   The server binds 0.0.0.0. Allowlists of NAMES only; nothing from a
   request reaches a shell.
 - **A destructive route gets no defaults.** `/forget` and

@@ -10710,7 +10710,7 @@ class TestUpdatingWithoutTheCable(unittest.TestCase):
 
         page = (Path(__file__).parent / "ui" / "home.html").read_text()
         block = page[page.index("update.onclick"):]
-        block = block[:block.index("// ---- the deck, as an app")]
+        block = block[:block.index("// ---- getting out")]
         code = "\n".join(ln.split("//")[0] for ln in block.splitlines())
         self.assertIn("r.boot", code, "the page ignores which server answered")
         self.assertIn("boot.json", code, "the page never asks who is up now")
@@ -10720,128 +10720,15 @@ class TestUpdatingWithoutTheCable(unittest.TestCase):
                          "any answer at all still counts as 'she is back'")
 
 
-class TestTheDeckPutsItselfOnTheDesktop(unittest.TestCase):
-    """`POST /icons`, and the ⊞ Desktop button beside Update.
+class TestTheBottomBar(unittest.TestCase):
+    """The bar under every view: Back on the left, Update on the right,
+    and a line for whatever a tap is doing.
 
-    Ghost, Sept 17, told that plugging a monitor into the board gives
-    him an ordinary Ubuntu desktop with the deck sitting on top of it:
-    "i want a button on that gnome desktop that opens a window with
-    this part in it if possible? I just dislike using terminals
-    honestly", and then "Like fully a window not a browser tab."
-
-    THE WINDOW ALREADY EXISTED. `deckapps` has always written .desktop
-    files that open these pages with `--app= --start-fullscreen` -- no
-    tab strip, no url bar, no window edge -- and
-    test_her_pages_open_FULLSCREEN_but_never_as_a_kiosk pins that. What
-    needed a keyboard was INSTALLING them, and his one shell is a
-    serial cable. So the last setup step that needed typing became a
-    button he can tap from the phone."""
-
-    import yuzu_face as face
-
-    def _stub(self, body):
-        """A `deckapps` that records how it was called, or fails."""
-        tmp = tempfile.mkdtemp()
-        script = Path(tmp) / "deckapps"
-        script.write_text(body)
-        script.chmod(0o755)
-        return tmp, script
-
-    def _run(self, body):
-        tmp, script = self._stub(body)
-        try:
-            with unittest.mock.patch.object(self.face, "DECKAPPS_SCRIPT",
-                                            str(script)):
-                return self.face.run_deckapps()
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-
-    def test_the_last_setup_step_that_needed_a_TERMINAL_is_a_button(self):
-        """It is in the BAR, for the reason Update and Back are: a tile
-        spends an app slot forever in the drawer he means to "pile up
-        our fancy future apps" in, and MOVES every time that drawer
-        grows -- and seven tiles across three columns orphans one onto
-        a row of its own, which is the layout bug this page has had
-        twice. Maintenance is not an app."""
-        page = (Path(__file__).parent / "ui" / "home.html").read_text()
-        self.assertIn('id="desktop"', page,
-                      "the icons still need a terminal to install")
-        start = page.index('<div id="bar">')
-        bar = page[start:page.index("</div>", start + 400)]
-        self.assertIn('id="desktop"', bar, "⊞ Desktop left the bottom bar")
-        for tile in re.findall(r'<div class="tile[ "][^>]*>', page):
-            self.assertNotIn("desktop", tile, "⊞ Desktop became a tile")
-        block = page[page.index("desktop.onclick"):]
-        block = block[:block.index("// ---- getting out")]
-        self.assertIn("fetch('icons'", block, "the button asks for nothing")
-        self.assertIn("method: 'POST'", block)
-
-    def test_the_route_takes_NOTHING_from_the_request(self):
-        """The whole reason this is safe on a server bound to 0.0.0.0,
-        and here it matters more than it does for /pull: `deckapps`
-        takes `--remove`, which is the destructive word. A route that
-        could be told WHICH word to pass would be a box on his WiFi
-        that can strip his desktop.
-
-        It takes no arguments at all, which is the strongest form of
-        the guarantee."""
-        sig = inspect.signature(self.face.run_deckapps)
-        self.assertEqual(list(sig.parameters), [],
-                         "run_deckapps grew a parameter; the request "
-                         "can reach it")
-        source = inspect.getsource(self.face.run_deckapps)
-        self.assertNotIn("shell=True", source)
-        handler = inspect.getsource(self.face._Handler.do_POST)
-        self.assertIn('path == "/icons"', handler,
-                      "the route matches by prefix; a subpath would differ")
-        # DRIVEN, NOT GREPPED, and the first version of this test was
-        # the twelfth instance of the trap: it banned the string
-        # "--remove" from the source and went red on the DOCSTRING
-        # saying --remove is unreachable. A comment explaining an
-        # absence must never read as that thing being present.
-        #
-        # A failing stub is what makes the argv observable -- its own
-        # output IS the message on a non-zero exit.
-        said, ok = self._run('#!/bin/bash\necho "ARGS=[$*]"\nexit 1\n')
-        self.assertFalse(ok)
-        self.assertIn("ARGS=[]", said,
-                      "deckapps was handed an argument, and one of the "
-                      "words it takes is --remove")
-
-    def test_a_FAILED_install_is_never_reported_as_DONE(self):
-        """`deckapps` refuses to leave a dead icon and exits non-zero
-        when it removes one -- an icon that looks installed and does
-        nothing when tapped reads as a broken deck. Throwing that away
-        for a cheerful sentence is the silent failure this project
-        refuses everywhere else.
-
-        Its own words are the message: they name which icon failed and
-        what to install."""
-        said, ok = self._run('#!/bin/bash\n'
-                             'echo "  BROKEN: Game Boy points at /nope"\n'
-                             'exit 1\n')
-        self.assertFalse(ok, "a failed install reported success")
-        self.assertIn("BROKEN", said,
-                      "deckapps said which icon failed and it was dropped")
-        said, ok = self._run('#!/bin/bash\necho "  installed: Deck"\n'
-                             'echo "Done."\n')
-        self.assertTrue(ok)
-        self.assertTrue(said.startswith("DONE."),
-                        "the verdict goes first: %r" % said[:40])
-        self.assertIn("Deck", said, "it never says what it put out")
-
-    def test_a_MISSING_script_says_so_rather_than_claiming_the_icons(self):
-        """Absent rather than wrong, same as every other route here."""
-        tmp = tempfile.mkdtemp()
-        try:
-            with unittest.mock.patch.object(
-                    self.face, "DECKAPPS_SCRIPT",
-                    str(Path(tmp) / "not-there")):
-                said, ok = self.face.run_deckapps()
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-        self.assertFalse(ok)
-        self.assertIn("deckapps", said)
+    It carried ⊞ Desktop too, from Sept 17 (`POST /icons`, which put the
+    deck's app icons on the board's own GNOME desktop) until Ghost,
+    Sept 30: "we dont need desktop button now". A robot has no monitor
+    for icons to land on. The tests that pinned the button went with it;
+    what it taught about the bar stays."""
 
     def test_the_bar_can_GROW_without_shoving_a_button_off_the_screen(self):
         """MEASURED by rendering, which is the only thing that can see
@@ -10866,7 +10753,7 @@ class TestTheDeckPutsItselfOnTheDesktop(unittest.TestCase):
                       "the message cannot shrink, so a button leaves "
                       "the screen")
         self.assertIn("flex: 1", style)
-        buttons = page[page.index("#update, #desktop {"):]
+        buttons = page[page.index("#update {"):]
         buttons = buttons[:buttons.index("}")]
         self.assertIn("flex: none", buttons,
                       "the buttons shrink instead of the message")
@@ -16109,6 +15996,38 @@ class TestHomeScreen(unittest.TestCase):
         # stuff.
         for stays in ('data-launch="wiki"', 'id="save"'):
             self.assertIn(stays, code, "%s went with them" % stays)
+
+    def test_the_bar_holds_NOTHING_a_metal_spider_cannot_use(self):
+        """Ghost, Sept 30: "we dont need desktop button now". ⊞ Desktop
+        put the deck's app icons on the board's own GNOME desktop, which
+        a robot with no monitor never shows anyone. Gone the way the
+        calculator went: the button, its script, and `POST /icons`,
+        which now answers like any route the deck does not know.
+
+        The `deckapps` SCRIPT stays (dormant, like `gba`): `deck` still
+        calls it, and deleting it was not asked for."""
+        page = self.PAGE.read_text()
+        code = re.sub(r"<!--.*?-->|/\*.*?\*/", "", page, flags=re.S)
+        code = re.sub(r"(?m)^\s*//.*$", "", code)
+        for gone in ('id="desktop"', "fetch('icons'", "#desktop"):
+            self.assertNotIn(gone, code, "%s is still on the deck" % gone)
+        start = code.index('<div id="bar">')
+        bar = code[start:code.index("<script", start)]
+        self.assertEqual(re.findall(r'<button id="(\w+)"', bar),
+                         ["back", "update"],
+                         "the bar is Back and Update, and nothing else")
+        # DRIVEN: the route is refused, not merely unlinked.
+        refused = []
+        with unittest.mock.patch.object(
+                self.face._Handler, "send_error",
+                lambda handler, code, *a: refused.append(code)):
+            answered = drive_route("/icons", {})
+        self.assertEqual(refused, [404],
+                         "POST /icons still does something: %r" % answered)
+        self.assertFalse(hasattr(self.face, "run_deckapps"),
+                         "the icon installer is still reachable in code")
+        self.assertTrue((Path(__file__).parent / "deckapps").exists(),
+                        "the deckapps script itself was not his to delete")
 
     def test_the_icons_are_line_art_and_not_emoji(self):
         """Ghost wanted "clean single-color line icons... rather than

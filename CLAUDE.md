@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 888 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 885 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -146,6 +146,34 @@ through the real parser here:
   she answers in 10-30s and may pick the wrong move, and a new move
   should end any walk first (Hiwonder's `cmd_vel` walks forever).
   Recorded, not built: nothing drives the legs yet.
+
+### ⊞ Desktop is gone too, and the update landed on his board
+
+**CONFIRMED on his board, same day**: three screenshots after tapping
+Update -- Yuzu is the front tile, the A.I. drawer says "5 of them",
+☆Misc☆ is Wikipedia and Save my stuff, and the Game Boy is gone. The
+whole Sept 30 round arrived.
+
+Then: *"was thinking we dont need desktop button now"*. **Deleted, his
+call**: the button, its script, `run_deckapps()` and `POST /icons`
+(which now answers 404 like any route the deck does not know). It put
+the deck's app icons on the board's own GNOME desktop -- a monitor the
+robot will never have. `git show 2eacd11:ui/home.html` and
+`:yuzu_face.py` bring it back. **The `deckapps` SCRIPT stays**
+(dormant, like `gba`): `deck` still calls it, and deleting it was not
+asked for; a test holds that too. The bar is Back and Update, with
+Update's own `margin-left: auto` now that it is alone on the right.
+Rendered at 1024, 412 and 360: Update in the corner, Back on the left,
+no sideways scroll.
+
+The four tests that pinned the button went with it; the two about the
+bar's layout stay, in `TestTheBottomBar`. One new guard
+(`test_the_bar_holds_NOTHING_a_metal_spider_cannot_use`): the bar is
+exactly Back and Update, `/icons` is DRIVEN and refused, and the
+script survives. **Six breaks, all red as failures. 888 -> 885.**
+
+He was **about to try Save my stuff**, the one check that has to pass
+before the robot arrives -- see the top entry's UNVERIFIED list.
 
 ## THE BOT ROUND: THREE BUTTONS GONE, ZERO GETS LEGS, THE SPIDER READS (Sept 30)
 

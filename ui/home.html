@@ -261,18 +261,19 @@ body {
    three columns orphans one onto a row of its own, which is the layout
    bug this page has now had twice. In the bar it is in the same place
    whatever is on screen, and it is maintenance rather than an app. */
-#update, #desktop {
+#update {
   flex: none;
   font: inherit; font-weight: 700; font-size: 13px;
   color: var(--ink); background: var(--tile); cursor: pointer;
   border: 2px solid var(--edge); border-radius: 4px; padding: 7px 14px;
 }
-/* The margin is on the FIRST of the pair, not on each of them, or the
-   second one is shoved off the right edge on a narrow screen -- which
-   is the fault that put the ⌂ 169px past the viewport on four
-   character pages. */
-#desktop { margin-left: auto; }
-#update:disabled, #desktop:disabled { opacity: .5; cursor: default; }
+/* ⊞ DESKTOP IS GONE, his call, Sept 30: "we dont need desktop button
+   now" -- it put the deck's app icons on a monitor the robot will never
+   have. So Update is the one button on the right again, and the margin
+   that pushes it there is its own. `git show 2eacd11:ui/home.html` has
+   the button. */
+#update { margin-left: auto; }
+#update:disabled { opacity: .5; cursor: default; }
 /* ON A PHONE THE MESSAGE GETS ITS OWN LINE, above the buttons. Side by
    side it was squeezed to one word wide and half the screen tall -- the
    fault the rule above records -- and "Save my stuff" says a whole
@@ -281,7 +282,7 @@ body {
    two lines. Found by rendering, Sept 29. An empty message takes no
    line at all, so the bar is its old height until something is said. */
 /* And the gaps shrink to fit a 360px phone: Back, Desktop and Update
-   side by side came to 368px there, so in a drawer Update used to sit
+   (three buttons, until Sept 30) side by side came to 368px there, so in a drawer Update used to sit
    off the edge, and with wrapping it fell to a third row instead. */
 @media (max-width: 560px) {
   #bar { flex-wrap: wrap; row-gap: 8px; column-gap: 8px;
@@ -361,9 +362,9 @@ body {
        since Sept 30, when he asked, the girls' brains -- and the FIRST
        tap only says how big that is; the second tap saves it. See
        save_plan() in yuzu_face.py.
-       A tile rather than a bar button: the bar already carries Back,
-       Desktop and Update, and on a phone one more button there is the
-       fault that once put Update 2px off a 412px screen. -->
+       A tile rather than a bar button: the bar carries Back and Update,
+       and on a phone one more button there is the fault that once put
+       Update 2px off a 412px screen. -->
   <div class="tile" id="save" data-view="misc" data-save="">
     <div class="big"><svg viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4 15.5v4h16v-4"/></svg></div>
     <b>Save my stuff</b>
@@ -374,9 +375,6 @@ body {
 <div id="bar">
   <button id="back" type="button">⌂ Back</button>
   <div id="note"></div>
-  <button id="desktop" type="button"
-          title="put the deck's app icons on the board's own desktop"
-          >⊞ Desktop</button>
   <button id="update" type="button" title="git pull">↻ Update</button>
 </div>
 
@@ -751,42 +749,6 @@ update.onclick = () => {
     .catch(() => {
       update.disabled = false;
       update.textContent = '↻ Update';
-      say('No answer from the deck. Is ~/YUZU/face running?', 9000);
-    });
-};
-
-// ---- the deck, as an app on the board's own desktop -----------------
-// Ghost, Sept 17: "i want a button on that gnome desktop that opens a
-// window with this part in it if possible? I just dislike using
-// terminals honestly" -- and then "Like fully a window not a browser
-// tab."
-//
-// THE WINDOW ALREADY EXISTED. `deckapps` writes .desktop files that
-// open these pages with --app= --start-fullscreen: no tab strip, no
-// url bar, no window edge. The part that needed a keyboard was
-// INSTALLING them, and his one shell is a serial cable -- so this is
-// the same maintenance-not-an-app call Update already made, one seat
-// along in the same bar.
-//
-// He can tap it from the phone. The icons land on the board whether or
-// not a monitor is plugged in.
-const desktop = document.getElementById('desktop');
-desktop.onclick = () => {
-  desktop.disabled = true;
-  desktop.textContent = '...';
-  say('Putting the icons out.');
-  fetch('icons', { method: 'POST' })
-    .then(r => r.json())
-    .then(r => {
-      const text = (r.said || '').trim();
-      say(text.split('\n').filter(l => l.trim()).slice(0, 4).join('\n'),
-          r.ok ? 12000 : 20000);
-      desktop.disabled = false;
-      desktop.textContent = '⊞ Desktop';
-    })
-    .catch(() => {
-      desktop.disabled = false;
-      desktop.textContent = '⊞ Desktop';
       say('No answer from the deck. Is ~/YUZU/face running?', 9000);
     });
 };
