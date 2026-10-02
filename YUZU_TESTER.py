@@ -9,6 +9,7 @@ behaviour worth locking down so a future edit can't quietly break it.
 """
 
 import json
+import importlib.util
 import inspect
 import unittest
 import unittest.mock
@@ -19,8 +20,10 @@ import contextlib
 import itertools
 import os
 import re
+import shlex
 import shutil
 import struct
+import subprocess
 import sys
 import tempfile
 import textwrap
@@ -3742,6 +3745,325 @@ class TestStackChanCube(unittest.TestCase):
                         "four-cube; ls", "fourcube"):
             self.assertIsNone(yuzu_face.persona_for(hostile),
                               "%r reached a persona" % hostile)
+
+
+class TestTheCubeCode(unittest.TestCase):
+    """The StackChan cube's own program (stackchan/four_cube) and the one
+    word that flashes it (`cube`). Ghost, Oct 2: "B w/ the raining code
+    you know it 2 as well 3 also 4 but make it turn neon red instead of
+    purple when thinking. And 5. And 6. Note 7 for later." -- and a fifth
+    colour, bright glowy blue, for her page and her cube alike.
+
+    The C++ was compiled against the real ESP32 core and M5Unified in the
+    container; it has never run on a cube. What these hold is everything
+    the board and the cube have to AGREE on, and everything the flash
+    must never do with his WiFi password."""
+
+    ROOT = Path(__file__).parent
+    MAIN = ROOT / "stackchan" / "four_cube" / "four_cube_main.cpp"
+    PAGE = ROOT / "ui" / "four.html"
+
+    def code(self):
+        text = self.MAIN.read_text()
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return re.sub(r"//[^\n]*", "", text)
+
+    def table(self, name):
+        """The rows of one of the cube's C tables, as tuples of fields."""
+        body = re.search(r"%s\[\]\s*=\s*\{(.*?)\n\};" % name, self.code(), re.S)
+        self.assertTrue(body, "the cube has no %s table" % name)
+        return [tuple(f.strip().strip('"') for f in row.split(","))
+                for row in re.findall(r"\{([^{}]*)\}", body.group(1))]
+
+    def page_palette(self, skin):
+        """--ink, --head and --tail of one skin on her page, as 0xRRGGBB."""
+        page = self.PAGE.read_text()
+        sel = "body.%s" % skin if skin else "body"
+        block = re.search(r"\n%s \{([^}]*)\}" % re.escape(sel), page)
+        self.assertTrue(block, "her page has no %s block" % sel)
+        out = {}
+        for prop in ("ink", "head", "tail"):
+            v = re.search(r"--%s:\s*([^;]+);" % prop, block.group(1)).group(1)
+            hexed = re.match(r"#([0-9a-fA-F]{6})", v.strip())
+            if hexed:
+                out[prop] = int(hexed.group(1), 16)
+            else:
+                r, g, b = re.findall(r"\d+", v)[:3]
+                out[prop] = (int(r) << 16) | (int(g) << 8) | int(b)
+        return out
+
+    def test_the_cube_and_her_page_wear_the_SAME_colours_in_the_same_ORDER(self):
+        """Two copies that must agree: a tap on the cube that lands on a
+        different red from a tap on her page is the drift this repo
+        guards in the battery renderer and the way out."""
+        skins = self.table("SKINS")
+        page_order = TestFour().skins()
+        self.assertEqual([s[0] for s in skins],
+                         [x or "green" for x in page_order],
+                         "the cube cycles different colours from her page")
+        for (name, ink, head, tail, _bright), skin in zip(skins, page_order):
+            want = self.page_palette(skin)
+            self.assertEqual(int(head, 16), want["head"], "%s head" % name)
+            self.assertEqual(int(tail, 16), want["tail"], "%s tail" % name)
+            if skin:   # green is her art untouched, on both
+                self.assertEqual(int(ink, 16), want["ink"], "%s ink" % name)
+            else:
+                self.assertEqual(int(ink, 16), 0, "green is tinted on the cube")
+
+    def test_she_thinks_in_NEON_RED_except_where_red_is_no_signal(self):
+        """His word was neon red. Red rain on the red face is no signal,
+        and on the pink face it rendered near identical to her own pink
+        rain -- so those two keep their page's purples, and a test says
+        which, so it is a decision rather than a drift."""
+        skins, thinks = self.table("SKINS"), self.table("THINKS")
+        self.assertEqual(len(skins), len(thinks),
+                         "a colour cycles with no thinking colour decided")
+        neon = 0xff2b39
+        for (name, _ink, head, tail, _b), (t_head, t_tail) in zip(skins, thinks):
+            self.assertNotEqual(int(t_head, 16), int(head, 16),
+                                "%s thinks in its own colour" % name)
+            self.assertNotEqual(int(t_tail, 16), int(tail, 16),
+                                "%s thinks in its own colour" % name)
+            if name in ("red", "pink"):
+                self.assertNotEqual(int(t_tail, 16), neon,
+                                    "%s thinks in red it cannot show" % name)
+            else:
+                self.assertEqual(int(t_tail, 16), neon,
+                                 "%s does not think in neon red" % name)
+
+    def test_the_cube_asks_by_a_name_and_routes_the_BOARD_has(self):
+        """The cube is only as good as the board answering it: its name
+        must be in yuzu_face.DEVICES, and every route it posts to must be
+        one the face server handles."""
+        import yuzu_face
+        who = re.search(r'WHO\[\]\s*=\s*"([^"]+)"', self.code())
+        self.assertTrue(who, "the cube never says who it is")
+        self.assertIn(who.group(1), yuzu_face.DEVICES,
+                      "the board does not know the name the cube asks by")
+        board = Path(yuzu_face.__file__).read_text()
+        routes = set(re.findall(r'"(/(?:listen|stream|voice\.wav|say))"',
+                                self.code()))
+        self.assertTrue({"/listen", "/stream", "/voice.wav"} <= routes,
+                        "the cube no longer asks the routes it was built on")
+        for route in routes:
+            self.assertIn('path == "%s"' % route, board,
+                          "the board has no %s for the cube" % route)
+
+    def test_the_sketch_file_holds_no_CODE(self):
+        """Every function lives in the .cpp. The Arduino build runs ctags
+        over a .ino to invent prototypes, and a stand-in ctags mangled
+        them into compile errors in the container -- a .cpp is compiled
+        the same on every machine that flashes her."""
+        ino = (self.ROOT / "stackchan" / "four_cube" / "four_cube.ino").read_text()
+        self.assertEqual([ln for ln in ino.splitlines()
+                          if ln.strip() and not ln.strip().startswith("//")],
+                         [], "the .ino has code in it again")
+
+    @unittest.skipUnless(importlib.util.find_spec("PIL"), "needs PIL")
+    def test_the_picture_on_the_cube_is_HER_picture(self):
+        """four_art.h is generated and committed; regenerate it here and
+        compare, so changing her art without rerunning the script fails."""
+        import importlib.util as iu
+        spec = iu.spec_from_file_location(
+            "make_art", self.ROOT / "stackchan" / "make_art.py")
+        make_art = iu.module_from_spec(spec)
+        spec.loader.exec_module(make_art)
+        self.assertEqual(make_art.render(),
+                         (self.ROOT / "stackchan" / "four_cube" / "four_art.h")
+                         .read_text(),
+                         "four_art.h is stale -- run stackchan/make_art.py")
+
+
+class TestCubeFlash(unittest.TestCase):
+    """`~/YUZU/cube`, driven for real against stand-ins for arduino-cli,
+    nmcli, sudo, hostname and ip. Nothing here touches USB or downloads
+    a byte."""
+
+    REPO = Path(__file__).parent
+    PASSWORD = 'pa"ss\\w0rd-SECRET'
+
+    def setUp(self):
+        import tempfile
+        self.tmp = Path(tempfile.mkdtemp())
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        self.tools = self.tmp / "tools"
+        self.log = self.tmp / "cli.log"
+        self.cube = self.tmp / "ttyACM9"
+        self.cube.write_text("")
+        self.stub_fail = ""
+        self.board = "ghostnano"
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def stub(self, name, body):
+        path = self.bin / name
+        path.write_text("#!/bin/bash\n" + body)
+        path.chmod(0o755)
+
+    def run_cube(self, serial=None, cli=True, extra=None):
+        log = self.log
+        self.stub("nmcli", """
+case "$*" in
+  *"--active"*) echo "Home:802-11-wireless"; echo "docker0:bridge" ;;
+  *"-s -g 802-11-wireless-security.psk"*) printf '%%s\\n' %s ;;
+  *"802-11-wireless.ssid"*) echo "HomeNet" ;;
+esac
+""" % shlex.quote(self.PASSWORD))
+        self.stub("sudo", 'exec "$@"\n')
+        self.stub("hostname", 'case "$1" in -s) echo "%s" ;; *) echo "" ;; esac\n'
+                  % self.board)
+        self.stub("ip", 'echo "8.8.8.8 via 192.0.2.1 dev wlan0 src 192.0.2.7 uid 1000"\n')
+        self.stub("uname", 'echo x86_64\n')
+        self.stub("curl", 'exit 22\n')
+        if cli:
+            self.stub("arduino-cli", """
+echo "$*" >> %s
+case "$*" in
+  *" core list"*) echo "esp32:esp32 3.3.2 3.3.2 esp32" ;;
+  *" compile "*)
+    sketch="${@: -1}"
+    echo "SKETCH $sketch" >> %s
+    cp "$sketch/cube_secrets.h" %s.secrets
+    [ -n "$STUB_FAIL" ] && { echo "$STUB_FAIL"; exit 1; }
+    ;;
+esac
+exit 0
+""" % (log, log, log))
+        env = dict(os.environ,
+                   PATH="%s:%s" % (self.bin, os.environ.get("PATH", "")),
+                   YUZU_CUBE_TOOLS=str(self.tools),
+                   YUZU_CUBE_SERIAL=str(serial if serial is not None
+                                        else self.cube),
+                   STUB_FAIL=self.stub_fail)
+        env.pop("YUZU_CUBE_SSID", None)
+        env.pop("YUZU_CUBE_PASS", None)
+        if cli:
+            env["YUZU_CUBE_CLI"] = str(self.bin / "arduino-cli")
+        else:
+            env["YUZU_CUBE_CLI"] = str(self.tools / "nothing-here")
+        env.update(extra or {})
+        return subprocess.run([str(self.REPO / "cube")], env=env, text=True,
+                              capture_output=True, timeout=60,
+                              stdin=subprocess.DEVNULL)
+
+    def secrets(self):
+        """The header the cube was built with, decoded back to values."""
+        path = Path(str(self.log) + ".secrets")
+        if not path.exists():
+            self.fail("the cube was built with no settings header")
+        text = path.read_text()
+        out = {}
+        for key, lit in re.findall(r'#define (\w+) ("(?:[^"\\]|\\.)*"|\d+)', text):
+            if lit.startswith('"'):
+                raw = re.sub(r"\\x([0-9a-f]{2})",
+                             lambda m: chr(int(m.group(1), 16)), lit[1:-1])
+                out[key] = raw.encode("latin-1").decode("utf-8")
+            else:
+                out[key] = int(lit)
+        missing = {"CUBE_WIFI_SSID", "CUBE_WIFI_PASS", "CUBE_HOST",
+                   "CUBE_HOST_IP", "CUBE_PORT"} - set(out)
+        if missing:
+            self.fail("the settings header does not read back as C: %s"
+                      % sorted(missing))
+        return out
+
+    def test_no_cube_is_said_FIRST_and_nothing_is_spent(self):
+        got = self.run_cube(serial=self.tmp / "nothing")
+        self.assertEqual(got.returncode, 1)
+        self.assertTrue(got.stdout.startswith("NO CUBE FOUND."), got.stdout)
+        self.assertFalse(self.log.exists(), "it built with no cube to put her on")
+
+    def test_she_joins_the_BOARDS_wifi_and_the_password_never_lands_in_the_repo(self):
+        got = self.run_cube()
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertTrue(got.stdout.rstrip().splitlines()[-3].startswith("DONE."),
+                        got.stdout)
+        sec = self.secrets()
+        self.assertEqual(sec["CUBE_WIFI_SSID"], "HomeNet")
+        self.assertEqual(sec["CUBE_WIFI_PASS"], self.PASSWORD,
+                         "the password did not survive the C escaping")
+        self.assertEqual(sec["CUBE_HOST"], "ghostnano")
+        self.assertEqual(sec["CUBE_HOST_IP"], "192.0.2.7")
+        self.assertEqual(sec["CUBE_PORT"], 8081)
+        # The folder it was built in is gone, and nothing it wrote is in
+        # the repository or anywhere git would see.
+        sketch = re.search(r"^SKETCH (.+)$", self.log.read_text(), re.M).group(1)
+        self.assertFalse(Path(sketch).exists(), "the build folder outlived it")
+        self.assertFalse((self.REPO / "stackchan" / "four_cube"
+                          / "cube_secrets.h").exists())
+        hits = subprocess.run(["git", "grep", "-l", "-F", "w0rd-SECRET"],
+                              cwd=self.REPO, capture_output=True, text=True)
+        self.assertEqual(hits.stdout.strip(),
+                         "YUZU_TESTER.py", "his password reached a tracked file")
+        ignored = subprocess.run(["git", "check-ignore",
+                                  "stackchan/four_cube/cube_secrets.h"],
+                                 cwd=self.REPO, capture_output=True, text=True)
+        self.assertEqual(ignored.returncode, 0,
+                         "a hand-built secrets file would be committable")
+
+    def test_the_build_stays_in_the_TEMP_folder_and_asks_for_PSRAM(self):
+        """arduino-cli's default build path copies the sketch -- secrets
+        and all -- into /tmp/arduino and leaves it there."""
+        self.run_cube()
+        compile_line = [ln for ln in self.log.read_text().splitlines()
+                        if " compile " in ln][0]
+        sketch = re.search(r"^SKETCH (.+)$", self.log.read_text(), re.M).group(1)
+        build = re.search(r"--build-path (\S+)", compile_line)
+        self.assertTrue(build, "the build writes outside its temp folder")
+        self.assertTrue(build.group(1).startswith(str(Path(sketch).parent)),
+                        "the build path is not inside the deleted folder")
+        self.assertIn("PSRAM=enabled", compile_line)
+        self.assertIn("PartitionScheme=huge_app", compile_line,
+                      "she is 1.3 MB and the default layout holds 1.2")
+        self.assertIn("--upload -p %s" % self.cube, compile_line)
+
+    def test_a_board_named_localhost_gives_the_cube_NUMBERS_only(self):
+        """`localhost` means the asker -- the refusal face and pull
+        already make, or the cube looks for itself."""
+        self.board = "localhost"
+        self.run_cube()
+        sec = self.secrets()
+        self.assertEqual(sec["CUBE_HOST"], "")
+        self.assertEqual(sec["CUBE_HOST_IP"], "192.0.2.7")
+
+    def test_the_first_time_says_the_SIZE_before_it_fetches(self):
+        got = self.run_cube(cli=False)
+        self.assertEqual(got.returncode, 1)
+        out = got.stdout
+        self.assertIn("1.5 GB", out)
+        self.assertLess(out.index("1.5 GB"), out.index("NOT FLASHED"),
+                        "the size came after the attempt")
+
+    def test_a_settings_header_that_cannot_be_written_STOPS_the_flash(self):
+        """A cube built with no WiFi in it says only "No WiFi" -- about a
+        fault that happened here, on the board. So the flash stops where
+        it happened, and nothing is built."""
+        # ONLY the writer fails: a python3 that exits 1, everything else
+        # real. Emptying PATH instead would stop the script long before
+        # this step and pass for the wrong reason.
+        self.stub("python3", "exit 1\n")
+        got = self.run_cube()
+        self.assertEqual(got.returncode, 1, got.stdout)
+        self.assertIn("couldn't write the cube's WiFi settings", got.stdout)
+        self.assertNotIn("compile", self.log.read_text()
+                         if self.log.exists() else "",
+                         "it built a cube with no settings")
+
+    def test_every_failure_says_what_to_DO(self):
+        for said, fix in (("Permission denied: '/dev/ttyACM0'", "dialout"),
+                          ("A fatal error occurred: Failed to connect to ESP32-S3",
+                           "reset button"),
+                          ("Could not open /dev/ttyACM0, the port is busy",
+                           "plug it back in")):
+            self.stub_fail = said
+            got = self.run_cube()
+            self.assertEqual(got.returncode, 1)
+            self.assertTrue(got.stdout.splitlines()[-3:] and
+                            "NOT FLASHED." in got.stdout, got.stdout)
+            self.assertIn(fix, got.stdout, "no fix named for: %s" % said)
 
 
 class TestSaveMyStuff(unittest.TestCase):

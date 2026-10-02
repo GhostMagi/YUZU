@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 892 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 904 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,115 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## FOUR GOES IN A STACKCHAN CUBE, AND GETS A FIFTH COLOUR (Oct 2)
+
+The robot is on hold "a month or so" (Oct 1). Meanwhile he bought an
+M5Stack **StackChan Core (ESP32-S3)** -- the face cube, NOT the robot
+kit with the two-servo body -- and an **M5GO Battery Bottom3** (the LED
+base; his old Stackchan-era memory export says he once decided against
+it, and now has it). Full circle: this project began as a Stackchan.
+*"can we put Four in it? Her art on the screen?"* Picked off a mockup at
+the cube's real 320x240: *"B w/ the raining code you know it 2 as well
+3 also 4 but make it turn neon red instead of purple when thinking. And
+5. And 6. Note 7 for later."* Plus: *"add a bright glowy blue as an
+extra color? For her main face. Make sure that loops back around too.
+U can choose the code rain color on that one"*.
+
+**7, THE LED BASE GLOWING HER COLOUR, IS LATER, his call.** Nothing in
+the cube code touches it.
+
+### Blue, on her page (and the cube)
+
+`body.blue`: her art tinted `#1e90ff` (three blues rendered on her art
+at 412 and looked at; it glowed, the royal one sat deep), her rain HIS
+OWN CYAN `#2ee6ff` (his Saya-face colour, beside the pink), chosen over
+white, pink and purple rain rendered side by side. Five colours now,
+green -> red -> purple -> pink -> blue -> green, driven in a real
+browser for seven taps. **On her PAGE blue thinks in purple**, his
+general rule ("neon purple when thinking. In general."); his neon red
+was for the cube. If he wants red on the page too, it is one block.
+
+### Four on the cube
+
+- **`four_cube`**, `same_girl_as: four`, on `_hardware_stackchan.txt`:
+  a cube on a desk, screen face, speaker, mic, no legs, `[MOVES] no`;
+  **her mind on the Orin over the room's WiFi**, so the deck's "works
+  the same with the WiFi off" is the one deck sentence NOT carried
+  (false for a cube that reaches the board over WiFi); nothing she does
+  reaches the internet; the cube's camera is named and said to be
+  unconnected ("what do you see?" has an example that asks him). Every
+  deck example still true of a cube is kept WORD FOR WORD and a test
+  holds that; Status, her look ("Green, unless you've tapped me into
+  another colour"), "what's it like in there" (split: face here, mind
+  there), "do you like your cube" and the introduction (which tells a
+  stranger: hold to talk, tap for colours) are rewritten. 5711 chars.
+- **`yuzu_face.DEVICES`**, a second allowlist: `four-cube` -> `four_cube`.
+  `persona_for` reads it, `roster()` never does, so the cube adds NO
+  tile. She gets her own brain and memory under `four_cube` (separate
+  from page-Four's; sharing facts between the two is a possible later
+  ask) and **no board line** -- its JSAUX-bank hours are the deck's.
+- **The cube's program**, `stackchan/four_cube/` (Arduino, M5Unified):
+  her art baked in as RGB565 (`stackchan/make_art.py` -> `four_art.h`,
+  committed, a test regenerates and compares), her rain (Font0 x2, her
+  page's glyphs, fade and speeds), `screen` blend, the five colours in
+  a table a test holds EQUAL to her page's. **Thinking is neon red with
+  a saturated head (`#ff5a64`)** -- an emulator render showed the
+  page's pale heads read as white rain -- **except red (purple: red on
+  red is no signal) and pink (her page's bright purple: neon red and
+  pink rain rendered near identical, 26 degrees of hue)**. Tap = next
+  colour; **hold = talk, recording from the TOUCH** (a hold is only
+  known half a second in, which would cut his first word), let go to
+  send; hold mid-reply stops her. A turn runs on core 0 so the rain
+  keeps falling: `/listen` (WAV) -> `/stream` (NOT `/say`: HTTPClient
+  waits at most a uint16 of ms, ~65s, and a cold model's first reply
+  can take longer; /stream sends headers at once and the cube reads
+  it with its own 180s clock, showing none of it) -> `/voice.wav` in
+  sentence pieces of <=220 chars, the next fetched while one plays
+  (600 tokens of Kokoro at 24kHz would not fit 8MB of PSRAM). Errors
+  go on a one-line status, verdict first.
+- **`~/YUZU/cube`**, the one word, run with the cube on the board's
+  USB-A: cube found FIRST (nothing spent without one); the board's OWN
+  WiFi read via nmcli (the password needs sudo -- the only prompt);
+  first time only, ~1.5 GB of tools into `~/.yuzu/cube-tools` (said
+  before it starts; outside the repo; not in Save my stuff, which takes
+  only `history/` and `facts/`); built in a temp folder WITH
+  `--build-path` inside it (arduino-cli's default copies the sketch,
+  password and all, into /tmp/arduino and leaves it) and deleted; the
+  password is C-escaped (`\xNN`) because a WiFi password can hold
+  quotes; board by NAME (mDNS) with its numbers as the fallback,
+  `localhost` refused. Every failure names the fix (dialout group,
+  reset button, replug). `pull` will show it as a NEW COMMAND.
+
+### Built, compiled, never run on a cube
+
+**COMPILED for real in the container** -- esp32 core 3.3.2 (GitHub
+releases; downloads.arduino.cc is blocked here), M5Unified 0.2.25 and
+M5GFX 0.2.32 from git -- with no warnings under `--warnings all`, and
+the real `cube` script was driven to the upload step twice with a
+password full of quotes and backslashes; no copy of it was left
+anywhere. **Nothing has run on CoreS3 hardware.** UNVERIFIED: touch
+(press/click/hold) and mic/speaker switching on the real cube; the USB
+name it shows up as; the CoreS3 download-mode advice (hold reset ~3s);
+that the pinned library versions exist in the Arduino index (it falls
+back to the latest); that the Battery Bottom3 fits (it says CoreS3
+only, and M5Stack's StackChan is CoreS3-based).
+
+**THE .ino HOLDS NO CODE**: arduino-cli runs ctags over a .ino to make
+prototypes, and the stand-in ctags here mangled them into compile
+errors; the .cpp builds the same everywhere. **AND THIS CONTAINER'S
+dpkg IS BROKEN** ("unknown system user 'root' in statoverride" -- the
+/etc/passwd incident's leftover): `apt-get install` fails. Use
+`apt-get download` + `dpkg-deb -x` into the scratchpad, as ctags was.
+Never touch the credential files to "fix" it.
+
+**Two of my own test faults, both found by breaking on purpose.** A
+test set `self.fail = ""` as stub state, which shadowed TestCase.fail
+-- every caught fault came back as a TypeError ERROR rather than a
+FAIL. Read the failure KIND. And breaking the password escaping made
+the settings writer crash, which showed the script built the cube
+anyway with no settings: it stops now. **Over thirty breaks across the round,
+every one red as a failure. 885 -> 904.**
 
 ## YUZU IS THE MAIN, THE GAME BOY GOES, AND THEY KNOW IT IS A METAL SPIDER (Sept 30)
 
