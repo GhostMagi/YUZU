@@ -3794,6 +3794,30 @@ class TestYuzuCube(TestStackChanCube):
         self.assertNotIn("no arms on this thing", text)
 
 
+class TestZeroCube(TestStackChanCube):
+    """Zero on the same cube. Ghost, Oct 2: "Can the qwen variant, Zero,
+    go on there plz? (Kuro and shiro arent needed)". Every test of the
+    cube's Four, run again for her; only her introduction is rewritten
+    (her deck one said she lives on this deck)."""
+
+    KEY, NAME, TWIN = "zero_cube", "zero-cube", "zero"
+    REWRITTEN = {"Introduce yourself."}
+
+    def test_she_keeps_HER_OWN_QWEN_and_her_exact_maths_on_the_cube(self):
+        """"Remember thad zero stays a qwen tho" -- on the cube too. The
+        one girl there who does not share the Llama, and the one whose
+        sums are worked out in code before she sees them."""
+        model = lambda k: YuzuBrain(persona=k, host="http://127.0.0.1:9").model
+        self.assertIn("qwen", model(self.KEY).lower(),
+                      "Zero on the cube is not on her Qwen")
+        self.assertNotEqual(model(self.KEY), model("four_cube"),
+                            "Zero on the cube thinks with Four's brain")
+        cube = self.cube()
+        self.assertEqual(cube.settings.get("maths"), "exact")
+        self.assertIn("<|im_end|>", cube.settings.get("stop", ""),
+                      "her turn has nothing telling it where to end")
+
+
 class TestTheCubeIsSHARED(unittest.TestCase):
     """Two girls, one cube, a swipe between them. What is true of the
     CUBE is one copy in the body file; what is true of ONE GIRL is hers,
@@ -3993,9 +4017,11 @@ class TestTheCubeCode(unittest.TestCase):
             self.assertIn("CUBE_SCREEN", persona.settings,
                           "%s is not a girl on the cube" % who)
             self.assertIn("Hold", hint, "%s's hint hides how to talk" % name)
+            self.assertIn("Swipe for ", hint, "%s's hint hides the swipe" % name)
+            swipe = hint.split("Swipe for ", 1)[1]
             for _w, other, _h in girls:
                 if other != name:
-                    self.assertIn("Swipe for %s" % other, hint,
+                    self.assertIn(other, swipe,
                                   "%s's hint hides %s" % (name, other))
             self.assertEqual("tap" in hint.lower(),
                              "tap" in persona.settings["CUBE_SCREEN"],
@@ -4040,6 +4066,80 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertTrue(swipe and int(swipe.group(1)) >= 60,
                         "a finger drifting while he talks would swap girls")
 
+    def test_a_swipe_goes_BOTH_ways_and_visits_every_girl(self):
+        """Three girls: left brings the next, right the one before. Read
+        off the code and walked, so a swipe that only ever goes one way
+        (two swipes to go back one) or skips a girl goes red."""
+        code = self.code()
+        self.assertIn("swap_girl(t.distanceX())", code,
+                      "the swipe's direction never reaches the swap")
+        step = re.search(r"girl\s*=\s*\(girl\s*\+\s*\(dx\s*<\s*0\s*\?\s*"
+                         r"([^:]+?)\s*:\s*([^)]+?)\)\)\s*%\s*GIRL_COUNT", code)
+        self.assertTrue(step, "the swap is not girl + (dx < 0 ? a : b)")
+        n = len(self.girls())
+        left = eval(step.group(1).replace("GIRL_COUNT", str(n)))
+        right = eval(step.group(2).replace("GIRL_COUNT", str(n)))
+        seen, g = [], 0
+        for _ in range(n):
+            g = (g + left) % n
+            seen.append(g)
+        self.assertEqual(sorted(seen), list(range(n)),
+                         "swiping left does not visit every girl")
+        self.assertEqual((g + left + right) % n, g,
+                         "a swipe right does not undo a swipe left")
+        self.assertEqual(left % n, 1,
+                         "a swipe left does not bring the NEXT girl")
+
+    # M5GFX's Font2 (lgfx/Fonts/Font16.h, widtbl_f16), the status line's
+    # font, character widths for ASCII 32..127.
+    FONT2 = [6, 3, 4, 9, 8, 9, 9, 3, 7, 7, 8, 6, 3, 6, 5, 7, 8, 8, 8, 8,
+             8, 8, 8, 8, 8, 8, 3, 3, 6, 6, 6, 8, 9, 8, 8, 8, 8, 8, 8, 8,
+             8, 4, 8, 8, 7, 10, 8, 8, 8, 8, 8, 8, 8, 8, 8, 10, 8, 8, 8, 4,
+             7, 4, 7, 9, 4, 7, 7, 7, 7, 7, 6, 7, 7, 4, 5, 6, 4, 8, 7, 8,
+             7, 8, 6, 6, 5, 7, 8, 8, 6, 7, 7, 5, 3, 5, 8, 6]
+
+    def test_everything_the_cube_SAYS_fits_its_screen(self):
+        """Every sentence the cube writes on its own status line, and
+        every girl's hint, fits the 320px screen in at most the TWO lines
+        draw_status wraps to -- split, as it splits, at the space that
+        balances them. A hint clipped at both edges names nobody."""
+        width = lambda s: sum(self.FONT2[ord(c) - 32] for c in s)
+        margin = re.search(r"STATUS_ROOM\s*=\s*W\s*-\s*(\d+)", self.code())
+        self.assertTrue(margin, "the status line has no room set")
+        room = 320 - int(margin.group(1))
+        # ABSOLUTE, not read back off the constant: a room wider than
+        # the screen less a margin is text drawn off both edges.
+        self.assertLessEqual(room, 312, "the status line is wider than "
+                                        "the screen")
+        said = re.findall(r'say_status\("((?:[^"\\]|\\.)*)"', self.code())
+        said += [h for _w, _n, h in self.girls()]
+        self.assertGreater(len(said), 10, "the status lines did not parse")
+        for s in said:
+            if width(s) <= room:
+                continue
+            spaces = [i for i, c in enumerate(s) if c == " "]
+            self.assertTrue(spaces, "%r cannot wrap" % s)
+            worst = min(max(width(s[:i]), width(s[i + 1:])) for i in spaces)
+            self.assertLessEqual(worst, room,
+                                 "%r does not fit two lines of the cube" % s)
+
+    def test_zeros_face_on_the_cube_is_her_PAGES(self):
+        """Her pink and her working cue, two copies that must agree: the
+        page brightens her picture to 1.3 while she works, and so does
+        the cube."""
+        page = (self.ROOT / "ui" / "zero.html").read_text()
+        her = re.search(r"--her:\s*#([0-9a-fA-F]{6})", page).group(1)
+        cube_pink = re.search(r"ZERO_PINK\s*=\s*0x([0-9a-f]{6})", self.code())
+        self.assertTrue(cube_pink, "the cube has no pink for her")
+        self.assertEqual(int(cube_pink.group(1), 16), int(her, 16))
+        working = re.search(r"@keyframes working\s*\{(.*?)\n\}", page, re.S)
+        peak = max(float(b) for b in
+                   re.findall(r"brightness\(([\d.]+)\)", working.group(1)))
+        cube = re.search(r"ZERO_WORKING\s*=\s*([\d.]+)f", self.code())
+        self.assertTrue(cube, "the cube has no working cue for her")
+        self.assertAlmostEqual(float(cube.group(1)), peak,
+                               msg="she works at a different brightness")
+
     def test_the_sketch_file_holds_no_CODE(self):
         """Every function lives in the .cpp. The Arduino build runs ctags
         over a .ino to invent prototypes, and a stand-in ctags mangled
@@ -4066,6 +4166,9 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertEqual(make_art.render_yuzu(),
                          (cube / "yuzu_art.h").read_text(),
                          "yuzu_art.h is stale -- run stackchan/make_art.py")
+        self.assertEqual(make_art.render_zero(),
+                         (cube / "zero_art.h").read_text(),
+                         "zero_art.h is stale -- run stackchan/make_art.py")
 
     def test_yuzu_keeps_her_PAGES_fades_on_the_cube(self):
         """Her bust is cropped at the bottom and both sleeves, and her

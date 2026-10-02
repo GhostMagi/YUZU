@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 920 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 931 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,53 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## ZERO IS IN THE CUBE TOO -- THREE GIRLS, AND KURO AND SHIRO STAY OFF (Oct 2)
+
+*"Nice. Can the qwen variant, Zero, go on there plz? (Kuro and shiro
+arent needed)"*, right after Yuzu landed. **Three girls on the cube:
+Four, Yuzu, Zero. A swipe LEFT brings the next, RIGHT the one before**
+(three girls should not take two swipes to go back one). **Kuro and
+Shiro are NOT on the cube, his call** -- they stay on their pages.
+
+- **`zero_cube`**, `same_girl_as: zero`, every setting equal **including
+  her OWN QWEN**, `think: no`, `maths: exact` and her ChatML `stop`; a
+  test holds her to the Qwen and away from Four's Llama ("zero stays a
+  qwen"). She uses `{CUBE_SELF}` (bodiless, like Four). Only her
+  introduction is rewritten (it said "this deck"), plus "What do you
+  see?". 5281 chars. **Swiping to or from her is a MODEL SWAP on the
+  board** (one model in memory at a time): her first reply after a
+  swipe is the slow one (~40s cold, measured Sept 24), and the cube's
+  180s wait and her thinking cue cover it. Said to him.
+- **`CUBE_COMPANY` names both other girls** on all three, and
+  `[CUBE_FACTS]` says "You share it with {CUBE_COMPANY}; a swipe across
+  the screen changes which of you is on it" (a semicolon, so three
+  names read). Four's and Yuzu's prompts moved by those words and their
+  introductions name Zero. None is `LIVE_PERSONA`; nothing to paste.
+- **Her face: her page's picture CLOSE UP, the whole 320x240**, cut from
+  the top of `zero.jpg` at 4:3 (`make_art.render_zero`, `ZERO_TOP`).
+  Shown whole she was a 158px strip in the middle of black -- both
+  rendered at the cube's size and looked at. Her page shows her full
+  height only because its log takes the rest of the screen. **Her
+  thinking cue is her page's own** (brightness up to 1.3 over 1.6s),
+  which at full screen reads at a glance; a test holds the 1.3 and her
+  pink to `ui/zero.html`. A tap flashes it.
+- **The status line wraps to TWO lines** at the most balanced space
+  (`STATUS_ROOM`), because the hints name two girls and Four's would
+  have been clipped at both edges. A test measures EVERY `say_status`
+  literal and every hint against M5GFX's real Font2 width table.
+- **The flash script says "Four, Yuzu and Zero".** Compiled, no
+  warnings, 1.63 MB of 3 MB. Never run on a cube.
+
+**Twenty breaks for this round, eighteen red as failures first time,
+and the two that stayed green were my tests, not the code.** A swipe
+stepping by 2 visits all three girls (just backwards), so the walk now
+also pins that LEFT brings the NEXT one. And the fits-the-screen test
+read its room back off `STATUS_ROOM` -- the threshold-from-the-constant
+trap this file already names -- so it now holds that room to 312 of
+the 320px, absolutely; a room set to the whole screen goes red. A
+NARROWER room stays green on purpose: every line still fits, it only
+wraps sooner. **920 -> 931.**
 
 ## YUZU IS IN THE CUBE TOO, A SWIPE AWAY FROM FOUR (Oct 2)
 

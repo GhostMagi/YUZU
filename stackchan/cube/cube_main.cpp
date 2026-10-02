@@ -1,11 +1,12 @@
-// FOUR AND YUZU IN THE STACKCHAN CUBE -- the cube's whole program.
+// FOUR, YUZU AND ZERO IN THE STACKCHAN CUBE -- the cube's whole program.
 // =====================================================================
-// TWO GIRLS, ONE CUBE, A SWIPE BETWEEN THEM. Four came first (below);
-// then, the same day: "Can you squeeze Yuzu on too?" So a swipe across
-// the screen swaps who is on it, and the cube remembers which one it
-// was through a power cut. Everything below the swipe is shared: hold
-// to talk, her voice out of the speaker, hold to stop her. What differs
-// is the face:
+// THREE GIRLS, ONE CUBE, A SWIPE BETWEEN THEM. Four came first (below);
+// then, the same day: "Can you squeeze Yuzu on too?", and "Can the qwen
+// variant, Zero, go on there plz? (Kuro and shiro arent needed)". A
+// swipe LEFT brings the next girl and a swipe RIGHT the one before, and
+// the cube remembers who was on it through a power cut. Everything
+// below the swipe is shared: hold to talk, her voice out of the
+// speaker, hold to stop her. What differs is the face:
 //
 //   FOUR  her code rain, tap for her five colours, the rain turns neon
 //         red while she thinks
@@ -14,6 +15,11 @@
 //         screen her page's glow alone was too faint to read as a signal
 //         (an emulator render is what said so) and sparkles are hers
 //         (rule 6). A tap makes the glow flash, so a tap is never dead.
+//   ZERO  her page's picture CLOSE UP, the whole screen, brightening
+//         while she works -- her page's own cue, which at full screen
+//         reads at a glance. A tap flashes it. She thinks on her own Qwen,
+//         so the first reply after swiping to or from her is a model
+//         swap on the board: slower, and the thinking cue covers it.
 //
 // Each girl asks the board under her OWN name (yuzu_face.DEVICES), so
 // each has her own brain, memory and voice speed on the board.
@@ -79,6 +85,7 @@
 
 #include "four_art.h"
 #include "yuzu_art.h"
+#include "zero_art.h"
 // Written by `~/YUZU/cube` at flash time from the board's OWN WiFi
 // connection and name, and never committed: his WiFi password does not
 // belong in a repository.
@@ -90,11 +97,12 @@
 // says when she comes on.
 struct Girl { const char* who; const char* name; const char* hint; };
 static const Girl GIRLS[] = {
-  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu."},
-  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four."},
+  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu or Zero."},
+  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four or Zero."},
+  {"zero-cube", "Zero", "Hold the screen to talk. Swipe for Four or Yuzu."},
 };
 static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
-static const int FOUR = 0, YUZU = 1;
+static const int FOUR = 0, YUZU = 1, ZERO = 2;
 // A swipe is a quarter of the screen sideways. Fingers drift while he
 // holds the screen and talks; they do not drift 80 pixels sideways.
 static const int SWIPE_PX = 80;
@@ -161,6 +169,12 @@ struct Stop { float at; uint32_t rgb; };
 static const Stop ROOM[] = {{0.00f, 0x5b4a82}, {0.46f, 0x33294a}, {1.00f, 0x1c1629}};
 static const uint32_t YUZU_PINK = 0xff5fa8;
 static const uint32_t SPARK = 0xffd0e8;
+
+// ---- Zero ------------------------------------------------------------------
+// Her page's: black, her picture, and `brightness(1) -> (1.3)` over 1.6s
+// while she works. Her lines on her page are hot pink, so is her status.
+static const uint32_t ZERO_PINK = 0xff2d95;
+static const float ZERO_WORKING = 1.30f;
 // The glow is stronger and wider than her page's (peak .26, opacity up
 // to .8): rendered at the cube's real size, her page's numbers made a
 // thinking Yuzu look like an idle one.
@@ -191,7 +205,7 @@ static int asking = FOUR;                // who the running turn is for
 static Preferences prefs;
 static uint8_t* room_rgb = nullptr;      // Yuzu's room, 8 bits a channel
 static uint8_t* glow_a = nullptr;        // her glow at full strength, 0..255
-static uint32_t flash_until = 0;         // a tap on Yuzu
+static uint32_t flash_until = 0;         // a tap on Yuzu or Zero
 struct Sparkle { int16_t x, y; uint32_t born; };
 static const int SPARKS = 10;
 static const uint32_t SPARK_LIFE = 700;
@@ -215,6 +229,8 @@ static volatile bool lost_board = false;
 // ---- one line of status, verdict first --------------------------------
 static portMUX_TYPE status_mux = portMUX_INITIALIZER_UNLOCKED;
 static char status_text[96] = "";
+// What one line of Font2 may take: the screen less a margin either side.
+static const int STATUS_ROOM = W - 12;
 static uint32_t status_until = 0;
 
 static void say_status(const char* text, uint32_t ms = 6000) {
@@ -421,29 +437,76 @@ static void compose_yuzu() {
   }
 }
 
+// Her picture IS the screen, so it must be exactly the screen's size.
+static_assert(ZERO_ART_W == 320 && ZERO_ART_H == 240, "zero_art.h is not 320x240");
+
+static void compose_zero() {
+  uint32_t now = millis();
+  float b = 1.0f;
+  if (thinking)
+    b += (ZERO_WORKING - 1.0f) * (0.5f - 0.5f * cosf(now * (2 * PI / 1600.0f)));
+  if (flash_until > now)
+    b = max(b, 1.0f + (ZERO_WORKING - 1.0f) * (flash_until - now) / 500.0f);
+  const int b256 = (int)(b * 256);
+  uint16_t* dst = (uint16_t*)frame.getBuffer();
+  for (int i = 0; i < ZERO_ART_W * ZERO_ART_H; i++) {
+    int r, g, bl;
+    unpack565(ZERO_ART[i], r, g, bl);
+    if (b256 != 256) {
+      r = min(255, r * b256 >> 8);
+      g = min(255, g * b256 >> 8);
+      bl = min(255, bl * b256 >> 8);
+    }
+    dst[i] = swap16(pack565(r, g, bl));
+  }
+}
+
 // The status line, only while there is something to say, in her colour.
+// ONE line when it fits and TWO when it does not, split at the space
+// that balances them: a sentence from the board clipped at both edges
+// is a sentence he cannot read, and the hints name two other girls.
 static void draw_status() {
   char text[sizeof(status_text)];
   portENTER_CRITICAL(&status_mux);
   bool show = status_text[0] && millis() < status_until;
   strcpy(text, status_text);
   portEXIT_CRITICAL(&status_mux);
-  if (show) {
-    uint32_t ink = girl == YUZU ? YUZU_PINK
-                 : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
-    frame.fillRect(0, H - 22, W, 22, girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0);
-    frame.setTextColor(hex565(ink));
-    frame.setFont(&fonts::Font2);
-    frame.setTextSize(1);
-    frame.setTextDatum(middle_center);
+  if (!show) return;
+  uint32_t ink = girl == YUZU ? YUZU_PINK
+               : girl == ZERO ? ZERO_PINK
+               : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+  frame.setFont(&fonts::Font2);
+  frame.setTextSize(1);
+  frame.setTextDatum(middle_center);
+  int split = -1;
+  if (frame.textWidth(text) > STATUS_ROOM) {
+    int best = 1 << 30;
+    for (int i = 0; text[i]; i++) {
+      if (text[i] != ' ') continue;
+      text[i] = 0;
+      int worst = max(frame.textWidth(text), frame.textWidth(text + i + 1));
+      text[i] = ' ';
+      if (worst < best) { best = worst; split = i; }
+    }
+  }
+  const int bar = split < 0 ? 22 : 40;
+  frame.fillRect(0, H - bar, W, bar,
+                 girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0);
+  frame.setTextColor(hex565(ink));
+  if (split < 0) {
     frame.drawString(text, W / 2, H - 11);
+  } else {
+    text[split] = 0;
+    frame.drawString(text, W / 2, H - 29);
+    frame.drawString(text + split + 1, W / 2, H - 11);
   }
 }
 
 // One frame of whoever is on the cube.
 static void draw_frame() {
   if (girl == FOUR) { rain_step(); compose_four(); }
-  else compose_yuzu();
+  else if (girl == YUZU) compose_yuzu();
+  else compose_zero();
   draw_status();
   frame.pushSprite(0, 0);
 }
@@ -812,8 +875,10 @@ void setup() {
 }
 
 // ---- the three things a finger does --------------------------------------------
-static void swap_girl() {
-  girl = (girl + 1) % GIRL_COUNT;
+// LEFT brings the next girl, RIGHT the one before -- the way a phone
+// pages, so three girls never take two swipes to go back one.
+static void swap_girl(int dx) {
+  girl = (girl + (dx < 0 ? 1 : GIRL_COUNT - 1)) % GIRL_COUNT;
   prefs.putUChar("girl", girl);
   say_status(GIRLS[girl].hint, 4000);
 }
@@ -841,7 +906,7 @@ void loop() {
       stop_recording();
       if (is_swipe(t)) {
         // A swipe is never a talk: the girl changes and the clip goes.
-        swap_girl();
+        swap_girl(t.distanceX());
       } else if (t.wasClicked() || rec_len < REC_MIN) {
         // A tap, not a talk: her tap does its thing and the clip goes.
         if (t.wasClicked()) tapped();

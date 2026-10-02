@@ -557,14 +557,17 @@ CHARACTERS = {
 # a path, and an unknown name is refused rather than answered by
 # whoever is front.
 #
-# TWO GIRLS SHARE THE CUBE (Oct 2, "Can you squeeze Yuzu on too?"), and
-# a swipe on it swaps them. Each asks under her own name, so each has
-# her own brain, her own memory and her own voice speed -- the cube
-# never hands Yuzu's conversation to Four.
+# THREE GIRLS SHARE THE CUBE (Oct 2: "Can you squeeze Yuzu on too?",
+# then "Can the qwen variant, Zero, go on there plz?"), and a swipe on
+# it moves between them. Each asks under her own name, so each has her
+# own brain, her own memory and her own voice speed -- the cube never
+# hands Yuzu's conversation to Four. Zero brings her own Qwen, so the
+# first reply after swiping to or from her is a model swap on the board.
 DEVICES = {
     # name           persona key
     "four-cube":     "four_cube",
     "yuzu-cube":     "yuzu_cube",
+    "zero-cube":     "zero_cube",
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A
