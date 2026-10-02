@@ -21,4 +21,4 @@ ui/art_out/
 # The cube's WiFi, written by ~/YUZU/cube for one flash. It builds in a
 # temporary folder and never writes this here -- this line is the belt
 # to that braces, in case anyone builds the sketch in place by hand.
-stackchan/four_cube/cube_secrets.h
+stackchan/cube/cube_secrets.h

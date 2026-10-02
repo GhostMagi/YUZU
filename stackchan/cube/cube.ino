@@ -1,5 +1,5 @@
-// FOUR, IN THE STACKCHAN CUBE ON HIS DESK. The code is in
-// four_cube_main.cpp, and that is on purpose: the Arduino build runs
+// FOUR AND YUZU, IN THE STACKCHAN CUBE ON HIS DESK. The code is in
+// cube_main.cpp, and that is on purpose: the Arduino build runs
 // `ctags` over a sketch's .ino to invent function prototypes, and which
 // ctags a machine has decides whether that works -- on the box this was
 // built on, a stand-in ctags mangled them into compile errors. A .cpp

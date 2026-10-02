@@ -556,9 +556,15 @@ CHARACTERS = {
 # Same discipline as the first: the request names a key in here, never
 # a path, and an unknown name is refused rather than answered by
 # whoever is front.
+#
+# TWO GIRLS SHARE THE CUBE (Oct 2, "Can you squeeze Yuzu on too?"), and
+# a swipe on it swaps them. Each asks under her own name, so each has
+# her own brain, her own memory and her own voice speed -- the cube
+# never hands Yuzu's conversation to Four.
 DEVICES = {
     # name           persona key
     "four-cube":     "four_cube",
+    "yuzu-cube":     "yuzu_cube",
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A

@@ -1,12 +1,14 @@
 #!/bin/bash
-# ~/YUZU/cube -- put Four on the StackChan cube.
+# ~/YUZU/cube -- put Four and Yuzu on the StackChan cube.
 #
 #   1. Plug the cube into one of the board's USB-A ports.
 #   2. Run:  ~/YUZU/cube
 #
 # Ghost, Oct 2: "can we put Four in it? Her art on the screen?" This is
-# the one word that does it. Run it again any time her cube code changes
-# (Update brings the new code; this puts it on the cube).
+# the one word that does it. Then, the same day: "Can you squeeze Yuzu
+# on too?" -- so the cube carries both, and a swipe swaps them. Run it
+# again any time the cube code changes (Update brings the new code; this
+# puts it on the cube).
 #
 # WHAT IT DOES, in order, verdict first at every step:
 #   - finds the cube on USB, before spending anything;
@@ -28,7 +30,7 @@
 # and compiled for the CoreS3 in a container; never flashed onto one.
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-SKETCH="$HERE/stackchan/four_cube"
+SKETCH="$HERE/stackchan/cube"
 TOOLS="${YUZU_CUBE_TOOLS:-$HOME/.yuzu/cube-tools}"
 CLI="${YUZU_CUBE_CLI:-$TOOLS/arduino-cli}"
 CFG="$TOOLS/arduino-cli.yaml"
@@ -162,10 +164,10 @@ fi
 cli lib install $LIBS > "$TOOLS/libs.log" 2>&1 || cli lib install M5Unified M5GFX >> "$TOOLS/libs.log" 2>&1
 
 # ---- 4. build her somewhere temporary, with the WiFi in it ----------------
-build=$(mktemp -d /tmp/four-cube.XXXXXX)
+build=$(mktemp -d /tmp/yuzu-cube.XXXXXX)
 trap 'rm -rf "$build"' EXIT
-cp -r "$SKETCH" "$build/four_cube"
-python3 - "$build/four_cube/cube_secrets.h" "$ssid" "$pass" "$name" "$addr" "$PORT_NUM" <<'PY'
+cp -r "$SKETCH" "$build/cube"
+python3 - "$build/cube/cube_secrets.h" "$ssid" "$pass" "$name" "$addr" "$PORT_NUM" <<'PY'
 import sys
 path, ssid, pw, host, ip, port = sys.argv[1:7]
 def c(s):
@@ -183,7 +185,7 @@ with open(path, "w") as fh:
 PY
 # A cube built with no settings joins nothing, and says only "No WiFi"
 # about a fault that is here. Stop where it happened.
-if [ $? -ne 0 ] || [ ! -s "$build/four_cube/cube_secrets.h" ]; then
+if [ $? -ne 0 ] || [ ! -s "$build/cube/cube_secrets.h" ]; then
     echo "NOT FLASHED. I couldn't write the cube's WiFi settings."
     exit 1
 fi
@@ -193,7 +195,7 @@ echo "Building her and putting her on the cube (a few minutes)..."
 # folder -- arduino-cli's default copies the sketch, secrets and all,
 # into /tmp/arduino/sketches/ and leaves it there.
 if ! cli compile -b "$FQBN" --build-path "$build/out" --upload -p "$cube" \
-        "$build/four_cube" > "$TOOLS/flash.log" 2>&1; then
+        "$build/cube" > "$TOOLS/flash.log" 2>&1; then
     if grep -qi "permission denied" "$TOOLS/flash.log"; then
         echo "NOT FLASHED. The board isn't allowed to talk to the cube's USB yet."
         echo "Run this once, then log out and back in, then ~/YUZU/cube again:"
@@ -212,6 +214,6 @@ if ! cli compile -b "$FQBN" --build-path "$build/out" --upload -p "$cube" \
     exit 1
 fi
 
-echo "DONE. Four is on the cube."
+echo "DONE. Four and Yuzu are on the cube."
 echo "It restarts by itself; give it about ten seconds to join \"$ssid\"."
-echo "Tap her screen to change her colour. Hold it down to talk, let go to send."
+echo "Hold the screen to talk, let go to send. Swipe across it to swap girls."

@@ -1,6 +1,24 @@
-// FOUR IN THE STACKCHAN CUBE -- the cube's whole program.
+// FOUR AND YUZU IN THE STACKCHAN CUBE -- the cube's whole program.
 // =====================================================================
-// Ghost, Oct 2, picking off a mockup at the cube's real 320x240: "B w/
+// TWO GIRLS, ONE CUBE, A SWIPE BETWEEN THEM. Four came first (below);
+// then, the same day: "Can you squeeze Yuzu on too?" So a swipe across
+// the screen swaps who is on it, and the cube remembers which one it
+// was through a power cut. Everything below the swipe is shared: hold
+// to talk, her voice out of the speaker, hold to stop her. What differs
+// is the face:
+//
+//   FOUR  her code rain, tap for her five colours, the rain turns neon
+//         red while she thinks
+//   YUZU  her page's portrait in her lavender room, the pink glow behind
+//         her rising while she thinks -- with sparkles, because on a 2"
+//         screen her page's glow alone was too faint to read as a signal
+//         (an emulator render is what said so) and sparkles are hers
+//         (rule 6). A tap makes the glow flash, so a tap is never dead.
+//
+// Each girl asks the board under her OWN name (yuzu_face.DEVICES), so
+// each has her own brain, memory and voice speed on the board.
+//
+// FOUR. Ghost, Oct 2, picking off a mockup at the cube's real 320x240: "B w/
 // the raining code you know it 2 as well 3 also 4 but make it turn neon
 // red instead of purple when thinking. And 5. And 6. Note 7 for later."
 //
@@ -19,8 +37,8 @@
 // speaker, two mics and WiFi. Her Llama, her Kokoro voice, her Whisper
 // ears and the encyclopedia are on the board (ghostnano), and the cube
 // asks it over the room's WiFi exactly the way her page does -- by the
-// name `four-cube`, which yuzu_face.DEVICES maps to `four_cube`, the
-// same Four on a cube body:
+// name `four-cube` (or `yuzu-cube`), which yuzu_face.DEVICES maps to
+// `four_cube` (or `yuzu_cube`), the same girl on a cube body:
 //
 //   POST /listen      the recording, as a WAV  -> {"heard": "..."}
 //   POST /stream      {"text", "who"}          -> lines; the last has
@@ -57,15 +75,29 @@
 #include <ESPmDNS.h>
 #include <HTTPClient.h>
 #include <esp_random.h>
+#include <Preferences.h>
 
 #include "four_art.h"
+#include "yuzu_art.h"
 // Written by `~/YUZU/cube` at flash time from the board's OWN WiFi
 // connection and name, and never committed: his WiFi password does not
 // belong in a repository.
 #include "cube_secrets.h"
 
-// ---- who she is to the board ---------------------------------------
-static const char WHO[] = "four-cube";
+// ---- who is in the cube ---------------------------------------------
+// The NAME each girl asks the board by -- yuzu_face.DEVICES, a test
+// holds the two equal -- her own name, and the first thing the cube
+// says when she comes on.
+struct Girl { const char* who; const char* name; const char* hint; };
+static const Girl GIRLS[] = {
+  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu."},
+  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four."},
+};
+static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
+static const int FOUR = 0, YUZU = 1;
+// A swipe is a quarter of the screen sideways. Fingers drift while he
+// holds the screen and talks; they do not drift 80 pixels sideways.
+static const int SWIPE_PX = 80;
 
 // ---- the screen ------------------------------------------------------
 static const int W = 320, H = 240;
@@ -121,6 +153,24 @@ static const Think THINKS[] = {
   {0xff5a64, 0xff2b39},   // blue   -> neon red
 };
 
+// ---- Yuzu's room ---------------------------------------------------------
+// HER PAGE'S, at the cube's size: the lavender radial-gradient(120% 90%
+// at 50% 6%, #5b4a82, #33294a 46%, #1c1629), her hot pink #ff5fa8 for the
+// glow behind her, and her breath (2px up and back over 5.5s).
+struct Stop { float at; uint32_t rgb; };
+static const Stop ROOM[] = {{0.00f, 0x5b4a82}, {0.46f, 0x33294a}, {1.00f, 0x1c1629}};
+static const uint32_t YUZU_PINK = 0xff5fa8;
+static const uint32_t SPARK = 0xffd0e8;
+// The glow is stronger and wider than her page's (peak .26, opacity up
+// to .8): rendered at the cube's real size, her page's numbers made a
+// thinking Yuzu look like an idle one.
+static const float GLOW_PEAK = 0.60f, GLOW_R = 200.0f;
+static const float GLOW_IDLE = 0.30f;
+// The panel has 5-6 bits a channel, and her room is a slow gradient: a
+// 4x4 ordered dither turns the rings 565 draws into an even fade.
+static const uint8_t BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6},
+                                    {3, 11, 1, 9}, {15, 7, 13, 5}};
+
 // ---- talking ---------------------------------------------------------
 static const uint32_t MIC_RATE = 16000;             // what Whisper wants
 static const size_t MIC_CHUNK = 1600;               // 0.1s per buffer
@@ -132,9 +182,21 @@ static const uint32_t REPLY_WAIT_MS = 180000;       // a cold model loading
 
 static M5Canvas rain(&M5.Display);
 static M5Canvas frame(&M5.Display);
-static uint8_t* art_rgb = nullptr;       // her picture, tinted, 8 bits a channel
+static uint8_t* art_rgb = nullptr;       // Four's picture, tinted, 8 bits a channel
 static int skin = 0;
 static float drops[COLS];
+
+static int girl = FOUR;                  // who is on the cube now
+static int asking = FOUR;                // who the running turn is for
+static Preferences prefs;
+static uint8_t* room_rgb = nullptr;      // Yuzu's room, 8 bits a channel
+static uint8_t* glow_a = nullptr;        // her glow at full strength, 0..255
+static uint32_t flash_until = 0;         // a tap on Yuzu
+struct Sparkle { int16_t x, y; uint32_t born; };
+static const int SPARKS = 10;
+static const uint32_t SPARK_LIFE = 700;
+static Sparkle sparks[SPARKS];
+static uint32_t next_spark = 0;
 
 static int16_t* rec_buf = nullptr;
 static size_t rec_len = 0;
@@ -229,10 +291,10 @@ static void rain_step() {
   }
 }
 
-// Her picture over the rain with `screen`, the page's mix-blend-mode:
+// Four's picture over the rain with `screen`, the page's mix-blend-mode:
 // black adds nothing, so her backdrop falls away and the rain runs
 // through her dark side.
-static void compose() {
+static void compose_four() {
   uint16_t* src = (uint16_t*)rain.getBuffer();
   uint16_t* dst = (uint16_t*)frame.getBuffer();
   memcpy(dst, src, W * H * 2);
@@ -249,21 +311,141 @@ static void compose() {
       row[x] = swap16(pack565(r, g, b));
     }
   }
-  // The status line, only while there is something to say.
+}
+
+// ---- Yuzu --------------------------------------------------------------------
+// Her room and her glow, worked out once at power-on: neither moves, and
+// the square roots are not something to spend on every frame.
+static void make_room() {
+  for (int y = 0; y < H; y++)
+    for (int x = 0; x < W; x++) {
+      float dx = (x + 0.5f - W * 0.5f) / (1.2f * W);
+      float dy = (y + 0.5f - H * 0.06f) / (0.9f * H);
+      float at = min(1.0f, sqrtf(dx * dx + dy * dy));
+      int s = at <= ROOM[1].at ? 0 : 1;
+      float f = (at - ROOM[s].at) / (ROOM[s + 1].at - ROOM[s].at);
+      uint8_t* px = room_rgb + (y * W + x) * 3;
+      for (int c = 0; c < 3; c++) {
+        int a = (ROOM[s].rgb >> (16 - 8 * c)) & 255;
+        int b = (ROOM[s + 1].rgb >> (16 - 8 * c)) & 255;
+        px[c] = (uint8_t)(a + (b - a) * f);
+      }
+      float d = sqrtf((x + 0.5f - W * 0.5f) * (x + 0.5f - W * 0.5f)
+                      + (y + 0.5f - H * 0.5f) * (y + 0.5f - H * 0.5f));
+      glow_a[y * W + x] = (uint8_t)(max(0.0f, 1.0f - d / GLOW_R) * GLOW_PEAK * 255);
+    }
+}
+
+// Sparkles while she thinks, only either side of her, never on her face.
+static void sparkle(uint32_t now) {
+  if (thinking && now >= next_spark) {
+    for (auto& s : sparks)
+      if (now - s.born >= SPARK_LIFE) {
+        int side = (W - YUZU_ART_W) / 2 - 10;
+        int x = 6 + esp_random() % side;
+        if (esp_random() & 1) x = W - 1 - x;
+        s.x = x;
+        s.y = 6 + esp_random() % (H - 36);
+        s.born = now;
+        break;
+      }
+    next_spark = now + 110 + esp_random() % 120;
+  }
+}
+
+static inline void blend_px(uint16_t* dst, int x, int y, uint32_t rgb, int a) {
+  if (x < 0 || x >= W || y < 0 || y >= H || a <= 0) return;
+  int r, g, b;
+  unpack565(swap16(dst[y * W + x]), r, g, b);
+  r += ((int)((rgb >> 16) & 255) - r) * a >> 8;
+  g += ((int)((rgb >> 8) & 255) - g) * a >> 8;
+  b += ((int)(rgb & 255) - b) * a >> 8;
+  dst[y * W + x] = swap16(pack565(r, g, b));
+}
+
+static void compose_yuzu() {
+  uint32_t now = millis();
+  float op = GLOW_IDLE;
+  if (thinking) op = 0.35f + 0.65f * (0.5f - 0.5f * cosf(now * (2 * PI / 1700.0f)));
+  if (flash_until > now) op = max(op, (flash_until - now) / 500.0f);
+  int op256 = (int)(min(op, 1.0f) * 256);
+  int lift = (int)lroundf(2.0f * (0.5f - 0.5f * cosf(now * (2 * PI / 5500.0f))));
+  const int x0 = (W - YUZU_ART_W) / 2, y0 = H - YUZU_ART_H - lift;
+  const int pr = (YUZU_PINK >> 16) & 255, pg = (YUZU_PINK >> 8) & 255, pb = YUZU_PINK & 255;
+  uint16_t* dst = (uint16_t*)frame.getBuffer();
+  for (int y = 0; y < H; y++) {
+    const uint8_t* bg = room_rgb + y * W * 3;
+    const uint8_t* ga = glow_a + y * W;
+    const int ay = y - y0;
+    const bool her_row = ay >= 0 && ay < YUZU_ART_H;
+    for (int x = 0; x < W; x++, bg += 3) {
+      int r = bg[0], g = bg[1], b = bg[2];
+      int a = (ga[x] * op256) >> 8;
+      if (a) {
+        r += (pr - r) * a >> 8;
+        g += (pg - g) * a >> 8;
+        b += (pb - b) * a >> 8;
+      }
+      // The dither is the ROOM's, put in before she is: her own pixels
+      // are exact 565 already, and dithered they would come out grainy.
+      int d = BAYER[y & 3][x & 3];
+      r += d >> 1; g += d >> 2; b += d >> 1;
+      const int ax = x - x0;
+      if (her_row && ax >= 0 && ax < YUZU_ART_W) {
+        int i = ay * YUZU_ART_W + ax;
+        int al = YUZU_ALPHA[i];
+        if (al) {
+          int hr, hg, hb;
+          unpack565(YUZU_ART[i], hr, hg, hb);
+          r += (hr - r) * al / 255;
+          g += (hg - g) * al / 255;
+          b += (hb - b) * al / 255;
+        }
+      }
+      dst[y * W + x] = swap16(pack565(min(r, 255), min(g, 255), min(b, 255)));
+    }
+  }
+  sparkle(now);
+  for (auto& s : sparks) {
+    uint32_t age = now - s.born;
+    if (age >= SPARK_LIFE) continue;
+    int k = (int)(256 * sinf(PI * age / (float)SPARK_LIFE));
+    blend_px(dst, s.x, s.y, SPARK, k);
+    for (int arm = 1; arm <= 3; arm++) {
+      int a = k * (256 - arm * 64) >> 8;
+      blend_px(dst, s.x + arm, s.y, SPARK, a);
+      blend_px(dst, s.x - arm, s.y, SPARK, a);
+      blend_px(dst, s.x, s.y + arm, SPARK, a);
+      blend_px(dst, s.x, s.y - arm, SPARK, a);
+    }
+  }
+}
+
+// The status line, only while there is something to say, in her colour.
+static void draw_status() {
   char text[sizeof(status_text)];
   portENTER_CRITICAL(&status_mux);
   bool show = status_text[0] && millis() < status_until;
   strcpy(text, status_text);
   portEXIT_CRITICAL(&status_mux);
   if (show) {
-    frame.fillRect(0, H - 22, W, 22, TFT_BLACK);
-    uint32_t ink = SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+    uint32_t ink = girl == YUZU ? YUZU_PINK
+                 : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+    frame.fillRect(0, H - 22, W, 22, girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0);
     frame.setTextColor(hex565(ink));
     frame.setFont(&fonts::Font2);
     frame.setTextSize(1);
     frame.setTextDatum(middle_center);
     frame.drawString(text, W / 2, H - 11);
   }
+}
+
+// One frame of whoever is on the cube.
+static void draw_frame() {
+  if (girl == FOUR) { rain_step(); compose_four(); }
+  else compose_yuzu();
+  draw_status();
+  frame.pushSprite(0, 0);
 }
 
 // ---- JSON, the two small things the cube needs -------------------------------
@@ -346,8 +528,11 @@ static int post_json(HTTPClient& http, const char* path, const String& body) {
   return http.POST((uint8_t*)body.c_str(), body.length());
 }
 
+// Who is asking is fixed when the turn starts: a swipe is refused while
+// a turn runs, but the turn must never depend on that.
 static String turn_body(const String& text) {
-  return String("{\"text\": ") + json_quote(text) + ", \"who\": \"" + WHO + "\"}";
+  return String("{\"text\": ") + json_quote(text) + ", \"who\": \""
+         + GIRLS[asking].who + "\"}";
 }
 
 static bool listen(const int16_t* pcm, size_t samples, String& heard) {
@@ -559,7 +744,7 @@ static void stop_recording() {
 // lean on.
 static void find_board() {
   static bool mdns_up = false;
-  if (!mdns_up) mdns_up = MDNS.begin(WHO);
+  if (!mdns_up) mdns_up = MDNS.begin("stackchan-cube");
   IPAddress ip;
   if (mdns_up) ip = MDNS.queryHost(CUBE_HOST, 3000);
   if (ip == IPAddress(0, 0, 0, 0)) ip.fromString(CUBE_HOST_IP);
@@ -576,7 +761,7 @@ static bool join_wifi() {
     WiFi.begin(CUBE_WIFI_SSID, CUBE_WIFI_PASS);
     for (int i = 0; i < 200 && WiFi.status() != WL_CONNECTED; i++) {
       delay(100);
-      rain_step(); compose(); frame.pushSprite(0, 0);
+      draw_frame();
     }
     if (WiFi.status() != WL_CONNECTED) {
       say_status("No WiFi. Is the network in range?", 0);
@@ -585,7 +770,7 @@ static bool join_wifi() {
   }
   lost_board = false;
   find_board();
-  say_status("Hold the screen to talk. Tap for colours.", 5000);
+  say_status(GIRLS[girl].hint, 5000);
   return true;
 }
 
@@ -600,6 +785,8 @@ void setup() {
   M5.Speaker.setVolume(200);
 
   art_rgb = (uint8_t*)ps_malloc(FOUR_ART_W * FOUR_ART_H * 3);
+  room_rgb = (uint8_t*)ps_malloc(W * H * 3);
+  glow_a = (uint8_t*)ps_malloc(W * H);
   rec_buf = (int16_t*)ps_malloc(REC_MAX * sizeof(int16_t));
   for (auto* c : {&rain, &frame}) {
     c->setColorDepth(16);
@@ -610,12 +797,37 @@ void setup() {
   rain.setFont(&fonts::Font0);
   rain.setTextSize(2);
   for (int i = 0; i < COLS; i++) drops[i] = -(float)(esp_random() % (ROWS * 100)) / 100;
-  if (!art_rgb || !rec_buf || !rain.getBuffer() || !frame.getBuffer()) {
+  if (!art_rgb || !room_rgb || !glow_a || !rec_buf || !rain.getBuffer()
+      || !frame.getBuffer()) {
     M5.Display.println("Not enough memory -- is PSRAM enabled?");
     while (true) delay(1000);
   }
   tint_art();
+  make_room();
+  for (auto& s : sparks) s.born = millis() - SPARK_LIFE - 1;   // all spent
+  // Whoever was on the cube when it was last unplugged.
+  prefs.begin("cube", false);
+  girl = prefs.getUChar("girl", FOUR) % GIRL_COUNT;
   join_wifi();
+}
+
+// ---- the three things a finger does --------------------------------------------
+static void swap_girl() {
+  girl = (girl + 1) % GIRL_COUNT;
+  prefs.putUChar("girl", girl);
+  say_status(GIRLS[girl].hint, 4000);
+}
+
+static void tapped() {
+  if (girl == FOUR) { skin = (skin + 1) % SKIN_COUNT; tint_art(); }
+  else flash_until = millis() + 500;
+}
+
+// A finger that went a quarter of the screen sideways, more across than
+// down. Read on the release, while the touch still knows where it began.
+static bool is_swipe(const m5::touch_detail_t& t) {
+  int dx = t.distanceX(), dy = t.distanceY();
+  return abs(dx) >= SWIPE_PX && abs(dx) > abs(dy);
 }
 
 void loop() {
@@ -627,27 +839,33 @@ void loop() {
     if (t.isPressed()) feed_recording();
     else {
       stop_recording();
-      if (t.wasClicked() || rec_len < REC_MIN) {
-        // A tap, not a talk: the colour changes and the clip goes.
-        if (t.wasClicked()) { skin = (skin + 1) % SKIN_COUNT; tint_art(); }
+      if (is_swipe(t)) {
+        // A swipe is never a talk: the girl changes and the clip goes.
+        swap_girl();
+      } else if (t.wasClicked() || rec_len < REC_MIN) {
+        // A tap, not a talk: her tap does its thing and the clip goes.
+        if (t.wasClicked()) tapped();
         else say_status("Hold the screen while you talk.", 3000);
       } else if (join_wifi()) {
         busy = true;
+        asking = girl;
         say_status("", 1);
         xTaskCreatePinnedToCore(turn_task, "turn", 16384, nullptr, 1, nullptr, 0);
       }
     }
   } else if (t.wasPressed()) {
     if (busy) {
-      // Mid-reply: a press is a colour or a stop, never a recording --
-      // the speaker and the mic cannot both have the cube's audio.
+      // Mid-reply: a press is a tap, a stop or a swipe, never a
+      // recording -- the speaker and the mic cannot both have the audio.
     } else start_recording();
   } else if (busy && t.wasHold()) {
     stop_her = true;          // he holds the screen: she stops talking
     say_status("Stopped. Hold again to talk.", 3000);
+  } else if (busy && (t.wasFlicked() || t.wasDragged()) && is_swipe(t)) {
+    // Swapping girls mid-reply would put Yuzu's face on Four's voice.
+    say_status("She's still talking. Hold to stop her first.", 3000);
   } else if (busy && t.wasClicked()) {
-    skin = (skin + 1) % SKIN_COUNT;
-    tint_art();
+    tapped();
   }
 
   // ~14 frames a second idle, faster while she thinks -- her page's
@@ -655,8 +873,6 @@ void loop() {
   uint32_t step = thinking ? 45 : 72;
   if (millis() - last_frame >= step) {
     last_frame = millis();
-    rain_step();
-    compose();
-    frame.pushSprite(0, 0);
+    draw_frame();
   }
 }

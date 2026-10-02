@@ -3633,57 +3633,65 @@ class TestStackChanCube(unittest.TestCase):
     put Four in it? Her art on the screen?" She lives in it as
     `four_cube` -- `same_girl_as: four`, on `_hardware_stackchan.txt` --
     with her mind still on the Orin and the cube as her face, voice and
-    ears. The cube asks by the name `four-cube`, which no page offers."""
+    ears. The cube asks by the name `four-cube`, which no page offers.
 
-    KEY, NAME = "four_cube", "four-cube"
+    Then, the same day: "Can you squeeze Yuzu on too?" Every test here
+    runs again for her in TestYuzuCube, because what makes a girl on the
+    cube honest is the same for both of them."""
+
+    KEY, NAME, TWIN = "four_cube", "four-cube", "four"
 
     def cube(self):
         return yuzu_personas.load(self.KEY)
 
-    def test_the_cube_is_FOUR_and_not_a_new_girl(self):
-        """Same settings, same sounds, same Llama -- the four_bot check,
-        held here because the cube is not a robot pilot and that class
-        finds its girls by the robot body."""
+    def test_the_cube_is_HER_and_not_a_new_girl(self):
+        """Same settings, same sounds, same look, same Llama -- the
+        four_bot check, held here because the cube is not a robot pilot
+        and that class finds its girls by the robot body. The CUBE_
+        settings are the body's own tokens and are checked below."""
         cube = self.cube()
-        self.assertEqual(cube.settings.get("same_girl_as"), "four")
-        twin = yuzu_personas.load("four")
+        self.assertEqual(cube.settings.get("same_girl_as"), self.TWIN)
+        twin = yuzu_personas.load(self.TWIN)
         skip = (set(yuzu_personas._parse_hardware(cube.hardware))
                 | set(yuzu_personas._parse_hardware(twin.hardware))
+                | {k for k in cube.settings if k.startswith("CUBE_")}
                 | {"hardware", "description", "same_girl_as"}) - {
                     "SOUND_EXAMPLES"}
         hers = {k: v for k, v in twin.settings.items() if k not in skip}
         mine = {k: v for k, v in cube.settings.items() if k not in skip}
-        self.assertEqual(mine, hers, "the cube is not the same Four")
-        self.assertEqual(cube.blocks["SOUND_EXAMPLES"],
-                         twin.blocks["SOUND_EXAMPLES"])
+        self.assertEqual(mine, hers, "the cube is not the same %s"
+                         % twin.name)
+        for block in ("SOUND_EXAMPLES", "LOOK"):
+            self.assertEqual(cube.blocks.get(block), twin.blocks.get(block),
+                             "the cube changed her %s" % block)
         model = lambda k: YuzuBrain(persona=k, host="http://127.0.0.1:9").model
-        self.assertEqual(model(self.KEY), model("four"),
+        self.assertEqual(model(self.KEY), model(self.TWIN),
                          "the cube thinks with a different brain")
 
-    def test_she_carries_every_win_her_deck_self_carries(self):
-        """Read off four.persona rather than listed, so a win Four gains
-        on her page is a win the cube has to answer for."""
-        deck, cube = yuzu_personas.load("four"), self.cube()
+    def test_she_carries_every_win_her_page_self_carries(self):
+        """Read off her page persona rather than listed, so a win she
+        gains on her page is a win the cube has to answer for."""
+        deck, cube = yuzu_personas.load(self.TWIN), self.cube()
         for name in TestYuzu5.MEASURED_WINS:
             if TestYuzu5.carries(name, deck.prompt):
                 self.assertTrue(TestYuzu5.carries(name, cube.prompt),
                                 "the cube lacks: %s" % name)
 
-    # The deck turns that are NOT true of a cube, and only those, are
-    # rewritten. Everything else is the measured deck Four word for word.
+    # The page turns that are NOT true of a cube, and only those, are
+    # rewritten. Everything else is the measured girl word for word.
     REWRITTEN = {"Status.", "What do you look like?",
                  "What's it like in there?",
                  "Is this deck actually any good?", "Introduce yourself."}
 
-    def test_every_deck_example_still_true_of_a_cube_is_kept_WORD_FOR_WORD(self):
+    def test_every_page_example_still_true_of_a_cube_is_kept_WORD_FOR_WORD(self):
         """Her persona's own header promises it, so it is checked rather
         than trusted. MEASURED_WINS alone could not see it: the lookup
         example is a measured shape that is not a named win, and
         deleting it on purpose left the win check green."""
-        deck = TestSpiderBodies.turns(yuzu_personas.load("four"))
+        deck = TestSpiderBodies.turns(yuzu_personas.load(self.TWIN))
         cube = TestSpiderBodies.turns(self.cube())
         self.assertTrue({q for q, _a in deck} >= self.REWRITTEN,
-                        "a rewritten turn is no longer one of the deck's")
+                        "a rewritten turn is no longer one of hers")
         for ask, said in deck:
             if ask not in self.REWRITTEN:
                 self.assertIn((ask, said), cube,
@@ -3713,11 +3721,28 @@ class TestStackChanCube(unittest.TestCase):
                               "what she sees")
         self.assertIn("camera", seen[0])
         self.assertIn("Tell me", seen[0], "she does not ask him instead")
-        # Strangers get told how to use the cube, by her.
-        intro = [a for q, a in turns if q == "Introduce yourself."]
-        self.assertTrue(intro and "Hold the screen" in intro[0]
-                        and "tap it" in intro[0],
-                        "her introduction does not say how to talk to her")
+
+    def test_her_introduction_says_how_to_USE_the_cube(self):
+        """Strangers get told how to use the cube, by her: hold to talk,
+        swipe for the other girl -- and a tap, if a tap does anything
+        on her face. Read off her own CUBE_ settings, so the day a tap
+        means something on Yuzu, her introduction has to say so."""
+        cube = self.cube()
+        intro = [a for q, a in TestSpiderBodies.turns(cube)
+                 if q == "Introduce yourself."]
+        self.assertTrue(intro, "she has no introduction")
+        said = intro[0].lower()
+        self.assertIn("hold the screen", said,
+                      "her introduction does not say how to talk to her")
+        self.assertIn("swipe", said, "her introduction hides the swipe")
+        others = [yuzu_personas.load(k).name for k in
+                  __import__("yuzu_face").DEVICES.values() if k != self.KEY]
+        for other in others:
+            self.assertIn(other.lower(), said,
+                          "her introduction does not name %s" % other)
+        if "tap" in cube.settings["CUBE_SCREEN"]:
+            self.assertIn("tap it", said,
+                          "a tap does something and she never says what")
 
     def test_the_cube_can_ASK_but_has_no_TILE(self):
         """A second allowlist, not a roster entry: the cast is a dict of
@@ -3741,14 +3766,105 @@ class TestStackChanCube(unittest.TestCase):
         """The KEY is not a name, and nothing that merely looks like the
         name gets in. Same allowlist discipline as /launch/."""
         import yuzu_face
-        for hostile in (self.KEY, "../four-cube", "four-cube/..",
-                        "four-cube; ls", "fourcube"):
+        for hostile in (self.KEY, "../" + self.NAME, self.NAME + "/..",
+                        self.NAME + "; ls", self.NAME.replace("-", "")):
             self.assertIsNone(yuzu_face.persona_for(hostile),
                               "%r reached a persona" % hostile)
 
 
+class TestYuzuCube(TestStackChanCube):
+    """Yuzu on the same cube, a swipe away from Four. Ghost, Oct 2: "Can
+    you squeeze Yuzu on too?" Every test of the cube's Four, run again
+    for her -- and NONE of her page's turns needed rewriting, because
+    her page self was never a machine in the first place."""
+
+    KEY, NAME, TWIN = "yuzu_cube", "yuzu-cube", "yuzu_avatar"
+    REWRITTEN = set()
+
+    def test_she_keeps_her_DRAWN_body_on_the_cube(self):
+        """The fault Ghost named for her by hand, Sept 11: "in case i
+        wana paint her nails she wouldnt just be like 'ima computer'".
+        Four's cube self says she doesn't pretend to have hands; that
+        sentence on Yuzu is the 'ima computer' answer back."""
+        text = self.cube().prompt
+        self.assertIn("It is a drawn one", text)
+        self.assertIn("Your nails, your hair, your clothes", text)
+        self.assertNotIn("pretend to have hands", text,
+                         "the cube took her hands away")
+        self.assertNotIn("no arms on this thing", text)
+
+
+class TestTheCubeIsSHARED(unittest.TestCase):
+    """Two girls, one cube, a swipe between them. What is true of the
+    CUBE is one copy in the body file; what is true of ONE GIRL is hers,
+    and has no default -- so a third girl on the cube has to say what
+    the screen shows of her and who she shares it with, or she does not
+    load."""
+
+    def cube_girls(self):
+        """Every girl the board lets the cube ask for -- each one held to
+        being ON the cube and saying both of her own cube things, as a
+        failure rather than a KeyError further down."""
+        import yuzu_face
+        girls = [yuzu_personas.load(k) for k in yuzu_face.DEVICES.values()]
+        for girl in girls:
+            self.assertEqual(girl.hardware, "stackchan",
+                             "%s is asked for by the cube but is not on it"
+                             % girl.key)
+            for token in ("CUBE_SCREEN", "CUBE_COMPANY"):
+                self.assertIn(token, girl.settings,
+                              "%s does not declare %s" % (girl.key, token))
+        return girls
+
+    def test_every_cube_girl_says_what_the_screen_shows_of_HER(self):
+        body = yuzu_personas._parse_hardware("stackchan")
+        for token in ("CUBE_SCREEN", "CUBE_COMPANY"):
+            self.assertNotIn(token, body,
+                             "%s has a default -- one girl's screen "
+                             "would dress the next one" % token)
+        girls = self.cube_girls()
+        self.assertGreaterEqual(len(girls), 2)
+        screens = set()
+        for girl in girls:
+            for token in ("CUBE_SCREEN", "CUBE_COMPANY"):
+                self.assertIn(token, girl.settings,
+                              "%s does not declare %s" % (girl.key, token))
+            screens.add(girl.settings["CUBE_SCREEN"])
+            self.assertIn(girl.settings["CUBE_SCREEN"], girl.prompt)
+        self.assertEqual(len(screens), len(girls),
+                         "two girls share one description of the screen")
+
+    def test_each_one_knows_WHO_ELSE_is_in_there_and_not_herself(self):
+        """Swiped to Yuzu and asked where Four went, a girl who was never
+        told invents somebody. Each names every other girl, by name."""
+        girls = self.cube_girls()
+        for girl in girls:
+            company = girl.settings["CUBE_COMPANY"]
+            for other in girls:
+                if other.key == girl.key:
+                    self.assertNotIn(girl.name, company,
+                                     "%s shares the cube with herself"
+                                     % girl.name)
+                else:
+                    self.assertIn(other.name, company,
+                                  "%s doesn't know %s is in there"
+                                  % (girl.name, other.name))
+
+    def test_the_cube_FACTS_are_one_copy_on_every_girl(self):
+        """The mind on the board, the mic, the swipe, the camera: one
+        block, the same words on both, so a fix lands on both at once."""
+        body = yuzu_personas._parse_hardware("stackchan")
+        for girl in self.cube_girls():
+            self.assertEqual(girl.hardware, "stackchan")
+            facts = body["CUBE_FACTS"].replace(
+                "{CUBE_COMPANY}", girl.settings["CUBE_COMPANY"])
+            self.assertIn(facts, girl.prompt,
+                          "%s's cube facts are not the shared ones"
+                          % girl.key)
+
+
 class TestTheCubeCode(unittest.TestCase):
-    """The StackChan cube's own program (stackchan/four_cube) and the one
+    """The StackChan cube's own program (stackchan/cube) and the one
     word that flashes it (`cube`). Ghost, Oct 2: "B w/ the raining code
     you know it 2 as well 3 also 4 but make it turn neon red instead of
     purple when thinking. And 5. And 6. Note 7 for later." -- and a fifth
@@ -3760,7 +3876,7 @@ class TestTheCubeCode(unittest.TestCase):
     must never do with his WiFi password."""
 
     ROOT = Path(__file__).parent
-    MAIN = ROOT / "stackchan" / "four_cube" / "four_cube_main.cpp"
+    MAIN = ROOT / "stackchan" / "cube" / "cube_main.cpp"
     PAGE = ROOT / "ui" / "four.html"
 
     def code(self):
@@ -3770,7 +3886,7 @@ class TestTheCubeCode(unittest.TestCase):
 
     def table(self, name):
         """The rows of one of the cube's C tables, as tuples of fields."""
-        body = re.search(r"%s\[\]\s*=\s*\{(.*?)\n\};" % name, self.code(), re.S)
+        body = re.search(r"%s\[\]\s*=\s*\{(.*?)\}\s*;" % name, self.code(), re.S)
         self.assertTrue(body, "the cube has no %s table" % name)
         return [tuple(f.strip().strip('"') for f in row.split(","))
                 for row in re.findall(r"\{([^{}]*)\}", body.group(1))]
@@ -3831,15 +3947,29 @@ class TestTheCubeCode(unittest.TestCase):
                 self.assertEqual(int(t_tail, 16), neon,
                                  "%s does not think in neon red" % name)
 
-    def test_the_cube_asks_by_a_name_and_routes_the_BOARD_has(self):
-        """The cube is only as good as the board answering it: its name
-        must be in yuzu_face.DEVICES, and every route it posts to must be
-        one the face server handles."""
+    def girls(self):
+        """The cube's GIRLS table: (name it asks by, her name, her hint)."""
+        body = re.search(r"GIRLS\[\]\s*=\s*\{(.*?)\n\};", self.code(), re.S)
+        self.assertTrue(body, "the cube has no GIRLS table")
+        rows = re.findall(r'\{\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)"\s*\}',
+                          body.group(1))
+        self.assertTrue(rows, "the GIRLS table did not parse")
+        return rows
+
+    def test_the_cube_asks_by_names_and_routes_the_BOARD_has(self):
+        """The cube is only as good as the board answering it: every girl
+        on it asks by a name in yuzu_face.DEVICES, every device the board
+        knows has a face on the cube, and every route it posts to must
+        be one the face server handles."""
         import yuzu_face
-        who = re.search(r'WHO\[\]\s*=\s*"([^"]+)"', self.code())
-        self.assertTrue(who, "the cube never says who it is")
-        self.assertIn(who.group(1), yuzu_face.DEVICES,
-                      "the board does not know the name the cube asks by")
+        girls = self.girls()
+        self.assertEqual(sorted(w for w, _n, _h in girls),
+                         sorted(yuzu_face.DEVICES),
+                         "the cube and the board disagree about who is in it")
+        for who, name, _hint in girls:
+            self.assertEqual(
+                yuzu_personas.load(yuzu_face.DEVICES[who]).name, name,
+                "the cube calls %s by the wrong name" % who)
         board = Path(yuzu_face.__file__).read_text()
         routes = set(re.findall(r'"(/(?:listen|stream|voice\.wav|say))"',
                                 self.code()))
@@ -3849,29 +3979,115 @@ class TestTheCubeCode(unittest.TestCase):
             self.assertIn('path == "%s"' % route, board,
                           "the board has no %s for the cube" % route)
 
+    def test_each_girls_HINT_tells_the_truth_about_the_cube(self):
+        """The first thing on the screen when she comes on. It names the
+        other girl the swipe brings, and a tap only where her own persona
+        says a tap does something -- the cube and her prompt agree about
+        what a finger does."""
+        import yuzu_face
+        girls = self.girls()
+        for who, name, hint in girls:
+            self.assertIn(who, yuzu_face.DEVICES,
+                          "the board does not know %s" % who)
+            persona = yuzu_personas.load(yuzu_face.DEVICES[who])
+            self.assertIn("CUBE_SCREEN", persona.settings,
+                          "%s is not a girl on the cube" % who)
+            self.assertIn("Hold", hint, "%s's hint hides how to talk" % name)
+            for _w, other, _h in girls:
+                if other != name:
+                    self.assertIn("Swipe for %s" % other, hint,
+                                  "%s's hint hides %s" % (name, other))
+            self.assertEqual("tap" in hint.lower(),
+                             "tap" in persona.settings["CUBE_SCREEN"],
+                             "%s's hint and her prompt disagree about a tap"
+                             % name)
+
+    def test_yuzus_room_on_the_cube_is_her_PAGES_room(self):
+        """Her lavender and her pink, two copies that must agree -- the
+        room his call put her in on Sept 24, not a near miss of it."""
+        page = (self.ROOT / "ui" / "yuzu.html").read_text()
+        var = dict(re.findall(r"--(\w+):\s*(#[0-9a-fA-F]{6})", page))
+        grad = re.search(r"radial-gradient\(120% 90% at 50% 6%,(.*?)\);",
+                         page, re.S).group(1)
+        stops = []
+        for colour, at in re.findall(r"(#[0-9a-fA-F]{6}|var\(--\w+\))\s+(\d+)%",
+                                     grad):
+            if colour.startswith("var"):
+                colour = var[colour[6:-1]]
+            stops.append((int(at) / 100, int(colour[1:], 16)))
+        room = [(float(a.rstrip("f")), int(c, 16)) for a, c in self.table("ROOM")]
+        self.assertEqual(room, stops, "the cube's room is not her page's")
+        pink = re.search(r"YUZU_PINK\s*=\s*0x([0-9a-f]{6})", self.code())
+        self.assertTrue(pink, "the cube has no pink for her")
+        self.assertEqual(int(pink.group(1), 16), int(var["pink"][1:], 16),
+                         "the cube's pink is not hers")
+
+    def test_a_swipe_is_NEVER_a_talk_and_a_turn_keeps_its_girl(self):
+        """Read off the release of a recording, in order: a swipe is
+        decided before anything can start a turn, and the turn is told
+        which girl asked before it starts -- or a swipe would send a
+        clip of nothing to the board, or Yuzu's question to Four."""
+        code = self.code()
+        release = code[code.index("stop_recording();\n      if"):
+                       code.index("xTaskCreatePinnedToCore")]
+        self.assertIn("is_swipe(t)", release.split("wasClicked")[0],
+                      "the swipe is checked after a turn could start")
+        self.assertIn("asking = girl;", release,
+                      "the turn does not know which girl it is for")
+        self.assertIn("GIRLS[asking].who", code,
+                      "the turn asks as whoever is on screen NOW")
+        swipe = re.search(r"SWIPE_PX\s*=\s*(\d+)", code)
+        self.assertTrue(swipe and int(swipe.group(1)) >= 60,
+                        "a finger drifting while he talks would swap girls")
+
     def test_the_sketch_file_holds_no_CODE(self):
         """Every function lives in the .cpp. The Arduino build runs ctags
         over a .ino to invent prototypes, and a stand-in ctags mangled
         them into compile errors in the container -- a .cpp is compiled
         the same on every machine that flashes her."""
-        ino = (self.ROOT / "stackchan" / "four_cube" / "four_cube.ino").read_text()
+        ino = (self.ROOT / "stackchan" / "cube" / "cube.ino").read_text()
         self.assertEqual([ln for ln in ino.splitlines()
                           if ln.strip() and not ln.strip().startswith("//")],
                          [], "the .ino has code in it again")
 
     @unittest.skipUnless(importlib.util.find_spec("PIL"), "needs PIL")
-    def test_the_picture_on_the_cube_is_HER_picture(self):
-        """four_art.h is generated and committed; regenerate it here and
-        compare, so changing her art without rerunning the script fails."""
+    def test_the_pictures_on_the_cube_are_THEIR_pictures(self):
+        """four_art.h and yuzu_art.h are generated and committed;
+        regenerate them here and compare, so changing either girl's art
+        without rerunning the script fails."""
         import importlib.util as iu
         spec = iu.spec_from_file_location(
             "make_art", self.ROOT / "stackchan" / "make_art.py")
         make_art = iu.module_from_spec(spec)
         spec.loader.exec_module(make_art)
-        self.assertEqual(make_art.render(),
-                         (self.ROOT / "stackchan" / "four_cube" / "four_art.h")
-                         .read_text(),
+        cube = self.ROOT / "stackchan" / "cube"
+        self.assertEqual(make_art.render(), (cube / "four_art.h").read_text(),
                          "four_art.h is stale -- run stackchan/make_art.py")
+        self.assertEqual(make_art.render_yuzu(),
+                         (cube / "yuzu_art.h").read_text(),
+                         "yuzu_art.h is stale -- run stackchan/make_art.py")
+
+    def test_yuzu_keeps_her_PAGES_fades_on_the_cube(self):
+        """Her bust is cropped at the bottom and both sleeves, and her
+        page fades all three. Read off the committed header, so it holds
+        without PIL: the edges are clear, and her face is solid."""
+        text = (self.ROOT / "stackchan" / "cube" / "yuzu_art.h").read_text()
+        w, h = map(int, re.search(r"YUZU_ART_W = (\d+), YUZU_ART_H = (\d+)",
+                                  text).groups())
+        alpha = re.search(r"YUZU_ALPHA\[(\d+)\] = \{(.*?)\n\};", text, re.S)
+        self.assertEqual(int(alpha.group(1)), w * h)
+        a = [int(v) for v in re.findall(r"\d+", alpha.group(2))]
+        self.assertEqual(len(a), w * h)
+        at = lambda x, y: a[y * w + x]
+        # The fade ends AT the edge, so the last pixel's centre keeps a
+        # trace (3 of 255); a cut edge would be her full 255.
+        self.assertLessEqual(max(at(x, h - 1) for x in range(w)), 8,
+                             "her bottom edge is cut, not faded")
+        self.assertLessEqual(max(at(0, y) for y in range(h)), 8,
+                             "her left sleeve is cut, not faded")
+        self.assertLessEqual(max(at(w - 1, y) for y in range(h)), 8,
+                             "her right sleeve is cut, not faded")
+        self.assertGreater(at(w // 2, h // 3), 240, "her face is see-through")
 
 
 class TestCubeFlash(unittest.TestCase):
@@ -3992,14 +4208,14 @@ exit 0
         # the repository or anywhere git would see.
         sketch = re.search(r"^SKETCH (.+)$", self.log.read_text(), re.M).group(1)
         self.assertFalse(Path(sketch).exists(), "the build folder outlived it")
-        self.assertFalse((self.REPO / "stackchan" / "four_cube"
+        self.assertFalse((self.REPO / "stackchan" / "cube"
                           / "cube_secrets.h").exists())
         hits = subprocess.run(["git", "grep", "-l", "-F", "w0rd-SECRET"],
                               cwd=self.REPO, capture_output=True, text=True)
         self.assertEqual(hits.stdout.strip(),
                          "YUZU_TESTER.py", "his password reached a tracked file")
         ignored = subprocess.run(["git", "check-ignore",
-                                  "stackchan/four_cube/cube_secrets.h"],
+                                  "stackchan/cube/cube_secrets.h"],
                                  cwd=self.REPO, capture_output=True, text=True)
         self.assertEqual(ignored.returncode, 0,
                          "a hand-built secrets file would be committable")
@@ -7178,14 +7394,19 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         conversation it would otherwise interleave with -- and NOT the
         board line: its watts and "hours from a full bank" are the
         deck's JSAUX bank, a confident wrong fact on a cube."""
-        got = self.json.loads(self.post(
-            "/say", {"text": "hi", "who": "four-cube"}).read())
-        self.assertTrue(got["ok"], got)
-        self.assertIn("four_cube", self.face._BRAINS)
-        self.assertNotIn("four", self.face._BRAINS,
-                         "the cube spoke through the page's Four")
-        self.assertNotIn("RIGHT NOW",
-                         self.face._BRAINS["four_cube"].system_prompt)
+        # Both girls on the cube (Yuzu since the same day), each under
+        # her own key, never through her page self.
+        for name, key in self.face.DEVICES.items():
+            got = self.json.loads(self.post(
+                "/say", {"text": "hi", "who": name}).read())
+            self.assertTrue(got["ok"], got)
+            self.assertIn(key, self.face._BRAINS)
+            twin = yuzu_personas.load(key).settings.get("same_girl_as")
+            self.assertTrue(twin, "%s is not a body of anybody" % name)
+            self.assertNotIn(twin, self.face._BRAINS,
+                             "%s spoke through her page self" % name)
+            self.assertNotIn("RIGHT NOW",
+                             self.face._BRAINS[key].system_prompt)
 
     def test_her_specs_are_READ_from_this_machine_and_never_typed_in(self):
         """Asked for her specs, Four gave an Intel XScale palmtop with

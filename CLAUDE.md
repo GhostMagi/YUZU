@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 904 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 920 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,68 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## YUZU IS IN THE CUBE TOO, A SWIPE AWAY FROM FOUR (Oct 2)
+
+*"Can you squeeze Yuzu on too?"*, straight after the Four cube landed.
+**Two girls, one cube: a swipe across the screen swaps them**, and the
+cube remembers which one through a power cut (ESP32 `Preferences`).
+Hold to talk, hold to stop her and her voice out of the speaker are
+shared; the FACE is per girl.
+
+- **`yuzu_cube`**, `same_girl_as: yuzu_avatar`, on the same
+  `_hardware_stackchan.txt`. **She keeps her DRAWN body** -- the avatar
+  world's self text, with the cube as where the drawing is shown -- and
+  NOT Four's "you don't pretend to have hands", which on Yuzu is the
+  exact 'ima computer' answer he asked never to hear (Sept 11). Every
+  yuzu_avatar example is kept word for word (`REWRITTEN` is EMPTY for
+  her); plus "What do you see?" and an introduction that says hold to
+  talk and swipe for Four. 4867 chars.
+- **The body file split.** `[CUBE_FACTS]` is what is true of THE CUBE
+  (speaker, mic, the swipe, the mind on the board, nothing reaching the
+  internet, the camera unconnected), ONE copy for both girls.
+  `CUBE_SCREEN` (what the screen shows of her, and what a tap does) and
+  `CUBE_COMPANY` (who she shares it with, in a few words) are each
+  girl's own and **have NO default**, so a third girl who forgets one
+  fails to load instead of wearing another girl's screen -- the
+  avatar-world hair bleed, prevented rather than fixed. `[CUBE_SELF]`
+  (the bodiless self) is Four's now; Yuzu never uses it. Four's prompt
+  moved by those words and her introduction gained "swipe it for
+  Yuzu" (5858 chars). Neither is `LIVE_PERSONA`, so nothing to paste.
+- **`DEVICES` gained `yuzu-cube`**, so each girl has her own brain,
+  memory and voice speed on the board, and never her page self's.
+- **The sketch moved to `stackchan/cube/`** (`cube.ino`,
+  `cube_main.cpp`) -- it is not Four's alone now. `make_art.py` also
+  writes `yuzu_art.h`: `ui/yuzu/yuzu.png` at 178x230, shrunk with
+  premultiplied alpha (or the cut-out's white haloes her), RGB565 plus
+  an alpha byte, **her page's three fades baked into the alpha**.
+- **Her face on the cube**: her page's lavender radial room and hot
+  pink, held EQUAL to `ui/yuzu.html` by a test; a 1-2px breath. **The
+  thinking cue is stronger than her page's** (glow peak .6 radius 200,
+  pulsing to full, plus pink sparkles either side of her, never on her
+  face): an emulator render at the cube's real size showed her page's
+  numbers made a thinking Yuzu look idle. **A 4x4 ordered dither on the
+  room only** -- 565 drew her gradient as rings; dithering her own
+  pixels made her grainy. A tap flashes her glow, so a tap is never
+  dead. Four's face is unchanged.
+- **The swipe**: 80px sideways and more across than down, read on the
+  release, and decided BEFORE anything can start a turn (the clip is
+  thrown away). A finger drifting while he talks does not go 80px
+  sideways. Refused mid-reply ("hold to stop her first") -- a swap then
+  would put Yuzu's face on Four's voice -- and the turn is pinned to
+  the girl who asked (`asking`), not whoever is on screen.
+
+**Compiled again, no warnings, 1.47 MB of the 3 MB layout. Still never
+run on a cube**; the swipe thresholds are UNVERIFIED on a real finger.
+
+**Every Four-cube test runs again for her** (`TestYuzuCube` subclasses
+`TestStackChanCube`), plus `TestTheCubeIsSHARED` and four new firmware
+guards. **Twenty-one breaks, all red** -- and two of them came back as
+ERRORs first: mapping `yuzu-cube` to her PAGE self, or dropping it from
+the board, made later tests KeyError on settings the cube girls carry.
+Read the failure KIND again: those tests assert that each girl IS on
+the cube before reading her cube settings now, and both breaks re-ran
+as clean failures. **904 -> 920.**
 
 ## FOUR GOES IN A STACKCHAN CUBE, AND GETS A FIFTH COLOUR (Oct 2)
 
