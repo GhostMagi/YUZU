@@ -9245,10 +9245,16 @@ class TestFour(unittest.TestCase):
     # ("hex",   h)  a colour she never wears -- pink's purple is bluer
     #               and brighter than the deck's, because the deck's sits
     #               49 degrees of hue from her and vanished against her.
+    #
+    # Blue (Oct 2) follows his general rule -- "neon purple when
+    # thinking. In general." -- because purple sits clear of both her
+    # blue and her cyan rain. His "neon red instead of purple" that day
+    # was for the StackChan cube, which carries its own table.
     THINKS_IN = {"":       ("theme", "purple"),
                  "red":    ("theme", "purple"),
                  "purple": ("theme", ""),
-                 "pink":   ("hex",   "#e8dcff")}
+                 "pink":   ("hex",   "#e8dcff"),
+                 "blue":   ("theme", "purple")}
 
     def test_each_theme_thinks_in_the_colour_he_chose(self):
         """Every colour gets used across the four, and the signal can

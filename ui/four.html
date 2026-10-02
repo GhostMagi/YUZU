@@ -108,6 +108,23 @@ body.pink {
   --key:  #120409;
   --tint: url(#four-pink) brightness(1.26);
 }
+/* BRIGHT GLOWY BLUE, his ask (Oct 2): *"can u plz also add a bright
+   glowy blue as an extra color? ... Make sure that loops back around
+   too. U can choose the code rain color on that one"*. Three blues were
+   rendered on her art at 412 and looked at; `#1e90ff` was the one that
+   glowed rather than sat deep and royal. HER RAIN IS HIS OWN CYAN, the
+   one he named for Saya's face beside the pink above -- picked over
+   white, pink and purple rain rendered side by side, because it reads
+   as the same light as her, the way the green rain does on green. */
+body.blue {
+  --ink:  #1e90ff;
+  --dim:  #0f4a85;
+  --box:  rgba(4, 10, 18, .88);
+  --head: #d6fbff;
+  --tail: rgba(46, 230, 255, .55);
+  --key:  #03101e;
+  --tint: url(#four-blue) brightness(1.3);
+}
 /* ---- SHE THINKS IN THE OTHER COLOUR ---------------------------------
    Ghost, Sept 16: *"i dislike the words typing up as she says it thing
    as im a speed reader. Can we just give her a thinking pose somehow
@@ -506,6 +523,13 @@ body.thinking #four { animation-duration: 1.6s; }
               0.2126 0.7152 0.0722 0 0
               0 0 0 1 0"/>
   </filter>
+  <filter id="four-blue" color-interpolation-filters="sRGB">
+    <!-- bright glowy blue -- #1e90ff, matching --ink on body.blue -->
+    <feColorMatrix type="matrix" values="0.0250 0.0841 0.0085 0 0
+              0.1201 0.4039 0.0408 0 0
+              0.2126 0.7152 0.0722 0 0
+              0 0 0 1 0"/>
+  </filter>
 </svg>
 
 <canvas id="rain"></canvas>
@@ -659,7 +683,7 @@ document.getElementById('home').onclick = () => { location.href = 'home.html'; }
 // the deck is, and it is the state anyone else who picks her up meets --
 // she is the front door. One line of localStorage makes it sticky if he
 // would rather; this is the version with nothing to explain.
-const SKINS = ['', 'red', 'purple', 'pink'];
+const SKINS = ['', 'red', 'purple', 'pink', 'blue'];
 let skin = 0;
 document.getElementById('stage').addEventListener('click', (event) => {
   // #facts is excluded for the same reason #says is: it carries
