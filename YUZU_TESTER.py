@@ -3625,6 +3625,125 @@ class TestSpiderBodies(unittest.TestCase):
                             % name)
 
 
+class TestStackChanCube(unittest.TestCase):
+    """Ghost, Oct 2, with an M5Stack StackChan cube in his cart: "can we
+    put Four in it? Her art on the screen?" She lives in it as
+    `four_cube` -- `same_girl_as: four`, on `_hardware_stackchan.txt` --
+    with her mind still on the Orin and the cube as her face, voice and
+    ears. The cube asks by the name `four-cube`, which no page offers."""
+
+    KEY, NAME = "four_cube", "four-cube"
+
+    def cube(self):
+        return yuzu_personas.load(self.KEY)
+
+    def test_the_cube_is_FOUR_and_not_a_new_girl(self):
+        """Same settings, same sounds, same Llama -- the four_bot check,
+        held here because the cube is not a robot pilot and that class
+        finds its girls by the robot body."""
+        cube = self.cube()
+        self.assertEqual(cube.settings.get("same_girl_as"), "four")
+        twin = yuzu_personas.load("four")
+        skip = (set(yuzu_personas._parse_hardware(cube.hardware))
+                | set(yuzu_personas._parse_hardware(twin.hardware))
+                | {"hardware", "description", "same_girl_as"}) - {
+                    "SOUND_EXAMPLES"}
+        hers = {k: v for k, v in twin.settings.items() if k not in skip}
+        mine = {k: v for k, v in cube.settings.items() if k not in skip}
+        self.assertEqual(mine, hers, "the cube is not the same Four")
+        self.assertEqual(cube.blocks["SOUND_EXAMPLES"],
+                         twin.blocks["SOUND_EXAMPLES"])
+        model = lambda k: YuzuBrain(persona=k, host="http://127.0.0.1:9").model
+        self.assertEqual(model(self.KEY), model("four"),
+                         "the cube thinks with a different brain")
+
+    def test_she_carries_every_win_her_deck_self_carries(self):
+        """Read off four.persona rather than listed, so a win Four gains
+        on her page is a win the cube has to answer for."""
+        deck, cube = yuzu_personas.load("four"), self.cube()
+        for name in TestYuzu5.MEASURED_WINS:
+            if TestYuzu5.carries(name, deck.prompt):
+                self.assertTrue(TestYuzu5.carries(name, cube.prompt),
+                                "the cube lacks: %s" % name)
+
+    # The deck turns that are NOT true of a cube, and only those, are
+    # rewritten. Everything else is the measured deck Four word for word.
+    REWRITTEN = {"Status.", "What do you look like?",
+                 "What's it like in there?",
+                 "Is this deck actually any good?", "Introduce yourself."}
+
+    def test_every_deck_example_still_true_of_a_cube_is_kept_WORD_FOR_WORD(self):
+        """Her persona's own header promises it, so it is checked rather
+        than trusted. MEASURED_WINS alone could not see it: the lookup
+        example is a measured shape that is not a named win, and
+        deleting it on purpose left the win check green."""
+        deck = TestSpiderBodies.turns(yuzu_personas.load("four"))
+        cube = TestSpiderBodies.turns(self.cube())
+        self.assertTrue({q for q, _a in deck} >= self.REWRITTEN,
+                        "a rewritten turn is no longer one of the deck's")
+        for ask, said in deck:
+            if ask not in self.REWRITTEN:
+                self.assertIn((ask, said), cube,
+                              "the cube lost or changed: %s" % ask)
+
+    def test_she_knows_what_the_CUBE_is_and_not_what_the_deck_was(self):
+        """Her mind is on the Orin and the cube reaches it over WiFi, so
+        the deck's "you work the same with the WiFi off" is FALSE here --
+        the one sentence of the deck body that could not be carried
+        over. And a cube with a lens on it gets asked what it sees."""
+        cube = self.cube()
+        self.assertFalse(cube.moves, "the face cube has no legs to drive")
+        self.assertTrue(cube.looks_up, "the encyclopedia is on the Orin")
+        text = cube.prompt
+        self.assertIn("Your mind does not live in the cube", text)
+        self.assertIn("Nothing you do reaches the internet", text)
+        self.assertNotIn("WiFi off", text,
+                         "the cube cannot work with the WiFi off")
+        for word in ("handheld", "deck", "battery"):
+            self.assertNotIn(word, text.lower(),
+                             "the cube still thinks it is a %s" % word)
+        # The see-question, answered without inventing a room.
+        turns = TestSpiderBodies.turns(cube)
+        seen = [a for q, a in turns if q.rstrip("?").lower()
+                == "what do you see"]
+        self.assertTrue(seen, "nothing shows her what to say when asked "
+                              "what she sees")
+        self.assertIn("camera", seen[0])
+        self.assertIn("Tell me", seen[0], "she does not ask him instead")
+        # Strangers get told how to use the cube, by her.
+        intro = [a for q, a in turns if q == "Introduce yourself."]
+        self.assertTrue(intro and "Hold the screen" in intro[0]
+                        and "tap it" in intro[0],
+                        "her introduction does not say how to talk to her")
+
+    def test_the_cube_can_ASK_but_has_no_TILE(self):
+        """A second allowlist, not a roster entry: the cast is a dict of
+        tiles and rails, and the cube is not a new character."""
+        import yuzu_face
+        self.assertEqual(yuzu_face.persona_for(self.NAME), self.KEY)
+        self.assertEqual(yuzu_face.persona_for(self.NAME.upper()), self.KEY)
+        self.assertNotIn(self.NAME, yuzu_face.CHARACTERS)
+        self.assertNotIn(self.NAME, [r["who"] for r in yuzu_face.roster()])
+        self.assertNotIn(self.KEY, [k for k, _p, _b
+                                    in yuzu_face.CHARACTERS.values()])
+        # Every device is a BODY of somebody on the roster, never a
+        # stranger with no page anywhere.
+        cast = {k for k, _p, _b in yuzu_face.CHARACTERS.values()}
+        for name, key in yuzu_face.DEVICES.items():
+            twin = yuzu_personas.load(key).settings.get("same_girl_as")
+            self.assertIn(twin, cast, "%s is a body of nobody on the "
+                                      "roster" % name)
+
+    def test_a_device_answers_to_its_NAME_and_nothing_near_it(self):
+        """The KEY is not a name, and nothing that merely looks like the
+        name gets in. Same allowlist discipline as /launch/."""
+        import yuzu_face
+        for hostile in (self.KEY, "../four-cube", "four-cube/..",
+                        "four-cube; ls", "fourcube"):
+            self.assertIsNone(yuzu_face.persona_for(hostile),
+                              "%r reached a persona" % hostile)
+
+
 class TestSaveMyStuff(unittest.TestCase):
     """Ghost, Sept 29, asked whether he needs a save button before the
     robot: "I dont wana hit it and auto fill my phones memory lol. Just
@@ -6730,6 +6849,21 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         self.post("/say", {"text": "hello", "who": "yuzu"}).read()
         key = self.face.persona_for("yuzu")
         self.assertNotIn("RIGHT NOW", self.face._BRAINS[key].system_prompt)
+
+    def test_the_CUBE_asks_as_herself_and_gets_no_BANK_hours(self):
+        """Oct 2: the StackChan cube asks /say as `four-cube`. It gets
+        its own brain under its own key -- never the page's Four, whose
+        conversation it would otherwise interleave with -- and NOT the
+        board line: its watts and "hours from a full bank" are the
+        deck's JSAUX bank, a confident wrong fact on a cube."""
+        got = self.json.loads(self.post(
+            "/say", {"text": "hi", "who": "four-cube"}).read())
+        self.assertTrue(got["ok"], got)
+        self.assertIn("four_cube", self.face._BRAINS)
+        self.assertNotIn("four", self.face._BRAINS,
+                         "the cube spoke through the page's Four")
+        self.assertNotIn("RIGHT NOW",
+                         self.face._BRAINS["four_cube"].system_prompt)
 
     def test_her_specs_are_READ_from_this_machine_and_never_typed_in(self):
         """Asked for her specs, Four gave an Intel XScale palmtop with
@@ -11038,7 +11172,8 @@ class TestEveryCharacterCanActuallyBeAsked(unittest.TestCase):
 
         was = dict(yuzu_face._BRAINS)
         try:
-            for who in sorted(yuzu_face.CHARACTERS):
+            # The bodies with no page ask the same way (Oct 2, the cube).
+            for who in sorted(yuzu_face.CHARACTERS) + sorted(yuzu_face.DEVICES):
                 with mock.patch.object(yuzu_face, "_BRAINS", {}):
                     with mock.patch("yuzu_brain.YuzuBrain", Strict):
                         reply, error = yuzu_face.answer("hello", who)
@@ -11048,7 +11183,8 @@ class TestEveryCharacterCanActuallyBeAsked(unittest.TestCase):
             yuzu_face._BRAINS.clear()
             yuzu_face._BRAINS.update(was)
             yuzu_face.set_state("idle")
-        self.assertEqual(len(seen), len(yuzu_face.CHARACTERS))
+        self.assertEqual(len(seen),
+                         len(yuzu_face.CHARACTERS) + len(yuzu_face.DEVICES))
 
     def test_an_unknown_name_is_refused_rather_than_answered(self):
         """Putting the wrong character on screen is the confusing kind

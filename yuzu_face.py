@@ -543,6 +543,24 @@ CHARACTERS = {
     "kuro": ("kuro",                   "kuro.html",  "her sister, the menace"),
 }
 
+# BODIES THAT ASK WITHOUT A PAGE. Oct 2, Ghost, of the StackChan cube:
+# "can we put Four in it? Her art on the screen?" The cube is Four in a
+# second body -- `four_cube`, `same_girl_as: four` -- and it asks /say,
+# /voice.wav and /listen exactly the way her page does, by a NAME.
+#
+# NOT IN CHARACTERS, ON PURPOSE. That dict is the CAST: every entry is
+# a tile in the A.I. drawer, a link on every rail, a brain in the Save
+# file's list. The cube is not a new character, and a tile that opens
+# no page is the roster rule pointing the wrong way. So it is a second,
+# smaller allowlist that `persona_for` reads and `roster()` never does.
+# Same discipline as the first: the request names a key in here, never
+# a path, and an unknown name is refused rather than answered by
+# whoever is front.
+DEVICES = {
+    # name           persona key
+    "four-cube":     "four_cube",
+}
+
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A
 # CONVERSATION, and this list is why it is a list.
 #
@@ -631,6 +649,8 @@ def persona_for(who):
     # under that name. `FRONT` is the honest reading of a request that
     # names nobody, and it moves when he moves it.
     who = (who or FRONT).strip().lower()
+    if who in DEVICES:
+        return DEVICES[who]
     if who not in CHARACTERS:
         return None
     import yuzu_personas
