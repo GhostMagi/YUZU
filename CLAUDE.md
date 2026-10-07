@@ -49,6 +49,37 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## FOUR BRAINSTORMED HIS NEXT GAME, ON HIS PHONE IN BLUE (Oct 7, ~12:15)
+
+Fourteen screenshots of her page on his Z Flip, the same day she went
+back to being the main AI. He pitched a futuristic GBA-style RPG with
+her as a Cortana-style companion and named the companion **Nova**.
+Nothing was changed because of it.
+
+**Confirmed on his phone for the first time:**
+
+- **The blue skin.** Her art renders blue on his phone.
+- **Blue thinks in purple.** The rain turned purple while she
+  thought, as `THINKS_IN` says it should.
+- His lines are labelled GHOST, she never called him "user", and all
+  four replies finished whole.
+
+**The Saya bleed fix held on an outward-facing subject** (n=4). She
+stayed warm and helpful, with no snark. Her ideas were generic: she
+suggested bullet time and a bullet-hell phase for a game he had just
+called turn-based. That is a 3B's genre-blindness, not a prompt fault.
+
+**Watch items, not changed:**
+
+- **Three of four replies open with "Ah,".** `Ah` is the first of her
+  `SOUND_EXAMPLES`, so this is the Kuro "Oi, Ghost!" shape: a taught
+  sound turning into a tic. If it wears thin, reorder or swap the
+  sounds. That is a prompt change, so it comes with a paste.
+- **She spoke as Nova** ("I can create a custom interface that uses my
+  processing capabilities"). He invited it ("with you as a ai
+  companion"), so it is in-fiction. It would only matter as the
+  palmtop fault if she claimed real abilities outside a game.
+
 ## FOUR IS THE MAIN AI AGAIN (Oct 7)
 
 *"Please put Four as the main AI please. In general."* -- the Sept 30
