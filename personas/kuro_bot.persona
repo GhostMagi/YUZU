@@ -2,6 +2,10 @@ name: Kuro
 archetype: Menace (spider mech)
 hardware: jethexa
 description: Kuro in the robot. The same grinning menace as kuro.persona -- same settings, same voice (af_sarah), same rules -- with six real legs to brag about at last. Ghost, Sept 29: "Spider bodies for everyone." UNMEASURED, and the body is BUILT no: nothing drives the legs yet, so no page offers her.
+retired: yes
+# Ghost, Oct 7: "Can we srt8 up remove shiro and kuro plz bro". Her
+# deck self left the roster that day, so her robot twin is retired
+# with her: going live must not bring back a girl he removed.
 # WHICH GIRL THIS IS, read by the tests (every setting of hers must
 # match) and by whoever puts the pilots on the roster: going live is
 # pointing each roster entry at the persona that names it here.

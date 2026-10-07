@@ -49,6 +49,42 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## SHIRO AND KURO ARE RETIRED, AND THE CUBE IS AN INTERFACE (Oct 7)
+
+*"Can we srt8 up remove shiro and kuro plz bro :))"* -- five days
+after he left them off the cube. **The cast is Yuzu, Four and Zero.**
+
+- **Retired, not deleted**, the Sept 20 call: two lines leave
+  `CHARACTERS`, and `shiro_mk2`, `kuro`, `shiro_bot` and `kuro_bot` say
+  `retired: yes`. Their pages, art and voices (Sky, Sarah) stay on disk;
+  putting one back is a line here and a line there. Their saved chats on
+  his board stay too, harmless, and still ride in Save my stuff.
+- **Their ROBOT twins went with them**, and a test holds that: going
+  live is pointing the roster at the `_bot` keys, and a girl he removed
+  must not come back on six legs that day.
+- **No remaining girl's prompt moved** -- the sisters were named only in
+  comments elsewhere -- so there is nothing to paste. The A.I. drawer is
+  one row of three, rendered at 1024 and 412, no sideways scroll.
+- **Four tests were about the sisters BEING on the roster** and were
+  repointed, not loosened: the all-thought reply asks `FRONT` (it never
+  needed Shiro); the sisters' sounds are still checked against each
+  other and the cast; the log-page agreement reads log pages off the
+  roster, so a retired page is not held to Zero's code; and the Gemma
+  stand-in drops `retired:` as well, because it is Kuro AS SHE SHIPPED.
+  The cut list gained both; putting Shiro back on the roster or
+  un-retiring `kuro_bot` both go red as failures. Still 931.
+
+**He also asked how much of a girl is "converted" to the cube, or
+whether she just uses it as an interface.** An interface, like her
+page on his phone: the cube carries her FACE (art, rain, glow, all
+drawn by the ESP32) and does the touch, the mic recording and the
+speaker. Her brain, her memory, her ears (Whisper) and her voice
+(Kokoro) all stay on the Orin -- an ESP32-S3 with 8MB cannot hold a 3B
+model. What WAS made for the cube is a cube self for each girl
+(`four_cube`, `yuzu_cube`, `zero_cube`) that knows it is a cube, and
+her own memory there, apart from her page's. Board off, the cube shows
+her face and cannot talk.
+
 ## ZERO IS IN THE CUBE TOO -- THREE GIRLS, AND KURO AND SHIRO STAY OFF (Oct 2)
 
 *"Nice. Can the qwen variant, Zero, go on there plz? (Kuro and shiro

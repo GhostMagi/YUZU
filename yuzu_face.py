@@ -536,11 +536,10 @@ CHARACTERS = {
     "four": ("four",                   "four.html",  "the deck's own voice"),
     # Her own WEIGHTS as well as her own page -- `model:` in her persona.
     "zero": ("zero",                   "zero.html",  "the brainy one"),
-    # SISTERS ON SIX LEGS, Sept 26; on Four's Llama since Sept 27. `shiro` is
-    # a NEW persona under an old name -- the yami kawaii Shiro stays
-    # retired as the record -- so the key says which one this is.
-    "shiro": ("shiro_mk2",             "shiro.html", "the shy one, six legs"),
-    "kuro": ("kuro",                   "kuro.html",  "her sister, the menace"),
+    # CUT TO THREE, Oct 7. Ghost: "Can we srt8 up remove shiro and kuro
+    # plz bro". The sisters (shiro_mk2, kuro, and their robot twins)
+    # are `retired: yes`, their pages and art kept on disk -- the Sept 20
+    # call again, and putting one back is a line here and a line there.
 }
 
 # BODIES THAT ASK WITHOUT A PAGE. Oct 2, Ghost, of the StackChan cube:

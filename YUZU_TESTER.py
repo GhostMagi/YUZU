@@ -5887,7 +5887,8 @@ class TestTheCastIsTwo(unittest.TestCase):
     stronger unknown-name case than a string nobody ever wired up.
     """
 
-    CUT = ("saya", "cait", "mimi")
+    # Oct 7, the sisters too: "Can we srt8 up remove shiro and kuro plz bro"
+    CUT = ("saya", "cait", "mimi", "shiro", "kuro")
 
     def test_a_name_crosses_and_nothing_else_does(self):
         """Same discipline as /launch/ and /vpet/: the page POSTs a
@@ -6253,7 +6254,9 @@ console.log(JSON.stringify(%s.map(text => {
         cast = {c["who"] for c in yuzu_face.roster()}
         for who, key, page in (("saya", "saya_deck", "face.html"),
                                ("cait", "cait", "cait.html"),
-                               ("mimi", "mimi", "mimi.html")):
+                               ("mimi", "mimi", "mimi.html"),
+                               ("shiro", "shiro_mk2", "shiro.html"),
+                               ("kuro", "kuro", "kuro.html")):
             self.assertNotIn(who, yuzu_face.CHARACTERS,
                              f"{who} is back on the rail")
             self.assertNotIn(who, cast)
@@ -6265,6 +6268,12 @@ console.log(JSON.stringify(%s.map(text => {
                             f"{key} is not marked retired")
             self.assertTrue((here / "ui" / page).exists(),
                             f"{page} was deleted rather than unlinked")
+        # Their ROBOT twins leave with them (Oct 7). Going live is pointing
+        # the roster at the `_bot` keys, and a girl he removed must not
+        # come back on six legs that day.
+        for key in ("shiro_bot", "kuro_bot"):
+            self.assertTrue(yuzu_personas.load(key).retired,
+                            f"{key} would go live with the robot")
 
     def test_retired_characters_are_off_the_roster_but_still_on_disk(self):
         """Ghost, Sept 11: "we no longer need coco shes retired. or the
@@ -8516,9 +8525,11 @@ function post(route) { posts.push(route); return Promise.resolve({ ok: true, fac
                 return ""
 
         import yuzu_brain
+        # Whoever greets him: it asked Shiro by name until she left the
+        # roster (Oct 7), and the property was never about her.
         with mock.patch.object(yuzu_brain, "YuzuBrain", Thought), \
                 mock.patch.dict(face._BRAINS, {}, clear=True):
-            reply, error = face.answer("hi", "shiro")
+            reply, error = face.answer("hi", face.FRONT)
         self.assertIsNone(error)
         self.assertIn("thought out loud", reply)
 
@@ -10472,7 +10483,8 @@ class TestTheSisters(BrainTestCase):
             head, body = (staged / "kuro.persona").read_text(
                 encoding="utf-8").split("\n---\n", 1)
             head = "\n".join(line for line in head.splitlines()
-                             if not line.startswith("temperature:"))
+                             if not line.startswith(("temperature:",
+                                                     "retired:")))
             (staged / (self.GEMMA + ".persona")).write_text(
                 head + "\n" + self.GEMMA_SETTINGS + "---\n" + body,
                 encoding="utf-8")
@@ -10596,7 +10608,10 @@ class TestTheSisters(BrainTestCase):
         laugh, and neither should they and Zero."""
         import yuzu_face, yuzu_voice
         taken = {}
-        for who, (key, _, _) in yuzu_face.CHARACTERS.items():
+        # Off the roster since Oct 7, so they are added by hand: they
+        # still must not share a laugh with each other or with the cast.
+        keys = [key for key, _, _ in yuzu_face.CHARACTERS.values()]
+        for key in keys + [k for k in self.SISTERS if k not in keys]:
             for sound in self.persona(key).blocks.get("SOUND_EXAMPLES", "").split(","):
                 if sound.strip():
                     taken.setdefault(sound.strip().lower(), set()).add(key)
@@ -10682,7 +10697,14 @@ class TestTheSisters(BrainTestCase):
         import yuzu_face
         names = {c["who"]: c["name"] for c in yuzu_face.roster()}
         first = self.log_block("zero.html", "zero")
-        for me, name in self.PAGES.items():
+        # READ OFF THE ROSTER, not this class's PAGES. The sisters left it
+        # on Oct 7 and their pages are records now: a retired page is not
+        # held to Zero's code, or every change to hers would force an edit
+        # to two pages nobody can open. The next log page joins by itself.
+        logs = {c["who"]: c["page"] for c in yuzu_face.roster()
+                if c["page"] != "zero.html"
+                and self.LOG_MARK in self.page(c["page"])}
+        for me, name in logs.items():
             self.assertEqual(self.log_block(name, me), first,
                              "%s shows the conversation differently from "
                              "zero.html" % name)

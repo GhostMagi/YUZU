@@ -59,13 +59,13 @@ So:
     LIVE_PERSONA   yuzu_bot    (yuzu_personas.py — the MEASUREMENT pointer;
                    robot Yuzu since Sept 30, "Yuzu the main default robot")
     FRONT          yuzu        (yuzu_face.py     — who GREETS you)
-    roster         Yuzu, Four, Zero, Shiro, Kuro  (Cait, Mimi, Saya and
-                   the yami kawaii Shiro are `retired: yes`), all still on
-                   their deck bodies; each has a `_bot` twin waiting for
-                   the robot's legs to be driven
+    roster         Yuzu, Four, Zero  (Cait, Mimi, Saya, both Shiros and
+                   Kuro are `retired: yes` -- the sisters went Oct 7),
+                   all still on their deck bodies; each has a `_bot` twin
+                   waiting for the robot's legs to be driven, and a cube
+                   self (`DEVICES`)
     Zero's weights  her own `model:` -- Qwen3-4B-Instruct-2507 heretic
-    the sisters'   Four's Llama since Sept 27 (no `model:` line); the
-                   Gemma path in the brain stays, used by nobody
+    the Gemma path in the brain stays, used by nobody
     Four's prompt  5446 chars
     tests          931, ~95s,  `python YUZU_TESTER.py`
     tree           clean, pushed to main
