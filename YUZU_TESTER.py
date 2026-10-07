@@ -10391,22 +10391,23 @@ class TestFour(unittest.TestCase):
         self.assertEqual(bar[rail:home].count("</div>"), 1,
                          "the way out is nested inside the rail")
 
-    def test_YUZU_is_the_front_door_now_and_four_is_still_in_the_drawer(self):
-        """Ghost, Sept 30: "Can we make Yuzu the main default robot
-        instead of 4." The front tile and the pointer that is measured
-        and pasted both name her -- the ROBOT her for the pointer, since
-        that is the prompt worth testing before the robot comes -- and
-        Four is still two taps away: stepping down is not leaving."""
+    def test_FOUR_is_the_main_AI_again_and_yuzu_is_still_in_the_drawer(self):
+        """Ghost, Oct 7: "Please put Four as the main AI please. In
+        general." (Sept 30 had made it Yuzu.) In general is BOTH
+        pointers: the front tile, and the pointer that is measured and
+        pasted -- the ROBOT her for that one, the Sept 30 reason: it is
+        the prompt the robot will boot. Yuzu is still two taps away:
+        stepping down is not leaving."""
         import yuzu_face
-        self.assertEqual(yuzu_face.FRONT, "yuzu")
-        self.assertEqual(yuzu_personas.LIVE_PERSONA, "yuzu_bot")
-        self.assertEqual(yuzu_personas.load("yuzu_bot").settings[
-            "same_girl_as"], yuzu_face.persona_for("yuzu"),
+        self.assertEqual(yuzu_face.FRONT, "four")
+        self.assertEqual(yuzu_personas.LIVE_PERSONA, "four_bot")
+        self.assertEqual(yuzu_personas.load("four_bot").settings[
+            "same_girl_as"], yuzu_face.persona_for("four"),
             "the front door and the live pointer are two different girls")
         front = [c for c in yuzu_face.roster() if c["front"]]
-        self.assertEqual([c["who"] for c in front], ["yuzu"])
+        self.assertEqual([c["who"] for c in front], ["four"])
         # Being the front tile is a shortcut, not a filing cabinet.
-        self.assertIn("four", {c["who"] for c in yuzu_face.roster()})
+        self.assertIn("yuzu", {c["who"] for c in yuzu_face.roster()})
 
     def test_the_wiki_belongs_to_the_BODY_not_to_whoever_is_live(self):
         """Both `/wiki` and "does this character drive Saya's face

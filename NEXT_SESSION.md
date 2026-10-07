@@ -56,9 +56,9 @@ So:
 
 ## The state of the board today
 
-    LIVE_PERSONA   yuzu_bot    (yuzu_personas.py — the MEASUREMENT pointer;
-                   robot Yuzu since Sept 30, "Yuzu the main default robot")
-    FRONT          yuzu        (yuzu_face.py     — who GREETS you)
+    LIVE_PERSONA   four_bot    (yuzu_personas.py — the MEASUREMENT pointer;
+                   robot Four since Oct 7, "Four as the main AI. In general")
+    FRONT          four        (yuzu_face.py     — who GREETS you)
     roster         Yuzu, Four, Zero  (Cait, Mimi, Saya, both Shiros and
                    Kuro are `retired: yes` -- the sisters went Oct 7),
                    all still on their deck bodies; each has a `_bot` twin

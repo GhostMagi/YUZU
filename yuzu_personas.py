@@ -65,7 +65,12 @@ DEFAULT_PERSONA = "yuzu"
 # robot instead of 4." Her ROBOT persona, because this pointer is what
 # gets MEASURED and pasted into PocketPal -- and the robot prompt is the
 # one still unmeasured, and the one worth testing before the robot comes.
-LIVE_PERSONA = "yuzu_bot"
+#
+# FOUR AGAIN, Oct 7: "Please put Four as the main AI please. In general."
+# In general means both pointers, so `FRONT` is `four` too -- and her
+# ROBOT twin here, for the Sept 30 reason: this is the prompt that gets
+# pasted into PocketPal, and it is the one the robot will boot.
+LIVE_PERSONA = "four_bot"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",

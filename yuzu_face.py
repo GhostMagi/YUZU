@@ -635,7 +635,10 @@ POSES = {
 # `yuzu` at yuzu_bot she is the front door on six legs with nothing here
 # moving. Four's page hides its rail only while SHE is front (the gate
 # reads `front`, never a name), so it lists everybody again by itself.
-FRONT = "yuzu"
+#
+# FOUR AGAIN, Oct 7: "Please put Four as the main AI please. In general."
+# Her page hides its rail again by itself, and Yuzu's lists everybody.
+FRONT = "four"
 
 # YUZU HAS ONE PICTURE NOW. Sept 24, Ghost: "Remove her old art and
 # clothes switch feature". The wardrobe folder, /outfits.json and her

@@ -49,6 +49,26 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## FOUR IS THE MAIN AI AGAIN (Oct 7)
+
+*"Please put Four as the main AI please. In general."* -- the Sept 30
+call ("Yuzu the main default robot") undone, by him, the same evening
+as the sisters left. **In general is BOTH pointers**, the Sept 30 shape
+in reverse:
+
+- **`FRONT = "four"`**: the front tile is Four, with Stuff beside it.
+  Her page hides its rail again by itself (the gate reads `front`) and
+  Yuzu's lists Four and Zero. Rendered at 1024 and 412: the exit in its
+  corner on both pages, no sideways scroll.
+- **`LIVE_PERSONA = "four_bot"`**, her ROBOT twin, for the Sept 30
+  reason: it is the prompt pasted into PocketPal and the one the robot
+  will boot. **The composed live prompt was pasted to him.**
+- **The cube already started on Four** (`prefs.getUChar("girl", FOUR)`),
+  so no firmware change and no reflash.
+- **One test was the record of the decision** and was repointed, not
+  loosened (`test_FOUR_is_the_main_AI_again...`); putting either
+  pointer back alone goes red as a failure. Still 931.
+
 ## SHIRO AND KURO ARE RETIRED, AND THE CUBE IS AN INTERFACE (Oct 7)
 
 *"Can we srt8 up remove shiro and kuro plz bro :))"* -- five days
@@ -977,8 +997,9 @@ examples cost yuzu4 any movement?).
    into her turn in the board_now() shape, with its arithmetic in the
    context guard.
 4. ~~**Decide `LIVE_PERSONA`**~~ **DECIDED Sept 30, his call**: Yuzu.
-   `LIVE_PERSONA` is `yuzu_bot` already and `FRONT` is `yuzu`; going
-   live only points the roster's `yuzu` at `yuzu_bot`.
+   **CHANGED Oct 7, his call: Four.** `LIVE_PERSONA` is `four_bot` and
+   `FRONT` is `four`; going live points the roster at the `_bot` keys
+   and changes neither pointer.
 
 ### He also asked whether he needs the Save button (#1)
 
