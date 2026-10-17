@@ -49,6 +49,15 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## FOUR IS ON THE CUBE (Oct 17)
+
+**FLASHED AND RUNNING ON REAL HARDWARE.** After the dialout fix, his
+photo shows her art and rain falling on the cube's screen, with the
+board beside it. The art, the rain and the flash are CONFIRMED. Still
+UNVERIFIED, because he was at 2% of his weekly limit: talking (hold,
+the mic, her voice from the speaker), the swipe to Yuzu and Zero, and
+the hotspot.
+
 ## HIS FIRST REAL FLASH GOT TO THE LAST STEP (Oct 17, 00:47)
 
 His terminal, run on the board: **`cube` found the cube** as
