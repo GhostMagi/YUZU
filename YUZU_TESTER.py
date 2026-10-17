@@ -4124,6 +4124,76 @@ class TestTheCubeCode(unittest.TestCase):
             self.assertLessEqual(worst, room,
                                  "%r does not fit two lines of the cube" % s)
 
+    def pocket(self):
+        """Each girl's pocket lines, in GIRLS order, read off the code."""
+        rows = re.search(r"POCKET\[\]\s*=\s*\{(.*?)\}\s*;", self.code(), re.S)
+        self.assertTrue(rows, "the cube has no POCKET table")
+        names = re.findall(r"POCKET_OF\((\w+)\)", rows.group(1))
+        out = []
+        for name in names:
+            body = re.search(r"%s\[\]\s*=\s*\{(.*?)\}\s*;" % name,
+                             self.code(), re.S)
+            self.assertTrue(body, "no lines for %s" % name)
+            out.append((name, re.findall(r'"((?:[^"\\]|\\.)*)"',
+                                         body.group(1))))
+        return out
+
+    def test_away_from_the_board_every_girl_still_ANSWERS(self):
+        """Ghost, Oct 17: "Can we give the cube at least sumn cute/fun to
+        display/ interact with when its away from the board. So it still
+        has pocket use". Every girl on the cube has her own lines, in
+        GIRLS order (Four's must never come out of Yuzu), enough that
+        they do not repeat at once, ASCII (the box is Font2, which has
+        nothing else), and short enough for the box: seven lines of
+        292px, worst case a whole line lost to wrapping."""
+        width = lambda s: sum(self.FONT2[ord(c) - 32] for c in s)
+        girls = [n for _w, n, _h in self.girls()]
+        pocket = self.pocket()
+        self.assertEqual([n for n, _ in pocket],
+                         ["POCKET_" + g.upper() for g in girls],
+                         "a girl's pocket lines come out of someone else")
+        for name, lines in pocket:
+            self.assertGreaterEqual(len(lines), 6, "%s has too few" % name)
+            self.assertEqual(len(set(lines)), len(lines), name)
+            for line in lines:
+                self.assertTrue(all(32 <= ord(c) < 127 for c in line),
+                                "Font2 cannot draw %r" % line)
+                self.assertLessEqual(width(line), 292 * 5,
+                                     "%r does not fit her box" % line)
+
+    def test_she_never_claims_to_have_HEARD_him_out_there(self):
+        """Without the board there are no ears, so a line that answers
+        what he said is a line that lies. Yuzu's "I can't hear it" is
+        the honest shape; "you said" or "I heard" is not."""
+        for name, lines in self.pocket():
+            for line in lines:
+                self.assertNotRegex(line.lower(),
+                                    r"\byou said\b|\bi heard\b|good question",
+                                    "%s claims she heard him" % name)
+
+    def test_every_way_of_missing_the_board_ends_in_her_pocket_line(self):
+        """No WiFi when he lets go, no WiFi a moment ago (so no second
+        twenty-second look), and a board that does not answer: each ends
+        in pocket_reply, so a hold is never only an error. And her box
+        sits ABOVE the status bar, since out here both show at once."""
+        code = self.code()
+        release = code[code.index("stop_recording();\n      if (is_swipe"):
+                       code.index("} else if (t.wasPressed())")]
+        self.assertRegex(release, r"else if \(away && millis\(\) - away_at "
+                                  r"< AWAY_MS\) \{\s*pocket_reply\(\);",
+                         "a hold out of range looks for the WiFi again")
+        self.assertRegex(release, r"(?s)join_wifi\(\)\) \{.*?\} else \{\s*"
+                                  r"pocket_reply\(\);", "no WiFi: no answer")
+        self.assertIn("else if (lost_board) pocket_reply();", code,
+                      "a board that is off gets no answer")
+        self.assertIn("away = true;", code[code.index("static bool join_wifi"):],
+                      "a failed look is never remembered")
+        away = re.search(r"AWAY_MS\s*=\s*(\d+)", code)
+        self.assertTrue(away and 30000 <= int(away.group(1)) <= 300000,
+                        "back home, she stays in her pocket too long")
+        self.assertIn("draw_said(H - draw_status());", code,
+                      "her box is drawn under the status line")
+
     def test_zeros_face_on_the_cube_is_her_PAGES(self):
         """Her pink and her working cue, two copies that must agree: the
         page brightens her picture to 1.3 while she works, and so does

@@ -104,6 +104,61 @@ static const Girl GIRLS[] = {
 };
 static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
 static const int FOUR = 0, YUZU = 1, ZERO = 2;
+
+// ---- away from the board -----------------------------------------------
+// Ghost, Oct 17: "Can we give the cube at least sumn cute/fun to
+// display/ interact with when its away from the board. So it still has
+// pocket use". Her face, her rain, her colours and the swipe never
+// needed the board; talking did. So away from it a hold still gets an
+// answer: a line of her own, baked in, in the chat box. Without the
+// board's ears she cannot hear the question, so every line has to work
+// as an answer to anything -- half of them a yes or a no, which makes
+// her a pocket fortune teller. ASCII only: the box is Font2.
+static const char* const POCKET_FOUR[] = {
+  "My mind's back on the board, so you've got the pocket version. Still better than no version.",
+  "Can't hear you out here, but the odds look good. Go for it.",
+  "Short answer: yes. The long answer is on the board.",
+  "No. Probably. Ask me properly when we're home.",
+  "Out of range. I'm still here, just quieter.",
+  "Signal's gone, so I'm keeping the rain going for you.",
+  "Tap me for a new colour. That part works anywhere.",
+  "Heads. It's always heads with me.",
+  "Yes, and I'm not taking questions on how I know.",
+  "Not today. Tomorrow, maybe.",
+};
+static const char* const POCKET_YUZU[] = {
+  "Ehehe~ my brain's back on the board, but I'm still cute out here, right?",
+  "Can't hear you without the board, cutie. Just assume I said yes!",
+  "Pocket Yuzu reporting! Are we at the mall? Tell me we're at the mall.",
+  "Totally yes. Like, a hundred percent. Don't ask me how I know.",
+  "Hmm... no. Unless it's pink. Then yes.",
+  "Out of WiFi, not out of vibes.",
+  "Hot pink nails would fix this. They fix everything.",
+  "Take me somewhere fun, Ghost! Tell me all about it when we're home.",
+  "A secret? I can't hear it, so it's extra safe with me.",
+  "Swipe for Four if you need the serious one. I'm the fun one!",
+};
+static const char* const POCKET_ZERO[] = {
+  "My working is on the board, so this is an estimate: probably yes.",
+  "Out of range. I can't hear you, but I'd bet on you anyway.",
+  "Aha, pocket mode. Running on eight megabytes and good intentions.",
+  "No, with moderate confidence. Ask again near the board for a real answer.",
+  "Fun fact while we wait: there are more ways to shuffle a deck of cards than atoms on Earth.",
+  "Huh. Without the board I'm mostly a picture. A good picture, though.",
+  "Yes. Don't check my working, it's on the board.",
+  "Fun fact: an octopus has three hearts.",
+  "Unclear. I'd need the board, a calculator and a minute.",
+  "Signal lost. Head home, or find a WiFi I know.",
+};
+struct Pocket { const char* const* lines; int count; };
+#define POCKET_OF(a) {a, (int)(sizeof(a) / sizeof(a[0]))}
+static const Pocket POCKET[] = {
+  POCKET_OF(POCKET_FOUR), POCKET_OF(POCKET_YUZU), POCKET_OF(POCKET_ZERO),
+};
+// Looking for a WiFi that wasn't there a moment ago costs up to twenty
+// seconds, so for two minutes after a look finds nothing a hold goes
+// straight to her pocket answer.
+static const uint32_t AWAY_MS = 120000;
 // A swipe is a quarter of the screen sideways. Fingers drift while he
 // holds the screen and talks; they do not drift 80 pixels sideways.
 static const int SWIPE_PX = 80;
@@ -243,6 +298,11 @@ static uint32_t status_until = 0;
 // are dropped and *asterisks* lose their stars, as on her page.
 static portMUX_TYPE said_mux = portMUX_INITIALIZER_UNLOCKED;
 static char said_text[PIECE_CHARS + 16] = "";
+// When a pocket line goes; 0 while her voice decides it.
+static volatile uint32_t said_until = 0;
+static bool away = false;                // no WiFi when the cube last looked
+static uint32_t away_at = 0;
+static int last_pocket = -1;
 
 static void set_said(const char* t) {
   char out[sizeof(said_text)];
@@ -278,7 +338,19 @@ static void set_said(const char* t) {
   portENTER_CRITICAL(&said_mux);
   strncpy(said_text, start, sizeof(said_text) - 1);
   said_text[sizeof(said_text) - 1] = 0;
+  said_until = 0;
   portEXIT_CRITICAL(&said_mux);
+}
+
+// One of her own lines in the chat box for seven seconds, never the
+// same one twice running.
+static void pocket_reply() {
+  const Pocket& p = POCKET[girl];
+  int k = esp_random() % p.count;
+  if (p.count > 1 && k == last_pocket) k = (k + 1) % p.count;
+  last_pocket = k;
+  set_said(p.lines[k]);
+  said_until = millis() + 7000;
 }
 
 static void say_status(const char* text, uint32_t ms = 6000) {
@@ -513,13 +585,15 @@ static void compose_zero() {
 // ONE line when it fits and TWO when it does not, split at the space
 // that balances them: a sentence from the board clipped at both edges
 // is a sentence he cannot read, and the hints name two other girls.
-static void draw_status() {
+// The status bar along the bottom, and how tall it came out (0 when
+// there is none), so her chat box can sit above it rather than under.
+static int draw_status() {
   char text[sizeof(status_text)];
   portENTER_CRITICAL(&status_mux);
   bool show = status_text[0] && millis() < status_until;
   strcpy(text, status_text);
   portEXIT_CRITICAL(&status_mux);
-  if (!show) return;
+  if (!show) return 0;
   uint32_t ink = girl == YUZU ? YUZU_PINK
                : girl == ZERO ? ZERO_PINK
                : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
@@ -548,12 +622,14 @@ static void draw_status() {
     frame.drawString(text, W / 2, H - 29);
     frame.drawString(text + split + 1, W / 2, H - 11);
   }
+  return bar;
 }
 
 // A rounded box along the bottom in her colours, the words wrapped to
 // fit, as many lines as the piece needs (a piece is at most
 // PIECE_CHARS, which is about six lines of Font2).
-static void draw_said() {
+static void draw_said(int floor) {
+  if (said_until && (int32_t)(millis() - said_until) >= 0) set_said("");
   char text[sizeof(said_text)];
   portENTER_CRITICAL(&said_mux);
   strcpy(text, said_text);
@@ -592,7 +668,7 @@ static void draw_said() {
                : girl == ZERO ? ZERO_PINK
                : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
   const int box_h = lines * line_h + 12;
-  const int y = H - box_h - 6;
+  const int y = floor - box_h - 6;
   frame.fillRoundRect(6, y, W - 12, box_h, 10,
                       girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0);
   frame.drawRoundRect(6, y, W - 12, box_h, 10, hex565(ink));
@@ -610,8 +686,7 @@ static void draw_frame() {
   if (girl == FOUR) { rain_step(); compose_four(); }
   else if (girl == YUZU) compose_yuzu();
   else compose_zero();
-  draw_said();
-  draw_status();
+  draw_said(H - draw_status());
   frame.pushSprite(0, 0);
 }
 
@@ -878,6 +953,7 @@ static void turn_task(void*) {
   thinking = true;
   String heard, reply;
   if (listen(rec_buf, rec_len, heard) && ask(heard, reply)) speak(reply);
+  else if (lost_board) pocket_reply();    // the board is off or gone
   thinking = false;
   stop_her = false;
   busy = false;
@@ -1018,11 +1094,14 @@ static bool join_wifi() {
     }
     if (WiFi.status() != WL_CONNECTED) {
       // The cube hears 2.4 GHz only, and a phone hotspot is often 5.
-      if (seen) say_status("No WiFi. Is the network in range?", 0);
-      else say_status("Can't see your WiFi. The cube only hears 2.4 GHz.", 0);
+      if (seen) say_status("No WiFi in range. Pocket mode: hold and ask me.", 9000);
+      else say_status("Can't see your WiFi (2.4 GHz only). Pocket mode.", 9000);
+      away = true;
+      away_at = millis();
       return false;
     }
   }
+  away = false;
   lost_board = false;
   say_status("Looking for the board...", 0);
   find_board();
@@ -1073,6 +1152,8 @@ void setup() {
 static void swap_girl(int dx) {
   girl = (girl + (dx < 0 ? 1 : GIRL_COUNT - 1)) % GIRL_COUNT;
   prefs.putUChar("girl", girl);
+  set_said("");
+  last_pocket = -1;
   say_status(GIRLS[girl].hint, 4000);
 }
 
@@ -1104,11 +1185,16 @@ void loop() {
         // A tap, not a talk: her tap does its thing and the clip goes.
         if (t.wasClicked()) tapped();
         else say_status("Hold the screen while you talk.", 3000);
+      } else if (away && millis() - away_at < AWAY_MS) {
+        pocket_reply();        // no WiFi a moment ago: don't spend 20s looking
       } else if (join_wifi()) {
         busy = true;
         asking = girl;
+        set_said("");
         say_status("", 1);
         xTaskCreatePinnedToCore(turn_task, "turn", 16384, nullptr, 1, nullptr, 0);
+      } else {
+        pocket_reply();
       }
     }
   } else if (t.wasPressed()) {

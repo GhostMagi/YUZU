@@ -155,7 +155,7 @@ cd YUZU
 python3 YUZU_TESTER.py
 ```
 
-**941 tests, ~19 seconds.** If they pass, the software made the trip
+**944 tests, ~19 seconds.** If they pass, the software made the trip
 intact. Nothing to install — the whole thing is standard library.
 
 ## 9 — Talk to her

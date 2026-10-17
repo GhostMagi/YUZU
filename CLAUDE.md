@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 941 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 944 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,42 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## POCKET MODE: THE CUBE STILL ANSWERS AWAY FROM THE BOARD (Oct 17)
+
+**THE CHAT BOX IS CONFIRMED ON THE CUBE**: his photo shows Yuzu with
+her words in the pink box ("livin' my best life in my cube... a REALLY
+big urge" for the mall). So is the swipe, since she is on there.
+
+He asked what the buttons do: **the firmware uses neither physical
+button.** Power and reset are the cube's own, and a reset brings back
+whoever was on screen (her memory is on the board).
+
+Then: *"Can we give the cube at least sumn cute/fun to display/
+interact with when its away from the board. So it still has pocket
+use xD"*. Her face, rain, colours and the swipe never needed the
+board; talking did. **So away from it, a hold still gets an answer:
+a line of her own, baked into the firmware, in the chat box for seven
+seconds** (`POCKET_FOUR/YUZU/ZERO`, ten each, never the same twice
+running). Without the board's ears she cannot hear the question, so
+every line works as an answer to anything -- half are a yes or a no,
+which makes her a pocket fortune teller -- and a test bans "you said"
+and "I heard".
+
+- **Three ways in, one answer**: no WiFi on release, no WiFi in the
+  last two minutes (`AWAY_MS`: a look costs up to twenty seconds, so
+  it is not spent again on every hold), and a board that does not
+  answer (`lost_board` in the turn).
+- **The no-WiFi status times out now** (9s, says "Pocket mode") rather
+  than sitting on screen forever, and still names 2.4 GHz.
+- **Her box sits ABOVE the status bar** (`draw_status` returns its
+  height), since out here both show at once.
+- Firmware text, not a prompt: nothing to paste.
+
+Compiled clean, 1.63 MB. **UNSEEN on the cube** until he Updates and
+runs `~/YUZU/cube` again. Three tests, eleven breaks, all red as
+failures (two re-run after my own breaks missed: an anchor that
+matched nothing, and a "too long" status that still fit). **941 -> 944.**
 
 ## FOUR IS ON THE CUBE (Oct 17)
 
