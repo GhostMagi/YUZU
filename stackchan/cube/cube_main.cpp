@@ -234,6 +234,53 @@ static char status_text[96] = "";
 static const int STATUS_ROOM = W - 12;
 static uint32_t status_until = 0;
 
+// ---- what she is saying, in a box ------------------------------------
+// Ghost, Oct 17, the first time she spoke out of the cube: "Can we add
+// a cute chat box for what she says? In case its loud. Simpler the
+// better." So the piece she is SAYING shows while she says it, and goes
+// when her voice does. Font2 is ASCII, so her curly quotes and dashes
+// become plain ones and anything else is left out; [stage directions]
+// are dropped and *asterisks* lose their stars, as on her page.
+static portMUX_TYPE said_mux = portMUX_INITIALIZER_UNLOCKED;
+static char said_text[PIECE_CHARS + 16] = "";
+
+static void set_said(const char* t) {
+  char out[sizeof(said_text)];
+  size_t n = 0;
+  bool in_bracket = false;
+  for (const unsigned char* c = (const unsigned char*)t; *c && n < sizeof(out) - 4; c++) {
+    if (*c == '[') { in_bracket = true; continue; }
+    if (*c == ']') { in_bracket = false; continue; }
+    if (in_bracket || *c == '*') continue;
+    if (*c == '\n' || *c == '\t') { if (n && out[n - 1] != ' ') out[n++] = ' '; continue; }
+    if (*c < 0x80) {
+      if (*c == ' ' && n && out[n - 1] == ' ') continue;
+      out[n++] = *c;
+      continue;
+    }
+    // U+2018/2019 quotes, 201C/201D double quotes, 2013/2014 dashes,
+    // 2026 an ellipsis: E2 80 xx. Everything else non-ASCII is skipped.
+    if (c[0] == 0xE2 && c[1] == 0x80 && c[2]) {
+      unsigned char k = c[2];
+      if (k == 0x98 || k == 0x99) out[n++] = '\'';
+      else if (k == 0x9C || k == 0x9D) out[n++] = '"';
+      else if (k == 0x93 || k == 0x94) out[n++] = '-';
+      else if (k == 0xA6) { out[n++] = '.'; out[n++] = '.'; out[n++] = '.'; }
+      c += 2;
+      continue;
+    }
+    while ((c[1] & 0xC0) == 0x80) c++;     // the rest of this character
+  }
+  while (n && out[n - 1] == ' ') n--;
+  out[n] = 0;
+  const char* start = out;
+  while (*start == ' ') start++;
+  portENTER_CRITICAL(&said_mux);
+  strncpy(said_text, start, sizeof(said_text) - 1);
+  said_text[sizeof(said_text) - 1] = 0;
+  portEXIT_CRITICAL(&said_mux);
+}
+
 static void say_status(const char* text, uint32_t ms = 6000) {
   portENTER_CRITICAL(&status_mux);
   strncpy(status_text, text, sizeof(status_text) - 1);
@@ -503,11 +550,67 @@ static void draw_status() {
   }
 }
 
+// A rounded box along the bottom in her colours, the words wrapped to
+// fit, as many lines as the piece needs (a piece is at most
+// PIECE_CHARS, which is about six lines of Font2).
+static void draw_said() {
+  char text[sizeof(said_text)];
+  portENTER_CRITICAL(&said_mux);
+  strcpy(text, said_text);
+  portEXIT_CRITICAL(&said_mux);
+  if (!text[0]) return;
+  frame.setFont(&fonts::Font2);
+  frame.setTextSize(1);
+  frame.setTextDatum(top_left);
+  const int room = W - 28, line_h = 16, max_lines = 7;
+  int starts[max_lines], ends[max_lines], lines = 0;
+  int i = 0, len = strlen(text);
+  while (i < len && lines < max_lines) {
+    int fit = i, j = i;
+    while (j <= len) {
+      if (j == len || text[j] == ' ') {
+        char keep = text[j];
+        text[j] = 0;
+        bool ok = frame.textWidth(text + i) <= room;
+        text[j] = keep;
+        if (!ok) break;
+        fit = j;
+      }
+      j++;
+    }
+    if (fit == i) {                      // one word wider than the box
+      fit = i;
+      while (fit < len && text[fit] != ' ') fit++;
+    }
+    starts[lines] = i;
+    ends[lines] = fit;
+    lines++;
+    i = fit;
+    while (i < len && text[i] == ' ') i++;
+  }
+  uint32_t ink = girl == YUZU ? YUZU_PINK
+               : girl == ZERO ? ZERO_PINK
+               : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+  const int box_h = lines * line_h + 12;
+  const int y = H - box_h - 6;
+  frame.fillRoundRect(6, y, W - 12, box_h, 10,
+                      girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0);
+  frame.drawRoundRect(6, y, W - 12, box_h, 10, hex565(ink));
+  frame.setTextColor(hex565(ink));
+  for (int k = 0; k < lines; k++) {
+    char keep = text[ends[k]];
+    text[ends[k]] = 0;
+    frame.drawString(text + starts[k], 14, y + 6 + k * line_h);
+    text[ends[k]] = keep;
+  }
+}
+
 // One frame of whoever is on the cube.
 static void draw_frame() {
   if (girl == FOUR) { rain_step(); compose_four(); }
   else if (girl == YUZU) compose_yuzu();
   else compose_zero();
+  draw_said();
   draw_status();
   frame.pushSprite(0, 0);
 }
@@ -749,6 +852,7 @@ static void speak(const String& reply) {
   String piece = next_piece(reply, from);
   uint8_t* next = piece.length() ? fetch_voice(piece, len) : nullptr;
   size_t next_len = len;
+  String next_text = piece;
   if (!next) say_status("She answered, but her voice didn't come.");
   while (next && !stop_her) {
     while (M5.Speaker.isPlaying() && !stop_her) delay(10);
@@ -756,12 +860,15 @@ static void speak(const String& reply) {
     if (stop_her) { free(next); next = nullptr; break; }
     playing = next;
     M5.Speaker.playWav(playing, next_len, 1, 0, true);
+    set_said(next_text.c_str());       // the words she is saying now
     thinking = false;
     piece = next_piece(reply, from);
     next = piece.length() ? fetch_voice(piece, len) : nullptr;
     next_len = len;
+    next_text = piece;
   }
   while (M5.Speaker.isPlaying() && !stop_her) delay(10);
+  set_said("");                        // her voice stopped, so do her words
   if (stop_her) M5.Speaker.stop();
   if (playing) free(playing);
   if (next) free(next);

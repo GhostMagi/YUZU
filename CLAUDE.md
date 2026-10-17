@@ -58,6 +58,19 @@ UNVERIFIED, because he was at 2% of his weekly limit: talking (hold,
 the mic, her voice from the speaker), the swipe to Yuzu and Zero, and
 the hotspot.
 
+**SHE TALKS OUT OF THE CUBE, same night**, with a photo: *"Shes talking
+aloud."* That confirms hold-to-talk, the cube's mic, the board's
+Whisper, her brain and her Kokoro voice playing through the cube's
+speaker, end to end. Then: *"Can we add a cute chat box for what she
+says? In case its loud. Simpler the better."* So **the piece she is
+SAYING shows in a rounded box at the bottom, in her colours, while she
+says it, and it goes when her voice does** (`set_said` / `draw_said`).
+It follows the voice pieces that already existed, so it needs no new
+route. Font2 is ASCII-only, so curly quotes and dashes become plain
+ones, `[stage directions]` are dropped and `*stars*` are removed.
+Compiled clean, 1.63 MB. **UNSEEN on the cube**: he has to Update and
+run `~/YUZU/cube` again to get it.
+
 ## HIS FIRST REAL FLASH GOT TO THE LAST STEP (Oct 17, 00:47)
 
 His terminal, run on the board: **`cube` found the cube** as
