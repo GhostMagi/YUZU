@@ -90,6 +90,24 @@ if [ -z "$cube" ]; then
 fi
 echo "Found the cube at $cube."
 
+no_usb() {
+    echo "NOT FLASHED. The board isn't allowed to use the cube's USB yet."
+    echo "Type these two, one at a time (the board restarts after the second):"
+    echo "    sudo usermod -aG dialout \$USER"
+    echo "    sudo reboot"
+    echo "Then ~/YUZU/cube again. It won't download anything a second time."
+}
+
+# CHECKED HERE, before 1.5 GB of tools and minutes of building. His
+# first real flash (Oct 17) did all of that and then failed on exactly
+# this: his user was not in the group that may open a USB serial port,
+# and esptool said so as "Path ... is not readable", which no line
+# below knew to translate.
+if [ ! -r "$cube" ] || [ ! -w "$cube" ]; then
+    no_usb
+    exit 1
+fi
+
 # ---- 2. every WiFi the board knows -------------------------------------------
 # Ghost, Oct 17: "i need it to be able to connect to my phones mobile
 # hotspot". So the cube is given EVERY WiFi network the board has saved
@@ -245,10 +263,8 @@ echo "Building her and putting her on the cube (a few minutes)..."
 # into /tmp/arduino/sketches/ and leaves it there.
 if ! cli compile -b "$FQBN" --build-path "$build/out" --upload -p "$cube" \
         "$build/cube" > "$TOOLS/flash.log" 2>&1; then
-    if grep -qi "permission denied" "$TOOLS/flash.log"; then
-        echo "NOT FLASHED. The board isn't allowed to talk to the cube's USB yet."
-        echo "Run this once, then log out and back in, then ~/YUZU/cube again:"
-        echo "    sudo usermod -aG dialout \$USER"
+    if grep -qiE "permission denied|is not readable|is not writable" "$TOOLS/flash.log"; then
+        no_usb
     elif grep -qi "could not open" "$TOOLS/flash.log"; then
         echo "NOT FLASHED. The board couldn't open the cube's USB port."
         echo "Unplug the cube, plug it back in, and run ~/YUZU/cube again."

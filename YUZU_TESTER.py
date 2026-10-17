@@ -4227,7 +4227,7 @@ class TestCubeFlash(unittest.TestCase):
         path.write_text("#!/bin/bash\n" + body)
         path.chmod(0o755)
 
-    def run_cube(self, serial=None, cli=True, extra=None):
+    def run_cube(self, serial=None, cli=True, extra=None, as_him=False):
         log = self.log
         self.stub("nmcli", self.nmcli_stub())
         self.stub("sudo", 'exec "$@"\n')
@@ -4263,7 +4263,21 @@ exit 0
         else:
             env["YUZU_CUBE_CLI"] = str(self.tools / "nothing-here")
         env.update(extra or {})
-        return subprocess.run([str(self.REPO / "cube")], env=env, text=True,
+        argv = [str(self.REPO / "cube")]
+        if as_him and os.geteuid() == 0:
+            # Root opens anything, so a port he may not open can only be
+            # tried as someone who is not root: an ordinary uid, with no
+            # groups -- what his user was before dialout.
+            # The script is run from a copy in the test's own folder, so
+            # that user can reach it wherever the checkout lives.
+            self.tmp.chmod(0o755)
+            self.bin.chmod(0o755)
+            mine = self.tmp / "cube"
+            shutil.copy(self.REPO / "cube", mine)
+            mine.chmod(0o755)
+            argv = ["setpriv", "--reuid=65534", "--regid=65534",
+                    "--clear-groups", str(mine)]
+        return subprocess.run(argv, env=env, text=True,
                               capture_output=True, timeout=60,
                               stdin=subprocess.DEVNULL)
 
@@ -4416,6 +4430,30 @@ exit 0
         self.assertEqual(used - written, set(),
                          "the firmware reads settings the flash never writes")
 
+    def test_a_port_he_may_not_open_is_said_BEFORE_anything_is_spent(self):
+        """His first real flash, Oct 17: it found the cube, fetched 1.5 GB
+        of tools, built her for minutes -- and then could not open the
+        cube's port, because his user was not in the group that may.
+        Said first now, with the fix, and nothing fetched or built."""
+        if os.geteuid() == 0 and not shutil.which("setpriv"):
+            self.skipTest("root can open any port, and no setpriv to drop it")
+        # No access at all, and READ-only: esptool needs to write too.
+        for mode in (0o000, 0o444):
+            with self.subTest(mode=oct(mode)):
+                self.cube.chmod(mode)
+                got = self.run_cube(cli=False, as_him=True)
+                self.assertNotIn("Permission denied", got.stderr,
+                                 "the test could not even run the script: %s"
+                                 % got.stderr)
+                self.assertEqual(got.returncode, 1, got.stdout + got.stderr)
+                self.assertIn("dialout", got.stdout, got.stdout + got.stderr)
+                self.assertIn("reboot", got.stdout)
+                self.assertNotIn("FIRST TIME", got.stdout, "it fetched the "
+                                 "build tools for a cube it can't reach")
+                self.assertNotIn("Building her", got.stdout)
+                self.assertFalse(self.log.exists(),
+                                 "it built for a cube it can't reach")
+
     def test_the_build_stays_in_the_TEMP_folder_and_asks_for_PSRAM(self):
         """arduino-cli's default build path copies the sketch -- secrets
         and all -- into /tmp/arduino and leaves it there."""
@@ -4469,7 +4507,13 @@ exit 0
                           ("A fatal error occurred: Failed to connect to ESP32-S3",
                            "reset button"),
                           ("Could not open /dev/ttyACM0, the port is busy",
-                           "plug it back in")):
+                           "plug it back in"),
+                          # esptool's own words on his board, Oct 17,
+                          # which no line here knew to translate.
+                          ("Invalid value for '--port' / '-p': Path '/dev/serial"
+                           "/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_"
+                           "00:00:00:00:00:00-if00' is not readable.",
+                           "dialout")):
             self.stub_fail = said
             got = self.run_cube()
             self.assertEqual(got.returncode, 1)

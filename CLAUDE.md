@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 940 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 941 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,45 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HIS FIRST REAL FLASH GOT TO THE LAST STEP (Oct 17, 00:47)
+
+His terminal, run on the board: **`cube` found the cube** as
+`/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_...` (the
+`*Espressif*` glob matched, so the USB name is CONFIRMED). It **listed
+two networks, `SoapWorld` and `Ghost`**, with no unreadable-password
+flag, and the second is presumably his hotspot. **It fetched the
+aarch64 tools (10s), installed the ESP32 core (2m10s) and BUILT HER
+on the Orin (1m40s)**, so the toolchain on his board is CONFIRMED.
+Then the upload failed:
+
+    Invalid value for '--port' / '-p': Path '/dev/serial/by-id/...'
+    is not readable.
+
+**His user is not in `dialout`**, so it may not open a USB serial
+port. The script had a line for exactly this, matched on "permission
+denied", and **esptool 5 says it as "is not readable"**, so he got
+esptool's raw box instead of the fix. That translation was a guess
+about another program's wording.
+
+- **`cube` now ASKS THE FILESYSTEM FIRST**: right after it finds the
+  cube, it checks whether the port is readable AND writable. If not,
+  it prints the fix (`sudo usermod -aG dialout $USER`, then
+  `sudo reboot`, then `~/YUZU/cube` again) before anything is spent.
+  The upload translation knows esptool's words too, as the second net.
+- **Reboot, not "log out and back in"**: a new group only takes on a
+  new login, and on his serial terminal a reboot is the one he
+  already knows. The face server comes back by itself (`face --boot`).
+- **The suite runs as ROOT here, and root opens anything**, so the
+  test drops to an ordinary uid with `setpriv` (numeric, because this
+  container's passwd is the broken one, never to be touched) and tries
+  a port with no access, then a READ-only one. A read-only check went
+  green until the second mode was added. **And my first version ran
+  the script from a folder that uid could not enter**, so two
+  break-checks went red for the WRONG reason: the failure said
+  "Permission denied" on the script itself. **Read the failure's
+  message, not just its colour.** It runs its own copy now.
+  **940 -> 941.**
 
 ## THE CUBE ARRIVED, AND IT KNOWS EVERY WIFI THE BOARD KNOWS (Oct 17)
 
