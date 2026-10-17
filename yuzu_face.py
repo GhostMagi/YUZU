@@ -3159,9 +3159,60 @@ def restart_later(delay=2):
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+# HOW THE CUBE FINDS THE BOARD ON A NETWORK SHE WAS NOT FLASHED ON.
+#
+# Ghost, Oct 17: "i need it to be able to connect to my phones mobile
+# hotspot". At home the cube asks for the board BY NAME (mDNS, which
+# avahi answers -- confirmed on his board) and falls back to the numbers
+# it had at flash time. On his phone's hotspot both can fail: the
+# numbers are home's, and whether a phone hotspot carries mDNS between
+# two of its clients is UNVERIFIED. So the cube also shouts one fixed
+# question to the whole network, and the board answers with the port
+# her pages are on; the answer's own sender IS the board's address.
+#
+# Nothing from the request reaches anything: an exact match or silence,
+# and the answer is shorter than the question, so the board can never
+# be used to amplify traffic at anyone. The cube holds the same two
+# strings and a test holds them equal.
+CUBE_ASK = b"yuzu? where is the board"
+CUBE_ANSWER = b"yuzu-face "
+
+
+def answer_the_cube(port, bind="0.0.0.0"):
+    """Answer the cube's broadcast from a thread. Returns the socket, or
+    None when the port cannot be had -- which costs the cube this one
+    way of finding the board and NEVER costs the pages."""
+    import socket
+    import threading
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((bind, port))
+    except OSError as e:
+        print("(The cube can't find this board by asking -- %s. It still "
+              "can by name.)" % e, file=sys.stderr)
+        return None
+    answer = CUBE_ANSWER + str(port).encode()
+
+    def listen():
+        while True:
+            try:
+                data, who = sock.recvfrom(64)
+            except OSError:
+                return              # closed
+            if data == CUBE_ASK:
+                try:
+                    sock.sendto(answer, who)
+                except OSError:
+                    pass
+    threading.Thread(target=listen, name="cube-finder", daemon=True).start()
+    return sock
+
+
 def serve(port=8081, bind="0.0.0.0"):
     """Blocks. `face` backgrounds this with nohup -- never foreground on
     his serial link, which reads as a frozen board."""
+    answer_the_cube(port, bind)
     # THREADING, and it is not optional: one reply takes tens of seconds
     # on that board, and a single-threaded server would stop answering
     # /state for the whole time -- so her face would freeze exactly when

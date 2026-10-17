@@ -13,14 +13,16 @@
 #
 # WHAT IT DOES, in order, verdict first at every step:
 #   - finds the cube on USB, before spending anything;
-#   - reads the WiFi the BOARD is on, so the cube joins the same one --
-#     the password needs sudo to read, which is the one thing it asks;
+#   - reads EVERY WiFi the board has saved, its current one first, so
+#     the cube joins whichever of them it can see -- home, or his
+#     phone's hotspot (Oct 17). The passwords need sudo to read, which
+#     is the one thing it asks;
 #   - the first time only, fetches the build tools (~1.5 GB, said before
 #     it starts) into ~/.yuzu/cube-tools, OUTSIDE the repo -- a repo
 #     folder full of toolchain would block every pull, and Save my stuff
 #     does not carry it, because it can always be fetched again;
 #   - builds her in a TEMPORARY folder with the WiFi password in it, and
-#     deletes that folder when it is done. His password is never written
+#     deletes that folder when it is done. His passwords are never written
 #     inside this repository, which is on GitHub.
 #
 # The board's NAME (for mDNS) and its current numbers (the fallback) are
@@ -88,30 +90,70 @@ if [ -z "$cube" ]; then
 fi
 echo "Found the cube at $cube."
 
-# ---- 2. the WiFi the board is on ------------------------------------------
-ssid="${YUZU_CUBE_SSID:-}"
-pass="${YUZU_CUBE_PASS:-}"
-if [ -z "$ssid" ] && command -v nmcli >/dev/null 2>&1; then
-    conn=$(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null \
-           | awk -F: '$2=="802-11-wireless" {print $1; exit}')
-    if [ -n "$conn" ]; then
-        ssid=$(nmcli -g 802-11-wireless.ssid connection show "$conn" 2>/dev/null)
-        echo "The cube will join the board's WiFi, \"$ssid\"."
-        echo "Reading its password needs sudo:"
-        pass=$(sudo nmcli -s -g 802-11-wireless-security.psk \
-               connection show "$conn" 2>/dev/null)
-    fi
+# ---- 2. every WiFi the board knows -------------------------------------------
+# Ghost, Oct 17: "i need it to be able to connect to my phones mobile
+# hotspot". So the cube is given EVERY WiFi network the board has saved
+# -- the one it is on first, then the rest -- and joins the first of
+# them it can see. A network the board has never joined would be no use
+# to her: the two have to be on the same one to find each other.
+#
+# By UUID, never by name: a name can hold a colon, and nmcli's terse
+# output mangles one. And `-e no` on every value read, because terse
+# mode otherwise ESCAPES ':' and '\' -- a password holding either would
+# reach the cube with a backslash it never had.
+nets=()     # ssid, password, ssid, password, ...
+unread=()   # locked networks whose password could not be read
+if [ -n "${YUZU_CUBE_SSID:-}" ]; then
+    nets+=("$YUZU_CUBE_SSID" "${YUZU_CUBE_PASS:-}")
+elif command -v nmcli >/dev/null 2>&1; then
+    uuids=$( { nmcli -t -f UUID,TYPE connection show --active 2>/dev/null
+               nmcli -t -f UUID,TYPE connection show 2>/dev/null; } \
+             | awk -F: '$2=="802-11-wireless" && !seen[$1]++ {print $1}')
+    [ -n "$uuids" ] && echo "Reading the WiFi passwords the board has saved needs sudo:"
+    for u in $uuids; do
+        s=$(nmcli -e no -g 802-11-wireless.ssid connection show uuid "$u" 2>/dev/null)
+        [ -z "$s" ] && continue
+        known=""
+        for ((i = 0; i < ${#nets[@]}; i += 2)); do
+            [ "${nets[i]}" = "$s" ] && known=1
+        done
+        [ -n "$known" ] && continue
+        pw=$(sudo nmcli -e no -s -g 802-11-wireless-security.psk \
+             connection show uuid "$u" 2>/dev/null)
+        # A locked network whose password came back empty is one the
+        # cube cannot join -- a password kept in a desktop keyring, out
+        # of sudo's reach. Said at flash time, never left to the cube to
+        # fail at quietly on the day.
+        lock=$(nmcli -e no -g 802-11-wireless-security.key-mgmt \
+               connection show uuid "$u" 2>/dev/null)
+        [ -n "$lock" ] && [ -z "$pw" ] && unread+=("$s")
+        nets+=("$s" "$pw")
+        [ ${#nets[@]} -ge 16 ] && break      # eight networks is plenty
+    done
 fi
-if [ -z "$ssid" ]; then
-    echo "The board isn't on WiFi I can read, so type it in."
+if [ ${#nets[@]} -eq 0 ]; then
+    echo "The board hasn't saved any WiFi I can read, so type it in."
     read -r -p "WiFi name: " ssid
     read -r -s -p "WiFi password: " pass
     echo
+    [ -n "$ssid" ] && nets+=("$ssid" "$pass")
 fi
-if [ -z "$ssid" ]; then
+if [ ${#nets[@]} -eq 0 ]; then
     echo "NOT FLASHED. The cube needs a WiFi name to find the board."
     exit 1
 fi
+echo "The cube will know these WiFi networks, and join the first it can see:"
+for ((i = 0; i < ${#nets[@]}; i += 2)); do
+    note=""
+    for x in "${unread[@]}"; do
+        [ "$x" = "${nets[i]}" ] && note="   <- I couldn't read its password, so she can't join it"
+    done
+    echo "    ${nets[i]}$note"
+done
+echo "(Your phone's hotspot not in that list? The board has never joined it."
+echo " Turn the hotspot on, run this once, then ~/YUZU/cube again:"
+echo "    sudo nmcli device wifi connect \"HOTSPOT NAME\" password \"PASSWORD\")"
+echo "The cube only hears 2.4 GHz WiFi, so set your hotspot's band to 2.4 GHz."
 
 name=$(board_name)
 addr=$(lan_ip)
@@ -168,9 +210,10 @@ cli lib install $LIBS > "$TOOLS/libs.log" 2>&1 || cli lib install M5Unified M5GF
 build=$(mktemp -d /tmp/yuzu-cube.XXXXXX)
 trap 'rm -rf "$build"' EXIT
 cp -r "$SKETCH" "$build/cube"
-python3 - "$build/cube/cube_secrets.h" "$ssid" "$pass" "$name" "$addr" "$PORT_NUM" <<'PY'
+python3 - "$build/cube/cube_secrets.h" "$name" "$addr" "$PORT_NUM" "${nets[@]}" <<'PY'
 import sys
-path, ssid, pw, host, ip, port = sys.argv[1:7]
+path, host, ip, port = sys.argv[1:5]
+pairs = list(zip(sys.argv[5::2], sys.argv[6::2]))
 def c(s):
     # A C string literal: backslashes and quotes escaped, nothing else
     # trusted -- a WiFi password can hold either.
@@ -178,8 +221,13 @@ def c(s):
                          else chr(b) for b in s.encode()) + '"'
 with open(path, "w") as fh:
     fh.write("// Written by ~/YUZU/cube for one flash, then deleted.\n")
-    fh.write("#define CUBE_WIFI_SSID %s\n" % c(ssid))
-    fh.write("#define CUBE_WIFI_PASS %s\n" % c(pw))
+    # Every network the board knows, its own first: the cube joins the
+    # first of them it can see.
+    fh.write("#define CUBE_WIFI_COUNT %d\n" % len(pairs))
+    fh.write("static const char* const CUBE_WIFI[CUBE_WIFI_COUNT][2] = {\n")
+    for ssid, pw in pairs:
+        fh.write("  {%s, %s},\n" % (c(ssid), c(pw)))
+    fh.write("};\n")
     fh.write("#define CUBE_HOST %s\n" % c(host))
     fh.write("#define CUBE_HOST_IP %s\n" % c(ip))
     fh.write("#define CUBE_PORT %d\n" % int(port))
@@ -216,5 +264,5 @@ if ! cli compile -b "$FQBN" --build-path "$build/out" --upload -p "$cube" \
 fi
 
 echo "DONE. Four, Yuzu and Zero are on the cube."
-echo "It restarts by itself; give it about ten seconds to join \"$ssid\"."
+echo "It restarts by itself; give it about ten seconds to join your WiFi."
 echo "Hold the screen to talk, let go to send. Swipe across it to change girls."

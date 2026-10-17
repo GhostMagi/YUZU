@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 931 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 940 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,78 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE CUBE ARRIVED, AND IT KNOWS EVERY WIFI THE BOARD KNOWS (Oct 17)
+
+**The StackChan cube is on his desk**: his photo, *"I got a lil robot"*,
+showing M5Stack's factory face, and a blue battery base under it with
+magnets, LEGO holes, a slide switch and four level dots (*"i got a
+battery in it ye"*). Which base model it is was not confirmed. **NOT
+FLASHED YET** when this was written. He was told flashing replaces the
+factory face, and that getting the factory face back is unverified.
+
+He asked whether the Orin uses the cube over WiFi (yes, by design: the
+cube is face, ears and mouth, and the Orin is everything else; no
+internet needed, only a shared network), then: *"Yes i need it to be
+able to connect to my phones mobile hotspot sharing a wifi. Um. Nano
+too if we didnt yet"*. **The Nano already knows his hotspot** (the
+Sept 22 round ran on it), and the flash now LISTS every network it
+hands the cube, so he can see it there.
+
+- **`~/YUZU/cube` hands the cube EVERY WiFi the board has saved**, the
+  board's current one first, then the rest. It reads them from nmcli
+  by UUID (a name can hold a colon), drops repeats of one name, caps
+  the list at eight, and prints the list. A hotspot the board has
+  never joined is useless to the cube, because the two have to meet
+  on one network; the printout names the one line that joins it.
+- **AND THE OLD SCRIPT HAD A LATENT PASSWORD BUG.** nmcli's terse
+  mode (`-g`) ESCAPES `:` and `\` in every value unless told `-e no`,
+  so a password holding either reached the cube with a backslash it
+  never had. Every value is read with `-e no` now. The nmcli stand-in
+  escapes the way the real one does, and the test's own password has
+  a backslash in it.
+- **A password it cannot READ is said at flash time.** A locked
+  network whose password came back empty (kept in a desktop keyring,
+  out of sudo's reach) is marked in the list, so a hotspot she can't
+  join isn't found out on the day. An open network is not flagged.
+- **The cube joins the first network on HIS list that it can see**,
+  not the strongest signal. The board's own network is first, so at
+  home with his hotspot on, she still joins home, where the board is.
+  The scan runs in the background so the rain keeps falling. If none
+  of his networks is in sight, the board's own still gets one try
+  (a hidden network never shows in a scan), and the status says
+  **the cube only hears 2.4 GHz**. That is the ESP32-S3's limit, and
+  a phone hotspot is often 5 GHz. He was told to set his hotspot's
+  band to 2.4 GHz.
+- **Finding the board, three ways, cheapest first**: by name (mDNS,
+  confirmed at home), then BY ASKING, then the flashed numbers. On a
+  hotspot the numbers are home's, and whether a phone hotspot carries
+  mDNS between two of its clients is UNVERIFIED. So the cube
+  broadcasts one fixed question to the face port, and
+  `yuzu_face.answer_the_cube()` answers `yuzu-face <port>`. The
+  answer comes from the board, so its sender is the board's address.
+  The cube side is a plain socket with `SO_BROADCAST` said out loud,
+  because WiFiUDP does not promise it.
+- **The board's answer**: an exact match or silence; the answer is
+  shorter than the question, so it can never amplify anything aimed
+  at anyone; a port it cannot bind costs only this one way of
+  finding it, never the pages. `serve()` starts it on the pages' own
+  port number. A test holds the cube's two strings EQUAL to the
+  board's.
+
+**Compiled again** with the toolchain still in the scratchpad: no
+warnings from the cube's own code (the 38 warnings are the ESP32
+core's own `Esp.cpp`), 1.63 MB of 3 MB. **Still never run on a cube.**
+UNVERIFIED: that his phone's hotspot lets two of its clients talk at
+all (if it isolates them, nothing works there, the pages from a
+second device included); where Samsung keeps the hotspot band
+setting; what the base's switch does.
+
+**Nine new tests, sixteen breaks, all red as failures.** One test of
+mine measured the CONSTANT rather than the packet ("the answer is
+shorter than the question"): an answer padded with a whole sentence
+stayed green. It measures what the board really sends now, and goes
+red. **931 -> 940.**
 
 ## FOUR BRAINSTORMED HIS NEXT GAME, ON HIS PHONE IN BLUE (Oct 7, ~12:15)
 

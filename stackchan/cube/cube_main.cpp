@@ -79,6 +79,7 @@
 #include <M5Unified.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <lwip/sockets.h>
 #include <HTTPClient.h>
 #include <esp_random.h>
 #include <Preferences.h>
@@ -86,9 +87,9 @@
 #include "four_art.h"
 #include "yuzu_art.h"
 #include "zero_art.h"
-// Written by `~/YUZU/cube` at flash time from the board's OWN WiFi
-// connection and name, and never committed: his WiFi password does not
-// belong in a repository.
+// Written by `~/YUZU/cube` at flash time from EVERY WiFi the board has
+// saved (its own first) and its name, and never committed: his WiFi
+// passwords do not belong in a repository.
 #include "cube_secrets.h"
 
 // ---- who is in the cube ---------------------------------------------
@@ -801,17 +802,93 @@ static void stop_recording() {
 }
 
 // ---- reaching the board ----------------------------------------------------------
-// The board by NAME first, the way his phone finds it, and by the
-// numbers it had when she was flashed if that fails. mDNS is started
-// once; a second begin() on a running responder is not something to
-// lean on.
+// Ghost, Oct 17: "i need it to be able to connect to my phones mobile
+// hotspot". So the cube knows EVERY WiFi the board knows (`~/YUZU/cube`
+// writes them all, the board's own first), and finds the board three
+// ways, cheapest first:
+//   1. by NAME, the way his phone does -- avahi answers it at home;
+//   2. by ASKING: one fixed question shouted to the whole network, and
+//      the board's answer comes FROM the board, so its sender is the
+//      address. On a phone hotspot the name may not carry (UNVERIFIED)
+//      and the flashed numbers are home's;
+//   3. by the numbers it had when she was flashed.
+// The question and the answer are yuzu_face.CUBE_ASK / CUBE_ANSWER, and
+// a test holds the two copies equal.
+static const char* CUBE_ASK = "yuzu? where is the board";
+static const char* CUBE_ANSWER = "yuzu-face ";
+
+// A plain socket rather than WiFiUDP, because a broadcast has to say
+// SO_BROADCAST out loud and WiFiUDP does not promise to.
+static String ask_for_board() {
+  int s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (s < 0) return "";
+  int yes = 1;
+  setsockopt(s, SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
+  struct timeval wait = {0, 500000};
+  setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait));
+  struct sockaddr_in to = {};
+  to.sin_family = AF_INET;
+  to.sin_port = htons(CUBE_PORT);
+  to.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+  const size_t pre = strlen(CUBE_ANSWER);
+  String found;
+  for (int tries = 0; tries < 3 && !found.length(); tries++) {
+    sendto(s, CUBE_ASK, strlen(CUBE_ASK), 0, (struct sockaddr*)&to, sizeof(to));
+    char buf[32];
+    struct sockaddr_in from = {};
+    socklen_t len = sizeof(from);
+    int n = recvfrom(s, buf, sizeof(buf) - 1, 0, (struct sockaddr*)&from, &len);
+    if (n <= 0) continue;
+    buf[n] = 0;
+    if (strncmp(buf, CUBE_ANSWER, pre) != 0) continue;
+    int port = atoi(buf + pre);
+    if (port <= 0 || port > 65535) continue;
+    char ip[16];
+    inet_ntoa_r(from.sin_addr, ip, sizeof(ip));
+    found = String("http://") + ip + ":" + String(port);
+  }
+  close(s);
+  return found;
+}
+
+// mDNS is started once; a second begin() on a running responder is not
+// something to lean on.
 static void find_board() {
   static bool mdns_up = false;
   if (!mdns_up) mdns_up = MDNS.begin("stackchan-cube");
   IPAddress ip;
-  if (mdns_up) ip = MDNS.queryHost(CUBE_HOST, 3000);
-  if (ip == IPAddress(0, 0, 0, 0)) ip.fromString(CUBE_HOST_IP);
+  if (mdns_up && strlen(CUBE_HOST)) ip = MDNS.queryHost(CUBE_HOST, 3000);
+  if (ip != IPAddress(0, 0, 0, 0)) {
+    base_url = String("http://") + ip.toString() + ":" + String(CUBE_PORT);
+    return;
+  }
+  String asked = ask_for_board();
+  if (asked.length()) {
+    base_url = asked;
+    return;
+  }
+  ip.fromString(CUBE_HOST_IP);
   base_url = String("http://") + ip.toString() + ":" + String(CUBE_PORT);
+}
+
+// The first network on HIS LIST that the cube can see -- his order, not
+// the strongest signal. The board's own network is first, so at home
+// she joins home even with his hotspot switched on, which is where the
+// board is too. -1 when none is in sight. The scan runs in the
+// background so the rain keeps falling.
+static int pick_network() {
+  WiFi.scanNetworks(true);
+  int n = WIFI_SCAN_RUNNING;
+  for (int i = 0; i < 150 && (n = WiFi.scanComplete()) == WIFI_SCAN_RUNNING; i++) {
+    delay(100);
+    draw_frame();
+  }
+  int best = -1;
+  for (int i = 0; i < n; i++)
+    for (int k = 0; k < CUBE_WIFI_COUNT; k++)
+      if (WiFi.SSID(i) == CUBE_WIFI[k][0] && (best < 0 || k < best)) best = k;
+  WiFi.scanDelete();
+  return best;
 }
 
 static bool join_wifi() {
@@ -821,17 +898,26 @@ static bool join_wifi() {
     say_status("Joining WiFi...", 0);
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);
-    WiFi.begin(CUBE_WIFI_SSID, CUBE_WIFI_PASS);
+    WiFi.disconnect();
+    int k = pick_network();
+    // None of his in sight: a hidden network never shows in a scan, so
+    // the board's own still gets its one try, as it always did.
+    bool seen = k >= 0;
+    if (!seen) k = 0;
+    WiFi.begin(CUBE_WIFI[k][0], CUBE_WIFI[k][1]);
     for (int i = 0; i < 200 && WiFi.status() != WL_CONNECTED; i++) {
       delay(100);
       draw_frame();
     }
     if (WiFi.status() != WL_CONNECTED) {
-      say_status("No WiFi. Is the network in range?", 0);
+      // The cube hears 2.4 GHz only, and a phone hotspot is often 5.
+      if (seen) say_status("No WiFi. Is the network in range?", 0);
+      else say_status("Can't see your WiFi. The cube only hears 2.4 GHz.", 0);
       return false;
     }
   }
   lost_board = false;
+  say_status("Looking for the board...", 0);
   find_board();
   say_status(GIRLS[girl].hint, 5000);
   return true;

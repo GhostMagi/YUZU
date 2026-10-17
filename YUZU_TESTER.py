@@ -11,6 +11,7 @@ behaviour worth locking down so a future edit can't quietly break it.
 import json
 import importlib.util
 import inspect
+import io
 import unittest
 import unittest.mock
 from unittest import mock
@@ -4212,6 +4213,10 @@ class TestCubeFlash(unittest.TestCase):
         self.cube.write_text("")
         self.stub_fail = ""
         self.board = "ghostnano"
+        # The board's saved WiFi: (uuid, ssid, password, active). One,
+        # by default -- the test that needs his hotspot adds it.
+        self.saved = [("u-home", "HomeNet", self.PASSWORD, True)]
+        self.open_nets = set()      # saved networks with no lock at all
 
     def tearDown(self):
         import shutil
@@ -4224,13 +4229,7 @@ class TestCubeFlash(unittest.TestCase):
 
     def run_cube(self, serial=None, cli=True, extra=None):
         log = self.log
-        self.stub("nmcli", """
-case "$*" in
-  *"--active"*) echo "Home:802-11-wireless"; echo "docker0:bridge" ;;
-  *"-s -g 802-11-wireless-security.psk"*) printf '%%s\\n' %s ;;
-  *"802-11-wireless.ssid"*) echo "HomeNet" ;;
-esac
-""" % shlex.quote(self.PASSWORD))
+        self.stub("nmcli", self.nmcli_stub())
         self.stub("sudo", 'exec "$@"\n')
         self.stub("hostname", 'case "$1" in -s) echo "%s" ;; *) echo "" ;; esac\n'
                   % self.board)
@@ -4268,25 +4267,60 @@ exit 0
                               capture_output=True, timeout=60,
                               stdin=subprocess.DEVNULL)
 
+    def nmcli_stub(self):
+        """nmcli as the board answers it -- including the part that
+        bites: in terse mode it ESCAPES ':' and '\\' in every value
+        unless told `-e no`, so a password holding either comes back
+        with a backslash it never had."""
+        def rows(uuids):
+            # A bridge rides along in both lists, as docker0 does on his.
+            return " ".join([shlex.quote(u + ":802-11-wireless") for u in uuids]
+                            + ["u-dock:bridge"])
+        lines = ['args="$*"',
+                 'say() { if [[ "$args" == *"-e no"* ]]; then printf "%s\\n" "$1";'
+                 ' else printf "%s\\n" "$1" | sed "s/[\\\\:]/\\\\&/g"; fi; }',
+                 'case "$args" in']
+        lines.append('  *UUID,TYPE*--active*) printf "%%s\\n" %s ;;'
+                     % rows([u for u, _, _, on in self.saved if on]))
+        lines.append('  *UUID,TYPE*) printf "%%s\\n" %s ;;'
+                     % rows([u for u, _, _, _ in self.saved]))
+        for u, ssid, pw, _ in self.saved:
+            lines.append('  *wireless.ssid*"uuid %s") say %s ;;'
+                         % (u, shlex.quote(ssid)))
+            lines.append('  *psk*"uuid %s") say %s ;;' % (u, shlex.quote(pw)))
+            lines.append('  *key-mgmt*"uuid %s") say %s ;;'
+                         % (u, "''" if u in self.open_nets else "wpa-psk"))
+        lines.append("esac")
+        return "\n".join(lines) + "\n"
+
     def secrets(self):
-        """The header the cube was built with, decoded back to values."""
+        """The header the cube was built with, decoded back to values.
+        `wifi` is every network it was given, in order."""
         path = Path(str(self.log) + ".secrets")
         if not path.exists():
             self.fail("the cube was built with no settings header")
         text = path.read_text()
+        lit = r'"(?:[^"\\]|\\.)*"'
+
+        def unc(s):
+            raw = re.sub(r"\\x([0-9a-f]{2})",
+                         lambda m: chr(int(m.group(1), 16)), s[1:-1])
+            return raw.encode("latin-1").decode("utf-8")
         out = {}
-        for key, lit in re.findall(r'#define (\w+) ("(?:[^"\\]|\\.)*"|\d+)', text):
-            if lit.startswith('"'):
-                raw = re.sub(r"\\x([0-9a-f]{2})",
-                             lambda m: chr(int(m.group(1), 16)), lit[1:-1])
-                out[key] = raw.encode("latin-1").decode("utf-8")
-            else:
-                out[key] = int(lit)
-        missing = {"CUBE_WIFI_SSID", "CUBE_WIFI_PASS", "CUBE_HOST",
-                   "CUBE_HOST_IP", "CUBE_PORT"} - set(out)
+        for key, val in re.findall(r'#define (\w+) (%s|\d+)' % lit, text):
+            out[key] = unc(val) if val.startswith('"') else int(val)
+        table = re.search(r"CUBE_WIFI\[CUBE_WIFI_COUNT\]\[2\] = \{(.*?)\n\};",
+                          text, re.S)
+        if table:
+            out["wifi"] = [(unc(a), unc(b)) for a, b in re.findall(
+                r"\{(%s), (%s)\}" % (lit, lit), table.group(1))]
+        missing = {"CUBE_WIFI_COUNT", "wifi", "CUBE_HOST", "CUBE_HOST_IP",
+                   "CUBE_PORT"} - set(out)
         if missing:
             self.fail("the settings header does not read back as C: %s"
                       % sorted(missing))
+        self.assertEqual(out["CUBE_WIFI_COUNT"], len(out["wifi"]),
+                         "the count and the list of networks disagree")
         return out
 
     def test_no_cube_is_said_FIRST_and_nothing_is_spent(self):
@@ -4301,9 +4335,8 @@ exit 0
         self.assertTrue(got.stdout.rstrip().splitlines()[-3].startswith("DONE."),
                         got.stdout)
         sec = self.secrets()
-        self.assertEqual(sec["CUBE_WIFI_SSID"], "HomeNet")
-        self.assertEqual(sec["CUBE_WIFI_PASS"], self.PASSWORD,
-                         "the password did not survive the C escaping")
+        self.assertEqual(sec["wifi"], [("HomeNet", self.PASSWORD)],
+                         "the password did not survive nmcli and the C escaping")
         self.assertEqual(sec["CUBE_HOST"], "ghostnano")
         self.assertEqual(sec["CUBE_HOST_IP"], "192.0.2.7")
         self.assertEqual(sec["CUBE_PORT"], 8081)
@@ -4322,6 +4355,66 @@ exit 0
                                  cwd=self.REPO, capture_output=True, text=True)
         self.assertEqual(ignored.returncode, 0,
                          "a hand-built secrets file would be committable")
+
+    def test_the_cube_knows_EVERY_wifi_the_board_has_saved_its_own_FIRST(self):
+        """Ghost, Oct 17: "i need it to be able to connect to my phones
+        mobile hotspot". The board already knows his hotspot (Sept 22),
+        so the cube is handed every network the board has saved -- the
+        one it is on first, because the cube joins the first it can see
+        and at home that has to be where the board is. A second saved
+        copy of one name is one network, and a bridge is no WiFi."""
+        hotspot = ("Galaxy Z Flip6 2214", "hot:spot\\pw")
+        self.saved = [("u-hot", hotspot[0], hotspot[1], False),
+                      ("u-home", "HomeNet", self.PASSWORD, True),
+                      ("u-home-old", "HomeNet", "an-old-password", False),
+                      ("u-cafe", "Cafe", "", False)]
+        self.open_nets = {"u-cafe"}
+        got = self.run_cube()
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertEqual(self.secrets()["wifi"],
+                         [("HomeNet", self.PASSWORD), hotspot, ("Cafe", "")])
+        # And he can SEE that his hotspot is in there, in the same order.
+        out = got.stdout
+        listed = [out.index("    " + name) for name in
+                  ("HomeNet", hotspot[0], "Cafe")]
+        self.assertEqual(listed, sorted(listed), out)
+        self.assertIn("2.4 GHz", out, "the one thing a phone hotspot gets "
+                      "wrong for this cube is never said")
+
+    def test_a_password_it_cannot_READ_is_said_at_flash_time(self):
+        """A password kept in a desktop keyring is out of sudo's reach,
+        and the cube would fail on that network on the day, quietly. An
+        open network has no password to read, and is not flagged."""
+        self.saved = [("u-home", "HomeNet", self.PASSWORD, True),
+                      ("u-hot", "Galaxy Z Flip6 2214", "", False),
+                      ("u-cafe", "Cafe", "", False)]
+        self.open_nets = {"u-cafe"}
+        got = self.run_cube()
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        lines = {ln.strip().split("   ")[0]: ln for ln in got.stdout.splitlines()
+                 if ln.startswith("    ")}
+        self.assertIn("password", lines.get("Galaxy Z Flip6 2214", ""),
+                      "a hotspot she cannot join was listed as if she could")
+        self.assertNotIn("password", lines.get("HomeNet", "-"))
+        self.assertNotIn("password", lines.get("Cafe", "-"),
+                         "an open network was flagged as unreadable")
+
+    def test_the_names_the_firmware_reads_are_the_names_the_flash_WRITES(self):
+        """The header exists only for one flash, on his board. A name
+        the firmware reads that the flash does not write is a cube that
+        fails to BUILD there, with nothing to compile it against here."""
+        self.run_cube()
+        header = Path(str(self.log) + ".secrets").read_text()
+        written = set(re.findall(r"#define (CUBE_\w+)", header)) | \
+            set(re.findall(r"\b(CUBE_\w+)\[", header))
+        code = (self.REPO / "stackchan" / "cube" / "cube_main.cpp").read_text()
+        code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
+        code = re.sub(r"//[^\n]*", "", code)
+        own = set(re.findall(r"static const char\* (CUBE_\w+) =", code))
+        used = set(re.findall(r"\b(CUBE_[A-Z_]+)\b", code)) - own
+        self.assertTrue(used, "the firmware reads no settings at all")
+        self.assertEqual(used - written, set(),
+                         "the firmware reads settings the flash never writes")
 
     def test_the_build_stays_in_the_TEMP_folder_and_asks_for_PSRAM(self):
         """arduino-cli's default build path copies the sketch -- secrets
@@ -4383,6 +4476,110 @@ exit 0
             self.assertTrue(got.stdout.splitlines()[-3:] and
                             "NOT FLASHED." in got.stdout, got.stdout)
             self.assertIn(fix, got.stdout, "no fix named for: %s" % said)
+
+
+class TestTheCubeFindsTheBoard(unittest.TestCase):
+    """Ghost, Oct 17: "i need it to be able to connect to my phones
+    mobile hotspot". On a hotspot the board's numbers are not the ones
+    the cube was flashed with, and whether a phone hotspot carries mDNS
+    between two of its clients is UNVERIFIED. So the cube shouts one
+    fixed question and the board answers it. Driven for real, on
+    loopback, against the real responder."""
+
+    import yuzu_face as face
+
+    def free_port(self):
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.bind(("127.0.0.1", 0))
+            return s.getsockname()[1]
+
+    def responder(self):
+        port = self.free_port()
+        sock = self.face.answer_the_cube(port, "127.0.0.1")
+        self.assertIsNotNone(sock, "the board would not listen for the cube")
+        self.addCleanup(sock.close)
+        return port
+
+    def ask(self, port, said, wait=0.6):
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.settimeout(wait)
+            s.sendto(said, ("127.0.0.1", port))
+            try:
+                return s.recvfrom(64)[0]
+            except socket.timeout:
+                return None
+
+    def test_the_board_ANSWERS_the_cubes_question_with_its_port(self):
+        port = self.responder()
+        self.assertEqual(self.ask(port, self.face.CUBE_ASK),
+                         self.face.CUBE_ANSWER + str(port).encode())
+
+    def test_anything_else_gets_SILENCE_and_the_board_keeps_listening(self):
+        port = self.responder()
+        for said in (b"hello", self.face.CUBE_ASK + b"\n",
+                     self.face.CUBE_ASK[:-1], b"GET / HTTP/1.1\r\n\r\n"):
+            self.assertIsNone(self.ask(port, said, wait=0.3),
+                              "the board answered %r" % said)
+        self.assertIsNotNone(self.ask(port, self.face.CUBE_ASK),
+                             "one stray packet stopped it answering")
+
+    def test_the_answer_is_SHORTER_than_the_question(self):
+        """It answers anyone on his WiFi, so it must never be a way to
+        turn a small packet into a bigger one aimed at someone else.
+        Measured on what it really SENDS, worst-cased to a five-digit
+        port."""
+        port = self.responder()
+        said = self.ask(port, self.face.CUBE_ASK)
+        self.assertIsNotNone(said, "the board never answered")
+        worst = len(said) - len(str(port)) + len("65535")
+        self.assertLess(worst, len(self.face.CUBE_ASK),
+                        "the answer is bigger than the question")
+
+    def test_a_port_it_cannot_have_costs_the_cube_NEVER_the_pages(self):
+        import socket
+        taken = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        taken.bind(("127.0.0.1", 0))
+        self.addCleanup(taken.close)
+        port = taken.getsockname()[1]
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                got = self.face.answer_the_cube(port, "127.0.0.1")
+        except OSError as e:
+            self.fail("a port it could not have took the server down: %s" % e)
+        self.assertIsNone(got)
+        # ...and serve() goes on to serve the pages all the same.
+        served = []
+
+        class Server:
+            def __init__(self, addr, handler):
+                served.append(addr)
+
+            def serve_forever(self):
+                pass
+        with mock.patch.object(self.face, "ThreadingHTTPServer", Server), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.face.serve(port, "127.0.0.1")
+        self.assertEqual(served, [("127.0.0.1", port)])
+
+    def test_serve_STARTS_the_answer_on_the_pages_own_port(self):
+        asked = []
+        with mock.patch.object(self.face, "answer_the_cube",
+                               lambda port, bind: asked.append((port, bind))), \
+                mock.patch.object(self.face, "ThreadingHTTPServer",
+                                  mock.MagicMock()):
+            self.face.serve(8123, "0.0.0.0")
+        self.assertEqual(asked, [(8123, "0.0.0.0")])
+
+    def test_the_cube_asks_the_SAME_question_the_board_answers(self):
+        code = (Path(__file__).parent / "stackchan" / "cube"
+                / "cube_main.cpp").read_text()
+        for name in ("CUBE_ASK", "CUBE_ANSWER"):
+            lit = re.search(r'static const char\* %s = "([^"]*)";' % name, code)
+            self.assertTrue(lit, "the cube has no %s" % name)
+            self.assertEqual(lit.group(1).encode(), getattr(self.face, name),
+                             "the cube and the board disagree on %s" % name)
 
 
 class TestSaveMyStuff(unittest.TestCase):
