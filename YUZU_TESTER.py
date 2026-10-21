@@ -6733,9 +6733,24 @@ class TestTheCastIsTwo(unittest.TestCase):
             self.assertEqual(c.get("user"), yuzu_face._his_name(key),
                              f"{c['who']}'s roster name for him drifted "
                              "from her persona")
-        mine = {c["who"]: c["user"] for c in yuzu_face.roster()}
-        self.assertEqual(mine["zero"], "Ghost", "she was never told his name")
-        self.assertEqual(mine["yuzu"], "Ghost", "Yuzu was never told his name")
+        # EVERY GIRL HE CAN OPEN KNOWS HIM, read off the ROSTER, so the
+        # next one is held to it the day she lands. It named Zero and
+        # Yuzu until Oct 21, when Saya came back as YOU on her own page
+        # and he asked: "Yea teach her im Ghost plz".
+        import build_yuzu_model
+        for c in yuzu_face.roster():
+            key = yuzu_face.CHARACTERS[c["who"]][0]
+            her = yuzu_personas.load(key)
+            self.assertEqual(c["user"], "Ghost",
+                             f"{c['who']} was never told his name")
+            self.assertEqual(build_yuzu_model.ask_label(her), "Ghost:",
+                             f"{c['who']}'s examples still label him otherwise")
+            self.assertRegex(her.prompt, r"is called Ghost\.",
+                             f"{c['who']} is never TOLD who he is")
+            mine = [ln for ln in her.prompt.splitlines()
+                    if ln.startswith(her.name + ":")]
+            self.assertTrue(any("Ghost" in ln for ln in mine),
+                            f"{c['who']} never once calls him by his name")
         self.assertEqual(yuzu_face._his_name("cait"), "",
                          "a name was invented for a character never told it")
 

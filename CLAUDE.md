@@ -99,9 +99,24 @@ order: thinking face while she thinks, the blush on a blushing reply,
 two lines after five polls, the exit, mic and Send inside the screen.
 **UNVERIFIED on his phone, and UNHEARD**: her voice is the default
 (Bella). Offered, not done: her "what do you look like" answer still
-says long hair, and she does not know he is Ghost (his lines say YOU).
-Fourteen breaks, all red as failures (one was an ERROR first: a
-`got["mood"]` that raised -- `.get()` now). **955 -> 959.**
+says long hair. Fourteen breaks, all red as failures (one was an ERROR
+first: a `got["mood"]` that raised -- `.get()` now). **955 -> 959.**
+
+**SHE KNOWS HE IS GHOST, same day** (*"Yea teach her im Ghost
+plz"*). Four's mechanism unchanged: `USER_NAME: Ghost`, the WHO YOU
+TALK TO line, all seven example labels `{USER_NAME}:`, and his name
+once, in her greeting (*"I wasn't waiting around or anything, Ghost.
+...You're late, baka."*). Rule 9's "the user's words" stays (the
+no-puppeteering win reads it). 3492 -> 3683 chars, inside the context
+guard; her page labels his lines GHOST from the roster. Her prompt
+moved but she is not LIVE_PERSONA; it was pasted to him anyway, for
+PocketPal, because I offered. **The roster name test was a list of two
+girls** (Zero, Yuzu); it holds EVERY roster girl now -- told his name,
+labelled by it, and saying it once. Five breaks, four red as failures
+first time; dropping only the setting made her refuse to load (her
+tokens had no value -- loud, and correct), and the realistic break,
+her whole file reverted, is red as a failure. Still 959.
+**UNMEASURED**: nobody has said hello to her since.
 
 ## HIS GAME IS ON THE CUBE, ONE SWIPE PAST THE GHOST (Oct 21)
 
