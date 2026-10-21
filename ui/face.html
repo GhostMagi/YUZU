@@ -40,6 +40,7 @@
   --bg:   #000000;      /* the deck has ONE look and this is it */
   --ink:  #39ff5e;      /* HER LINE WORK. the mask is filled with this */
   --face: min(76vw, 74vh);
+  --dim:  color-mix(in srgb, var(--ink) 55%, transparent);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; }
@@ -184,6 +185,13 @@ body.thinking #face { animation-duration: 2.6s; }
   border-color: color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 4px;
 }
+/* The conversation, the same lines as every bubble page: his dimmer
+   and labelled, hers in full ink, the deck's own notes dim. */
+#says .line + .line { margin-top: 10px; }
+#says .him { color: var(--dim); font-size: 14.5px; }
+#says .by { display: block; font-size: 10.5px; letter-spacing: .14em;
+            text-transform: uppercase; opacity: .85; }
+#says .pending, #says .deck { color: var(--dim); }
 
 /* ---- saying something back ---------------------------------------- */
 #ask {
@@ -203,6 +211,22 @@ body.thinking #face { animation-duration: 2.6s; }
   white-space: nowrap;
 }
 #ask button:disabled { opacity: .45; }
+/* THE MIC, the same button as every other girl's: tap to start, tap to
+   stop. In her ink, and it pulses while listening so a forgotten
+   recording is impossible to miss. */
+#ask #mic {
+  flex: none; width: 46px; height: 46px; padding: 0; cursor: pointer;
+  display: grid; place-items: center; border-radius: 4px;
+  color: var(--ink); background: rgba(13,13,17,.85);
+  border: 2px solid color-mix(in srgb, var(--ink) 55%, transparent);
+}
+#mic svg { width: 22px; height: 22px; }
+#ask #mic.on { color: #06080a; background: var(--ink);
+               animation: live 1.1s ease-in-out infinite; }
+@keyframes live {
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 25%, transparent); }
+}
+#ask #mic.busy { opacity: .45; cursor: default; }
 #ask input {
   background: rgba(13,13,17,.85); color: var(--ink);
   border-color: color-mix(in srgb, var(--ink) 55%, transparent);
@@ -251,6 +275,13 @@ body.thinking #face { animation-duration: 2.6s; }
        not exist -- the same lesson as the pack filenames. -->
   <input id="text" placeholder="Say something, or /wiki cats"
          maxlength="2000">
+  <button id="mic" type="button" title="talk to her" aria-label="talk to her">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
+    </svg>
+  </button>
   <button id="send" type="submit">Send</button>
   <div id="home" title="home">⌂</div>
 </form>
@@ -274,7 +305,7 @@ function paintSprite(file) {
     '--sprite', 'url("' + file + '")');
 }
 
-function show(i) {
+function showFace(i) {
   if (!expressions.length) return;
   current = (i + expressions.length) % expressions.length;
   const e = expressions[current];
@@ -304,7 +335,7 @@ fetch('sprites.json', { cache: 'no-store' })
     try { saved = localStorage.getItem('saya-face'); } catch (err) {}
     const wanted = saved || (m.roles && m.roles.idle);
     const at = expressions.findIndex(e => e.name === wanted);
-    show(at < 0 ? 0 : at);
+    showFace(at < 0 ? 0 : at);
     watch();
   })
   .catch(() => {
@@ -318,7 +349,7 @@ fetch('sprites.json', { cache: 'no-store' })
 // touchscreen with no keyboard anywhere near it.
 document.getElementById('face').onclick = () => {
   driven = null;            // he chose; let him keep it
-  show(current + 1);
+  showFace(current + 1);
 };
 
 // ⌂ goes to the home screen. It was decoration until now, which is
@@ -400,14 +431,19 @@ function watch() {
       const want = faceFor(s.state === 'talking' && s.mood ? s.mood : s.state);
       if (want !== null && want !== driven) {
         driven = want;
-        show(want);
+        showFace(want);
       }
       // `thinking` also drives the CSS, so the breathe speeds up even
       // when there is no separate thinking sprite to switch to.
       document.body.classList.toggle('thinking', s.state === 'thinking');
+      // A REPLY TO THIS PAGE IS ALREADY IN THE LOG; only a turn from
+      // the terminal chat is new here. While he is waiting on his own
+      // reply the poll never shows one, and the send path records the
+      // state's newest line before it lets go -- so no reply is shown
+      // twice. Shown, never spoken: it was not an answer to this page.
       if (s.said && s.said !== lastSaid) {
         lastSaid = s.said;
-        speech(s.said);
+        if (!send.disabled) show(line('her', '', spoken(s.said) || s.said.trim()));
       }
     })
     .catch(() => {})
@@ -472,22 +508,30 @@ function telemetry() {
 }
 telemetry();
 
-function speech(text) {
-  const box = document.getElementById('says');
-  // Bracketed stage directions are for reading, but they are not what
-  // she SAID -- and on a small screen they crowd out the words that
-  // are. Same call yuzu_voice already makes for the speaker.
-  box.textContent = text.replace(/\[[^\]]*\]/g, '')
-                        .replace(/\*[^*]+\*/g, '')
-                        .replace(/\s{2,}/g, ' ').trim() || text;
-  box.classList.add('on');
-  box.scrollTop = 0;
+// ---- who she is talking to ------------------------------------------
+// His label is READ from the roster (her USER_NAME, when she has one),
+// never typed into this page.
+const ME = 'saya';
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => cast.forEach(c => { if (c.who === ME && c.user) HIM = c.user; }))
+  .catch(() => {});
+
+// Stage directions are stripped from the BUBBLE, the same call
+// yuzu_voice already makes for the speaker -- and on a small screen they
+// crowd out the words she actually said.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/\*[^*]*\*/g, ' ')
+             .replace(/\s{2,}/g, ' ')
+             .trim();
 }
 
 // ---- talking to her -------------------------------------------------
 const form = document.getElementById('ask');
 const input = document.getElementById('text');
 const send = document.getElementById('send');
+const says = document.getElementById('says');
 
 // The home screen's Talk tile arrives at face.html#say. Focusing the
 // box is the whole difference between "her face" and "talk to her" --
@@ -496,34 +540,219 @@ const send = document.getElementById('send');
 // keyboard over half her face.
 if (location.hash === '#say') input.focus();
 
+// ---- HIS WORDS AND HERS ----------------------------------------------
+// Ghost, Sept 24: "I cant see my own words on Yuzus page and Fours page
+// like i can on Zeros page. Id like to." The bubble keeps the
+// conversation now, like Zero's log: his line goes up the moment he
+// sends it, hers fills in underneath, and the bubble scrolls to the
+// START of the newest exchange so a long reply is read from its top.
+// textContent only -- whatever anyone typed is shown as text. His label
+// is READ from the roster (her USER_NAME), never typed into this page.
+// ONE COPY on every page that has a bubble; a test holds them equal.
+let HIM = 'you';
+let waiting = null;
+
+function line(cls, by, text) {
+  const el = document.createElement('div');
+  el.className = 'line ' + cls;
+  if (by) {
+    const tag = document.createElement('span');
+    tag.className = 'by';
+    tag.textContent = by;
+    el.appendChild(tag);
+  }
+  el.appendChild(document.createTextNode(text));
+  says.appendChild(el);
+  // A long evening must not grow the page forever.
+  while (says.children.length > 40) says.removeChild(says.firstChild);
+  says.classList.add('on');
+  return el;
+}
+
+function show(el) {
+  says.scrollTop += el.getBoundingClientRect().top
+                    - says.getBoundingClientRect().top - 12;
+}
+
+function his(text) {
+  const mine = line('him', HIM, text);
+  waiting = line('her pending', '', '...');
+  show(mine);
+}
+
+function said(text) {
+  const words = spoken(text);
+  const el = waiting || line('her', '', '');
+  waiting = null;
+  el.className = 'line her';
+  el.textContent = words || text.trim();
+  const before = el.previousElementSibling;
+  show(before && before.classList.contains('him') ? before : el);
+  hear(words || text.trim());
+}
+
+// THE DECK'S OWN WORDS go in the bubble too, and she never says them
+// out loud -- "allow the microphone" in her voice would be her speaking
+// a line she never wrote.
+function note(text) {
+  show(line('deck', '', text));
+}
+
+// ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
+// The board has no speaker on it. Every device that opens this page
+// does -- the Steam Deck, a phone, the panel -- so the server renders
+// the wav and the BROWSER plays it.
+//
+// AUTOPLAY IS ALLOWED HERE because he tapped Speak to get this reply,
+// and that tap is the user gesture browsers require. Audio that arrives
+// unasked, on a page he never touched, is the thing they block -- and
+// it is also the thing nobody wants on a handheld.
+//
+// A MISSING VOICE IS SILENT, NEVER AN ERROR ON SCREEN. The reply is the
+// product; the audio is a nicety, the same promise the face, Piper and
+// the wiki all make. If Kokoro is not installed the page behaves
+// exactly as it did before this existed.
+//
+// SHE SENDS HER OWN NAME. The server builds one voice PER CHARACTER off
+// her own `piper_length_scale`, so a copied `who` would not just
+// mislabel the request -- it would hand her somebody else's speaking
+// rate, which is a character bug wearing a plumbing costume and is
+// inaudible in the code. A test drives the name out of the real fetch.
+let sound = null;
+function hear(words) {
+  if (!words) return;
+  fetch('voice.wav', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: words, who: 'saya' }),
+  })
+    .then(r => (r.ok ? r.blob() : null))
+    .then(blob => {
+      if (!blob) return;
+      // The PREVIOUS url is revoked, or a long conversation leaks one
+      // object per reply into a browser on a battery-powered handheld.
+      if (sound) { try { URL.revokeObjectURL(sound.src); } catch (e) {} }
+      sound = new Audio(URL.createObjectURL(blob));
+      sound.play().catch(() => {});
+    })
+    .catch(() => {});
+}
+
 form.onsubmit = (event) => {
   event.preventDefault();
-  const said = input.value.trim();
-  if (!said) return;
+  const asked = input.value.trim();
+  if (!asked) return;
   input.value = '';
+  his(asked);
   send.disabled = true;
   send.textContent = '...';
   // Show HER state immediately rather than waiting for the poll: on
   // that board a reply takes tens of seconds, and a screen that does
   // nothing for the first second reads as a tap that missed.
   const at = faceFor('thinking');
-  if (at !== null) { driven = at; show(at); }
+  if (at !== null) { driven = at; showFace(at); }
   document.body.classList.add('thinking');
 
+  // `who` is a NAME. Without it the server answers with whoever greets
+  // you -- Four -- so Saya's page would have had Four's brain behind it.
   fetch('say', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: said }),
+    body: JSON.stringify({ text: asked, who: 'saya' }),
   })
     .then(r => r.json())
-    .then(r => { speech(r.said || 'She said nothing.'); })
-    .catch(() => speech('No answer from the deck. Is ~/YUZU/face running?'))
+    .then(r => said(r.said || 'She said nothing.'))
+    .catch(() => said('No answer from the deck. Is ~/YUZU/face running?'))
+    // Her reply is in the state file too; note it as seen BEFORE the
+    // poll may show lines again, or it would appear a second time.
+    .then(() => fetch('state', { cache: 'no-store' }).then(r => r.json())
+                  .then(st => { if (st.said) lastSaid = st.said; })
+                  .catch(() => {}))
     .then(() => {
       send.disabled = false;
       send.textContent = 'Send';
       document.body.classList.remove('thinking');
       input.focus();
     });
+};
+
+// ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------
+// Ghost: "a button for the touch screen starts listening when i tap it,
+// ends recording when i tap it again and bam". Nothing listens until he
+// taps, and it stops when he taps again -- or after a minute, so a
+// recording he forgot about cannot run forever.
+//
+// THE MICROPHONE IS WHATEVER HE IS HOLDING. This page records on his
+// own device, sends the clip to the board (/listen), and what comes
+// back is sent exactly as if he had typed it. The board has no mic.
+//
+// A BROWSER ONLY HANDS A PAGE THE MIC WHEN IT TRUSTS THE PAGE -- https,
+// or the device's own localhost. His address is plain http on his WiFi,
+// so on his phone or laptop the mic is refused until he tells the
+// browser to trust it, once. The note says exactly how, with this
+// page's own address in it, rather than a mic that silently does
+// nothing.
+const mic = document.getElementById('mic');
+let recorder = null, clip = [], cap = null;
+
+
+mic.onclick = async () => {
+  if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+  // Busy working out the last clip, or she is still answering.
+  if (mic.classList.contains('busy') || send.disabled) return;
+  if (!(window.isSecureContext && navigator.mediaDevices
+        && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
+    note('This browser only lets a page use the microphone once it trusts '
+         + 'the page. One time, in Chrome on this device: open '
+         + 'chrome://flags/#unsafely-treat-insecure-origin-as-secure , '
+         + 'type ' + location.origin + ' in the box, set it to Enabled, '
+         + 'and tap Relaunch (on a Steam Deck in Gaming Mode, restart the '
+         + 'Deck instead -- a relaunched Chrome there goes invisible). '
+         + 'Chrome then shows a warning bar about the flag; that is '
+         + 'expected. Then tap the mic again.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    note('The microphone was blocked. Allow it for this page -- the icon '
+         + 'by the address -- then tap the mic again.');
+    return;
+  }
+  // Her voice must not end up in his recording.
+  if (sound) { try { sound.pause(); } catch (e) {} }
+  clip = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) clip.push(e.data); };
+  recorder.onstop = () => {
+    clearTimeout(cap);
+    stream.getTracks().forEach(t => t.stop());      // the mic goes OFF
+    mic.classList.remove('on');
+    mic.classList.add('busy');
+    mic.title = 'working out what you said';
+    const audio = new Blob(clip, { type: recorder.mimeType || 'audio/webm' });
+    fetch('listen', { method: 'POST',
+                      headers: { 'Content-Type': audio.type },
+                      body: audio })
+      .then(r => r.json())
+      .then(r => {
+        if (r.ok && r.heard) {
+          input.value = r.heard;
+          form.requestSubmit();
+        } else {
+          note(r.said || "I didn't catch that.");
+        }
+      })
+      .catch(() => note('No answer from the deck. Is ~/YUZU/face running?'))
+      .then(() => { mic.classList.remove('busy'); mic.title = 'talk to her'; });
+  };
+  recorder.start();
+  mic.classList.add('on');
+  mic.title = 'listening -- tap again to stop';
+  cap = setTimeout(() => {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+  }, 60000);
 };
 
 // ---- blink --------------------------------------------------------

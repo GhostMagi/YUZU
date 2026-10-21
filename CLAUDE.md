@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 955 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 959 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,60 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SAYA IS BACK, WITH HIS KAOMOJI FOR A FACE (Oct 21)
+
+*"After the error gets fixed i wouldnt mind bringing Saya the tsundere
+back but with these as her faces in neon green with the crt effect like
+she has. (So its easier and stays true) just a visual makeover."* -- a
+sheet of 24 kaomoji, white on black, three brown tears.
+
+- **Back on the roster** (`"saya": ("saya_deck", "face.html",
+  "Tsundere")`), `retired` gone from her persona -- the one line here,
+  one there that the Sept 20 retirement promised. **Her prompt did not
+  move** (both edits are above the `---`); LIVE_PERSONA is still
+  four_bot, so nothing to paste. Off the robot list on purpose
+  (`STAYS_ON_THE_DECK`): he did not ask for legs.
+- **22 of his 24 faces are her sprites**, cut by `cut_saya.py` from
+  `ui/art_in/saya_kaomoji.jpg` (needs numpy + PIL; a test re-cuts and
+  compares). Every face is cut from ONE window size so she never
+  changes size, with the EYES ON ONE LINE (two faces measured: brows,
+  an anger mark), upscaled 4x and re-sharpened. Tears go green as a
+  bright rim round a half-strength fill, the way he drew them. The
+  blink is her resting face (●—●) with each dot swapped for a stroke
+  cut from her own mouth line. Left out: two more tongue faces and a
+  pi-eyed weep. **His old hand-drawn faces and `ui/raw/` are deleted**
+  (in git: `git show dc928f8:ui/sprites/idle.png`) -- `yuzu_art.py`
+  with no arguments would have converted them back over the new ones.
+- **Her moods split** to use them: blush, flustered, puffed cheeks,
+  pout, an anger mark, shouting, angry, annoyed, bleh, smug, sob, cry,
+  dizzy, shock, ooh, cute, happy, sleepy -- still read off HER OWN
+  stage directions, blush still first. Mimi's sulk keeps meaning what
+  it meant.
+- **Her page caught up with the roster**: the mic, the conversation
+  bubble (his lines and hers) and her voice, copied character for
+  character, and her home tile is her resting face.
+
+**THREE FAULTS THAT ONLY EXISTED BECAUSE SHE CAME BACK:**
+- **Her page asked with no `who`**, so the server would have answered
+  with the front door -- Four's brain behind Saya's face. A roster test
+  now holds every page to asking as its own girl.
+- **Every real brain wrote the face state**, whatever page it was on.
+  Harmless with nobody on face.html; with Saya there, talking to Four
+  (or the cube) would have put Four's words and moods on Saya's face.
+  `owns_face()` gates it in the brain itself.
+- **Her page polls /state, which holds the reply its own /say just
+  showed**: rendered, that would double every reply. The poll skips
+  while he waits, and the send path notes the state's line first.
+
+Rendered at 1024x600 and 412 in a real browser with the server's real
+order: thinking face while she thinks, the blush on a blushing reply,
+two lines after five polls, the exit, mic and Send inside the screen.
+**UNVERIFIED on his phone, and UNHEARD**: her voice is the default
+(Bella). Offered, not done: her "what do you look like" answer still
+says long hair, and she does not know he is Ghost (his lines say YOU).
+Fourteen breaks, all red as failures (one was an ERROR first: a
+`got["mood"]` that raised -- `.get()` now). **955 -> 959.**
 
 ## HIS GAME IS ON THE CUBE, ONE SWIPE PAST THE GHOST (Oct 21)
 

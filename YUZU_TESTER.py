@@ -3375,7 +3375,9 @@ class TestSpiderBodies(unittest.TestCase):
     # variant goes. Can she go in spider too?" -- so she has legs too, on
     # her own Qwen, and the swap is the price, said to him. The set stays
     # so the next girl he keeps home is one line.
-    STAYS_ON_THE_DECK = set()
+    # SAYA, Oct 21: back as her face page, his kaomoji on the deck's
+    # screen. He did not ask for legs, and the robot is on hold.
+    STAYS_ON_THE_DECK = {"saya_deck"}
 
     @staticmethod
     def pilots():
@@ -6480,7 +6482,10 @@ class TestTheCastIsTwo(unittest.TestCase):
     """
 
     # Oct 7, the sisters too: "Can we srt8 up remove shiro and kuro plz bro"
-    CUT = ("saya", "cait", "mimi", "shiro", "kuro")
+    # Oct 21, Saya came BACK ("bringing Saya the tsundere back"), so she
+    # is not in this list any more -- the un-retiring this class promised
+    # was one line here, one in CHARACTERS and one in her persona.
+    CUT = ("cait", "mimi", "shiro", "kuro")
 
     def test_a_name_crosses_and_nothing_else_does(self):
         """Same discipline as /launch/ and /vpet/: the page POSTs a
@@ -6492,6 +6497,7 @@ class TestTheCastIsTwo(unittest.TestCase):
         self.assertEqual(yuzu_face.persona_for("four"), "four")
         self.assertEqual(yuzu_face.persona_for("  FOUR "), "four")
         self.assertEqual(yuzu_face.persona_for("yuzu"), "yuzu_avatar")
+        self.assertEqual(yuzu_face.persona_for("saya"), "saya_deck")
         # "" IS NOT IN HERE, and that is deliberate. An unnamed request
         # is a real case with a real answer -- the front door -- and it
         # has its own test one function up. The old version of this
@@ -6582,19 +6588,16 @@ class TestTheCastIsTwo(unittest.TestCase):
             yuzu_face.FRONT = was_front
             yuzu_personas.LIVE_PERSONA = was_live
 
-    def test_with_NOBODY_on_the_face_page_nobody_drives_it(self):
-        """THE CROSS-TALK TRAP, in the shape the two-character deck
-        leaves it in. `face.html` polls /state to pick a sprite, and
-        that file belongs to whoever is on that page -- so a second
-        character writing to it would light a face up in another window
-        and read as a haunted deck rather than as a bug.
+    def test_ONLY_the_face_pages_own_character_drives_it(self):
+        """THE CROSS-TALK TRAP. `face.html` polls /state to pick a
+        sprite, and that file belongs to whoever is on that page -- so a
+        second character writing to it would light a face up in another
+        window and read as a haunted deck rather than as a bug.
 
-        Saya was the only character ever on `face.html` and she is off
-        the interface now, so the honest invariant is the stronger one:
-        NOBODY writes it. And the gate is derived from the roster's own
-        page rather than from a name, so a character put back on
-        `face.html` lights it up again with no code change -- which is
-        what this drives, rather than asserting the file never moves."""
+        Saya is on `face.html` again (Oct 21), so the invariant is: she
+        drives it and nobody else does. The gate is derived from the
+        roster's own page rather than from a name, so moving the page
+        moves the face with it -- which is what this drives."""
         import yuzu_face
 
         class Fake:
@@ -6607,23 +6610,71 @@ class TestTheCastIsTwo(unittest.TestCase):
         try:
             with mock.patch.object(yuzu_face, "_BRAINS", {}):
                 with mock.patch("yuzu_brain.YuzuBrain", Fake):
+                    on_face = [w for w, e in yuzu_face.CHARACTERS.items()
+                               if e[1] == "face.html"]
+                    self.assertEqual(on_face, ["saya"])
                     for who in yuzu_face.CHARACTERS:
+                        yuzu_face.set_state("idle")
                         yuzu_face.answer("hello", who)
+                        want = "talking" if who in on_face else "idle"
                         self.assertEqual(
-                            yuzu_face.get_state().get("state"), "idle",
-                            f"{who} drove a face page nobody is on")
+                            yuzu_face.get_state().get("state"), want,
+                            f"{who} wrote the face page's state")
                     # ...and it is the ROSTER that decides, not a name.
                     yuzu_face.CHARACTERS["four"] = ("four", "face.html", "x")
+                    del yuzu_face.CHARACTERS["saya"]
                     yuzu_face._BRAINS.clear()
+                    yuzu_face.set_state("idle")
                     yuzu_face.answer("hello", "four")
                     self.assertEqual(
                         yuzu_face.get_state().get("state"), "talking",
-                        "a character back on face.html cannot drive it")
+                        "a character moved onto face.html cannot drive it")
         finally:
             yuzu_face.CHARACTERS.clear()
             yuzu_face.CHARACTERS.update(was_cast)
             yuzu_face._BRAINS.clear()
             yuzu_face._BRAINS.update(was)
+            yuzu_face.set_state("idle")
+
+    def test_every_page_asks_as_ITS_OWN_girl(self):
+        """Saya's page posted no `who` at all -- it predates the roster
+        -- so the day she came back (Oct 21) the server would have
+        answered her page with whoever greets you: Four's brain behind
+        Saya's face, and Four's voice out of her. Read off the ROSTER,
+        so every page he can open is held to it: every request it makes
+        with his words in it names that page's girl, and only her."""
+        import yuzu_face
+        ui = Path(__file__).parent / "ui"
+        for name, (_key, page, _what) in yuzu_face.CHARACTERS.items():
+            with self.subTest(page=page):
+                code = (ui / page).read_text()
+                asks = re.findall(r"JSON\.stringify\(\{[^}]*\btext:[^}]*\}\)", code)
+                self.assertTrue(asks, "%s never asks anything" % page)
+                for ask in asks:
+                    self.assertIn("who: '%s'" % name, ask,
+                                  "%s asks without saying it is %s" % (page, name))
+                self.assertEqual(set(re.findall(r"who: '(\w+)'", code)), {name},
+                                 "%s asks as somebody else" % page)
+
+    def test_the_BRAIN_itself_writes_her_face_only_for_HER(self):
+        """The same trap one layer down, where the fake brain above
+        cannot see it: every real brain wrote the state file from inside
+        its own turn. Harmless while nobody was on face.html; the moment
+        Saya was back, talking to Four -- on her page, on the cube, or
+        in the terminal -- would have put Four's words and moods on
+        Saya's face."""
+        import yuzu_brain
+        import yuzu_face
+        try:
+            for key, want in (("four", "idle"), ("four_cube", "idle"),
+                              (yuzu_personas.LIVE_PERSONA, "idle"),
+                              ("saya_deck", "talking")):
+                brain = yuzu_brain.YuzuBrain(persona=key)
+                yuzu_face.set_state("idle")
+                brain._face("talking", "[blushes] hmph.")
+                self.assertEqual(yuzu_face.get_state().get("state"), want,
+                                 f"{key}'s brain wrote Saya's face")
+        finally:
             yuzu_face.set_state("idle")
 
     def test_the_rail_is_ONE_roster_and_the_pages_hold_no_list(self):
@@ -6844,8 +6895,7 @@ console.log(JSON.stringify(%s.map(text => {
         import yuzu_face
         here = Path(__file__).parent
         cast = {c["who"] for c in yuzu_face.roster()}
-        for who, key, page in (("saya", "saya_deck", "face.html"),
-                               ("cait", "cait", "cait.html"),
+        for who, key, page in (("cait", "cait", "cait.html"),
                                ("mimi", "mimi", "mimi.html"),
                                ("shiro", "shiro_mk2", "shiro.html"),
                                ("kuro", "kuro", "kuro.html")):
@@ -6882,7 +6932,7 @@ console.log(JSON.stringify(%s.map(text => {
         had to read around. This is data nobody loads unless asked.)"""
         import yuzu_face
         for key in ("coco", "coco_deck", "shiro", "shiro_deck",
-                    "cait", "mimi", "saya", "saya_deck"):
+                    "cait", "mimi", "saya"):
             self.assertTrue(
                 (Path(__file__).parent / "personas" / f"{key}.persona").exists(),
                 f"{key} was deleted rather than retired")
@@ -6896,13 +6946,13 @@ console.log(JSON.stringify(%s.map(text => {
         # name-leak rule again: the name is not the identity, the key is.
         on = {entry[0] for entry in yuzu_face.CHARACTERS.values()}
         for key in ("coco", "coco_deck", "shiro", "shiro_deck",
-                    "cait", "mimi", "saya", "saya_deck"):
+                    "cait", "mimi", "saya"):
             self.assertNotIn(key, on, f"{key} is retired and back on the roster")
         for key in on:
             self.assertFalse(yuzu_personas.load(key).retired,
                              f"the roster points at {key}, which is retired")
         names = {c["name"] for c in yuzu_face.roster()}
-        for gone in ("Coco", "Saya", "Cait", "Mimi"):
+        for gone in ("Coco", "Cait", "Mimi"):
             self.assertNotIn(gone, names)
 
     def test_a_character_with_no_page_is_ABSENT_from_the_rail(self):
@@ -16317,19 +16367,23 @@ class TestArtConversion(unittest.TestCase):
         nw, _, _ = self.art.strip_bars(w, h, px)
         self.assertEqual(nw, w - 3, "the noisy bar survived the crop")
 
-    def test_every_sprite_is_SQUARE(self):
-        """What makes it look smooth. The page scales each sprite into
-        one square box with object-fit: contain, so a wide sprite renders
-        SMALLER -- her face visibly jumps size when the expression
-        changes, or every few seconds when she blinks. Cropped tight, his
-        four came out between 1.09 and 1.51 wide."""
+    def test_every_sprite_is_ONE_SIZE(self):
+        """What makes it look smooth. The page scales each sprite to fit
+        one box, so two sprites of different shapes render at different
+        scales -- her face visibly jumps size when the expression
+        changes, or every few seconds when she blinks. His first faces
+        were made square for this; his kaomoji (Oct 21) are wide, and
+        every one is cut from a window of the same size."""
+        sizes = {}
         for f in sorted(self.SPRITES.glob("*.png")):
             if ".paint" in f.name:
                 continue
             got = self.art.load_rgba(str(f))
             self.assertTrue(got, f"{f.name} will not load")
-            w, h, _ = got
-            self.assertEqual(w, h, f"{f.name} is {w}x{h}, not square")
+            sizes[f.name] = got[:2]
+        self.assertTrue(sizes, "she has no faces at all")
+        self.assertEqual(len(set(sizes.values())), 1,
+                         "her faces are different sizes: %s" % sizes)
 
     def test_no_sprite_was_reduced_to_nothing(self):
         """The blink disaster, guarded from the other end: whatever the
@@ -16367,11 +16421,16 @@ class TestArtConversion(unittest.TestCase):
                          "phone property")
 
     def test_the_raw_art_is_kept_so_it_can_be_redone(self):
-        """His originals live in ui/raw/ and the conversion is one
-        command with no arguments. A lossy step whose input was thrown
-        away can never be improved on."""
-        self.assertTrue(list(self.RAW.glob("*")),
-                        "the raw drawings were not kept")
+        """Her faces are cut from his kaomoji sheet (Oct 21) by one
+        command with no arguments, and the sheet is kept beside the
+        other originals. A lossy step whose input was thrown away can
+        never be improved on. (His first hand-drawn faces and their
+        raws are in git: `git show dc928f8:ui/sprites/idle.png`.)"""
+        here = Path(__file__).parent
+        self.assertTrue((here / "ui" / "art_in" / "saya_kaomoji.jpg").exists(),
+                        "the sheet her faces are cut from was not kept")
+        self.assertIn('SOURCE = HERE / "ui" / "art_in" / "saya_kaomoji.jpg"',
+                      (here / "cut_saya.py").read_text())
 
 
 class TestSheReacts(unittest.TestCase):
@@ -16968,7 +17027,7 @@ class TestTelemetry(unittest.TestCase):
         days deciding to keep rather than suppress. No direction, no
         mood -- and then `talking`, exactly as before."""
         for said, want in (
-                ("[blushes] I-It's not like I missed you.", "annoyed"),
+                ("[blushes] I-It's not like I missed you.", "blush"),
                 ("*giggles* fine, you win.", "happy"),
                 ("[eye roll] whatever.", "annoyed"),
                 ("[smirks] obviously.", "smug"),
@@ -17004,11 +17063,17 @@ class TestTelemetry(unittest.TestCase):
         """Narrowing `sad` must not empty it -- `cry.png` is his art and
         it has a job. The words that keep it are the ones that only ever
         mean crying."""
+        art = self.face.roles_for(self.face.sprites())
         for said in ("[starts crying] I hate you.",
                      "[sniffles] ...whatever.",
                      "[sobs quietly]",
                      "[a tear runs down] don't look at me."):
-            self.assertEqual(self.face.mood_from(said), "sad", said)
+            role = self.face.mood_from(said)
+            # Oct 21: loud crying got its own wide-eyed face (`sob`);
+            # both are faces WITH tears, named by file.
+            self.assertIn(role, ("sad", "sob"), said)
+            self.assertIn(art.get(role), ("cry", "sob"),
+                          f"{said!r} has no tears on her face")
 
     def test_the_blush_words_resolve_to_art_that_has_no_tears(self):
         """The end-to-end version: a blushing line must not land on the
@@ -17029,7 +17094,28 @@ class TestTelemetry(unittest.TestCase):
         AND giggles is blushing -- that is the whole character, and it
         is why `happy` is last in the list."""
         self.assertEqual(
-            self.face.mood_from("[blushes and giggles] shut up"), "annoyed")
+            self.face.mood_from("[blushes and giggles] shut up"), "blush")
+
+    def test_a_reply_is_never_shown_TWICE_on_her_page(self):
+        """Her page keeps a conversation now (Oct 21) and still polls
+        /state, which carries her newest reply -- the same reply the
+        page's own /say just put in the log. Rendered in a real browser
+        with the server's real order (state written, then the answer
+        sent): two lines, after five polls. This holds the two things
+        that made that true: the poll never shows a line while he is
+        waiting on his own, and the send path records the state's newest
+        line BEFORE it lets the poll show lines again."""
+        page = (Path(__file__).parent / "ui" / "face.html").read_text()
+        watch = page[page.index("function watch()"):]
+        watch = watch[:watch.index("\n}\n")]
+        self.assertRegex(watch, r"if \(!send\.disabled\) show\(line\('her'",
+                         "the poll adds her line while his own reply is due")
+        send = page[page.index("form.onsubmit"):]
+        send = send[:send.index("\n};")]
+        self.assertIn("lastSaid = st.said", send, "the page never notes its reply as seen")
+        self.assertLess(send.index("lastSaid = st.said"),
+                        send.index("send.disabled = false"),
+                        "the poll can show her reply again before it is noted")
 
     def test_the_mood_never_replaces_what_she_is_DOING(self):
         """Two questions, two fields. `state` is the honest loading
@@ -17043,7 +17129,8 @@ class TestTelemetry(unittest.TestCase):
                 self.face.set_state("talking", "[blushes] hmph.")
                 got = self.face.get_state()
                 self.assertEqual(got["state"], "talking")
-                self.assertEqual(got["mood"], "annoyed")
+                self.assertEqual(got.get("mood"), "blush",
+                                 "a blush wrote no mood, or the wrong one")
                 self.face.set_state("thinking")
                 self.assertNotIn("mood", self.face.get_state(),
                                  "a stale mood outlived the reply")
@@ -17740,9 +17827,14 @@ class TestFaceSprites(unittest.TestCase):
         for role, sprite in resolved.items():
             self.assertIn(sprite, have,
                           f"role {role} points at art that is not there")
-        self.assertNotIn("asleep", resolved,
-                         "there is no asleep art, so the role must be "
-                         "ABSENT rather than pointing at the wrong face")
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ("idle", "talking"):
+                (Path(tmp) / f"{name}.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            thin = self.face.roles_for(self.face.sprites(tmp))
+        self.assertNotIn("asleep", thin,
+                         "with no asleep art the role must be ABSENT "
+                         "rather than pointing at the wrong face")
+        self.assertEqual(thin.get("talking"), "talking")
 
     def test_the_mouth_paint_is_GONE_not_disabled(self):
         """Ghost, Sept 11: "her mouth paint seems kinda weird still.
@@ -17764,6 +17856,34 @@ class TestFaceSprites(unittest.TestCase):
         page = (Path(__file__).parent / "ui" / "face.html").read_text()
         self.assertNotIn('id="paint"', page,
                          "the page still stacks a paint layer")
+
+    def test_her_faces_ARE_his_kaomoji_cut_by_the_tool(self):
+        """Ghost, Oct 21: "bringing Saya the tsundere back but with these
+        as her faces in neon green". Every face in ui/sprites/ is what
+        cut_saya.py makes from his sheet -- re-cut here and compared by
+        pixel, so a face edited by hand, or a tool changed and not re-run,
+        is caught. Skipped where numpy or PIL is missing (his phone)."""
+        try:
+            import numpy as np
+            from PIL import Image
+        except ImportError:
+            self.skipTest("needs numpy and PIL")
+        import importlib.util as iu
+        spec = iu.spec_from_file_location(
+            "cut_saya", Path(__file__).parent / "cut_saya.py")
+        cut = iu.module_from_spec(spec)
+        spec.loader.exec_module(cut)
+        with tempfile.TemporaryDirectory() as tmp:
+            made = cut.cut(out=Path(tmp))
+            self.assertEqual(sorted(made),
+                             sorted(s["name"] for s in self.face.sprites()),
+                             "her faces and the cut disagree on WHICH faces")
+            for name in made:
+                want = np.asarray(Image.open(Path(tmp) / (name + ".png")))
+                have = np.asarray(Image.open(self.SPRITES / (name + ".png")))
+                self.assertEqual(want.shape, have.shape, name)
+                self.assertLessEqual(int(np.abs(want.astype(int) - have.astype(int)).max()),
+                                     1, "%s is not what the tool cuts" % name)
 
     def test_odd_art_is_survived_rather_than_raised_on(self):
         """One odd export must never take her whole face down."""

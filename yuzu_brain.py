@@ -590,10 +590,17 @@ class YuzuBrain:
     # wiki: the face is a nicety and the reply is the product, so a
     # missing or broken face module must never be able to stop her
     # talking. `_face_state` swallows everything on purpose.
+    #
+    # ONLY THE FACE PAGE'S OWN CHARACTER WRITES IT. The state file is
+    # face.html's, and that page belongs to one character on the roster
+    # (Saya, Oct 21). Every other brain -- Four on her page, a girl on
+    # the cube, the terminal chat -- would otherwise put its own turns
+    # and moods on HER face.
     def _face(self, state, said="", rate=None):
         try:
             import yuzu_face
-            yuzu_face.set_state(state, said, rate)
+            if yuzu_face.owns_face(getattr(self.persona, "key", None)):
+                yuzu_face.set_state(state, said, rate)
         except Exception:
             pass
 

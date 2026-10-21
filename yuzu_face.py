@@ -57,15 +57,27 @@ EXTS = (".png", ".svg", ".webp", ".gif", ".jpg", ".jpeg")
 # Hard-coding one to the other is the name-leak bug this repo has now
 # hit six times.
 ROLES = {
-    "idle":     ("idle", "neutral", "wink", "thinking"),
-    "thinking": ("thinking",),
-    "talking":  ("talking", "woahshock", "wink"),
-    "happy":    ("happy", "wink"),
-    "annoyed":  ("mad", "annoyed"),
-    "sad":      ("cry", "sad"),
-    "smug":     ("smug",),
-    "shock":    ("woahshock", "shock"),
-    "asleep":   ("asleep", "sleepy"),
+    "idle":      ("idle", "neutral", "thinking"),
+    "thinking":  ("thinking",),
+    "talking":   ("talking",),
+    "happy":     ("happy",),
+    "cute":      ("cute", "happy"),
+    "blush":     ("blush",),
+    "flustered": ("flustered", "blush"),
+    "puff":      ("puff", "pout"),
+    "pout":      ("pout",),
+    "irritated": ("irritated", "angry"),
+    "shout":     ("shout", "angry"),
+    "angry":     ("angry",),
+    "annoyed":   ("annoyed",),
+    "bleh":      ("bleh", "smug"),
+    "smug":      ("smug",),
+    "sob":       ("sob", "cry"),
+    "sad":       ("cry", "sad"),
+    "dizzy":     ("dizzy", "shock"),
+    "shock":     ("shock",),
+    "ooh":       ("ooh", "shock"),
+    "asleep":    ("sleepy", "asleep"),
 }
 
 # ---------------------------------------------------------------------
@@ -91,12 +103,31 @@ ROLES = {
 
 MOODS = (
     # (role, words she actually writes inside brackets or asterisks)
-    ("annoyed", ("blush", "flustered", "embarrass", "pout", "huff",
-                 "hmph", "annoy", "glare", "scowl", "grumbl", "mutter",
-                 "eye roll", "rolls her eyes", "sulk", "tsk",
-                 # exasperation, not sorrow -- see the note on `sad`
-                 "sigh", "trails off", "ahem", "clears her throat")),
-    ("smug",    ("smug", "smirk", "grin", "chuckl", "preen", "gloat")),
+    #
+    # Oct 21: HIS KAOMOJI SHEET IS HER FACE NOW, 22 faces where there
+    # were 9, so a feeling that used to share `mad.png` gets its own: a
+    # blush, flustered, puffed cheeks, a pout, an anger mark, a shout.
+    # ORDER IS STILL THE DESIGN -- a tsundere who blushes AND giggles is
+    # blushing, so `blush` leads and `happy` is nearly last.
+    ("blush",     ("blush", "bashful", "shy", "red-faced", "looks away")),
+    ("flustered", ("flustered", "embarrass", "stammer", "stutter",
+                   "squirm", "fidget", "panic", "flail")),
+    ("puff",      ("puffs", "puffed", "puffing")),
+    ("pout",      ("pout", "sulk")),
+    ("irritated", ("twitch", "vein", "grits", "gritted", "seeth", "fuming",
+                   "fumes")),
+    ("shout",     ("yell", "shout", "scream", "screech")),
+    ("angry",     ("angry", "anger", "furious", "glare", "scowl", "growl",
+                   "stomp", "frown")),
+    ("annoyed",   ("huff", "hmph", "annoy", "grumbl", "mutter",
+                   "eye roll", "rolls her eyes", "tsk", "scoff",
+                   "crosses her arms", "arms crossed", "unimpressed",
+                   "deadpan",
+                   # exasperation, not sorrow -- see the note on `sad`
+                   "sigh", "trails off", "ahem", "clears her throat")),
+    ("bleh",      ("tongue", "bleh", "blep", "raspberry", "teasing",
+                   "teases")),
+    ("smug",      ("smug", "smirk", "grin", "chuckl", "preen", "gloat")),
     # `sad` MEANS CRYING, and nothing softer. It used to catch "sigh",
     # "trails off" and "quiet" -- and a tsundere sighs in almost every
     # reply. Her very first live line was `*sigh* Fine, I'll talk about
@@ -106,16 +137,22 @@ MOODS = (
     # down her face over ice cream.
     #
     # Ghost, Sept 11: *"she 'cry faces' when she should blush"*. This
-    # is that bug. A sigh is exasperation, so it belongs with annoyed,
-    # and `mad.png` -- blush plus pout -- is what he confirmed he
-    # wants: *"mad works for blushing looks like it. thats what i meant
-    # by pouty."* Real tears need real crying words.
-    ("sad",     ("cries", "crying", "sob", "sniff", "tear", "whimper",
-                 "weep", "sad")),
-    ("shock",   ("gasp", "startl", "shock", "jumps", "wide eye",
-                 "wide-eyed", "surprise", "squeal", "yelp")),
-    ("happy",   ("giggl", "laugh", "beam", "smile", "hums", "bounce",
-                 "delight", "cheer", "wink")),
+    # is that bug. A sigh is exasperation, so it belongs with annoyed.
+    # Real tears need real crying words -- and loud crying (`sob`) has
+    # its own wide-eyed face now.
+    ("sob",       ("sob", "wail", "bawl")),
+    ("sad",       ("cries", "crying", "sniff", "tear", "whimper", "weep",
+                   "sad")),
+    ("dizzy",     ("dizzy", "dazed", "swirl", "woozy")),
+    ("shock",     ("gasp", "startl", "shock", "jumps", "wide eye",
+                   "wide-eyed", "surprise", "squeal", "yelp")),
+    ("ooh",       ("ooh", "curious", "tilts her head", "whistl",
+                   "intrigued", "impressed")),
+    ("cute",      ("sparkl", "aww", "heart eyes", "hearts", "adore", "swoon",
+                   "melts")),
+    ("happy",     ("giggl", "laugh", "beam", "smile", "hums", "bounce",
+                   "delight", "cheer", "wink")),
+    ("asleep",    ("yawn", "sleep", "doze", "snore", "drowsy")),
 )
 
 
@@ -208,7 +245,10 @@ def pose_for(text):
     a guess, and a wrong guess puts the wrong picture on a real reply;
     here a wrong picture needs her to have written the wrong thing.
     """
-    return "sulking" if mood_from(text) in ("annoyed", "sad") else "talking"
+    # Every mood that was `annoyed` or `sad` before Saya's 22 faces split
+    # them (Oct 21) -- Mimi has one sulk, and it keeps meaning the same.
+    sulks = ("blush", "flustered", "pout", "angry", "annoyed", "sob", "sad")
+    return "sulking" if mood_from(text) in sulks else "talking"
 
 
 def roles_for(found):
@@ -459,6 +499,19 @@ def set_state(state, said="", rate=None):
         pass
 
 
+def owns_face(key):
+    """Whether persona `key` is the character on face.html -- the only
+    one whose turns may write the state file that page polls.
+
+    Read off the ROSTER, never a name. The BRAIN asks this too, from
+    inside every turn: Four's brain used to write the state file
+    whatever page she was on, which was harmless while nobody was on
+    face.html and is Saya's face lighting up with Four's words the
+    moment Saya is back on it (Oct 21)."""
+    return bool(key) and any(entry[1] == "face.html" and entry[0] == key
+                             for entry in CHARACTERS.values())
+
+
 def get_state():
     """What she is doing, and what she last said.
 
@@ -540,6 +593,13 @@ CHARACTERS = {
     # plz bro". The sisters (shiro_mk2, kuro, and their robot twins)
     # are `retired: yes`, their pages and art kept on disk -- the Sept 20
     # call again, and putting one back is a line here and a line there.
+    #
+    # SAYA IS BACK, Oct 21, as the Sept 20 call promised: one line here
+    # and one in her persona. Ghost: "bringing Saya the tsundere back but
+    # with these as her faces in neon green with the crt effect like she
+    # has... just a visual makeover." Her faces are his kaomoji sheet
+    # (cut_saya.py); her words are the same Saya.
+    "saya": ("saya_deck",              "face.html",  "Tsundere"),
 }
 
 # BODIES THAT ASK WITHOUT A PAGE. Oct 2, Ghost, of the StackChan cube:
@@ -2174,8 +2234,7 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
     # than by the code meaning it. The sprite face belongs to whoever's
     # page IS face.html; with nobody on it the state file is simply
     # never written, and if she is ever put back this follows her.
-    drives_face = any(entry[1] == "face.html" and persona_for(name) == key
-                      for name, entry in CHARACTERS.items())
+    drives_face = owns_face(key)
 
     # AND `/wiki` IS A SEPARATE QUESTION FROM THAT, which it was not
     # until Four landed. Both used to hang off `drives_face`, and the
