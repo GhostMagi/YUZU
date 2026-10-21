@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 959 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 963 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,66 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE CUBE'S "NOT ENOUGH MEMORY" CAME MID-USE, SO IT SAYS WHY NOW (Oct 21)
+
+*"did ya fix that crash error thing too? Happened after using her for
+a few btw if that helps at all."* It does: **the Oct 18 screen ("Not
+enough memory -- is PSRAM enabled?") is only ever drawn in setup()**,
+so the cube had **RESTARTED BY ITSELF mid-use** and then come up with
+no PSRAM. Two faults, neither reproducible here: what restarted it,
+and why the memory was missing after. The f5ae526 fix (retry with
+`esp_restart()`) was aimed at "one bad start" and is the WEAKER retry
+for this: a soft restart never takes the power off the memory chip.
+
+- **Notes that outlive a restart** (`Notes notes`, RTC_NOINIT, a magic
+  word so a power cut's noise never reads as a crash): what the cube
+  is doing (`doing(NOW_...)` at the hold, the trip to the board, her
+  thinking, her voice, his game, joining WiFi) and the battery it last
+  read. The boot after an UNPLANNED restart (`esp_reset_reason()`:
+  brownout/glitch = "the power dipped", panic/lockup = "crashed",
+  watchdogs = "froze") says it **in her chat box for 30s**, e.g.
+  *"Restarted by itself: the power dipped while talking. Battery was
+  18%."* -- on his game's page, which has no chat box, on the bare
+  panel for 8s. **A photo of it names the cause.** A flash, the button
+  or turning it on says nothing.
+- **The retry is a second of deep sleep with VDD_SDIO off**, not
+  `esp_restart()`: that can power the PSRAM chip off and on (whether
+  the CoreS3's PSRAM sits on VDD_SDIO is UNVERIFIED) and gives a tired
+  battery a moment. Still twice at most, counted in the notes.
+- **The give-up screen** names the restart before it, the PSRAM, the
+  battery, and at 20% or less (not charging) **"Charge me first"**.
+  Word-wrapped now (print() broke mid-word); measured with the Font2
+  table: 14 lines, it fits 240px with ~10 to spare.
+- **A REAL BUG FOUND ON THE WAY:** a hold mid-sentence FREED her voice
+  buffer before stopping the speaker, and M5Unified plays straight out
+  of that buffer (stop() only asks its task). It stops, waits (bounded)
+  for silence, then frees. Reading freed PSRAM is noise, not a crash,
+  so this is NOT believed to be the restart.
+
+**LEADING GUESS, said to him as a guess: the power.** Her voice at
+volume 200 + WiFi with sleep off on a draining battery is a
+textbook brownout, and "after using her for a few" fits a draining
+battery. Volume and WiFi sleep were NOT changed -- the next photo
+decides. **None of this is on his cube until he Updates and runs
+`~/YUZU/cube`**; whether he flashed anything after Oct 17 is unknown.
+
+Driven on this machine: the notes block is cut out of the real
+cube_main.cpp and run through power-on, noise, a dip, the deep-sleep
+retry, a flash, a crash in his game (no battery known: none made up),
+a freeze, and every kind of doing. Compiled for the cube, no warnings,
+2.35 MB. **Sixteen breaks, all red as failures** (two were ERRORs first,
+an `.index()` on a deleted line; asserted before indexing now).
+
+**SAYA KNOWS HER FACE, same day** (*"Yes plz"*). Her prompt said "no
+face" (the deck body's default) and "long hair". `DECK_BODY` in her
+settings now says her face is the neon green lines on the deck's
+screen, two dots and a line resting, and that it blushes, pouts and
+glares on its own; rule 7 is that face giving her away before she has
+finished denying anything; her look answer is "A face on the screen.
+Green lines..." (3683 -> 3935 chars, inside the context guard). Not
+LIVE_PERSONA; pasted to him for PocketPal anyway. Four breaks, all red.
+**959 -> 963.**
 
 ## SAYA IS BACK, WITH HIS KAOMOJI FOR A FACE (Oct 21)
 

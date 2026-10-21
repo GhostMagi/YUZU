@@ -4234,26 +4234,36 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertRegex(crt, r"if \(y & 1\) g \*= 0\.\d+f;",
                          "his screen has no scanlines")
 
-    def test_a_boot_with_no_ROOM_restarts_then_says_what_it_found(self):
+    def test_a_boot_with_no_ROOM_tries_again_then_says_what_it_found(self):
         """Ghost, Oct 18, a photo: "Not enough memory -- is PSRAM
-        enabled?" on firmware that had run for days. A question he cannot
-        answer, on the one screen he has. The cube restarts itself (a
-        bad start is the likely cause), at most twice, counted in memory
-        that survives a restart -- uncounted, it would restart forever --
-        and then says which picture had no room and what PSRAM it
-        found, with the fix."""
+        enabled?" -- a question he cannot answer, on the one screen he
+        has. Oct 21: it came "after using her for a few", so the cube had
+        restarted itself and come up with no room. It tries again at
+        most twice, counted in memory that survives a restart (uncounted,
+        it would loop forever) -- and not with esp_restart(), which never
+        takes the power off the memory chip, but with a second of deep
+        sleep with VDD_SDIO off. Then it says which picture had no room,
+        the restart before it, the PSRAM it found, the battery, the fix."""
         code = self.code()
         self.assertNotIn("is PSRAM enabled?", code,
                          "the boot asks him a question again")
-        self.assertRegex(code, r"RTC_NOINIT_ATTR\s+static\s+uint32_t\s+boot_tries",
-                         "the restart count does not survive a restart")
+        self.assertRegex(code, r"RTC_NOINIT_ATTR\s+static\s+Notes\s+notes",
+                         "the retry count does not survive a restart")
         oom = code[code.index("static void out_of_memory"):code.index("void setup()")]
-        self.assertRegex(oom, r"if \(boot_tries < 2\)\s*\{\s*boot_tries\+\+;",
-                         "the restarts are not counted, or not bounded")
-        self.assertIn("esp_restart()", oom, "it never retries")
-        for said in ("psramFound()", "ESP.getPsramSize()", "power button"):
+        self.assertRegex(oom, r"if \(notes\.tries < 2\)\s*\{\s*notes\.tries\+\+;",
+                         "the retries are not counted, or not bounded")
+        self.assertIn("esp_deep_sleep_start()", oom, "it never retries")
+        self.assertIn("esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO, ESP_PD_OPTION_OFF)", oom,
+                      "the retry leaves the memory chip powered")
+        self.assertNotIn("esp_restart()", oom,
+                         "the retry is a restart that never powers the memory off")
+        for said in ("psramFound()", "ESP.getPsramSize()", "power button",
+                     "restart_note(buf", "read_battery()"):
             self.assertIn(said, oom, "the failure does not say %s" % said)
-        self.assertIn("boot_tries = 0;", code[code.index("void setup()"):],
+        self.assertRegex(oom, r"if \(battery_pct >= 0 && battery_pct <= 20 && !battery_charging\)"
+                              r"\s*say_plainly\(\"Charge me",
+                         "a flat battery is not named as the fix")
+        self.assertIn("notes.tries = 0;", code[code.index("void setup()"):],
                       "a good boot does not reset the count")
 
     def test_her_BATTERY_shows_top_left_and_never_a_guess(self):
@@ -4873,6 +4883,153 @@ class TestHisGameOnTheCube(unittest.TestCase):
                       code[code.index("static void game_leave"):code.index("static void game_page")])
         self.assertRegex(code, r"GAME = GIRL_COUNT \+ 1, SCREENS = GIRL_COUNT \+ 2",
                          "his game is not the page after the ghost")
+
+
+class TestTheCubeSaysWhyItRestarted(unittest.TestCase):
+    """Ghost, Oct 21, about his Oct 18 photo of "Not enough memory": it
+    "happened after using her for a few". That screen is only drawn at
+    boot, so the cube had restarted BY ITSELF mid-use, and then come up
+    with no room. Neither half can be reproduced from here, so the cube
+    keeps notes in memory that survives a restart (what it was doing,
+    the battery it last read) and the boot after an UNPLANNED restart
+    says which kind it was: the power dipping, a crash, or a freeze.
+
+    The notes code is cut out of the cube's REAL cube_main.cpp and
+    driven on this machine through a run of restarts. Skipped where
+    there is no g++."""
+
+    ROOT = Path(__file__).parent
+    MAIN = ROOT / "stackchan" / "cube" / "cube_main.cpp"
+    HARNESS = r'''
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#define RTC_NOINIT_ATTR
+typedef enum { ESP_RST_UNKNOWN, ESP_RST_POWERON, ESP_RST_EXT, ESP_RST_SW, ESP_RST_PANIC,
+  ESP_RST_INT_WDT, ESP_RST_TASK_WDT, ESP_RST_WDT, ESP_RST_DEEPSLEEP, ESP_RST_BROWNOUT,
+  ESP_RST_SDIO, ESP_RST_USB, ESP_RST_JTAG, ESP_RST_EFUSE, ESP_RST_PWR_GLITCH,
+  ESP_RST_CPU_LOCKUP } esp_reset_reason_t;
+static esp_reset_reason_t fake_reason;
+static esp_reset_reason_t esp_reset_reason() { return fake_reason; }
+#include "notes.inc"
+static void boot(esp_reset_reason_t r, const char* label) {
+  fake_reason = r;
+  read_notes();
+  char n[160];
+  restart_note(n, sizeof n);
+  printf("%s|%s\n", label, n);
+}
+int main() {
+  memset(&notes, 0xA5, sizeof notes);          // what a power cut leaves
+  boot(ESP_RST_PANIC, "noise");
+  boot(ESP_RST_POWERON, "poweron");
+  doing(NOW_TALKING); notes.battery = 18;
+  boot(ESP_RST_BROWNOUT, "dip");
+  notes.tries = 1;                              // out_of_memory's retry
+  boot(ESP_RST_DEEPSLEEP, "retry");
+  notes.tries = 0; notes.why = 0;               // the boot that said it
+  boot(ESP_RST_SW, "flash");
+  doing(NOW_PLAYING); notes.battery = -1;
+  boot(ESP_RST_PANIC, "crash");
+  doing(NOW_THINKING); notes.battery = 64;
+  boot(ESP_RST_TASK_WDT, "froze");
+  for (int d = 0; d < NOW_KINDS; d++) { doing((Doing)d); boot(ESP_RST_INT_WDT, "kind"); }
+  return 0;
+}
+'''
+
+    def code(self):
+        text = self.MAIN.read_text()
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return re.sub(r"//[^\n]*", "", text)
+
+    def drive(self):
+        if not shutil.which("g++"):
+            self.skipTest("needs g++")
+        import tempfile
+        text = self.MAIN.read_text()
+        start, end = text.index("enum Doing"), text.index("static void set_said")
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        (tmp / "notes.inc").write_text(text[start:end])
+        (tmp / "h.cpp").write_text(self.HARNESS)
+        built = subprocess.run(["g++", "-std=gnu++17", "-w", "-o", str(tmp / "h"),
+                                str(tmp / "h.cpp")], capture_output=True, text=True,
+                               timeout=120)
+        self.assertEqual(built.returncode, 0, "the notes do not compile:\n" + built.stderr[-1500:])
+        got = subprocess.run([str(tmp / "h")], capture_output=True, text=True, timeout=30)
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        return [tuple(line.split("|", 1)) for line in got.stdout.splitlines()]
+
+    def test_each_kind_of_restart_is_SAID_and_a_planned_one_is_not(self):
+        runs = self.drive()
+        said = dict(r for r in runs if r[0] != "kind")
+        self.assertEqual(said["noise"], "", "a power cut's noise reads as a crash")
+        self.assertEqual(said["poweron"], "", "turning it on reads as a crash")
+        self.assertEqual(said["dip"], "Restarted by itself: the power dipped while "
+                                      "talking. Battery was 18%.")
+        self.assertEqual(said["retry"], said["dip"],
+                         "the retry after a boot with no room forgets what began it")
+        self.assertEqual(said["flash"], "", "a flash or a button reads as a crash")
+        self.assertEqual(said["crash"], "Restarted by itself: the cube crashed while "
+                                        "playing your game.",
+                         "a crash is not said, or an unknown battery is made up")
+        self.assertEqual(said["froze"], "Restarted by itself: the cube froze while "
+                                        "thinking. Battery was 64%.")
+        kinds = [r[1] for r in runs if r[0] == "kind"]
+        self.assertEqual(len(kinds), len(set(kinds)), "two things it does read the same")
+        for note in kinds:
+            self.assertRegex(note, r"^Restarted by itself: the cube froze while [a-z][a-zA-Z ]+\."
+                                   r" Battery was 64%\.$",
+                             "a thing the cube does has no words")
+
+    def test_every_part_of_a_turn_leaves_a_NOTE(self):
+        """What it was doing is only worth saying if every part of a turn
+        writes it: the hold, the trip to the board, her thinking, her
+        voice, his game -- and the battery as it is read."""
+        code = self.code()
+        def body(name):
+            at = code.index(name)
+            return code[at:code.index("\n}", at)]
+        self.assertIn("doing(NOW_LISTENING)", body("static void start_recording"))
+        turn = body("static void turn_task")
+        for said in ("doing(NOW_SENDING)", "doing(NOW_THINKING)"):
+            self.assertIn(said, turn, "a turn never notes %s" % said)
+        self.assertLess(turn.index("doing(NOW_SENDING)"), turn.index("listen(rec_buf"))
+        self.assertLess(turn.index("doing(NOW_THINKING)"), turn.index("ask(heard"))
+        self.assertIn("doing(NOW_RESTING)", turn, "a finished turn still says it is talking")
+        self.assertIn("doing(NOW_TALKING)", body("static void speak"))
+        self.assertIn("doing(NOW_PLAYING)", body("static void game_enter"))
+        self.assertIn("doing(NOW_JOINING)", body("static bool join_wifi"))
+        self.assertIn("notes.battery = battery_pct;", body("static void read_battery"))
+        setup = body("void setup()")
+        self.assertLess(setup.index("read_notes()"), setup.index("M5.begin"),
+                        "the notes are read after something could change them")
+        self.assertRegex(setup, r"restart_note\(note, sizeof note\);",
+                         "the boot never says why it restarted")
+        self.assertIn("set_said(note)", setup, "the restart is not said in the chat box")
+        self.assertIn("notes.why = 0;", setup, "the same restart is said on every boot")
+
+    def test_a_hold_mid_sentence_never_frees_what_the_speaker_still_reads(self):
+        """M5Unified plays STRAIGHT OUT of the buffer it is handed, and
+        stop() only asks its task to stop. A hold mid-sentence freed her
+        voice first, so the speaker went on reading memory that was no
+        longer hers. Stop, wait for silence, then free."""
+        code = self.code()
+        speak = code[code.index("static void speak"):code.index("static void turn_task")]
+        loop = speak[speak.index("while (next && !stop_her)"):speak.index('set_said("");')]
+        self.assertLess(loop.index("if (stop_her) break;"), loop.index("free(playing)"),
+                        "a hold frees the piece that is still playing")
+        tail = speak[speak.index('set_said("");'):]
+        self.assertIn("M5.Speaker.stop()", tail, "a hold never stops her voice")
+        stop = tail.index("M5.Speaker.stop()")
+        self.assertIn("M5.Speaker.isPlaying()", tail[stop:],
+                      "nothing waits for the speaker to go quiet")
+        quiet = tail.index("M5.Speaker.isPlaying()", stop)
+        self.assertLess(quiet, tail.index("free(playing)"),
+                        "her voice is freed before the speaker has gone quiet")
+        self.assertRegex(tail[stop:], r"for \(int i = 0; i < \d+ && M5\.Speaker\.isPlaying\(\); i\+\+\)",
+                         "the wait for silence is unbounded or missing")
 
 
 class TestTheCubeFindsTheBoard(unittest.TestCase):
@@ -17871,6 +18028,25 @@ class TestFaceSprites(unittest.TestCase):
         page = (Path(__file__).parent / "ui" / "face.html").read_text()
         self.assertNotIn('id="paint"', page,
                          "the page still stacks a paint layer")
+
+    def test_her_PROMPT_knows_the_face_he_gave_her(self):
+        """Oct 21, "Yes plz": her prompt still said she had NO face (the
+        deck body's default) and long hair, while his kaomoji were her
+        face on screen. A confident wrong fact about her own body is the
+        Windows CE palmtop fault, so it says what is true: green lines on
+        the deck's screen that give her away."""
+        import yuzu_personas
+        prompt = yuzu_personas.load("saya_deck").prompt
+        self.assertNotIn("no face", prompt, "she is told she has no face")
+        self.assertNotIn("Long hair", prompt, "she describes a look she has not got")
+        self.assertIn("Your face is the one on this deck's screen", prompt,
+                      "her body never says where her face is")
+        self.assertRegex(prompt, r"\n7\. Your face[^\n]*gives you away",
+                         "rule 7 is not her face giving her away")
+        look = re.search(r"What do you look like\?\nSaya: ([^\n]+)", prompt)
+        self.assertTrue(look, "she has no answer for how she looks")
+        self.assertTrue(all(w in look.group(1) for w in ("face", "screen", "Green")),
+                        "her look answer is not her face on the screen: %r" % look.group(1))
 
     def test_her_faces_ARE_his_kaomoji_cut_by_the_tool(self):
         """Ghost, Oct 21: "bringing Saya the tsundere back but with these

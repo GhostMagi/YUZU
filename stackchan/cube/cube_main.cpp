@@ -94,6 +94,7 @@
 #include <esp_random.h>
 #include <Preferences.h>
 #include <esp_system.h>
+#include <esp_sleep.h>
 
 #include "four_art.h"
 #include "yuzu_art.h"
@@ -380,6 +381,77 @@ static volatile uint32_t said_until = 0;
 static bool away = false;                // no WiFi when the cube last looked
 static uint32_t away_at = 0;
 static int last_pocket = -1;
+
+// ---- notes that outlive a restart ---------------------------------------------
+// Ghost, Oct 21, about his Oct 18 photo of "Not enough memory": it
+// "happened after using her for a few". That screen is only ever drawn
+// at boot, so the cube had RESTARTED BY ITSELF mid-use and then come up
+// with no room. Two faults, and neither can be seen from here: what
+// restarted it (a crash, or the power dipping on a tired battery under
+// her voice?) and why the memory was missing after. So the cube keeps a
+// few notes in memory that survives a restart -- a crash, a watchdog and
+// a dip keep it, a real power cut leaves noise, which is what `magic`
+// is for -- saying what it was doing and the battery it last read, and
+// the boot after an UNPLANNED restart says which kind it was. The next
+// photo names the cause instead of a guess.
+enum Doing : uint8_t { NOW_RESTING, NOW_JOINING, NOW_LISTENING, NOW_SENDING,
+                       NOW_THINKING, NOW_TALKING, NOW_PLAYING, NOW_KINDS };
+static const char* const DOING[NOW_KINDS] = {
+  "resting", "joining WiFi", "listening to you", "sending your words",
+  "thinking", "talking", "playing your game"};
+struct Notes {
+  uint32_t magic;
+  uint8_t doing;        // what the cube is doing now
+  int8_t battery;       // its last reading; -1 when the chip can't tell
+  uint8_t tries;        // retries spent on a boot with no room
+  uint8_t why;          // the last UNPLANNED restart (esp_reset_reason_t), 0 none
+  uint8_t was_doing;    // ...what it was doing then
+  int8_t was_battery;   // ...and the battery it had last read
+};
+static const uint32_t NOTES_MAGIC = 0x59555a55;   // "YUZU"
+RTC_NOINIT_ATTR static Notes notes;
+
+static inline void doing(Doing d) { notes.doing = d; }
+
+// Once, first thing at boot.
+static void read_notes() {
+  const esp_reset_reason_t why = esp_reset_reason();
+  if (notes.magic != NOTES_MAGIC || why == ESP_RST_POWERON || notes.doing >= NOW_KINDS
+      || notes.was_doing >= NOW_KINDS || notes.tries > 2) {
+    notes = Notes{NOTES_MAGIC, NOW_RESTING, -1, 0, 0, NOW_RESTING, -1};
+    return;
+  }
+  // The retry below sleeps a second; waking keeps the record of what
+  // began it.
+  if (why == ESP_RST_DEEPSLEEP && notes.tries) return;
+  switch (why) {
+    case ESP_RST_PANIC: case ESP_RST_CPU_LOCKUP:
+    case ESP_RST_INT_WDT: case ESP_RST_TASK_WDT: case ESP_RST_WDT:
+    case ESP_RST_BROWNOUT: case ESP_RST_PWR_GLITCH:
+      notes.why = why;
+      notes.was_doing = notes.doing;
+      notes.was_battery = notes.battery;
+      break;
+    default:
+      notes.why = 0;      // a restart somebody meant: a flash, a button
+  }
+  notes.tries = 0;
+  notes.doing = NOW_RESTING;
+}
+
+// The words for the last unplanned restart, or "" when there was none.
+static void restart_note(char* out, size_t n) {
+  out[0] = 0;
+  if (!notes.why) return;
+  const char* what = notes.why == ESP_RST_BROWNOUT || notes.why == ESP_RST_PWR_GLITCH
+                         ? "the power dipped"
+                   : notes.why == ESP_RST_PANIC || notes.why == ESP_RST_CPU_LOCKUP
+                         ? "the cube crashed" : "the cube froze";
+  int k = snprintf(out, n, "Restarted by itself: %s while %s.", what,
+                   DOING[notes.was_doing]);
+  if (notes.was_battery >= 0 && k > 0 && (size_t)k < n)
+    snprintf(out + k, n - k, " Battery was %d%%.", notes.was_battery);
+}
 
 static void set_said(const char* t) {
   char out[sizeof(said_text)];
@@ -850,6 +922,7 @@ static void read_battery() {
   battery_at = millis();
   int pct = M5.Power.getBatteryLevel();
   battery_pct = (pct >= 0 && pct <= 100) ? pct : -1;
+  notes.battery = battery_pct;
   battery_charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
 }
 
@@ -1138,10 +1211,11 @@ static void speak(const String& reply) {
   size_t next_len = len;
   String next_text = piece;
   if (!next) say_status("She answered, but her voice didn't come.");
+  doing(NOW_TALKING);
   while (next && !stop_her) {
     while (M5.Speaker.isPlaying() && !stop_her) delay(10);
+    if (stop_her) break;
     if (playing) { free(playing); playing = nullptr; }
-    if (stop_her) { free(next); next = nullptr; break; }
     playing = next;
     M5.Speaker.playWav(playing, next_len, 1, 0, true);
     set_said(next_text.c_str());       // the words she is saying now
@@ -1153,16 +1227,27 @@ static void speak(const String& reply) {
   }
   while (M5.Speaker.isPlaying() && !stop_her) delay(10);
   set_said("");                        // her voice stopped, so do her words
-  if (stop_her) M5.Speaker.stop();
+  // The speaker plays STRAIGHT OUT of the buffer it was handed, and
+  // stop() only asks its task to stop. Freeing first -- which a hold
+  // mid-sentence used to do -- leaves it reading memory that is no
+  // longer hers. So: stop, wait until it is silent, then free.
+  if (stop_her) {
+    M5.Speaker.stop();
+    for (int i = 0; i < 100 && M5.Speaker.isPlaying(); i++) delay(5);
+  }
   if (playing) free(playing);
   if (next) free(next);
 }
 
 static void turn_task(void*) {
   thinking = true;
+  doing(NOW_SENDING);
   String heard, reply;
-  if (listen(rec_buf, rec_len, heard) && ask(heard, reply)) speak(reply);
+  const bool heard_him = listen(rec_buf, rec_len, heard);
+  if (heard_him) doing(NOW_THINKING);
+  if (heard_him && ask(heard, reply)) speak(reply);
   else if (lost_board) pocket_reply();    // the board is off or gone
+  doing(NOW_RESTING);
   thinking = false;
   stop_her = false;
   busy = false;
@@ -1174,6 +1259,7 @@ static void turn_task(void*) {
 // a second in, and starting then would cut off the first word he says.
 // A press that turns out to be a tap throws the recording away.
 static void start_recording() {
+  doing(NOW_LISTENING);
   M5.Speaker.end();
   M5.Mic.begin();
   rec_len = 0;
@@ -1191,6 +1277,7 @@ static void stop_recording() {
   M5.Mic.end();
   M5.Speaker.begin();
   recording = false;
+  doing(NOW_RESTING);
 }
 
 // ---- reaching the board ----------------------------------------------------------
@@ -1287,6 +1374,7 @@ static bool join_wifi() {
   if (WiFi.status() == WL_CONNECTED && base_url.length() && !lost_board)
     return true;
   if (WiFi.status() != WL_CONNECTED) {
+    doing(NOW_JOINING);
     say_status("Joining WiFi...", 0);
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);
@@ -1307,6 +1395,7 @@ static bool join_wifi() {
       else say_status("Can't see your WiFi (2.4 GHz only). Pocket mode.", 9000);
       away = true;
       away_at = millis();
+      doing(NOW_RESTING);
       return false;
     }
   }
@@ -1315,46 +1404,91 @@ static bool join_wifi() {
   say_status("Looking for the board...", 0);
   find_board();
   say_hint(5000);
+  doing(NOW_RESTING);
   return true;
 }
 
 // ---- a boot with no room ---------------------------------------------------
-// Ghost, Oct 18, a photo: "Not enough memory -- is PSRAM enabled?" on
-// firmware that allocates nothing new. Everything big lives in the
-// cube's PSRAM (8MB), so a boot where that chip did not come up is a
-// boot with no room for any picture. The same build ran on his cube
-// for days, so it is most likely ONE bad start: the cube restarts
-// itself, twice at most, before it gives up and says what it found.
-// RTC_NOINIT survives a restart and is cleared by a real power cut.
-RTC_NOINIT_ATTR static uint32_t boot_tries;
+// Ghost, Oct 18, a photo: "Not enough memory -- is PSRAM enabled?". On
+// Oct 21 he added that it came "after using her for a few": the cube had
+// restarted by itself and come up with no room (see the notes above).
+// Everything big lives in the cube's PSRAM (8MB), so a boot with no room
+// is a boot where that chip did not come up. It tries again twice,
+// counted in the notes so it can never loop -- and not with
+// esp_restart(), which never takes the power off the memory chip, but
+// with a second of deep sleep with VDD_SDIO off, which can, and which
+// gives a tired battery a moment to recover. Then it gives up and says
+// what it found: the restart before, the PSRAM, the battery, the fix.
 
-static void out_of_memory(const char* what) {
-  if (boot_tries > 2) boot_tries = 0;            // garbage after a power cut
+// Font2, white on the bare panel, from the top.
+static void plain_screen() {
   M5.Display.setTextSize(1);
   M5.Display.setFont(&fonts::Font2);
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5.Display.fillScreen(TFT_BLACK);
   M5.Display.setCursor(6, 6);
-  if (boot_tries < 2) {
-    boot_tries++;
-    M5.Display.printf("Not enough memory for %s.\nRestarting to try again (%u of 2)...",
-                      what, (unsigned)boot_tries);
-    delay(2500);
-    esp_restart();
+}
+
+// A paragraph on it, broken at spaces (print() breaks mid-word).
+static void say_plainly(const char* text) {
+  char line[160];
+  size_t n = 0;
+  for (const char* c = text;; c++) {
+    if (*c && *c != ' ' && *c != '\n' && n < sizeof(line) - 1) { line[n++] = *c; continue; }
+    line[n] = 0;
+    if (n && M5.Display.getCursorX() > 6
+        && M5.Display.getCursorX() + M5.Display.textWidth(line) > W - 6)
+      M5.Display.setCursor(6, M5.Display.getCursorY() + M5.Display.fontHeight());
+    M5.Display.print(line);
+    n = 0;
+    if (!*c) break;
+    if (*c == '\n') M5.Display.setCursor(6, M5.Display.getCursorY() + M5.Display.fontHeight());
+    else if (M5.Display.getCursorX() > 6) M5.Display.print(' ');
   }
-  boot_tries = 0;
-  M5.Display.printf("NOT ENOUGH MEMORY for %s.\n\n", what);
+  M5.Display.setCursor(6, M5.Display.getCursorY() + M5.Display.fontHeight() * 2);
+}
+
+static void out_of_memory(const char* what) {
+  plain_screen();
+  char buf[160];
+  if (notes.tries < 2) {
+    notes.tries++;
+    snprintf(buf, sizeof buf, "Not enough memory for %s. Resting a second, then trying again (%u of 2)...",
+             what, (unsigned)notes.tries);
+    say_plainly(buf);
+    delay(2500);
+    esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO, ESP_PD_OPTION_OFF);
+    esp_sleep_enable_timer_wakeup(1000000);
+    esp_deep_sleep_start();
+  }
+  notes.tries = 0;
+  snprintf(buf, sizeof buf, "NOT ENOUGH MEMORY for %s.", what);
+  say_plainly(buf);
+  restart_note(buf, sizeof buf);
+  if (buf[0]) say_plainly(buf);
   if (psramFound())
-    M5.Display.printf("PSRAM: %.1f MB, %.1f MB free.\n\n",
-                      ESP.getPsramSize() / 1048576.0, ESP.getFreePsram() / 1048576.0);
+    snprintf(buf, sizeof buf, "PSRAM: %.1f MB, %.1f MB free.",
+             ESP.getPsramSize() / 1048576.0, ESP.getFreePsram() / 1048576.0);
   else
-    M5.Display.print("PSRAM: not found.\n\n");
-  M5.Display.print("Hold the power button 6 seconds to\nturn it off, then turn it on again.\n\n"
-                   "Still here? Plug it into the board\nand run ~/YUZU/cube again.");
+    snprintf(buf, sizeof buf, "PSRAM: not found.");
+  say_plainly(buf);
+  read_battery();
+  if (battery_pct >= 0) {
+    snprintf(buf, sizeof buf, "Battery: %d%%%s.", battery_pct,
+             battery_charging ? ", charging" : "");
+    say_plainly(buf);
+  }
+  if (battery_pct >= 0 && battery_pct <= 20 && !battery_charging)
+    say_plainly("Charge me first. Then hold the power button 6 seconds "
+                "to turn it off, and turn it on again.");
+  else
+    say_plainly("Hold the power button 6 seconds to turn it off, then turn it on again.");
+  say_plainly("Still here? Plug it into the board and run ~/YUZU/cube again.");
   while (true) delay(1000);
 }
 
 void setup() {
+  read_notes();
   auto cfg = M5.config();
   M5.begin(cfg);
   // The speaker and the mic share the cube's audio, so exactly one is
@@ -1383,7 +1517,7 @@ void setup() {
                       : !glow_a ? "Yuzu's glow" : !crt ? "the ghost's screen"
                       : !rec_buf ? "the microphone" : nullptr;
   if (missing) out_of_memory(missing);
-  boot_tries = 0;
+  notes.tries = 0;
   tint_art();
   make_room();
   make_crt();
@@ -1393,6 +1527,20 @@ void setup() {
   prefs.begin("cube", false);
   girl = prefs.getUChar("girl", FOUR) % SCREENS;
   join_wifi();
+  // An unplanned restart is said, once: in the chat box for half a
+  // minute, or on his game's page (which has no chat box) on the bare
+  // panel for eight seconds first. A photo of it tells what happened.
+  char note[120];
+  restart_note(note, sizeof note);
+  if (note[0] && girl == GAME) {
+    plain_screen();
+    say_plainly(note);
+    delay(8000);
+  } else if (note[0]) {
+    set_said(note);
+    said_until = millis() + 30000;
+  }
+  notes.why = 0;
 }
 
 // ---- his game, the page --------------------------------------------------------
@@ -1472,6 +1620,7 @@ static void game_say(const char* why) {
 }
 
 static void game_enter() {
+  doing(NOW_PLAYING);
   game_shown = true;
   game_lit = 0xFF;
   M5.Display.fillScreen(TFT_BLACK);
@@ -1493,6 +1642,7 @@ static void game_enter() {
 // Leaving: his save is written now rather than in two seconds, and the
 // next girl's frame repaints the whole panel.
 static void game_leave() {
+  doing(NOW_RESTING);
   game_shown = false;
   game_save_if_due(true);
 }
