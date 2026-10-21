@@ -832,12 +832,58 @@ static void draw_said(int floor) {
   }
 }
 
+// ---- the battery, top left -----------------------------------------------
+// Ghost, Oct 17: "Add a small working battery percentage indicator on
+// top left of each girl." The cube's power chip (an AXP2101) measures
+// the battery in his base. Asking it is an I2C read, so it is asked
+// every 20 seconds, never every frame; and the readout is ABSENT, never
+// a guess, when the chip cannot tell (it answers below 0) -- a made-up
+// percentage is the one thing this project keeps refusing to print.
+static const uint32_t BATTERY_EVERY_MS = 20000;
+static int battery_pct = -1;
+static bool battery_charging = false;
+static uint32_t battery_at = 0;
+
+static void read_battery() {
+  battery_at = millis();
+  int pct = M5.Power.getBatteryLevel();
+  battery_pct = (pct >= 0 && pct <= 100) ? pct : -1;
+  battery_charging = M5.Power.isCharging() == m5::Power_Class::is_charging;
+}
+
+// A little battery and "87%" in her colour, on a backing so her rain or
+// her room never runs through the number. Red at 15% and under unless
+// it is charging; a bolt in it while it is.
+static void draw_battery() {
+  if (girl >= GIRL_COUNT || battery_pct < 0) return;
+  char text[16];
+  snprintf(text, sizeof(text), "%d%%", battery_pct);
+  frame.setFont(&fonts::Font2);
+  frame.setTextSize(1);
+  frame.setTextDatum(top_left);
+  const int tw = frame.textWidth(text);
+  const uint16_t ink = hex565(battery_pct <= 15 && !battery_charging ? 0xff2b39 : ink_now());
+  frame.fillRoundRect(3, 3, 36 + tw, 20, 6,
+                      girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0);
+  frame.drawRect(8, 8, 22, 11, ink);
+  frame.fillRect(30, 11, 2, 5, ink);
+  frame.fillRect(10, 10, battery_pct * 18 / 100, 7, ink);
+  if (battery_charging) {
+    const uint16_t dark = girl == YUZU ? hex565(ROOM[2].rgb) : (uint16_t)0;
+    frame.fillTriangle(20, 9, 15, 14, 19, 14, dark);
+    frame.fillTriangle(18, 18, 23, 13, 19, 13, dark);
+  }
+  frame.setTextColor(ink);
+  frame.drawString(text, 35, 5);
+}
+
 // One frame of whoever is on the cube.
 static void draw_frame() {
   if (girl == FOUR) { rain_step(); compose_four(); }
   else if (girl == YUZU) compose_yuzu();
   else if (girl == ZERO) compose_zero();
   else compose_ghost();
+  draw_battery();
   draw_said(H - draw_status());
   frame.pushSprite(0, 0);
 }
@@ -1332,6 +1378,7 @@ void setup() {
   make_crt();
   for (auto& s : sparks) s.born = millis() - SPARK_LIFE - 1;   // all spent
   // Whoever was on the cube when it was last unplugged.
+  read_battery();
   prefs.begin("cube", false);
   girl = prefs.getUChar("girl", FOUR) % SCREENS;
   join_wifi();
@@ -1404,6 +1451,8 @@ void loop() {
   } else if (busy && t.wasClicked()) {
     tapped();
   }
+
+  if (millis() - battery_at >= BATTERY_EVERY_MS) read_battery();
 
   // ~14 frames a second idle, faster while she thinks -- her page's
   // speeds. Wallpaper on a battery should not run at the panel's rate.

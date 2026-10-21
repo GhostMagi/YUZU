@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 946 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 947 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -78,6 +78,14 @@ her. The rule is about the CHASSIS FINISH, not her taste.
 Two of my break-checks were weak first (a missing branch came back as
 an ERROR; the scanline check matched another line). Both fixed, eight
 breaks red. **944 -> 946.**
+
+**Her battery, top left of each girl** (*"Add a small working battery
+percentage indicator on top left of each girl"*): a little battery and
+"87%" in her colour, from the cube's power chip (AXP2101) every 20s,
+red at 15% unless charging, a bolt while charging, and ABSENT when the
+chip cannot tell. **UNVERIFIED on his cube**: that the AXP2101 sees the
+battery in his base at all. If it never shows, that is why. Five
+breaks red. **946 -> 947.**
 
 ## POCKET MODE: THE CUBE STILL ANSWERS AWAY FROM THE BOARD (Oct 17)
 

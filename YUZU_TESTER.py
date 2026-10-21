@@ -4254,6 +4254,29 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertIn("boot_tries = 0;", code[code.index("void setup()"):],
                       "a good boot does not reset the count")
 
+    def test_her_BATTERY_shows_top_left_and_never_a_guess(self):
+        """Ghost, Oct 17: "Add a small working battery percentage
+        indicator on top left of each girl." On each GIRL (not his ghost
+        or his game), from the power chip, asked every so often rather
+        than every frame (an I2C read), and absent when the chip cannot
+        tell -- a made-up percentage is worse than none."""
+        code = self.code()
+        every = re.search(r"BATTERY_EVERY_MS\s*=\s*(\d+)", code)
+        self.assertTrue(every and 10000 <= int(every.group(1)) <= 60000,
+                        "the battery is asked too often, or goes stale")
+        self.assertIn("if (millis() - battery_at >= BATTERY_EVERY_MS) read_battery();",
+                      code, "the loop asks the battery every frame")
+        read = code[code.index("static void read_battery"):code.index("static void draw_battery")]
+        self.assertIn("M5.Power.getBatteryLevel()", read)
+        self.assertRegex(read, r"\(pct >= 0 && pct <= 100\) \? pct : -1",
+                         "an impossible reading is shown as a number")
+        draw = code[code.index("static void draw_battery"):code.index("static void draw_frame")]
+        self.assertIn("if (girl >= GIRL_COUNT || battery_pct < 0) return;", draw,
+                      "the battery shows off the girls' pages, or shows a guess")
+        self.assertRegex(draw, r"fillRoundRect\(3, 3,", "it is not top left")
+        self.assertIn("draw_battery();", code[code.index("static void draw_frame"):],
+                      "nothing draws the battery")
+
     def test_zeros_face_on_the_cube_is_her_PAGES(self):
         """Her pink and her working cue, two copies that must agree: the
         page brightens her picture to 1.3 while she works, and so does
