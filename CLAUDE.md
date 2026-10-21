@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 944 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 946 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,36 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE GHOST'S PAGE, 30 LINES EACH, AND A BOOT WITH NO ROOM (Oct 21)
+
+- **20 more pocket lines per girl** (*"Please add 20 more lines per
+  girl?"*): 30 each, same rules (an answer to anything, never "you
+  said", ASCII for Font2). A test holds his number.
+- **A page after the girls: his ghost on a green phosphor screen**
+  (*"a old neongreen/black crt vibe behind this png of a ghost? Im not
+  sure what the function should be yet"*). His first picture was a
+  pngtree stock image with its watermark, so I started drawing my own;
+  he sent a second one, *"I made sure this was free"*, and that is the
+  one used (`ui/art_in/ghost.webp`). **Its transparency was a
+  CHECKERBOARD PAINTED INTO THE PICTURE**, and his face's highlight is
+  exactly the white square's 255, so a colour flood ate his face.
+  `stackchan/cut_ghost.py` uses the 15px GRID: a grey square is decided
+  exactly (he is never 231-and-neutral), and a white square only as far
+  as its grey neighbours agree. Rendered on the cube's screen and
+  looked at. He floats, hops when tapped, has scanlines and a blinking
+  `>` prompt, and **does not talk**: he is a page (`GHOST =
+  GIRL_COUNT`, `SCREENS`), never a girl the board is asked as.
+- **"Not enough memory -- is PSRAM enabled?"**, his photo, Oct 18, on
+  pocket-mode firmware that allocates nothing new. Everything big lives
+  in the 8MB PSRAM, so most likely that chip did not come up on that
+  boot. UNREPRODUCED. The cube now restarts itself to retry (twice,
+  counted in RTC memory so it cannot loop) and then names which picture
+  had no room, what PSRAM it found, and the fix.
+
+Two of my break-checks were weak first (a missing branch came back as
+an ERROR; the scanline check matched another line). Both fixed, eight
+breaks red. **944 -> 946.**
 
 ## POCKET MODE: THE CUBE STILL ANSWERS AWAY FROM THE BOARD (Oct 17)
 

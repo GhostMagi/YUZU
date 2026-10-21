@@ -4067,19 +4067,27 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertTrue(swipe and int(swipe.group(1)) >= 60,
                         "a finger drifting while he talks would swap girls")
 
+    def screens(self):
+        """How many pages a swipe walks: the girls, then the pages after
+        them, read off `SCREENS = GIRL_COUNT + n`."""
+        extra = re.search(r"SCREENS\s*=\s*GIRL_COUNT\s*\+\s*(\d+)", self.code())
+        self.assertTrue(extra, "the cube does not say how many pages it has")
+        return len(self.girls()) + int(extra.group(1))
+
     def test_a_swipe_goes_BOTH_ways_and_visits_every_girl(self):
-        """Three girls: left brings the next, right the one before. Read
-        off the code and walked, so a swipe that only ever goes one way
-        (two swipes to go back one) or skips a girl goes red."""
+        """Three girls and the pages after them: left brings the next,
+        right the one before. Read off the code and walked, so a swipe
+        that only ever goes one way (two swipes to go back one) or skips
+        a page goes red."""
         code = self.code()
         self.assertIn("swap_girl(t.distanceX())", code,
                       "the swipe's direction never reaches the swap")
         step = re.search(r"girl\s*=\s*\(girl\s*\+\s*\(dx\s*<\s*0\s*\?\s*"
-                         r"([^:]+?)\s*:\s*([^)]+?)\)\)\s*%\s*GIRL_COUNT", code)
-        self.assertTrue(step, "the swap is not girl + (dx < 0 ? a : b)")
-        n = len(self.girls())
-        left = eval(step.group(1).replace("GIRL_COUNT", str(n)))
-        right = eval(step.group(2).replace("GIRL_COUNT", str(n)))
+                         r"([^:]+?)\s*:\s*([^)]+?)\)\)\s*%\s*SCREENS", code)
+        self.assertTrue(step, "the swap is not girl + (dx < 0 ? a : b) % SCREENS")
+        n = self.screens()
+        left = eval(step.group(1).replace("SCREENS", str(n)))
+        right = eval(step.group(2).replace("SCREENS", str(n)))
         seen, g = [], 0
         for _ in range(n):
             g = (g + left) % n
@@ -4153,7 +4161,9 @@ class TestTheCubeCode(unittest.TestCase):
                          ["POCKET_" + g.upper() for g in girls],
                          "a girl's pocket lines come out of someone else")
         for name, lines in pocket:
-            self.assertGreaterEqual(len(lines), 6, "%s has too few" % name)
+            # Ghost, Oct 17: "Please add 20 more lines per girl?" -- on
+            # top of the first ten.
+            self.assertGreaterEqual(len(lines), 30, "%s has too few" % name)
             self.assertEqual(len(set(lines)), len(lines), name)
             for line in lines:
                 self.assertTrue(all(32 <= ord(c) < 127 for c in line),
@@ -4193,6 +4203,56 @@ class TestTheCubeCode(unittest.TestCase):
                         "back home, she stays in her pocket too long")
         self.assertIn("draw_said(H - draw_status());", code,
                       "her box is drawn under the status line")
+
+    def test_after_the_girls_a_GHOST_who_does_not_talk(self):
+        """Ghost, Oct 17: "a slide-to-able screen in there after the last
+        one ... a old neongreen/black crt vibe behind this png of a
+        ghost? Im not sure what the function should be yet". He is a
+        page, not a girl: not in GIRLS (so the board is never asked as
+        him), one swipe past the last girl, remembered like they are,
+        and a hold on him never starts a turn."""
+        code = self.code()
+        self.assertRegex(code, r"GHOST\s*=\s*GIRL_COUNT\b",
+                         "the ghost is not the page after the girls")
+        self.assertNotIn("ghost", " ".join(w for w, _n, _h in self.girls()),
+                         "the ghost became a girl the board is asked as")
+        self.assertIn('prefs.getUChar("girl", FOUR) % SCREENS', code,
+                      "a cube unplugged on his page comes back somewhere else")
+        release = code[code.index("stop_recording();\n      if (is_swipe"):
+                       code.index("} else if (t.wasPressed())")]
+        self.assertIn("girl == GHOST", release, "a hold on the ghost is a talk")
+        ghost = release.index("girl == GHOST")
+        self.assertLess(ghost, release.index("join_wifi()"),
+                        "a hold on the ghost looks for the board")
+        self.assertLess(ghost, release.index("xTaskCreatePinnedToCore"),
+                        "a hold on the ghost starts a turn")
+        self.assertIn("compose_ghost()", code[code.index("static void draw_frame"):],
+                      "nothing draws his page")
+        crt = code[code.index("static void make_crt"):code.index("static void compose_ghost")]
+        self.assertRegex(crt, r"if \(y & 1\) g \*= 0\.\d+f;",
+                         "his screen has no scanlines")
+
+    def test_a_boot_with_no_ROOM_restarts_then_says_what_it_found(self):
+        """Ghost, Oct 18, a photo: "Not enough memory -- is PSRAM
+        enabled?" on firmware that had run for days. A question he cannot
+        answer, on the one screen he has. The cube restarts itself (a
+        bad start is the likely cause), at most twice, counted in memory
+        that survives a restart -- uncounted, it would restart forever --
+        and then says which picture had no room and what PSRAM it
+        found, with the fix."""
+        code = self.code()
+        self.assertNotIn("is PSRAM enabled?", code,
+                         "the boot asks him a question again")
+        self.assertRegex(code, r"RTC_NOINIT_ATTR\s+static\s+uint32_t\s+boot_tries",
+                         "the restart count does not survive a restart")
+        oom = code[code.index("static void out_of_memory"):code.index("void setup()")]
+        self.assertRegex(oom, r"if \(boot_tries < 2\)\s*\{\s*boot_tries\+\+;",
+                         "the restarts are not counted, or not bounded")
+        self.assertIn("esp_restart()", oom, "it never retries")
+        for said in ("psramFound()", "ESP.getPsramSize()", "power button"):
+            self.assertIn(said, oom, "the failure does not say %s" % said)
+        self.assertIn("boot_tries = 0;", code[code.index("void setup()"):],
+                      "a good boot does not reset the count")
 
     def test_zeros_face_on_the_cube_is_her_PAGES(self):
         """Her pink and her working cue, two copies that must agree: the
@@ -4237,6 +4297,9 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertEqual(make_art.render_yuzu(),
                          (cube / "yuzu_art.h").read_text(),
                          "yuzu_art.h is stale -- run stackchan/make_art.py")
+        self.assertEqual(make_art.render_ghost(),
+                         (cube / "ghost_art.h").read_text(),
+                         "ghost_art.h is stale -- run stackchan/make_art.py")
         self.assertEqual(make_art.render_zero(),
                          (cube / "zero_art.h").read_text(),
                          "zero_art.h is stale -- run stackchan/make_art.py")

@@ -24,6 +24,16 @@
 // Each girl asks the board under her OWN name (yuzu_face.DEVICES), so
 // each has her own brain, memory and voice speed on the board.
 //
+// AND A GHOST AFTER ZERO. Ghost, Oct 17: "a slide-to-able screen in
+// there after the last one that maybe has this as the screen with a
+// old neongreen/black crt vibe behind this png of a ghost? Im not sure
+// what the function should be yet". So one swipe past Zero is HIM: his
+// picture floating on a green phosphor screen (scanlines, a glow, a
+// slow refresh band, a blinking prompt), a hop when tapped -- and no
+// talking, because nobody has decided what he is for yet. He is a
+// SCREEN, not a girl: he is not in GIRLS, has no device on the board,
+// and asks it nothing.
+//
 // FOUR. Ghost, Oct 2, picking off a mockup at the cube's real 320x240: "B w/
 // the raining code you know it 2 as well 3 also 4 but make it turn neon
 // red instead of purple when thinking. And 5. And 6. Note 7 for later."
@@ -83,10 +93,12 @@
 #include <HTTPClient.h>
 #include <esp_random.h>
 #include <Preferences.h>
+#include <esp_system.h>
 
 #include "four_art.h"
 #include "yuzu_art.h"
 #include "zero_art.h"
+#include "ghost_art.h"
 // Written by `~/YUZU/cube` at flash time from EVERY WiFi the board has
 // saved (its own first) and its name, and never committed: his WiFi
 // passwords do not belong in a repository.
@@ -104,6 +116,9 @@ static const Girl GIRLS[] = {
 };
 static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
 static const int FOUR = 0, YUZU = 1, ZERO = 2;
+// The ghost's screen comes after the girls; a swipe walks all of them.
+static const int GHOST = GIRL_COUNT, SCREENS = GIRL_COUNT + 1;
+static const uint32_t CRT_GREEN = 0x39ff5e;
 
 // ---- away from the board -----------------------------------------------
 // Ghost, Oct 17: "Can we give the cube at least sumn cute/fun to
@@ -125,6 +140,26 @@ static const char* const POCKET_FOUR[] = {
   "Heads. It's always heads with me.",
   "Yes, and I'm not taking questions on how I know.",
   "Not today. Tomorrow, maybe.",
+  "Ask me again in an hour. The answer might change. Mine usually doesn't.",
+  "Yes. Obviously.",
+  "Hard no. I'd explain, but my explaining is on the board.",
+  "Signs point to yes. I've always wanted to say that.",
+  "Maybe. Shake me and ask again. Actually, don't shake me.",
+  "I'm a cube in your pocket. Adjust your expectations slightly.",
+  "Go with your first instinct. It's usually right, and so am I.",
+  "Not a chance. Well, a small chance. Fine, a decent chance.",
+  "Count to ten and try again. I'll still be here.",
+  "Out here I'm mostly rain and attitude.",
+  "The odds are in your favour. I checked. Sort of.",
+  "Definitely. Write it down so I can say I told you so.",
+  "Too close to call. Swipe to Zero, she likes those.",
+  "Yes, but do it properly.",
+  "No. And I'd say that even with the board.",
+  "Ask a better question. Kidding. Ask the same one again.",
+  "Whatever it is, you've handled worse.",
+  "I'd answer properly, but I left my brain at home.",
+  "Later. Good things take a minute.",
+  "It's a yes from me. The rain agrees.",
 };
 static const char* const POCKET_YUZU[] = {
   "Ehehe~ my brain's back on the board, but I'm still cute out here, right?",
@@ -137,6 +172,26 @@ static const char* const POCKET_YUZU[] = {
   "Take me somewhere fun, Ghost! Tell me all about it when we're home.",
   "A secret? I can't hear it, so it's extra safe with me.",
   "Swipe for Four if you need the serious one. I'm the fun one!",
+  "Ooh, yes yes yes! Wait, what did we agree to?",
+  "Ugh, no. That's giving bad vibes, bestie.",
+  "The cards say... go shopping. The cards always say that.",
+  "Ehehe~ obviously yes. Have you met me?",
+  "Maybe! Ask me again in a cuter voice.",
+  "Ghost, I'm stuck in your pocket. Are we at least somewhere fun?",
+  "Totally. Treat yourself, cutie!",
+  "Nope! Not unless there's a pink one.",
+  "Can we get boba after this? That's my answer to everything.",
+  "Out here I'm just a pretty face. Lucky you.",
+  "Hmm, my gut says yes. My gut is very fashionable.",
+  "It's a yes, but only if you wear something cute.",
+  "Ask Zero, she's the smart one. I'm the cute one.",
+  "Ooh, spicy. Yes!",
+  "Big no. Like, return-it-with-the-receipt no.",
+  "I'm pocket-sized and fabulous, what else do you need?",
+  "Pedicure first, decisions later.",
+  "Yes! Wait, no. Okay, yes. Final answer!",
+  "Bring me home and I'll gossip about this properly.",
+  "Whatever it is, do it in hot pink.",
 };
 static const char* const POCKET_ZERO[] = {
   "My working is on the board, so this is an estimate: probably yes.",
@@ -149,6 +204,26 @@ static const char* const POCKET_ZERO[] = {
   "Fun fact: an octopus has three hearts.",
   "Unclear. I'd need the board, a calculator and a minute.",
   "Signal lost. Head home, or find a WiFi I know.",
+  "Yes, within a reasonable margin of error.",
+  "No. I'd show my working, but it's on the board.",
+  "Fun fact: bananas are berries, and strawberries aren't.",
+  "Fun fact: a day on Venus is longer than its year.",
+  "Fun fact: sealed honey can keep for decades without spoiling.",
+  "Insufficient data. Which is a polite way of saying ask me at home.",
+  "Probability says yes. Probability is usually right, eventually.",
+  "Whoa. That's a big one. Sleep on it.",
+  "Fun fact: octopuses have blue blood.",
+  "Fun fact: there are more possible games of chess than atoms in the observable universe.",
+  "Yes. I'm confident, which for me is saying something.",
+  "No. Not a strong no. A carefully reasoned no.",
+  "Split the difference. It's usually the right answer.",
+  "Fun fact: sunlight takes about eight minutes to reach us.",
+  "Huh. Ask me near the board and I'll work it out properly.",
+  "Fun fact: wombat poo is cube-shaped. Respect.",
+  "Leaning yes. Sixty-forty.",
+  "I'd need more data. Or the board. The board would be good.",
+  "Fun fact: a group of flamingos is called a flamboyance.",
+  "Aha. Yes. Don't overthink it, I already did.",
 };
 struct Pocket { const char* const* lines; int count; };
 #define POCKET_OF(a) {a, (int)(sizeof(a) / sizeof(a[0]))}
@@ -261,7 +336,8 @@ static int asking = FOUR;                // who the running turn is for
 static Preferences prefs;
 static uint8_t* room_rgb = nullptr;      // Yuzu's room, 8 bits a channel
 static uint8_t* glow_a = nullptr;        // her glow at full strength, 0..255
-static uint32_t flash_until = 0;         // a tap on Yuzu or Zero
+static uint32_t flash_until = 0;         // a tap on Yuzu, Zero or the ghost
+static uint16_t* crt = nullptr;          // the ghost's screen, byte-swapped 565
 struct Sparkle { int16_t x, y; uint32_t born; };
 static const int SPARKS = 10;
 static const uint32_t SPARK_LIFE = 700;
@@ -345,6 +421,7 @@ static void set_said(const char* t) {
 // One of her own lines in the chat box for seven seconds, never the
 // same one twice running.
 static void pocket_reply() {
+  if (girl == GHOST) return;             // he has no lines (yet)
   const Pocket& p = POCKET[girl];
   int k = esp_random() % p.count;
   if (p.count > 1 && k == last_pocket) k = (k + 1) % p.count;
@@ -359,6 +436,12 @@ static void say_status(const char* text, uint32_t ms = 6000) {
   status_text[sizeof(status_text) - 1] = 0;
   status_until = ms ? millis() + ms : 0xFFFFFFFF;
   portEXIT_CRITICAL(&status_mux);
+}
+
+// What whoever is on screen does, said when she (or he) comes on.
+static void say_hint(uint32_t ms) {
+  if (girl == GHOST) say_status("Boo. Tap him. Swipe for the girls.", ms);
+  else say_status(GIRLS[girl].hint, ms);
 }
 
 // ---- colour arithmetic ---------------------------------------------------
@@ -585,6 +668,78 @@ static void compose_zero() {
 // ONE line when it fits and TWO when it does not, split at the space
 // that balances them: a sentence from the board clipped at both edges
 // is a sentence he cannot read, and the hints name two other girls.
+// ---- the ghost's screen ------------------------------------------------------
+// An old green phosphor monitor, worked out once: dark at the corners,
+// a glow where he floats, and every other line dimmer -- the scanlines.
+static void make_crt() {
+  for (int y = 0; y < H; y++) {
+    for (int x = 0; x < W; x++) {
+      float dx = (x - W / 2) / (float)(W / 2), dy = (y - H / 2) / (float)(H / 2);
+      float v = max(0.0f, 1.0f - 0.55f * (dx * dx + dy * dy));
+      float gx = x - W / 2, gy = y - 112;
+      float g = 22 * v + 60 * expf(-(gx * gx + gy * gy) / (2 * 75.0f * 75.0f));
+      if (y & 1) g *= 0.45f;
+      crt[y * W + x] = swap16(pack565((int)(g * 0.22f), min(255, (int)g),
+                                      (int)(g * 0.37f)));
+    }
+  }
+}
+
+// He floats (a 4px bob over 2.2s), hops when tapped, and a brighter
+// band rolls down the screen the way an old monitor's refresh does.
+// His own colours, with the scanlines over him too.
+static void compose_ghost() {
+  uint32_t now = millis();
+  uint16_t* dst = (uint16_t*)frame.getBuffer();
+  memcpy(dst, crt, W * H * 2);
+  int band = (int)((now / 25) % (H + 60)) - 30;
+  for (int y = max(0, band - 14); y < min(H, band + 14); y++) {
+    int add = (int)(18 * cosf((y - band) / 14.0f * (PI / 2)));
+    if (y & 1) add = add * 45 / 100;
+    for (int x = 0; x < W; x++) {
+      int r, g, b;
+      unpack565(swap16(dst[y * W + x]), r, g, b);
+      dst[y * W + x] = swap16(pack565(min(255, r + add * 22 / 100),
+                                      min(255, g + add),
+                                      min(255, b + add * 37 / 100)));
+    }
+  }
+  float hop = flash_until > now ? 14.0f * (flash_until - now) / 500.0f : 0;
+  int ox = (W - GHOST_ART_W) / 2;
+  int oy = 112 - GHOST_ART_H / 2
+           + (int)(4 * sinf(now * (2 * PI / 2200.0f))) - (int)hop;
+  for (int y = 0; y < GHOST_ART_H; y++) {
+    int sy = oy + y;
+    if (sy < 0 || sy >= H) continue;
+    for (int x = 0; x < GHOST_ART_W; x++) {
+      int a = GHOST_ALPHA[y * GHOST_ART_W + x];
+      if (!a) continue;
+      if (sy & 1) a = a * 85 / 100;      // the scanlines run over him too
+      int r, g, b, br, bg, bb;
+      unpack565(GHOST_ART[y * GHOST_ART_W + x], r, g, b);
+      uint16_t* d = &dst[sy * W + ox + x];
+      unpack565(swap16(*d), br, bg, bb);
+      *d = swap16(pack565(br + (r - br) * a / 255, bg + (g - bg) * a / 255,
+                          bb + (b - bb) * a / 255));
+    }
+  }
+  // A prompt waiting for whatever he turns out to be for.
+  frame.setFont(&fonts::Font2);
+  frame.setTextSize(1);
+  frame.setTextDatum(top_left);
+  frame.setTextColor(hex565(CRT_GREEN));
+  frame.drawString((now / 530) % 2 ? "> _" : ">", 10, H - 22);
+}
+
+// Whoever is on screen's colour for words: her pink, Four's ink, or
+// the ghost's phosphor green.
+static uint32_t ink_now() {
+  return girl == YUZU ? YUZU_PINK
+       : girl == ZERO ? ZERO_PINK
+       : girl == GHOST ? CRT_GREEN
+       : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+}
+
 // The status bar along the bottom, and how tall it came out (0 when
 // there is none), so her chat box can sit above it rather than under.
 static int draw_status() {
@@ -594,9 +749,7 @@ static int draw_status() {
   strcpy(text, status_text);
   portEXIT_CRITICAL(&status_mux);
   if (!show) return 0;
-  uint32_t ink = girl == YUZU ? YUZU_PINK
-               : girl == ZERO ? ZERO_PINK
-               : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+  uint32_t ink = ink_now();
   frame.setFont(&fonts::Font2);
   frame.setTextSize(1);
   frame.setTextDatum(middle_center);
@@ -664,9 +817,7 @@ static void draw_said(int floor) {
     i = fit;
     while (i < len && text[i] == ' ') i++;
   }
-  uint32_t ink = girl == YUZU ? YUZU_PINK
-               : girl == ZERO ? ZERO_PINK
-               : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
+  uint32_t ink = ink_now();
   const int box_h = lines * line_h + 12;
   const int y = floor - box_h - 6;
   frame.fillRoundRect(6, y, W - 12, box_h, 10,
@@ -685,7 +836,8 @@ static void draw_said(int floor) {
 static void draw_frame() {
   if (girl == FOUR) { rain_step(); compose_four(); }
   else if (girl == YUZU) compose_yuzu();
-  else compose_zero();
+  else if (girl == ZERO) compose_zero();
+  else compose_ghost();
   draw_said(H - draw_status());
   frame.pushSprite(0, 0);
 }
@@ -1105,8 +1257,44 @@ static bool join_wifi() {
   lost_board = false;
   say_status("Looking for the board...", 0);
   find_board();
-  say_status(GIRLS[girl].hint, 5000);
+  say_hint(5000);
   return true;
+}
+
+// ---- a boot with no room ---------------------------------------------------
+// Ghost, Oct 18, a photo: "Not enough memory -- is PSRAM enabled?" on
+// firmware that allocates nothing new. Everything big lives in the
+// cube's PSRAM (8MB), so a boot where that chip did not come up is a
+// boot with no room for any picture. The same build ran on his cube
+// for days, so it is most likely ONE bad start: the cube restarts
+// itself, twice at most, before it gives up and says what it found.
+// RTC_NOINIT survives a restart and is cleared by a real power cut.
+RTC_NOINIT_ATTR static uint32_t boot_tries;
+
+static void out_of_memory(const char* what) {
+  if (boot_tries > 2) boot_tries = 0;            // garbage after a power cut
+  M5.Display.setTextSize(1);
+  M5.Display.setFont(&fonts::Font2);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  M5.Display.fillScreen(TFT_BLACK);
+  M5.Display.setCursor(6, 6);
+  if (boot_tries < 2) {
+    boot_tries++;
+    M5.Display.printf("Not enough memory for %s.\nRestarting to try again (%u of 2)...",
+                      what, (unsigned)boot_tries);
+    delay(2500);
+    esp_restart();
+  }
+  boot_tries = 0;
+  M5.Display.printf("NOT ENOUGH MEMORY for %s.\n\n", what);
+  if (psramFound())
+    M5.Display.printf("PSRAM: %.1f MB, %.1f MB free.\n\n",
+                      ESP.getPsramSize() / 1048576.0, ESP.getFreePsram() / 1048576.0);
+  else
+    M5.Display.print("PSRAM: not found.\n\n");
+  M5.Display.print("Hold the power button 6 seconds to\nturn it off, then turn it on again.\n\n"
+                   "Still here? Plug it into the board\nand run ~/YUZU/cube again.");
+  while (true) delay(1000);
 }
 
 void setup() {
@@ -1122,6 +1310,7 @@ void setup() {
   art_rgb = (uint8_t*)ps_malloc(FOUR_ART_W * FOUR_ART_H * 3);
   room_rgb = (uint8_t*)ps_malloc(W * H * 3);
   glow_a = (uint8_t*)ps_malloc(W * H);
+  crt = (uint16_t*)ps_malloc(W * H * 2);
   rec_buf = (int16_t*)ps_malloc(REC_MAX * sizeof(int16_t));
   for (auto* c : {&rain, &frame}) {
     c->setColorDepth(16);
@@ -1132,17 +1321,19 @@ void setup() {
   rain.setFont(&fonts::Font0);
   rain.setTextSize(2);
   for (int i = 0; i < COLS; i++) drops[i] = -(float)(esp_random() % (ROWS * 100)) / 100;
-  if (!art_rgb || !room_rgb || !glow_a || !rec_buf || !rain.getBuffer()
-      || !frame.getBuffer()) {
-    M5.Display.println("Not enough memory -- is PSRAM enabled?");
-    while (true) delay(1000);
-  }
+  const char* missing = !rain.getBuffer() ? "rain" : !frame.getBuffer() ? "frame"
+                      : !art_rgb ? "Four's picture" : !room_rgb ? "Yuzu's room"
+                      : !glow_a ? "Yuzu's glow" : !crt ? "the ghost's screen"
+                      : !rec_buf ? "the microphone" : nullptr;
+  if (missing) out_of_memory(missing);
+  boot_tries = 0;
   tint_art();
   make_room();
+  make_crt();
   for (auto& s : sparks) s.born = millis() - SPARK_LIFE - 1;   // all spent
   // Whoever was on the cube when it was last unplugged.
   prefs.begin("cube", false);
-  girl = prefs.getUChar("girl", FOUR) % GIRL_COUNT;
+  girl = prefs.getUChar("girl", FOUR) % SCREENS;
   join_wifi();
 }
 
@@ -1150,11 +1341,11 @@ void setup() {
 // LEFT brings the next girl, RIGHT the one before -- the way a phone
 // pages, so three girls never take two swipes to go back one.
 static void swap_girl(int dx) {
-  girl = (girl + (dx < 0 ? 1 : GIRL_COUNT - 1)) % GIRL_COUNT;
+  girl = (girl + (dx < 0 ? 1 : SCREENS - 1)) % SCREENS;
   prefs.putUChar("girl", girl);
   set_said("");
   last_pocket = -1;
-  say_status(GIRLS[girl].hint, 4000);
+  say_hint(4000);
 }
 
 static void tapped() {
@@ -1185,6 +1376,8 @@ void loop() {
         // A tap, not a talk: her tap does its thing and the clip goes.
         if (t.wasClicked()) tapped();
         else say_status("Hold the screen while you talk.", 3000);
+      } else if (girl == GHOST) {
+        say_status("He doesn't talk yet. Swipe for the girls.", 3000);
       } else if (away && millis() - away_at < AWAY_MS) {
         pocket_reply();        // no WiFi a moment ago: don't spend 20s looking
       } else if (join_wifi()) {
