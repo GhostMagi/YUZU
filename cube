@@ -257,6 +257,12 @@ if [ $? -ne 0 ] || [ ! -s "$build/cube/cube_secrets.h" ]; then
     exit 1
 fi
 
+# His game, baked into this build's own copy (stackchan/make_rom.py).
+# No game, or one it refuses, costs the game page only -- never her.
+if [ -f "$HERE/stackchan/make_rom.py" ]; then
+    python3 "$HERE/stackchan/make_rom.py" "$build/cube" || true
+fi
+
 echo "Building her and putting her on the cube (a few minutes)..."
 # --build-path keeps EVERYTHING the build makes inside the temporary
 # folder -- arduino-cli's default copies the sketch, secrets and all,
@@ -282,3 +288,4 @@ fi
 echo "DONE. Four, Yuzu and Zero are on the cube."
 echo "It restarts by itself; give it about ten seconds to join your WiFi."
 echo "Hold the screen to talk, let go to send. Swipe across it to change girls."
+echo "Swipe past Zero for the ghost, and once more for your game."

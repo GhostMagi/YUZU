@@ -4401,11 +4401,12 @@ case "$*" in
     sketch="${@: -1}"
     echo "SKETCH $sketch" >> %s
     cp "$sketch/cube_secrets.h" %s.secrets
+    [ -f "$sketch/game_rom.h" ] && grep -m1 GAME_TITLE "$sketch/game_rom.h" > %s.game
     [ -n "$STUB_FAIL" ] && { echo "$STUB_FAIL"; exit 1; }
     ;;
 esac
 exit 0
-""" % (log, log, log))
+""" % (log, log, log, log))
         env = dict(os.environ,
                    PATH="%s:%s" % (self.bin, os.environ.get("PATH", "")),
                    YUZU_CUBE_TOOLS=str(self.tools),
@@ -4502,8 +4503,8 @@ exit 0
     def test_she_joins_the_BOARDS_wifi_and_the_password_never_lands_in_the_repo(self):
         got = self.run_cube()
         self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
-        self.assertTrue(got.stdout.rstrip().splitlines()[-3].startswith("DONE."),
-                        got.stdout)
+        tail = got.stdout.rstrip().splitlines()[-5:]
+        self.assertTrue(any(ln.startswith("DONE.") for ln in tail), got.stdout)
         sec = self.secrets()
         self.assertEqual(sec["wifi"], [("HomeNet", self.PASSWORD)],
                          "the password did not survive nmcli and the C escaping")
@@ -4626,6 +4627,20 @@ exit 0
                       "she is 1.3 MB and the default layout holds 1.2")
         self.assertIn("--upload -p %s" % self.cube, compile_line)
 
+    def test_his_GAME_is_baked_into_the_build_and_never_into_the_repo(self):
+        """The cube carries GHOSTRPG because the flash bakes it into the
+        build's own copy of the sketch; the generated header is never
+        written beside the real sketch, where git would see 2MB of it."""
+        got = self.run_cube()
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        baked = Path(str(self.log) + ".game")
+        self.assertTrue(baked.exists(), "the cube was built without his game")
+        self.assertIn('"GHOSTRPG"', baked.read_text())
+        self.assertFalse((self.REPO / "stackchan" / "cube" / "game_rom.h").exists(),
+                         "the baked game landed in the repo")
+        self.assertIn("stackchan/cube/game_rom.h",
+                      (self.REPO / ".gitignore").read_text().splitlines())
+
     def test_a_board_named_localhost_gives_the_cube_NUMBERS_only(self):
         """`localhost` means the asker -- the refusal face and pull
         already make, or the cube looks for itself."""
@@ -4676,6 +4691,186 @@ exit 0
             self.assertTrue(got.stdout.splitlines()[-3:] and
                             "NOT FLASHED." in got.stdout, got.stdout)
             self.assertIn(fix, got.stdout, "no fix named for: %s" % said)
+
+
+class TestHisGameOnTheCube(unittest.TestCase):
+    """Ghost, Oct 17: "Can we put my game on my stackchan cores
+    slide-to-able pages? A tap on right side of screen is right on d pad.
+    Left is left etc. Only visible (clearish) buttons should be the A B
+    and start/select." -- GHOSTRPG, his own Game Boy Color game.
+
+    The cube's REAL game code (cube_game.cpp, with the vendored
+    Walnut-CGB) is compiled on this machine against tiny stand-ins for
+    Arduino and the flash, and his ROM is played through it: the title
+    is reached with no fault, every pixel of the page is painted, a line
+    lands at exactly 1.5x in the panel's byte order, and his save is
+    written once it settles and read back on the next start. Skipped
+    where there is no g++."""
+
+    ROOT = Path(__file__).parent
+    CUBE = ROOT / "stackchan" / "cube"
+    ROM = ROOT / "stackchan" / "games" / "ghostrpg.gbc"
+    STUBS = {"Arduino.h": '#pragma once\n#include <cstdint>\n#include <cstring>\n#include <cstdlib>\n#include <cstdio>\n#include <string>\nextern uint32_t fake_ms;\ninline uint32_t millis() { return fake_ms; }\ninline void* ps_calloc(size_t n, size_t s) { return calloc(n, s); }\n', "esp_heap_caps.h": '#pragma once\n#include <cstdlib>\n#define MALLOC_CAP_INTERNAL 1\n#define MALLOC_CAP_8BIT 2\ninline void* heap_caps_calloc(size_t n, size_t s, int) { return calloc(n, s); }\n', "LittleFS.h": '#pragma once\n#include <map>\n#include <string>\n// The cube\'s flash as a map of path -> bytes, for the host.\nextern std::map<std::string, std::string> fake_fs;\nstruct File {\n  std::string path; bool writing = false; bool ok = false; size_t pos = 0;\n  explicit operator bool() const { return ok; }\n  size_t size() const { return fake_fs[path].size(); }\n  size_t read(uint8_t* b, size_t n) { std::string& d = fake_fs[path]; size_t k = std::min(n, d.size() - pos);\n                                      memcpy(b, d.data() + pos, k); pos += k; return k; }\n  size_t write(const uint8_t* b, size_t n) { fake_fs[path].append((const char*)b, n); return n; }\n  void close() {}\n};\nstruct FakeFS {\n  bool begin(bool) { return true; }\n  File open(const char* p, const char* mode) {\n    File f; f.path = p;\n    if (mode[0] == \'w\') { fake_fs[p] = ""; f.ok = true; f.writing = true; }\n    else f.ok = fake_fs.count(p) > 0;\n    return f;\n  }\n  bool rename(const char* a, const char* b) { if (!fake_fs.count(a)) return false;\n                                              fake_fs[b] = fake_fs[a]; fake_fs.erase(a); return true; }\n  bool remove(const char* p) { return fake_fs.erase(p) > 0; }\n};\nextern FakeFS LittleFS;\n'}
+    HARNESS = '#include "cube_game.cpp"\n#include <set>\nuint32_t fake_ms = 0;\nstd::map<std::string, std::string> fake_fs;\nFakeFS LittleFS;\nstatic uint16_t screen[GAME_H * GAME_W];\nint main(int argc, char** argv) {\n  std::string mode = argv[1];\n  if (mode == "line") {\n    // One line through draw_line by hand: the 1.5x and the byte swap.\n    static struct gb_s g; g.cgb.cgbMode = 1;\n    for (int i = 0; i < 0x40; i++) g.cgb.fixPalette[i] = 0x1000 + i;\n    uint8_t px[160]; for (int x = 0; x < 160; x++) px[x] = x % 0x40;\n    out = screen; for (auto& v : screen) v = 0xBEEF;\n    for (int y = 0; y < 144; y++) draw_line(&g, px, y);\n    int bad = 0;\n    for (int r = 0; r < GAME_H; r++) for (int c = 0; c < GAME_W; c++) {\n      uint16_t want = __builtin_bswap16(0x1000 + (c * 2 / 3) % 0x40);\n      if (screen[r * GAME_W + c] != want) bad++;\n    }\n    printf("line bad=%d drew=%d\\n", bad, (int)game_drew());\n    return 0;\n  }\n  if (mode == "seed") fake_fs["/" GAME_TITLE ".sav"] = std::string(8192, \'\\x5a\');\n  for (auto& v : screen) v = 0xBEEF;\n  const char* why = game_begin(screen);\n  printf("begin %s\\n", why ? why : "ok");\n  if (why) return 0;\n  printf("loaded %d\\n", cart_size && cart[0] == 0x5a && cart[8191] == 0x5a);\n  int drawn = 0;\n  for (int f = 0; f < 300; f++) {\n    uint8_t held = (f >= 280 && f < 290) ? GAME_START : 0;\n    game_frame(held);\n    if (game_drew()) drawn++;\n  }\n  // The Game Boy reads its buttons active-low: nothing held is 0xFF.\n  game_frame(0); int idle = gb->direct.joypad; game_frame(GAME_A | GAME_RIGHT);\n  printf("joy %d %d\\n", idle, gb->direct.joypad);\n  std::set<uint16_t> colours; int canary = 0;\n  for (auto v : screen) { colours.insert(v); if (v == 0xBEEF) canary++; }\n  printf("fault %s drawn %d colours %zu canary %d\\n", game_fault() ? game_fault() : "none",\n         drawn, colours.size(), canary);\n  // A save the game writes: through a .part and a rename, never twice.\n  fake_ms = 1000; cart_write(gb, 5, 0x42); game_save_if_due(false);\n  printf("early %d\\n", (int)fake_fs.count("/" GAME_TITLE ".sav") && fake_fs["/" GAME_TITLE ".sav"][5] == 0x42);\n  fake_ms = 4000; game_save_if_due(false);\n  printf("saved %d part %d\\n", fake_fs["/" GAME_TITLE ".sav"].size() == 8192 && fake_fs["/" GAME_TITLE ".sav"][5] == 0x42,\n         (int)fake_fs.count("/" GAME_TITLE ".sav.part"));\n  return 0;\n}\n'
+
+    @classmethod
+    def make_rom(cls):
+        import importlib.util as iu
+        spec = iu.spec_from_file_location("make_rom", cls.ROOT / "stackchan" / "make_rom.py")
+        mod = iu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls.tmp = Path(tempfile.mkdtemp())
+        cls.built = None
+        if not shutil.which("g++"):
+            return
+        stub = cls.tmp / "stub"
+        stub.mkdir()
+        for name, text in cls.STUBS.items():
+            (stub / name).write_text(text)
+        for name in ("cube_game.cpp", "cube_game.h", "walnut_cgb.h"):
+            shutil.copy(cls.CUBE / name, cls.tmp / name)
+        (cls.tmp / "game_rom.h").write_text(cls.make_rom().render(cls.ROM))
+        (cls.tmp / "harness.cpp").write_text(cls.HARNESS)
+        got = subprocess.run(["g++", "-std=gnu++17", "-O1", "-w", "-fpermissive",
+                              "-I", str(stub), "-I", str(cls.tmp), "-o",
+                              str(cls.tmp / "h"), str(cls.tmp / "harness.cpp")],
+                             capture_output=True, text=True, timeout=300)
+        cls.built = got
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def run_harness(self, mode):
+        if not shutil.which("g++"):
+            self.skipTest("needs g++")
+        self.assertEqual(self.built.returncode, 0,
+                         "the cube's game code does not compile:\n" + self.built.stderr[-2000:])
+        got = subprocess.run([str(self.tmp / "h"), mode], capture_output=True,
+                             text=True, timeout=120)
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        return dict(line.split(" ", 1) for line in got.stdout.splitlines()
+                    if " " in line)
+
+    def test_the_baker_carries_his_ROM_byte_for_byte(self):
+        """make_rom.py writes what the cube is built from: every byte,
+        in order, under the cartridge's own title."""
+        rom = self.ROM.read_bytes()
+        text = self.make_rom().render(self.ROM)
+        self.assertIn('#define GAME_TITLE "GHOSTRPG"', text)
+        self.assertIn("alignas(4)", text, "a misaligned ROM faults the cube")
+        body = text[text.index("{") + 1:text.rindex("}")]
+        baked = bytes(int(n) for n in re.findall(r"\d+", body))
+        self.assertEqual(baked, rom, "the baked ROM is not his ROM")
+
+    def test_the_baker_REFUSES_what_is_not_a_cartridge_and_says_why(self):
+        """A file that is not a Game Boy cartridge is refused in words
+        here, never baked into a cube that then crashes on it -- and no
+        game at all is not a failed flash."""
+        mr = self.make_rom()
+        rom = bytearray(self.ROM.read_bytes())
+        bad = self.tmp / "bad.gbc"
+        bad.write_bytes(bytes(rom[:0x8000 + 7]))
+        with self.assertRaisesRegex(ValueError, "16KB banks"):
+            mr.render(bad)
+        rom[0x14D] ^= 0xFF
+        bad.write_bytes(bytes(rom))
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            mr.render(bad)
+        out = self.tmp / "out"
+        out.mkdir(exist_ok=True)
+        empty = self.tmp / "nogames"
+        empty.mkdir(exist_ok=True)
+        old = mr.GAMES
+        try:
+            mr.GAMES = empty
+            said = io.StringIO()
+            with contextlib.redirect_stdout(said):
+                self.assertEqual(mr.main(out), 0, "no game failed the flash")
+            self.assertIn("No game", said.getvalue(), "no game is not said")
+            self.assertFalse((out / mr.OUT_NAME).exists())
+        finally:
+            mr.GAMES = old
+
+    def test_his_game_reaches_its_title_on_the_CUBES_OWN_code(self):
+        got = self.run_harness("run")
+        self.assertEqual(got["begin"], "ok")
+        self.assertTrue(got["fault"].startswith("none"), got["fault"])
+        drawn = int(got["fault"].split("drawn ")[1].split()[0])
+        colours = int(got["fault"].split("colours ")[1].split()[0])
+        canary = int(got["fault"].split("canary ")[1].split()[0])
+        self.assertGreater(drawn, 100, "the page hardly ever got a picture")
+        self.assertLess(drawn, 200, "every frame is drawn: twice the pushes")
+        self.assertGreater(colours, 8, "the picture is blank or one colour")
+        self.assertEqual(canary, 0, "part of the page is never painted")
+        self.assertEqual(got["joy"], "255 238",
+                         "his buttons reach the Game Boy the wrong way up "
+                         "(it reads them active-low: idle 0xFF, A+RIGHT 0xEE)")
+
+    def test_a_line_lands_at_1_5x_in_the_PANELS_byte_order(self):
+        """160x144 into exactly 240x216, every pixel the colour of the
+        Game Boy pixel it came from, byte-swapped -- unswapped, his title
+        screen came out the wrong colours."""
+        got = self.run_harness("line")
+        self.assertEqual(got["line"], "bad=0 drew=1")
+
+    def test_his_SAVE_settles_then_lands_whole_and_comes_back(self):
+        got = self.run_harness("run")
+        self.assertEqual(got["early"], "0", "the save is written while the game writes it")
+        self.assertEqual(got["saved"], "1 part 0",
+                         "the save never landed, or left its .part behind")
+        self.assertEqual(self.run_harness("seed")["loaded"], "1",
+                         "a save on the cube is not read back")
+
+    def test_the_D_PAD_is_where_the_finger_is(self):
+        """The page's own game_button_at, compiled: a finger on the
+        picture's right is RIGHT, left LEFT, top UP, bottom DOWN; its
+        very middle nothing; the right margin A over B; the left START
+        over SELECT."""
+        if not shutil.which("g++"):
+            self.skipTest("needs g++")
+        main = (self.CUBE / "cube_main.cpp").read_text()
+        fn = re.search(r"static uint8_t game_button_at\(int x, int y\) \{.*?\n\}", main, re.S)
+        self.assertTrue(fn, "the page has no game_button_at")
+        consts = re.search(r"static const int GAME_X = .*?;\n", main).group(0)
+        dead = re.search(r"static const int PAD_DEAD = \d+;", main).group(0)
+        src = ("#include <cstdlib>\n#include <cstdio>\n#include <cstdint>\n"
+               "#include \"cube_game.h\"\nstatic const int W = 320, H = 240;\n"
+               + consts + dead + "\n" + fn.group(0) +
+               "\nint main(){int p[][2]={{270,120},{50,120},{160,20},{160,225},"
+               "{160,120},{300,40},{300,200},{10,40},{10,200}};"
+               "for(auto&q:p)printf(\"%d \",game_button_at(q[0],q[1]));}\n")
+        (self.tmp / "pad.cpp").write_text(src)
+        build = subprocess.run(["g++", "-I", str(self.tmp), "-o", str(self.tmp / "pad"),
+                                str(self.tmp / "pad.cpp")], capture_output=True, text=True)
+        self.assertEqual(build.returncode, 0, build.stderr)
+        got = subprocess.run([str(self.tmp / "pad")], capture_output=True, text=True).stdout.split()
+        want = [0x10, 0x20, 0x40, 0x80, 0, 0x01, 0x02, 0x08, 0x04]
+        self.assertEqual([int(g) for g in got], want,
+                         "right, left, up, down, middle, A, B, START, SELECT")
+
+    def test_his_game_owns_every_TOUCH_on_its_page(self):
+        """On his page nothing is a talk: the loop hands the game every
+        touch before recording can start, a swipe still leaves, and
+        leaving writes his save now rather than in two seconds."""
+        code = (self.CUBE / "cube_main.cpp").read_text()
+        loop = code[code.index("void loop() {"):]
+        self.assertLess(loop.index("if (girl == GAME)"), loop.index("if (recording)"),
+                        "a touch on his game can start a recording")
+        self.assertRegex(loop, r"if \(girl == GAME\) \{\s*if \(t\.wasReleased\(\) && is_swipe\(t\)\)"
+                               r" swap_girl\(t\.distanceX\(\)\);\s*else \{\s*game_page\(t\);\s*return;",
+                         "his page cannot be left, or does not own its touches")
+        swap = code[code.index("static void swap_girl"):code.index("static void tapped")]
+        self.assertIn("if (girl == GAME) game_leave();", swap, "leaving does not save")
+        self.assertIn("game_save_if_due(true);",
+                      code[code.index("static void game_leave"):code.index("static void game_page")])
+        self.assertRegex(code, r"GAME = GIRL_COUNT \+ 1, SCREENS = GIRL_COUNT \+ 2",
+                         "his game is not the page after the ghost")
 
 
 class TestTheCubeFindsTheBoard(unittest.TestCase):

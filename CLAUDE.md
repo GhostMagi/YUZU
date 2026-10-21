@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 947 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 955 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,57 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HIS GAME IS ON THE CUBE, ONE SWIPE PAST THE GHOST (Oct 21)
+
+*"Can we put my game on my stackchan cores slide-to-able pages? A tap
+on right side of screen is right on d pad. Left is left etc. Only
+visible (clearish) buttons should be the A B and start/select. L R
+maybe too i spose?"* -- `ghostrpg.gbc`, his own Game Boy Color game
+(GHOSTRPG, CGB-only, MBC5 + battery save, 512KB).
+
+- **A page after the ghost** (`GAME = GIRL_COUNT + 1`, `SCREENS =
+  GIRL_COUNT + 2`). His picture is 240x216 (exactly 1.5x) in the
+  middle; a finger ON the picture is the d-pad, by which side of
+  centre it is furthest (a small dead spot in the very middle). The
+  side strips carry the only drawn buttons, as letters: **A over B on
+  the right, START over SELECT on the left**. Every finger counts, so
+  a direction and A at once works (UNVERIFIED: the panel's two-finger
+  touch). A swipe still leaves. **No L/R: a Game Boy Color has none**,
+  said to him.
+- **The emulator is Walnut-CGB**, vendored (`walnut_cgb.h`, MIT, one
+  header), compiled as C++ (as C it does not build). **No sound** --
+  Walnut has none built in. Every other frame is drawn (30 a second);
+  the game itself runs every frame.
+- **His colours are byte-swapped for the panel.** Walnut's colours are
+  plain RGB565 and the page's buffer wants them swapped: rendered both
+  ways, unswapped his title screen came out the wrong colours.
+- **The ROM is baked AT FLASH TIME**, never committed as a header:
+  `stackchan/make_rom.py` turns `stackchan/games/<any>.gbc` into
+  `game_rom.h` in the build's own temp copy (gitignored, `alignas(4)`).
+  It refuses a file that is not whole 16KB banks or fails the header
+  checksum, in words; no game costs only the page ("No game was baked
+  into this cube"). The firmware builds either way (`__has_include`).
+- **His save** lives on the cube's flash (`/GHOSTRPG.sav`, LittleFS):
+  written once the game has been quiet 2s, through a `.part` and a
+  rename, and at once when he swipes away. A save is read back on the
+  next start.
+
+**Driven on this machine through the cube's OWN `cube_game.cpp`**
+against stand-ins for Arduino and the flash: his ROM reaches its title
+with no fault, every pixel of the page is painted, a line lands at 1.5x
+in the panel's byte order, the save settles, lands whole and comes
+back. Compiled for the cube: 2.34 MB of 3 MB, no warnings from our
+code. **UNVERIFIED ON THE CUBE**: whether it keeps full speed (a drawn
+frame's push to the panel blocks ~20ms), and two-finger touch.
+
+Seven new tests plus one in the flash test (the game is baked into the
+BUILD, never the repo). **Seventeen breaks, all red as failures -- after
+one stayed green**: buttons sent the wrong way up (the Game Boy reads
+them active-low) changed nothing any test watched. The harness now
+reads the joypad back. And a flash test pinned "DONE is the third line
+from the end", which my new closing line broke; it finds DONE now.
+**947 -> 955.**
 
 ## THE GHOST'S PAGE, 30 LINES EACH, AND A BOOT WITH NO ROOM (Oct 21)
 
