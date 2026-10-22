@@ -143,9 +143,19 @@ if [ "$before" = "$after" ]; then
     echo "  ALREADY UP TO DATE. Nothing changed."
 else
     echo "  UPDATED."
+    files=$(git diff --name-only "$before" "$after" 2>/dev/null)
+    # THE CUBE IS NOT UPDATED BY THIS. Measured, Oct 22: Saya landed on
+    # the cube, he tapped Update, and asked "Saya still not on it???".
+    # Update only reaches the BOARD; the cube keeps the program it was
+    # flashed with until it is plugged in and `cube` runs. Said SECOND,
+    # right under the verdict, because the home screen shows only the
+    # first few lines -- under the commit list it would never be seen.
+    if printf '%s\n' "$files" | grep -q '^stackchan/'; then
+        echo "  YOUR CUBE STILL HAS THE OLD ONE. Plug it into the board"
+        echo "  and run ~/YUZU/cube to put the new one on it."
+    fi
     echo
     git log --oneline "$before..$after" 2>/dev/null | head -6 | sed 's/^/    /'
-    files=$(git diff --name-only "$before" "$after" 2>/dev/null)
     echo
     echo "    $(printf '%s\n' "$files" | grep -c .) files changed."
     # Her art is the thing he notices, so name it when it moved.

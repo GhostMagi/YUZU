@@ -451,6 +451,12 @@ function say(text, ms) {
 
 const grid = document.getElementById('grid');
 
+// What the last Update said, carried across the reload it caused.
+try {
+  const after = sessionStorage.getItem('updated');
+  if (after) { sessionStorage.removeItem('updated'); say(after, 30000); }
+} catch (e) {}
+
 // ---- SAVE MY STUFF ---------------------------------------------------
 // Ghost, Sept 29: "I dont wana hit it and auto fill my phones memory
 // lol." So the FIRST tap only asks the deck what it would save and how
@@ -708,7 +714,8 @@ update.onclick = () => {
     .then(r => {
       const text = (r.said || '').trim();
       // The first lines are the verdict and, when it failed, the fix.
-      say(text.split('\n').filter(l => l.trim()).slice(0, 4).join('\n'));
+      const verdict = text.split('\n').filter(l => l.trim()).slice(0, 4).join('\n');
+      say(verdict);
       // `restarting` from the server; UPDATED. for one that predates it.
       if (r.restarting || text.indexOf('UPDATED.') >= 0) {
         // HER SERVER IS RESTARTING ITSELF behind this reply, so the
@@ -738,7 +745,13 @@ update.onclick = () => {
             .then(res => (res.ok ? res.json() : null))
             .then(now => {
               if (now && now.boot && now.boot !== was) {
-                clearInterval(wait); location.reload();
+                clearInterval(wait);
+                // THE VERDICT OUTLIVES THE RELOAD. It used to vanish the
+                // moment the new page loaded, and the line that vanished
+                // on Oct 22 was the one saying the cube needs its own
+                // flash. Kept for this tab only, shown once, then gone.
+                try { sessionStorage.setItem('updated', verdict); } catch (e) {}
+                location.reload();
               } else if (++tries > 30) gaveUp();
             })
             .catch(() => { if (++tries > 30) gaveUp(); });

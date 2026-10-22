@@ -16523,6 +16523,57 @@ class TestPull(unittest.TestCase):
         self.assertEqual(calls, "", "a picture restarted the server")
         self.assertIn("HER FACE CHANGED", done.stdout)
 
+    # ---- the cube does not update with the board ---------------------
+
+    @staticmethod
+    def _what_the_home_screen_shows(stdout):
+        """`ui/home.html` shows the first four non-blank lines of the
+        pull, and nothing else. Anything below that he never sees."""
+        return [l for l in stdout.splitlines() if l.strip()][:4]
+
+    def test_a_CUBE_change_says_the_cube_needs_its_own_flash(self):
+        """MEASURED, Oct 22. Saya landed on the cube, he tapped Update,
+        and asked "I updated it. Saya still not on it???". Update only
+        reaches the BOARD; the cube keeps what it was flashed with until
+        it is plugged in and `cube` runs. Nothing on his screen said so.
+
+        It has to be in the four lines the home screen shows. Under the
+        commit list it would be there and never be read."""
+        done, _ = self._restart_run(
+            ["stackchan/cube/cube_main.cpp", "stackchan/cube/saya_art.h"],
+            server_up=False)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        shown = "\n".join(self._what_the_home_screen_shows(done.stdout))
+        self.assertIn("UPDATED.", shown, done.stdout)
+        self.assertIn("~/YUZU/cube", shown,
+                      "the cube line is below what the home screen shows:\n"
+                      + done.stdout)
+
+    def test_a_change_that_is_not_the_cube_says_nothing_about_it(self):
+        """A notice that fires on every update is noise, and noise is
+        what teaches him to stop reading the verdict."""
+        done, _ = self._restart_run(
+            ["ui/home.html", "personas/saya_cube.persona"], server_up=False)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertNotIn("~/YUZU/cube", done.stdout, done.stdout)
+
+    def test_the_verdict_OUTLIVES_the_reload_an_update_causes(self):
+        """An update that restarts her server reloads the home page, and
+        the verdict used to go with it -- the cube line included. The
+        page keeps it for that one reload and shows it once."""
+        page = (Path(__file__).parent / "ui" / "home.html").read_text()
+        click = page[page.index("update.onclick"):]
+        click = click[:click.index("location.reload()")]
+        self.assertIn("sessionStorage.setItem('updated', verdict)", click,
+                      "the verdict is not kept before the reload")
+        self.assertIn("sessionStorage.getItem('updated')", page)
+        self.assertIn("sessionStorage.removeItem('updated')", page,
+                      "it would show again on every load")
+        start = page.index("sessionStorage.getItem('updated')")
+        self.assertIn("try {", page[start - 40:start],
+                      "storage can throw in a private window; unguarded, "
+                      "that kills the whole home screen script")
+
     # ---- the pull that delivers a change to THIS SCRIPT ---------------
 
     def _selfchange_run(self, tail, changed=("pull",)):

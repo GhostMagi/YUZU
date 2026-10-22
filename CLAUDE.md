@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 984 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 987 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,32 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## "I UPDATED IT. SAYA STILL NOT ON IT???" -- UPDATE NEVER REACHES THE CUBE (Oct 22)
+
+The morning after Saya went on the cube. **Nothing was broken**: his
+Update pulled 0a4f373 onto the board. But **Update only reaches the
+BOARD**. The cube keeps the program it was last flashed with until it
+is plugged into the board's USB-A and `~/YUZU/cube` runs. Nothing on
+his screen said so, and the home screen's Update reply is all he reads.
+
+- **`pull` says it SECOND, right under UPDATED.**, whenever anything
+  under `stackchan/` changed: *"YOUR CUBE STILL HAS THE OLD ONE. Plug
+  it into the board and run ~/YUZU/cube to put the new one on it."*
+  Second because the home screen shows only the first four non-blank
+  lines; under the commit list it would never be read. Only on a
+  `stackchan/` change: a notice on every update is noise.
+- **The verdict outlives the reload.** An update that restarts her
+  server reloads the home page, and the verdict went with it. The cube
+  line would have been on screen for a few seconds. It is kept in
+  `sessionStorage` for that one reload, shown for 30s, then removed.
+  try/catch, because storage throws in a private window.
+
+Driven in a real browser against a stub server that restarts: the
+message is there before the reload and after it, and gone on the next
+load. Three tests, six breaks, all red as failures. **984 -> 987.**
+**He still has to flash the cube once for Saya**; this only makes the
+NEXT cube change say so.
 
 ## SAYA IS ON THE CUBE, A FOURTH GIRL WITH HIS KAOMOJI FOR A FACE (Oct 22)
 
