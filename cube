@@ -8,11 +8,13 @@
 # the one word that does it. Then, the same day: "Can you squeeze Yuzu
 # on too?", then Zero, then Saya (Oct 22) -- so the cube carries all
 # four, and a swipe moves between them. Run it
-# again any time the cube code changes (Update brings the new code; this
-# puts it on the cube).
+# again any time the cube code changes. It pulls the newest code itself
+# first (Oct 22), so it never puts an old cube back on.
 #
 # WHAT IT DOES, in order, verdict first at every step:
 #   - finds the cube on USB, before spending anything;
+#   - pulls the newest code from GitHub, and flashes what the board
+#     already has if there is no internet;
 #   - reads EVERY WiFi the board has saved, its current one first, so
 #     the cube joins whichever of them it can see -- home, or his
 #     phone's hotspot (Oct 17). The passwords need sudo to read, which
@@ -106,6 +108,39 @@ no_usb() {
 if [ ! -r "$cube" ] || [ ! -w "$cube" ]; then
     no_usb
     exit 1
+fi
+
+# ---- 1b. the newest code, first ----------------------------------------------
+# MEASURED, Oct 22, off his screen: Saya went on the cube the night
+# before, he flashed in the morning, and the cube came up without her.
+# The flash WORKED -- its own DONE line said "Four, Yuzu and Zero", the
+# old wording, so the BOARD had never pulled her down, and this built
+# exactly what the board had. It flashed the old cube perfectly.
+#
+# So it pulls first, with the `pull` he already has. No internet (the
+# garage, a cold clock) costs only the update: it says so and flashes
+# what the board already has, which is what it always did.
+#
+# ONE `if`, PARSED WHOLE BEFORE IT RUNS. `git pull` can replace this
+# very file while bash is reading it, and bash then carries on at the
+# same byte offset in the NEW file -- the splice `pull` itself had to
+# learn about. Nothing more of this file is read until the `if` ends,
+# and a changed script is run again from its top. Keep it one block.
+PULL="${YUZU_CUBE_PULL-$HERE/pull}"
+if [ -z "${YUZU_CUBE_PULLED:-}" ] && [ -n "$PULL" ] && [ -f "$PULL" ]; then
+    echo "Getting the newest version first (a minute on a cold board)..."
+    was=$(cksum < "$0")
+    out=$(bash "$PULL" 2>&1)
+    case "$out" in
+        *"UPDATED."*)      echo "  Updated." ;;
+        *"UP TO DATE"*)    echo "  Already the newest." ;;
+        *)  echo "  COULD NOT UPDATE, so this puts on what the board already has:"
+            printf '%s\n' "$out" | grep -v '^ *$' | head -4 | sed 's/^/    /' ;;
+    esac
+    if [ "$(cksum < "$0")" != "$was" ]; then
+        echo "  This script changed too, so running the new one."
+        YUZU_CUBE_PULLED=1 exec bash "$0" "$@"
+    fi
 fi
 
 # ---- 2. every WiFi the board knows -------------------------------------------

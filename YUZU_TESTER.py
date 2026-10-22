@@ -4420,7 +4420,8 @@ class TestCubeFlash(unittest.TestCase):
         path.write_text("#!/bin/bash\n" + body)
         path.chmod(0o755)
 
-    def run_cube(self, serial=None, cli=True, extra=None, as_him=False):
+    def run_cube(self, serial=None, cli=True, extra=None, as_him=False,
+                 script=None):
         log = self.log
         self.stub("nmcli", self.nmcli_stub())
         self.stub("sudo", 'exec "$@"\n')
@@ -4456,8 +4457,11 @@ exit 0
             env["YUZU_CUBE_CLI"] = str(self.bin / "arduino-cli")
         else:
             env["YUZU_CUBE_CLI"] = str(self.tools / "nothing-here")
+        # The REAL pull would `git pull` this checkout. Off unless a test
+        # hands it a stand-in.
+        env["YUZU_CUBE_PULL"] = ""
         env.update(extra or {})
-        argv = [str(self.REPO / "cube")]
+        argv = [str(script or self.REPO / "cube")]
         if as_him and os.geteuid() == 0:
             # Root opens anything, so a port he may not open can only be
             # tried as someone who is not root: an ordinary uid, with no
@@ -4536,6 +4540,86 @@ exit 0
         self.assertEqual(got.returncode, 1)
         self.assertTrue(got.stdout.startswith("NO CUBE FOUND."), got.stdout)
         self.assertFalse(self.log.exists(), "it built with no cube to put her on")
+
+    # ---- it pulls the newest code before it builds ---------------------
+
+    def pull_stub(self, says, code=0, then=""):
+        """A `pull` that logs into the same file the build does, so the
+        ORDER of pulling and building can be read off one log."""
+        path = self.tmp / "pull"
+        path.write_text('#!/bin/bash\necho PULLED >> %s\n%s\n'
+                        'printf "%%s\\n" %s\nexit %d\n'
+                        % (self.log, then, shlex.quote(says), code))
+        path.chmod(0o755)
+        return str(path)
+
+    def test_it_pulls_the_newest_code_BEFORE_it_builds(self):
+        """MEASURED, Oct 22, off his screen: Saya went on the cube the
+        night before, he flashed in the morning, and she was not there.
+        The flash's own DONE line said "Four, Yuzu and Zero" -- the OLD
+        wording -- so the board had never pulled her down, and the flash
+        built exactly the old code it had."""
+        got = self.run_cube(extra={"YUZU_CUBE_PULL": self.pull_stub(
+            "\n  UPDATED.\n\n    0a4f373 Saya on the cube")})
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        log = self.log.read_text()
+        self.assertIn("PULLED", log, "it never pulled")
+        self.assertIn(" compile ", log)
+        self.assertLess(log.index("PULLED"), log.index(" compile "),
+                        "it built before it pulled")
+        self.assertIn("Updated.", got.stdout, got.stdout)
+
+    def test_no_internet_still_FLASHES_what_the_board_has(self):
+        """The garage, or a cold clock. The update is lost; the flash is
+        not, and it says which one he got."""
+        got = self.run_cube(extra={"YUZU_CUBE_PULL": self.pull_stub(
+            "\n  PULL FAILED. Nothing was updated.\n"
+            "  The board cannot reach GitHub. Check WiFi.", code=1)})
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertIn(" compile ", self.log.read_text(),
+                      "no internet stopped the flash")
+        self.assertIn("COULD NOT UPDATE", got.stdout, got.stdout)
+        self.assertIn("cannot reach GitHub", got.stdout,
+                      "it hid why the update failed")
+        tail = got.stdout.rstrip().splitlines()[-5:]
+        self.assertTrue(any(ln.startswith("DONE.") for ln in tail), got.stdout)
+
+    def test_a_pull_that_changes_THIS_script_runs_the_new_one(self):
+        """`git pull` can rewrite this very file while bash is reading
+        it, and bash then carries on at the same byte offset in the new
+        one. The stand-in rewrites the script IN PLACE (same file, not a
+        new one), which is the dangerous case. The new script must be the
+        one that finishes, and it must not pull a second time."""
+        import shutil
+        here = self.tmp / "board"
+        here.mkdir()
+        mine = here / "cube"
+        shutil.copy(self.REPO / "cube", mine)
+        mine.chmod(0o755)
+        (here / "stackchan").symlink_to(self.REPO / "stackchan")
+        # The new version gains a line at its TOP, so everything after it
+        # shifts: only a run that starts again from the top can print it,
+        # and an old run reading on at its offset lands mid-line.
+        (here / "rewrite.sh").write_text(
+            'f="$1"; c=$(cat "$f"); c="${c//DONE./DONE-NEW.}"\n'
+            "printf '%s\\necho NEW-FROM-THE-TOP\\n%s\\n' "
+            '"${c%%$\'\\n\'*}" "${c#*$\'\\n\'}" > "$f"\n')
+        rewrite = "bash %s %s" % (shlex.quote(str(here / "rewrite.sh")),
+                                  shlex.quote(str(mine)))
+        pull = self.pull_stub("\n  UPDATED.", then=rewrite)
+        try:
+            got = self.run_cube(extra={"YUZU_CUBE_PULL": pull}, script=mine)
+        except subprocess.TimeoutExpired:
+            self.fail("it re-ran itself forever: every run pulled again")
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertIn("running the new one", got.stdout, got.stdout)
+        self.assertIn("NEW-FROM-THE-TOP", got.stdout,
+                      "the new script never ran from its top:\n" + got.stdout)
+        self.assertIn("DONE-NEW.", got.stdout,
+                      "the OLD script finished the run:\n" + got.stdout)
+        log = self.log.read_text()
+        self.assertEqual(log.count("PULLED"), 1, "it pulled again, or looped")
+        self.assertEqual(log.count(" compile "), 1, "it built twice")
 
     def test_she_joins_the_BOARDS_wifi_and_the_password_never_lands_in_the_repo(self):
         got = self.run_cube()
