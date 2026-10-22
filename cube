@@ -159,7 +159,12 @@ unread=()   # locked networks whose password could not be read
 if [ -n "${YUZU_CUBE_SSID:-}" ]; then
     nets+=("$YUZU_CUBE_SSID" "${YUZU_CUBE_PASS:-}")
 elif command -v nmcli >/dev/null 2>&1; then
+    # The board's OWN WiFi (own_wifi.sh, Oct 22) goes straight after the
+    # one it is on, so the cap of eight below can never drop it: it is
+    # the only network the two can meet on where there is no other.
     uuids=$( { nmcli -t -f UUID,TYPE connection show --active 2>/dev/null
+               nmcli -t -f UUID,TYPE,NAME connection show 2>/dev/null \
+                   | awk -F: '$3=="yuzu-own-wifi"'
                nmcli -t -f UUID,TYPE connection show 2>/dev/null; } \
              | awk -F: '$2=="802-11-wireless" && !seen[$1]++ {print $1}')
     [ -n "$uuids" ] && echo "Reading the WiFi passwords the board has saved needs sudo:"

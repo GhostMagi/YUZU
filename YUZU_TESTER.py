@@ -4410,6 +4410,7 @@ class TestCubeFlash(unittest.TestCase):
         # by default -- the test that needs his hotspot adds it.
         self.saved = [("u-home", "HomeNet", self.PASSWORD, True)]
         self.open_nets = set()      # saved networks with no lock at all
+        self.own = None             # the uuid of the board's own WiFi
 
     def tearDown(self):
         import shutil
@@ -4492,6 +4493,12 @@ exit 0
                  'say() { if [[ "$args" == *"-e no"* ]]; then printf "%s\\n" "$1";'
                  ' else printf "%s\\n" "$1" | sed "s/[\\\\:]/\\\\&/g"; fi; }',
                  'case "$args" in']
+        if self.own:
+            named = ["%s:802-11-wireless:%s" % (u, "yuzu-own-wifi"
+                                                 if u == self.own else u)
+                     for u, _, _, _ in self.saved]
+            lines.append('  *UUID,TYPE,NAME*) printf "%%s\\n" %s ;;'
+                         % " ".join(shlex.quote(r) for r in named))
         lines.append('  *UUID,TYPE*--active*) printf "%%s\\n" %s ;;'
                      % rows([u for u, _, _, on in self.saved if on]))
         lines.append('  *UUID,TYPE*) printf "%%s\\n" %s ;;'
@@ -4672,6 +4679,26 @@ exit 0
         self.assertEqual(listed, sorted(listed), out)
         self.assertIn("2.4 GHz", out, "the one thing a phone hotspot gets "
                       "wrong for this cube is never said")
+
+    def test_the_boards_OWN_wifi_is_never_CAPPED_off_the_cube(self):
+        """The cube takes eight networks at most. The board's own WiFi
+        (own_wifi.sh) is the only one the two can meet on where there is
+        no other, so it rides straight after the one the board is on,
+        however many cafes he has saved before it."""
+        own = ("ghostnano", "abcd-efgh-jkmn")
+        self.saved = ([("u-home", "HomeNet", self.PASSWORD, True)]
+                      + [("u-%d" % i, "Cafe%d" % i, "pw%d" % i, False)
+                         for i in range(9)]
+                      + [("u-own", own[0], own[1], False)])
+        self.own = "u-own"
+        got = self.run_cube()
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        wifi = self.secrets()["wifi"]
+        self.assertEqual(len(wifi), 8, "the cap of eight moved")
+        self.assertEqual(wifi[0], ("HomeNet", self.PASSWORD),
+                         "the board's current network is not first")
+        self.assertEqual(wifi[1], own,
+                         "the board's own WiFi fell off the cube's list")
 
     def test_a_password_it_cannot_READ_is_said_at_flash_time(self):
         """A password kept in a desktop keyring is out of sudo's reach,
@@ -18708,6 +18735,309 @@ class TestFaceSprites(unittest.TestCase):
             junk = Path(tmp) / "junk.png"
             junk.write_bytes(b"not a png at all")
             self.assertIsNone(self.face.read_rgba(str(junk)))
+
+
+class TestOwnWifi(unittest.TestCase):
+    """The board's OWN WiFi, for when there is no other (Oct 22).
+
+    Ghost: *"i wama be able to plug power in, and interact on
+    something"* and *"if shtf and i have to live in a cave"*. The girls
+    never touch the internet; what his phone and the cube need is a
+    NETWORK to reach the board on. With no network it knows in reach,
+    the board makes its own.
+
+    Driven for real against stand-ins for nmcli, sudo, systemctl,
+    setsid and sleep. The sudo stand-in REFUSES anything under /etc, so
+    a broken override can never write a unit into this machine's real
+    systemd: the escape lands in the sandbox or not at all."""
+
+    SCRIPT = Path(__file__).parent / "own_wifi.sh"
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.bin = self.tmp / "bin"
+        self.bin.mkdir()
+        self.state = self.tmp / "state"
+        self.state.mkdir()
+        self.home = self.tmp / "home"
+        self.home.mkdir()
+        self.log = self.tmp / "calls.log"
+        self.unit = self.tmp / "yuzu-own-wifi.service"
+        self.keep = self.home / ".yuzu" / "own-wifi"
+        # What `nmcli device status` says on each look, the last repeating.
+        self.looks = ["wlan0:wifi:disconnected"]
+        self.names = ""                    # saved connection names
+        self.up_fails = ""                 # nmcli's words if the card refuses
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def stub(self, name, body):
+        path = self.bin / name
+        path.write_text("#!/bin/bash\n" + body)
+        path.chmod(0o755)
+
+    def run_it(self, *args, env_out=()):
+        st, log = self.state, self.log
+        for i, look in enumerate(self.looks, 1):
+            (st / ("look.%d" % i)).write_text(look.replace(" ", "\n") + "\n")
+        (st / "looks").write_text(str(len(self.looks)))
+        if not (st / "names").exists():
+            (st / "names").write_text(self.names)
+        self.stub("nmcli", r"""
+echo "nmcli $*" >> %(log)s
+st=%(st)s
+case "$*" in
+  *"DEVICE,TYPE,STATE device status"*)
+    n=$(( $(cat $st/seen 2>/dev/null || echo 0) + 1 )); echo $n > $st/seen
+    max=$(cat $st/looks); [ $n -gt $max ] && n=$max
+    cat $st/look.$n ;;
+  *"TYPE device status"*)
+    cut -d: -f2 $st/look.1 ;;
+  *"-f NAME connection show"*) cat $st/names ;;
+  *"--active"*) echo "u-home:802-11-wireless" ;;
+  *"connection add"*)
+    echo yuzu-own-wifi >> $st/names
+    a=("$@")
+    for ((i = 0; i < ${#a[@]}; i++)); do
+      [ "${a[i]}" = ssid ] && echo "${a[i+1]}" > $st/ssid
+      [ "${a[i]}" = wifi-sec.psk ] && echo "${a[i+1]}" > $st/psk
+    done ;;
+  *"wireless.ssid connection show"*) cat $st/ssid ;;
+  *"security.psk connection show"*) cat $st/psk ;;
+  *"connection up yuzu-own-wifi"*)
+    [ -n "$STUB_UP_FAILS" ] && { echo "$STUB_UP_FAILS" >&2; exit 4; } ;;
+esac
+exit 0
+""" % {"log": log, "st": st})
+        self.stub("sudo", 'for a in "$@"; do case "$a" in /etc/*)'
+                  ' echo "REFUSED $a" >> %s; exit 1 ;; esac; done\n'
+                  'echo "sudo $*" >> %s\nexec "$@"\n' % (log, log))
+        self.stub("systemctl", 'echo "systemctl $*" >> %s\n' % log)
+        self.stub("setsid", 'echo "setsid $*" >> %s\n'
+                  '[ "$1" = -f ] && shift\nexec "$@"\n' % log)
+        self.stub("sleep", "exit 0\n")
+        self.stub("hostname", 'case "$1" in -s) echo ghostnano ;; esac\n')
+        env = dict(os.environ,
+                   PATH="%s:%s" % (self.bin, os.environ.get("PATH", "")),
+                   HOME=str(self.home),
+                   YUZU_OWN_WIFI_UNIT=str(self.unit),
+                   YUZU_OWN_WIFI_WAIT="20", YUZU_OWN_WIFI_STEP="5",
+                   YUZU_FACE_PORT="8081",
+                   STUB_UP_FAILS=self.up_fails)
+        env.pop("YUZU_OWN_WIFI_KEEP", None)
+        for key in env_out:
+            env.pop(key, None)
+        got = subprocess.run(["bash", str(self.SCRIPT), *args], env=env,
+                             text=True, capture_output=True, timeout=60,
+                             stdin=subprocess.DEVNULL)
+        self.calls = self.log.read_text() if self.log.exists() else ""
+        self.assertNotIn("REFUSED", self.calls,
+                         "it wrote outside its sandbox: " + self.calls)
+        return got
+
+    def switched_on(self):
+        return "nmcli connection up yuzu-own-wifi" in self.calls
+
+    # ---- at boot ---------------------------------------------------------
+
+    def test_a_board_on_a_network_it_KNOWS_never_makes_its_own(self):
+        """At home the board joins home and the cube finds it there. A
+        hotspot that came up anyway would hide the board from everything
+        that already works."""
+        self.names = "Wired connection 1\nyuzu-own-wifi\n"
+        self.looks = ["wlan0:wifi:connected"]
+        got = self.run_it()
+        self.assertEqual(got.returncode, 0, got.stderr)
+        self.assertFalse(self.switched_on(),
+                         "it made its own WiFi with home in reach")
+
+    def test_with_NOTHING_in_reach_it_waits_and_then_makes_its_own(self):
+        self.names = "yuzu-own-wifi\n"
+        self.looks = ["wlan0:wifi:disconnected"]
+        got = self.run_it()
+        self.assertTrue(self.switched_on(),
+                        "no network anywhere and the board made none: "
+                        + got.stdout + got.stderr)
+        looked = self.calls.count("DEVICE,TYPE,STATE device status")
+        self.assertGreaterEqual(looked, 5,
+                                "it did not WAIT for home (20s in steps of "
+                                "5 is five looks); a router back from a "
+                                "power cut would lose to it")
+        self.assertIn("nmcli radio wifi on", self.calls)
+
+    def test_home_coming_back_LATE_still_wins(self):
+        """The router that lost power with the board comes back after
+        it. Two minutes of patience is what keeps the board at home."""
+        self.names = "yuzu-own-wifi\n"
+        self.looks = ["wlan0:wifi:disconnected", "wlan0:wifi:connecting",
+                      "wlan0:wifi:connected"]
+        self.run_it()
+        self.assertFalse(self.switched_on(),
+                         "home came back on the third look and it made "
+                         "its own WiFi anyway")
+
+    def test_the_Jetsons_always_up_links_are_NOT_a_network(self):
+        """docker0 and l4tbr0 are 'connected' on a Jetson all the time,
+        and the USB link under l4tbr0 is up whenever his serial cable is
+        in -- which is exactly when he would set this up and check it.
+        None of them is a way for his phone to reach the board."""
+        self.names = "yuzu-own-wifi\n"
+        self.looks = ["docker0:bridge:connected l4tbr0:bridge:connected "
+                      "usb0:ethernet:connected rndis0:ethernet:connected "
+                      "wlan0:wifi:disconnected"]
+        self.run_it()
+        self.assertTrue(self.switched_on(),
+                        "a bridge or the USB link counted as a network")
+
+    def test_a_CABLE_counts(self):
+        self.names = "yuzu-own-wifi\n"
+        self.looks = ["eth0:ethernet:connected wlan0:wifi:disconnected"]
+        self.run_it()
+        self.assertFalse(self.switched_on(),
+                         "plugged into a router by cable, it still made "
+                         "its own WiFi")
+
+    def test_nothing_is_switched_on_until_face_boot_has_MADE_it(self):
+        self.names = "HomeNet\n"
+        got = self.run_it()
+        self.assertEqual(got.returncode, 0)
+        self.assertFalse(self.switched_on())
+
+    def test_a_root_service_with_NO_HOME_still_runs(self):
+        """systemd gives a root service no HOME, and under `set -u` a
+        bare $HOME ends the script on its first line -- the boot check
+        would never run at all, in exactly the place it is for."""
+        self.names = "yuzu-own-wifi\n"
+        got = self.run_it(env_out=("HOME",))
+        self.assertNotIn("unbound", got.stderr, got.stderr)
+        self.assertTrue(self.switched_on(), got.stdout + got.stderr)
+
+    # ---- set up once, from face --boot ----------------------------------
+
+    def add_args(self):
+        line = [ln for ln in self.calls.splitlines()
+                if ln.startswith("nmcli connection add")]
+        self.assertEqual(len(line), 1, "it was made %d times" % len(line))
+        return line[0]
+
+    def test_setup_makes_a_LOCKED_2_4GHz_network_of_its_own(self):
+        got = self.run_it("--setup")
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        add = self.add_args()
+        for need in ("802-11-wireless.mode ap",
+                     "802-11-wireless.band bg",     # the cube hears 2.4 only
+                     "ipv4.method shared",          # the board hands out addresses
+                     "wifi-sec.key-mgmt wpa-psk",
+                     "autoconnect no",              # only the boot check
+                     "ssid ghostnano"):             # read, never typed in
+            self.assertIn(need, add, "the network is made without " + need)
+        pw = (self.state / "psk").read_text().strip()
+        self.assertRegex(pw, r"^[a-hjkmnp-z2-9]{4}-[a-hjkmnp-z2-9]{4}-"
+                             r"[a-hjkmnp-z2-9]{4}$",
+                         "the password is not twelve plain letters and digits")
+
+    def test_the_password_is_made_on_the_BOARD_and_kept_for_HIM_only(self):
+        """His WiFi passwords never go in the repo. This one is made on
+        the board, and kept in his home folder where only he can read
+        it -- because he will not remember it, and `face` shows it."""
+        self.run_it("--setup")
+        pw = (self.state / "psk").read_text().strip()
+        self.assertTrue(self.keep.exists(), "the password was not kept")
+        self.assertEqual(self.keep.stat().st_mode & 0o777, 0o600,
+                         "anyone on the board can read its WiFi password")
+        self.assertIn("password: " + pw, self.keep.read_text())
+        source = self.SCRIPT.read_text()
+        self.assertNotIn(pw, source)
+        self.assertIn("/dev/urandom", source, "the password is not random")
+
+    def test_a_second_setup_never_hands_him_a_NEW_password(self):
+        self.run_it("--setup")
+        first = self.keep.read_text()
+        self.log.unlink()
+        self.run_it("--setup")
+        self.assertNotIn("connection add", self.calls,
+                         "a second face --boot made the network again")
+        self.assertEqual(self.keep.read_text().split("checked")[0],
+                         first.split("checked")[0],
+                         "the password he joined with changed")
+
+    def test_the_boot_service_does_not_HOLD_the_boot(self):
+        """Type=oneshot would hold the boot -- and the desktop with it --
+        for the two minutes it waits."""
+        self.run_it("--setup")
+        unit = self.unit.read_text()
+        self.assertIn("Type=simple", unit)
+        self.assertNotIn("oneshot", unit)
+        self.assertIn("WantedBy=multi-user.target", unit)
+        self.assertIn(str(self.SCRIPT), unit)
+        self.assertIn("systemctl enable yuzu-own-wifi.service", self.calls)
+
+    def test_the_card_is_checked_ONCE_detached_and_home_is_put_back(self):
+        """Whether his Orin's card will host a network cannot be known
+        from here, and a cave is the wrong place to find out. The check
+        drops his WiFi, so it runs in its own session (a dropped
+        terminal must not stop it halfway with home switched off) and
+        puts home back itself."""
+        got = self.run_it("--setup")
+        self.assertIn("setsid -f", self.calls, "the check is not detached")
+        order = [ln for ln in self.calls.splitlines()
+                 if ln.startswith(("nmcli connection up", "nmcli connection down"))]
+        self.assertEqual(order, ["nmcli connection up yuzu-own-wifi",
+                                 "nmcli connection down yuzu-own-wifi",
+                                 "nmcli connection up uuid u-home"],
+                         "the check did not put home back after itself")
+        self.assertIn("WORKS", got.stdout, got.stdout)
+        self.assertIn("checked: yes", self.keep.read_text())
+        self.log.unlink()
+        self.run_it("--setup")
+        self.assertNotIn("setsid", self.calls,
+                         "every face --boot drops his WiFi to check again")
+
+    def test_a_card_that_CANNOT_says_so_in_its_own_words(self):
+        self.up_fails = "Error: Connection activation failed: AP mode not supported"
+        got = self.run_it("--setup")
+        self.assertIn("WOULD NOT MAKE ITS OWN NETWORK", got.stdout, got.stdout)
+        self.assertIn("AP mode not supported", got.stdout,
+                      "NetworkManager's own words are not shown")
+        self.assertNotIn("checked: yes", self.keep.read_text())
+        self.assertIn("nmcli connection up uuid u-home", self.calls,
+                      "a failed check left home switched off")
+
+    def test_show_tells_him_the_name_the_password_and_where_to_go(self):
+        self.run_it("--setup")
+        pw = (self.state / "psk").read_text().strip()
+        got = self.run_it("--show")
+        for need in ("ghostnano", pw, "http://10.42.0.1:8081/",
+                     "http://ghostnano.local:8081/"):
+            self.assertIn(need, got.stdout, "it does not say " + need)
+
+    def test_face_says_it_where_he_LANDS(self):
+        """He will not remember the password, and `face` is the screen he
+        lands on -- including the one `face --boot` ends with."""
+        self.run_it("--setup")
+        pw = (self.state / "psk").read_text().strip()
+        port = TestFaceServer._free_port()
+        face = Path(__file__).parent / "face"
+        env = dict(os.environ, HOME=str(self.home), YUZU_FACE_PORT=str(port))
+        try:
+            got = subprocess.run(["bash", str(face)], env=env, text=True,
+                                 capture_output=True, timeout=30)
+        finally:
+            subprocess.run(["bash", str(face), "--off"], env=env,
+                           capture_output=True)
+        self.assertIn(pw, got.stdout, got.stdout + got.stderr)
+
+    def test_face_boot_sets_it_up_and_boot_off_stops_it(self):
+        text = (Path(__file__).parent / "face").read_text()
+        boot = text[text.index('if [ "${1:-}" = "--boot" ]'):]
+        boot = boot[:boot.index("\ncase ")]
+        off = boot[boot.index('"${2:-}" = "--off"'):boot.index("    fi\n")]
+        self.assertIn('own_wifi.sh" --off', off,
+                      "face --boot --off leaves the board making its own WiFi")
+        verified = boot[boot.index("    if up; then"):]
+        self.assertIn('own_wifi.sh" --setup', verified,
+                      "face --boot never makes the board's own WiFi")
 
 
 class TestFaceServer(unittest.TestCase):

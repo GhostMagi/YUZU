@@ -4,7 +4,9 @@
 #   ~/YUZU/face           serve it, print the address for the phone
 #   ~/YUZU/face --off     stop
 #   ~/YUZU/face --status  is it up, and can the phone reach it
-#   ~/YUZU/face --boot    start it at every boot, with no screen attached
+#   ~/YUZU/face --boot    start it at every boot, with no screen attached,
+#                         and give the board its own WiFi for when there
+#                         is no other (own_wifi.sh)
 #   ~/YUZU/face --boot --off    stop doing that
 #
 # The PHONE is the screen here, not the deck. It is a touchscreen
@@ -72,6 +74,15 @@ finally:
 up()        { _connect 127.0.0.1; }
 reachable() { _connect "$(lan_ip)"; }
 
+# Its own WiFi's name and password, when `face --boot` has made one.
+# Ghost will not remember it, and this is the screen he lands on.
+own_wifi() {
+    local said
+    said=$(bash "$(cd "$(dirname "$0")" && pwd)/own_wifi.sh" --show 2>/dev/null)
+    [ -n "$said" ] && { echo; printf '%s\n' "$said"; }
+    return 0
+}
+
 # The verdict goes FIRST. `pad --status` printed two alarming lines
 # about a transport that was not in use and the answer last, and a
 # working controller read as broken.
@@ -89,6 +100,7 @@ report() {
         echo
         echo "  On the deck's own screen it works now:"
         echo "      http://127.0.0.1:$PORT/"
+        own_wifi
         echo
         return 0
     fi
@@ -139,6 +151,7 @@ report() {
         echo "      http://$name.local:$PORT/"
         echo "  (mDNS. If it does not load, use the numbers above.)"
     fi
+    own_wifi
     echo
     echo "  That is the HOME SCREEN, not her face. Ghost, Sept 12:"
     echo "  \"id like to choose what i wana do before sayas face pops"
@@ -177,6 +190,7 @@ if [ "${1:-}" = "--boot" ]; then
         sudo systemctl disable --now yuzu-face.service 2>/dev/null
         sudo rm -f "$unit"
         sudo systemctl daemon-reload 2>/dev/null
+        bash "$me/own_wifi.sh" --off
         echo
         echo "  It will no longer start at boot. It is still installed;"
         echo "  run ~/YUZU/face to start it by hand."
@@ -212,6 +226,12 @@ UNIT
     if up; then
         echo "  DONE. She is serving now and will serve at every boot,"
         echo "  with no screen and nobody logged in."
+        # AND THE BOARD'S OWN WIFI, for a place with none (Oct 22: "if
+        # shtf and i have to live in a cave"). Here, in the one command
+        # that already means "she works when I just plug power in",
+        # rather than as a new word for him to remember.
+        echo
+        bash "$me/own_wifi.sh" --setup
         report
     else
         echo "  INSTALLED, but she did not come up. Its own output:"

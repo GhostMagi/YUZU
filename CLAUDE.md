@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 990 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1007 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,21 +49,72 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## "CAN I TALK TO THE GIRLS WITH THE WIFI DOWN?" (Oct 22)
+## THE BOARD MAKES ITS OWN WIFI WHEN THERE IS NO OTHER (Oct 22)
 
 *"is there ways to make it so even if wifis down in general like
 internet or sumn in general is down that i can interact with 'the
 girls' lol? ... i wama be able to plug power in, and interact on
-something."* **Answer given: they never use the internet**; what his
-phone (or the cube) needs is a shared NETWORK to reach the board.
-Internet down with the router on: everything works except Update. Away
-or router off: his phone's hotspot, which the board already knows
-(set to 2.4 GHz for the cube). Nothing at all: the USB serial cable
-and his terminal app, text only. **Offered, NOT built, waiting on his
-yes: the board makes its OWN WiFi when it finds none it knows** (an
-NM hotspot fallback), so power in and the phone joins it. UNVERIFIED:
-that his Orin's WiFi card does AP mode; the cube would need a reflash
-to know that network.
+something."* Then: *"Ngl i thought the boards own wifi signal and being
+fully independant from internet stuff was the goal from the start and
+that we already were doing it that way ... if shtf and i have to live
+in a cave LOL"* and, offered it, *"Yes in short."*
+
+**HALF OF IT WAS ALREADY TRUE, and that was said first.** The girls never
+touch the internet: model, voices, ears and wiki all live on the board.
+What his phone and the cube need is a NETWORK to reach it on, and that
+was his router or his phone's hotspot. Only Update and `wiki --get` need
+real internet. The board making its own WiFi was offered on Sept 29 and
+never built.
+
+**`own_wifi.sh`, set up by `~/YUZU/face --boot`** (the one word that
+already meant "she works when I just plug power in", NOT a new command;
+it has an extension, so `pull` does not call it one). Ghost has to run
+`face --boot` once more to get it:
+
+- **A FALLBACK, never the default.** A boot service (root, `Type=simple`
+  so it never holds the boot or the desktop) waits up to TWO MINUTES for
+  a network the board knows. A router that lost power with the board
+  takes about that long, and a hotspot that came up first at home would
+  hide the board from the cube and his phone until the next restart.
+  Only then does it switch on `yuzu-own-wifi`. **Back home, a restart
+  puts it on home again**; it does NOT switch back by itself.
+- **"On a network" is WiFi or a cable, connected.** NOT docker0, l4tbr0
+  or the USB link under it, which are "connected" on a Jetson whenever
+  his serial cable is in -- exactly when he would set it up and check.
+- **The network**: named after the board (`ghostnano`, read off
+  `hostname -s`, never typed in), **2.4 GHz** (`band bg`, the cube hears
+  nothing else), WPA2 CCMP only, `ipv4.method shared` so the board is
+  **10.42.0.1** and hands out addresses, `autoconnect no`.
+- **THE PASSWORD IS MADE ON THE BOARD** (twelve letters and digits from
+  /dev/urandom, no look-alikes, `xxxx-xxxx-xxxx`) and kept in
+  `~/.yuzu/own-wifi`, mode 600. Never in the repo. A second `face --boot`
+  reads it back from NetworkManager and never makes a new one. `face`
+  (and `face --status`, and the end of `face --boot`) prints the name,
+  the password, `http://10.42.0.1:8081/` and the `.local` name, because
+  he will not remember it and that is the screen he lands on.
+- **THE CARD IS CHECKED ONCE, at setup**: whether his Orin's WiFi card
+  can host a network is UNKNOWABLE from here, and a cave is the wrong
+  place to find out. The check drops his WiFi ~20s, so it runs DETACHED
+  (`setsid -f`, as root) -- a dropped terminal must never stop it halfway
+  with home switched off -- and puts the previous network back itself.
+  A card that refuses says so in NetworkManager's own words.
+- **The cube always learns it**: `cube` puts `yuzu-own-wifi` straight
+  after the board's current network, so the cap of eight can never drop
+  it. The cube needs one `~/YUZU/cube` after `face --boot` to learn it.
+
+**UNVERIFIED, all of it on his board:** that the card does AP mode (the
+setup check answers it); that `ghostnano.local` resolves on the board's
+own network (it is the AP, so avahi should answer; the numbers always
+work, and the mic's Chrome flag trusts only the `.local` address); that
+`nmcli connection add ... ifname '*'` is accepted by his NetworkManager;
+and how Android behaves on a WiFi with no internet (told him: tap to
+stay connected).
+
+**Sixteen tests in `TestOwnWifi` plus one in `TestCubeFlash`. Eighteen
+breaks, all red as failures. 990 -> 1007.** The sudo stand-in REFUSES any path under
+/etc, so the break that pointed the unit at the real
+`/etc/systemd/system` was refused inside the sandbox -- the /etc/passwd
+lesson, built in before the break rather than after.
 
 Same message: *"Cyberdecks still on the table btw due to robot dog for
 like 4k catching my eye"*. Recorded verbatim; what it changes is

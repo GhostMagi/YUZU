@@ -105,7 +105,7 @@ $400.
 | `muto_leg_control.py` | Leg wrapper, tripod gaits, `DummyBot` simulator |
 | `yuzu_voice.py` | Piper TTS. The project's one dependency boundary |
 | **The deck** | One word each, no arguments to remember |
-| `face` | Serve her face; open the address on the phone. `--boot` serves at every boot with no screen attached |
+| `face` | Serve her face; open the address on the phone. `--boot` serves at every boot with no screen attached, and gives the board its own WiFi for when there is no other (`own_wifi.sh`) |
 | `name` | Give the board a name, so the phone stops needing an IP |
 | `wiki` | Offline Wikipedia (kiwix-serve), every archive on the board. `--test` says why a lookup missed; `--get wikipedia_en_all_mini` fetches another archive in the background |
 | `gba` | VNC desktop + mGBA on the newest ROM |
