@@ -1132,7 +1132,14 @@ static bool ask(const String& text, String& reply) {
         say_status(said.length() ? said.c_str() : "She couldn't answer.");
         return false;
       }
-      reply = said;
+      // What she SAYS of it, decided on the board by her own rule
+      // (yuzu_face.spoken_for): her chat box shows these words and her
+      // voice says them, so the two never disagree. Ghost, Oct 22: the
+      // box showed **bold** words her voice skipped. An older board
+      // sends no "spoken", and a reply that was all gesture leaves it
+      // empty; either way she shows what she wrote, as her page does.
+      String spoken;
+      reply = json_string(line, "spoken", spoken) && spoken.length() ? spoken : said;
       return reply.length() > 0;
     }
     line = "";

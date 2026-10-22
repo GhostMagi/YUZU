@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 963 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 969 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,52 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HER VOICE SKIPPED THE WORDS SHE BOLDED (Oct 22)
+
+**CONFIRMED ON HIS CUBE, same morning:** *"Cube works again. Game
+works."* -- the restart-notes firmware flashed and runs, and GHOSTRPG
+plays on the cube's page. (Its speed and two-finger touch were not
+reported either way.) Then: *"Saya isnt on there tho .-."* -- she was
+left off the cube on purpose and offered; he took it as missing. That
+build was started and PAUSED for this:
+
+*"i noticed the girls will 'type' important wordage but the voice
+skips some things. Can you fix that? (Maybe sumn to do with old bracket
+rules and such)"*. **His guess was right.** `strip_stage_directions`
+dropped EVERY span in stars as a gesture -- `**bold**` included, which
+is how a model marks the important part (`**don't** unplug it`,
+`**Note:**`). The pages never showed it: they send the voice their own
+cleaned bubble text, which keeps bold words. **The cube did**: its chat
+box keeps every word inside stars and it sent the RAW reply to
+`/voice.wav`, so the box showed exactly the words she skipped. The
+terminal chat had the same gap.
+
+- **Bold keeps its words** unless it opens like a stage direction
+  (`**giggles**`), asked of the SAME list a parenthesis is
+  (`_a_direction`), so the two wrappers can never disagree.
+- **`asterisks: emphasis`** (zero, zero_cube, zero_bot; above the
+  `---`, every composed prompt byte-identical): Zero's single stars are
+  emphasis ("17 is *not* prime"), as her page has shown since Sept 24,
+  so her voice says them too. Everyone else's single stars stay
+  gestures, which is what THEIR pages show -- consistent, and it means
+  a Llama girl's `*not*` is lost on screen and in her voice alike. Not
+  changed: a classifier for single stars is a guess either way.
+- **`spoken_for(text, key)` in yuzu_face is the one copy** of what she
+  says. `/voice.wav` uses it, and `/stream`'s verdict carries it as
+  `spoken`; the cube shows AND sends those words (`said` when an older
+  board sends none, or when the reply was all gesture -- what her page
+  does). The terminal passes her rule as well.
+- **The /wiki NameError trap, caught before it shipped.** yuzu_face
+  has no top-level `yuzu_personas`; written bare inside `spoken_for`'s
+  `try`, the cleanup would have silently not run. Imported locally, and
+  a break-check holds it.
+
+**A property test holds every roster page to her voice**: each page's
+own `spoken()` (under node) against `spoken_for` on raw replies --
+nothing a page shows may be missing from what she says. Ten breaks,
+all red as failures. Compiled for the cube, no warnings. **963 ->
+969.** UNHEARD on the board: Update, then `~/YUZU/cube` for the cube.
 
 ## THE CUBE'S "NOT ENOUGH MEMORY" CAME MID-USE, SO IT SAYS WHY NOW (Oct 21)
 

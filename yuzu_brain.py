@@ -1368,7 +1368,8 @@ def _cli(argv):
                 # them for the SPOKEN copy only. The printed one keeps
                 # everything, which is how you see her doing it.
                 voice.say(yuzu_voice.strip_stage_directions(
-                    "".join(spoken)))
+                    "".join(spoken),
+                    emphasis=yuzu_voice.writes_emphasis(brain.persona)))
         except BrainError as exc:
             print(f"\n{exc}\n")
             return 1

@@ -9498,6 +9498,177 @@ function post(route) { posts.push(route); return Promise.resolve({ ok: true, fac
                          "here is patching the wrong name")
 
 
+class TestSheSaysWhatSheShows(unittest.TestCase):
+    """Ghost, Oct 22: "i noticed the girls will 'type' important wordage
+    but the voice skips some things ... (Maybe sumn to do with old
+    bracket rules and such)". He was right about the rules. The voice
+    dropped every span in stars as a gesture -- **bold** too, which is
+    how a model marks the IMPORTANT part ("**don't** unplug it") -- and
+    the cube's chat box showed those words while she skipped them. So:
+    bold keeps its words; Zero's single stars are emphasis, as her page
+    has always shown them; and the board decides once what she says,
+    which the cube both shows and plays."""
+
+    BOLD = "Make sure you **don't** unplug it while it's on."
+
+    def setUp(self):
+        import json, struct, tempfile, threading
+        from http.server import ThreadingHTTPServer
+        import yuzu_face
+        self.face, self.json, self.rendered = yuzu_face, json, {}
+
+        outer = self
+        class Fake:
+            ready, failures = True, []
+            def __init__(self, key):
+                self.key = key
+            def render(self, text, clean=True):
+                outer.rendered[self.key] = text
+                handle, path = tempfile.mkstemp(suffix=".wav")
+                os.close(handle)
+                data = b"\x00\x00" * 400
+                with open(path, "wb") as fh:
+                    fh.write(b"RIFF" + struct.pack("<I", 36 + len(data)) +
+                             b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1,
+                                                       16000, 32000, 2, 16) +
+                             b"data" + struct.pack("<I", len(data)) + data)
+                return path
+            def why_not(self):
+                return ""
+        self._saved = dict(yuzu_face._VOICES)
+        yuzu_face._VOICES.clear()
+        for key in ("four", "zero", "four_cube", "zero_cube"):
+            yuzu_face._VOICES[key] = Fake(key)
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.face._VOICES.clear()
+        self.face._VOICES.update(self._saved)
+
+    def post(self, path, payload):
+        import urllib.request
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d%s" % (self.port, path),
+            data=self.json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"})
+        return urllib.request.urlopen(req, timeout=20).read()
+
+    def say(self, text, who):
+        self.post("/voice.wav", {"text": text, "who": who})
+        return self.rendered[self.face.persona_for(who)]
+
+    def test_BOLD_is_said_because_bold_is_the_important_part(self):
+        for who in ("four", "four-cube", "zero"):
+            heard = self.say(self.BOLD, who)
+            self.assertIn("don't unplug", heard,
+                          "%s skipped the word she bolded" % who)
+            self.assertNotIn("*", heard)
+        heard = self.say("**Important:** charge me first.", "four-cube")
+        self.assertIn("Important", heard)
+        # A gesture in bold is still a gesture.
+        heard = self.say("**giggles** Okay, okay.", "four")
+        self.assertNotIn("giggles", heard)
+        self.assertIn("Okay", heard)
+
+    def test_ZEROS_stars_are_EMPHASIS_and_everyone_elses_are_gestures(self):
+        """Qwen writes "17 is *not* prime" -- the one sentence where a
+        dropped word is the opposite answer. Her page has kept those
+        words since Sept 24; now her voice does, on the cube too. A
+        gesture in her stars is still silent, and Four's single stars
+        stay gestures, which is also what HER page shows."""
+        for who in ("zero", "zero-cube"):
+            self.assertIn("is not prime", self.say("17 is *not* prime.", who),
+                          "%s's voice flipped her answer" % who)
+            heard = self.say("*leans in* Okay, listen.", who)
+            self.assertNotIn("leans", heard)
+            self.assertIn("listen", heard)
+        self.assertNotIn("winks", self.say("*winks* Sure.", "four"))
+        import yuzu_personas, yuzu_voice
+        for key in ("zero", "zero_cube", "zero_bot"):
+            self.assertTrue(yuzu_voice.writes_emphasis(yuzu_personas.load(key)),
+                            "%s's stars are read as gestures" % key)
+        for key in ("four", "four_cube", "yuzu_avatar", "saya_deck"):
+            self.assertFalse(yuzu_voice.writes_emphasis(yuzu_personas.load(key)))
+
+    def test_the_cube_is_handed_WHAT_SHE_SAYS_with_the_reply(self):
+        """The /stream verdict carries `spoken`, worked out by the same
+        function her voice runs -- so the words the cube shows in her
+        box are the words it sends to be said, by construction."""
+        raw = "I *really* need you to **charge me** soon. [winks] (laughs)"
+        for who, raw_said in (("four-cube", raw),
+                              ("zero-cube", "17 is *not* prime, **really**.")):
+            with mock.patch.object(self.face, "answer",
+                                   return_value=(raw_said, None)):
+                body = self.post("/stream", {"text": "hi", "who": who})
+            done = self.json.loads(body.decode().strip().splitlines()[-1])
+            key = self.face.persona_for(who)
+            self.assertIn("spoken", done, "the cube is not told what she says")
+            self.assertEqual(done["spoken"], self.face.spoken_for(raw_said, key))
+            self.assertEqual(done["said"], raw_said, "what she wrote was changed")
+            self.say(done["spoken"], who)
+            self.assertEqual(self.rendered[key].split(), done["spoken"].split(),
+                             "the cube's words and her voice disagree")
+        self.assertIn("charge me", self.face.spoken_for(raw, "four_cube"))
+        self.assertNotIn("winks", self.face.spoken_for(raw, "four_cube"))
+        self.assertIn("not prime", self.face.spoken_for(
+            "17 is *not* prime.", "zero_cube"))
+
+    def test_the_cube_SHOWS_and_SAYS_the_board_s_words(self):
+        """Read off the cube: the reply it speaks (and shows, a piece at
+        a time) is `spoken` when the board sends it, `said` otherwise --
+        an older board, or a reply that was all gesture."""
+        code = TestTheCubeCode().code()
+        ask = code[code.index("static bool ask("):code.index("static String next_piece")]
+        self.assertIn('json_string(line, "spoken", spoken)', ask,
+                      "the cube never reads what she says")
+        self.assertRegex(ask, r"reply = json_string\(line, \"spoken\", spoken\) "
+                              r"&& spoken\.length\(\) \? spoken : said;")
+        speak = code[code.index("static void speak("):code.index("static void turn_task")]
+        self.assertIn("fetch_voice(piece, len)", speak)
+        self.assertIn("next_text = piece;", speak,
+                      "the box shows a different piece than the voice says")
+
+    def test_the_terminal_chat_says_it_by_HER_rule_too(self):
+        import inspect, yuzu_brain
+        source = inspect.getsource(yuzu_brain._cli)
+        self.assertIn("emphasis=yuzu_voice.writes_emphasis(brain.persona)", source)
+
+    def test_every_word_HER_PAGE_shows_is_a_word_she_SAYS(self):
+        """The property, for every girl on the roster: her page's own
+        cleanup of a raw reply (run under node) against the board's
+        (spoken_for) -- nothing her page shows may be missing from her
+        voice. This is what holds Zero's setting to Zero's page, and
+        bold to every page."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the pages' own function")
+        import subprocess
+        raws = [self.BOLD, "**Important:** charge me first.",
+                "17 is *not* prime.", "[winks] You **really** should.",
+                "Okay. *grins* Fine.", "it's 2 * 3 * 4, babe."]
+        import collections
+        words = lambda s: collections.Counter(re.findall(r"[A-Za-z0-9']+", s))
+        for name, (key, page, _blurb) in self.face.CHARACTERS.items():
+            html = (Path(__file__).parent / "ui" / page).read_text()
+            fn = html[html.index("function spoken(text)"):]
+            fn = fn[:fn.index("\n}\n") + 3]
+            out = subprocess.run(
+                [node, "-e", fn + "\nconsole.log(JSON.stringify(%s.map(spoken)));"
+                 % self.json.dumps(raws)], capture_output=True, text=True,
+                timeout=30)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            for raw, shown in zip(raws, self.json.loads(out.stdout)):
+                said = self.face.spoken_for(raw, key)
+                missing = words(shown) - words(said)
+                if "*grins*" in raw and not missing - words("grins"):
+                    continue    # a gesture her page shows as a word: never said
+                self.assertFalse(missing, "%s's page shows %s of %r and her "
+                                 "voice skips it" % (name, sorted(missing), raw))
+
 class TestSheSpeaksOutOfThePage(unittest.TestCase):
     """AUDIO HAS TO TRAVEL. `yuzu_voice.say()` plays on the machine
     running the module -- the ORIN -- and the Orin has no speaker on it

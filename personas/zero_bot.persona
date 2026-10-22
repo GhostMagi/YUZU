@@ -22,6 +22,11 @@ same_girl_as: zero
 # movement number in this repo is Llama 3B's.
 model: hf.co/mradermacher/Qwen3-4B-Instruct-2507-heretic-GGUF:Q4_K_M
 think: no
+# HER STARS ARE EMPHASIS, not gestures: Qwen writes "17 is *not*
+# prime", and her page has kept those words since Sept 24. Her VOICE
+# keeps them too now (yuzu_voice.writes_emphasis) -- Oct 22, Ghost:
+# "the voice skips some things". Above the ---, so no prompt moved.
+asterisks: emphasis
 maths: exact
 stop: <|im_start|>, <|im_end|>, <|endoftext|>
 temperature: 0.7

@@ -2162,6 +2162,31 @@ def voice_for(key):
     return _VOICES[key]
 
 
+def spoken_for(text, key):
+    """WHAT SHE SAYS OF A REPLY. The one copy: her voice says this, and
+    the cube shows this in her chat box while she says it.
+
+    Ghost, Oct 22: *"the girls will 'type' important wordage but the
+    voice skips some things"*. The cube showed every word inside stars
+    and the voice dropped them -- **bold** most of all, which is how a
+    model marks the important part. So the words on the cube and the
+    words in her voice are decided HERE, once, by her own rule (see
+    yuzu_voice.strip_stage_directions), and the cube asks for both.
+    Never raises; whitespace a dropped direction leaves is tidied."""
+    try:
+        # Imported HERE: this module has no top-level yuzu_personas, and
+        # a NameError swallowed by the except below would hand the voice
+        # raw stars -- the shape that hid /wiki from Four for a week.
+        import yuzu_voice, yuzu_personas
+        persona = yuzu_personas.load(key) if key else None
+        said = yuzu_voice.strip_stage_directions(
+            text or "", emphasis=yuzu_voice.writes_emphasis(persona))
+    except Exception:
+        return (text or "").strip()
+    said = re.sub(r"[^\S\n]+", " ", said)
+    return "\n".join(line.strip() for line in said.split("\n")).strip()
+
+
 def voice_wav(text, who=None):
     """(wav_bytes, error). The caller gets audio or a sentence, never
     an exception -- a speaker that fails must not take the page with
@@ -2179,8 +2204,9 @@ def voice_wav(text, who=None):
         # STAGE DIRECTIONS ARE STRIPPED, the same call the bubble and
         # the terminal both make. `*leans in*` read out loud is the
         # word "leans" in the middle of a sentence -- measured, and the
-        # whole reason strip_stage_directions exists.
-        wav = voice.render(yuzu_voice.strip_stage_directions(text))
+        # whole reason strip_stage_directions exists. By HER rule, the
+        # one copy the cube's chat box is shown too (spoken_for).
+        wav = voice.render(spoken_for(text, key))
         if not wav:
             return None, "She could not say that. (%s)" % (
                 voice.failures[-1][1][0] if voice.failures else "no audio")
@@ -2933,9 +2959,15 @@ class _Handler(SimpleHTTPRequestHandler):
             offered = []
             reply, error = answer(said, who, on_chunk=chunk,
                                   on_suggest=offered.extend)
-            push({"done": True, "ok": error is None,
-                  "said": reply or error, "suggests": offered,
-                  "pose": pose_for(reply) if error is None else "idle"})
+            done = {"done": True, "ok": error is None,
+                    "said": reply or error, "suggests": offered,
+                    "pose": pose_for(reply) if error is None else "idle"}
+            # What she SAYS of it, for the cube: it shows these words in
+            # her chat box and sends them to /voice.wav, so the box and
+            # the voice can never disagree about a word (spoken_for).
+            if error is None and reply:
+                done["spoken"] = spoken_for(reply, persona_for(who))
+            push(done)
             return
         if path == "/voice.wav":
             # AUDIO, not JSON. The page feeds these bytes straight to an

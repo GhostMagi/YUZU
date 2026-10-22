@@ -143,7 +143,7 @@ _FENCED_CODE = re.compile(r"```.*?```", re.S)
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
 
 
-def strip_stage_directions(text):
+def strip_stage_directions(text, emphasis=False):
     """Drop [bracketed], *asterisked* and (parenthesised) stage
     directions -- the last only when it opens with one; see
     _STAGE_WORDS.
@@ -157,13 +157,50 @@ def strip_stage_directions(text):
     [winks] turning up in 3 of 4 replies while named as forbidden.
 
     The prompt REDUCES, code GUARANTEES. This is the guarantee.
+
+    **BOLD KEEPS ITS WORDS.** Ghost, Oct 22: *"the girls will 'type'
+    important wordage but the voice skips some things"*. Bold is how a
+    model marks the IMPORTANT part -- "**don't** unplug it", "**Note:**"
+    -- and every screen she is on shows those words, so dropping the
+    span here made her skip exactly the words she meant most, out loud,
+    while the cube's chat box showed them. A bold span is silent only
+    when it opens like a stage direction (`**giggles**`).
+
+    `emphasis` is for a girl who writes EMPHASIS with single stars
+    (`asterisks: emphasis` in her settings -- Zero, whose Qwen writes
+    "17 is *not* prime"): her *single* spans keep their words too,
+    unless they open like a direction. Everyone else's single stars are
+    gestures and go, which is also what her own page shows.
     """
     text = _FENCED_CODE.sub(" ", text)
-    text = _STAGE_BOLD.sub(" ", text)
-    text = _STAGE_EMPH.sub(" ", text)
+    text = _STAGE_BOLD.sub(_words_unless_a_direction, text)
+    text = _STAGE_EMPH.sub(_words_unless_a_direction if emphasis else " ",
+                           text)
     text = _STAGE_BRACKET.sub(" ", text)
     text = _STAGE_PAREN.sub(" ", text)
     return _INLINE_CODE.sub(r"\1", text)
+
+
+def _a_direction(inner):
+    """Does this starred span open like a stage direction? Asked of the
+    SAME list a parenthesis is, so the two wrappers can never disagree
+    about what a direction is."""
+    return bool(_STAGE_PAREN.fullmatch("(%s)" % inner.strip()))
+
+
+def _words_unless_a_direction(match):
+    inner = match.group(1)
+    return " " if _a_direction(inner) else inner
+
+
+def writes_emphasis(persona):
+    """`asterisks: emphasis` in her settings: her single stars mark a
+    word she means, not a gesture. Never raises."""
+    try:
+        return str(persona.settings.get("asterisks", "")).strip().lower() \
+            == "emphasis"
+    except Exception:
+        return False
 
 
 class VoiceError(RuntimeError):
