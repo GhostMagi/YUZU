@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 969 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 984 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,68 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## SAYA IS ON THE CUBE, A FOURTH GIRL WITH HIS KAOMOJI FOR A FACE (Oct 22)
+
+*"Cube works again. Game works. Saya isnt on there tho .-."* -- Oct 21
+brought her back as a makeover of her PAGE and never put her on the
+cube; he expected her there, which is the answer.
+
+    swipe:  Four -> Yuzu -> Zero -> Saya -> the ghost -> his game
+
+- **`saya_cube`**, `same_girl_as: saya_deck`, every setting equal (a
+  test holds them), on `_hardware_stackchan.txt` with the deck's
+  tsundere rules word for word. `CUBE_SCREEN`: her face is the neon
+  green lines on the little screen, it changes on its own, and **a tap
+  makes her blush, which she hates**. Two examples rewritten: "What do
+  you see?" (the camera is not hooked up, ask him) and her introduction
+  (*"...and don't you dare tap it. ...It makes me blush."*). 4350 chars.
+  **`DEVICES` gained `saya-cube`**, so her cube memory is her own.
+- **The other three name her**: `CUBE_COMPANY` became a semicolon list
+  (*"...and Saya, a sharp-tongued tsundere whose face is neon green
+  lines"*) and each introduction says "Four, Zero or Saya" and so on.
+  Four's cube prompt is 5985 chars, inside the context guard.
+  **None of the four is `LIVE_PERSONA`** (still `four_bot`), so there was
+  nothing to paste for PocketPal.
+- **Her face on the cube is her PAGE's faces, all 22**, baked into
+  `saya_art.h` by `make_art.render_saya()` from `ui/sprites/*.png`: ONE
+  window across every face (`SAYA_CROP`, the union of all 22 plus a
+  margin) so she never changes size, shrunk to 296x154, alpha at 4
+  bits, **run-length coded in flash (~50KB for all 22)**. The face on
+  screen is opened into a 45KB PSRAM buffer when it changes, never every
+  frame, and that buffer is in the boot's "not enough memory" list.
+- **Which face, first match wins**: a tap is `blush` for 1.5s; thinking
+  is `thinking` (and her breath quickens, 4.6s -> 2.6s, her page's); her
+  reply wears the face **her own stage directions** ask for, decided ON
+  THE BOARD by `yuzu_face.face_for()` -- `mood_from` + `roles_for`, the
+  page's rule -- and sent as `"face"` in /stream's verdict, `talking`
+  when she wrote none; a pocket line is `talking`; resting is `idle`
+  with an irregular blink. Only her own turns read `face`, and only the
+  girl on face.html or a body that is the same girl ever gets one.
+- **The page's CRT**: black, her ink `#39ff5e`, every third row at 82%
+  (the page's 18% scanline), and three dim corner brackets (the battery
+  is the fourth corner). **Rendering found one**: the bottom brackets
+  poked two pixels above the status bar as stray dots, so they are 12px
+  now and hide whole under the bar or her box.
+- **30 pocket lines of hers**, tsundere, every one an answer to
+  anything ("F-fine, yes. Don't read anything into it.").
+
+**Driven on this machine through the cube's OWN code**: her face block
+and the colour helpers are cut out of cube_main.cpp and compiled with
+g++ -- every face decodes back to exactly what make_art baked, the face
+she picks in every state, her frame's ink, scanlines and breath.
+Rendered at 320x240 with her chat box and looked at. Compiled for the
+cube: 2.40 MB of 3 MB, no warnings. **The flash's closing words were
+a typed cast too** ("Four, Yuzu and Zero are on the cube", "swipe past
+Zero for the ghost") -- held to GIRLS now. **Twenty-three breaks, all
+red as failures** -- after one came back as an ERROR (an `.index()` on
+a line the break deleted; asserted first now). **969 -> 984.**
+
+**UNSEEN ON HIS CUBE** until he taps Update and runs `~/YUZU/cube`.
+A cube last left on the ghost's page comes back on Saya's (the pages
+moved up one), which is harmless. UNVERIFIED: how fast a face swap
+draws on the real panel, and how her voice (Bella, the default) sounds
+out of it.
 
 ## HER VOICE SKIPPED THE WORDS SHE BOLDED (Oct 22)
 

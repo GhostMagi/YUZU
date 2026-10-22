@@ -33,9 +33,10 @@
 # the deck's JSAUX bank, which is a confident wrong fact anywhere else;
 # yuzu_face gates it on the deck body, and nothing here asks for it.
 #
-# THREE GIRLS SHARE THE CUBE, and a swipe moves between them. Ghost,
+# FOUR GIRLS SHARE THE CUBE, and a swipe moves between them. Ghost,
 # the same day: "Can you squeeze Yuzu on too?", then "Can the qwen
-# variant, Zero, go on there plz? (Kuro and shiro arent needed)". So
+# variant, Zero, go on there plz? (Kuro and shiro arent needed)", and
+# Oct 22, once Saya was back: "Saya isnt on there tho .-.". So
 # what is true of THE CUBE -- the
 # speaker, the mic, the swipe, the mind on the board, the camera -- is
 # [CUBE_FACTS], one copy for both. What is true of ONE GIRL is hers:

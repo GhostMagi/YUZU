@@ -3821,6 +3821,28 @@ class TestZeroCube(TestStackChanCube):
                       "her turn has nothing telling it where to end")
 
 
+class TestSayaCube(TestStackChanCube):
+    """Saya on the same cube. Ghost, Oct 22, the morning the cube came
+    back: "Saya isnt on there tho .-." Every test of the cube's Four,
+    run again for her; only her introduction is rewritten (her deck one
+    said she lives in his pocket)."""
+
+    KEY, NAME, TWIN = "saya_cube", "saya-cube", "saya_deck"
+    REWRITTEN = {"Introduce yourself."}
+
+    def test_her_FACE_is_the_one_he_drew_and_a_tap_makes_her_BLUSH(self):
+        """Her face on the cube is the kaomoji on her page, green lines
+        on black; a tap shows her blush, so her screen line says so, and
+        it gives her away exactly as rule 7 says on the deck."""
+        cube = self.cube()
+        screen = cube.settings["CUBE_SCREEN"]
+        self.assertIn("neon green lines", screen)
+        self.assertIn("tap", screen)
+        self.assertIn("blush", screen)
+        self.assertRegex(cube.prompt, r"\n7\. Your face[^\n]*gives you away")
+        self.assertNotIn("no face", cube.prompt)
+
+
 class TestTheCubeIsSHARED(unittest.TestCase):
     """Two girls, one cube, a swipe between them. What is true of the
     CUBE is one copy in the body file; what is true of ONE GIRL is hers,
@@ -4338,6 +4360,9 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertEqual(make_art.render_zero(),
                          (cube / "zero_art.h").read_text(),
                          "zero_art.h is stale -- run stackchan/make_art.py")
+        self.assertEqual(make_art.render_saya(),
+                         (cube / "saya_art.h").read_text(),
+                         "saya_art.h is stale -- run stackchan/make_art.py")
 
     def test_yuzu_keeps_her_PAGES_fades_on_the_cube(self):
         """Her bust is cropped at the bottom and both sleeves, and her
@@ -9668,6 +9693,301 @@ class TestSheSaysWhatSheShows(unittest.TestCase):
                     continue    # a gesture her page shows as a word: never said
                 self.assertFalse(missing, "%s's page shows %s of %r and her "
                                  "voice skips it" % (name, sorted(missing), raw))
+
+class TestSayaOnTheCube(unittest.TestCase):
+    """Ghost, Oct 22, with the cube working again: "Saya isnt on there
+    tho .-." -- after asking (Oct 21) for his kaomoji as her faces "in
+    neon green with the crt effect like she has". She is the fourth
+    girl: every face of her page baked into saya_art.h, the face her own
+    stage directions ask for (decided on the board, the way her page
+    decides it), her thinking face, a blush when he taps her, a blink
+    while she rests, and the page's scanlines.
+
+    Her face code is cut out of the cube's REAL cube_main.cpp and run on
+    this machine. Skipped where there is no g++."""
+
+    ROOT = Path(__file__).parent
+    MAIN = ROOT / "stackchan" / "cube" / "cube_main.cpp"
+    W, H = 320, 240
+    HARNESS = r'''
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+using std::min; using std::max;
+#define PI 3.14159265358979f
+static const int W = 320, H = 240;
+typedef int portMUX_TYPE;
+#define portENTER_CRITICAL(m) (void)(m)
+#define portEXIT_CRITICAL(m) (void)(m)
+static portMUX_TYPE said_mux;
+static char said_text[240] = "";
+static uint32_t flash_until = 0;
+static volatile bool thinking = false, busy = false;
+static uint32_t rnd = 0, fake_now = 0;
+static uint32_t esp_random() { return rnd; }
+static uint32_t millis() { return fake_now; }
+#include "colours.inc"
+struct Canvas {
+  uint16_t buf[W * H];
+  void* getBuffer() { return buf; }
+  void put(int x, int y, uint16_t c) { if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = swap16(c); }
+  void drawFastHLine(int x, int y, int w, uint16_t c) { for (int i = 0; i < w; i++) put(x + i, y, c); }
+  void drawFastVLine(int x, int y, int h, uint16_t c) { for (int i = 0; i < h; i++) put(x, y + i, c); }
+} frame;
+#include "saya_art.h"
+#include "saya.inc"
+int main(int argc, char** argv) {
+  saya_ink = (uint8_t*)malloc(SAYA_FACE_W * SAYA_FACE_H);
+  saya_idle = max(0, saya_face("idle"));
+  saya_blink = max(0, saya_face("blink"));
+  saya_thinking = max(0, saya_face("thinking"));
+  saya_talking = max(0, saya_face("talking"));
+  saya_blush = max(0, saya_face("blush"));
+  const char* mode = argv[1];
+  if (!strcmp(mode, "decode")) {
+    for (int k = 0; k < SAYA_FACES; k++) {
+      memset(saya_ink, 0x55, SAYA_FACE_W * SAYA_FACE_H);   // not a face
+      decode_face(k, saya_ink);
+      printf("%s ", SAYA_FACE_NAMES[k]);
+      for (int i = 0; i < SAYA_FACE_W * SAYA_FACE_H; i++)
+        putchar(saya_ink[i] < 16 ? "0123456789abcdef"[saya_ink[i]] : '?');
+      putchar('\n');
+    }
+    return 0;
+  }
+  if (!strcmp(mode, "pick")) {
+    auto show = [](const char* label, uint32_t now) {
+      printf("%s %s\n", label, SAYA_FACE_NAMES[saya_pick(now)]); };
+    rnd = 1000;
+    saya_blink_at = 50000;
+    show("resting", 10000);
+    show("blinking", 50050);
+    show("after", 50200);
+    show("before-next", 53700);
+    show("next-blink", 53850);
+    said_text[0] = 'x'; show("pocket", 60000); said_text[0] = 0;
+    thinking = busy = true; show("thinking", 60000);
+    thinking = false; show("talking", 60000);
+    saya_mood = saya_face("pout"); show("pouting", 60000);
+    flash_until = 61000; show("tapped", 60500);
+    show("tap-over", 61000);
+    saya_mood = -1; busy = false; flash_until = 0;
+    show("done", 62000);
+    return 0;
+  }
+  // frame <state> <now>: one whole frame of hers, as the canvas holds it
+  const uint32_t now = atoi(argv[3]);
+  saya_blink_at = now + 100000;
+  if (!strcmp(argv[2], "thinking")) thinking = busy = true;
+  else if (!strcmp(argv[2], "tap")) flash_until = now + 1000;
+  else if (strcmp(argv[2], "idle")) { busy = true; saya_mood = saya_face(argv[2]); }
+  fake_now = now;
+  compose_saya();
+  fwrite(frame.buf, 2, W * H, stdout);
+  return 0;
+}
+'''
+
+    @classmethod
+    def setUpClass(cls):
+        cls.built = None
+        if not shutil.which("g++"):
+            return
+        import tempfile
+        text = cls.MAIN.read_text()
+        tmp = Path(tempfile.mkdtemp())
+        cls.tmp = tmp
+        a, b = text.index("static inline uint16_t pack565"), \
+            text.index("// Her picture in the current colour")
+        (tmp / "colours.inc").write_text(text[a:b])
+        a, b = text.index("// ---- Saya: his kaomoji"), \
+            text.index("// Whoever is on screen's colour for words")
+        (tmp / "saya.inc").write_text(text[a:b])
+        shutil.copy(cls.ROOT / "stackchan" / "cube" / "saya_art.h", tmp)
+        (tmp / "h.cpp").write_text(cls.HARNESS)
+        cls.built = subprocess.run(
+            ["g++", "-std=gnu++17", "-w", "-o", str(tmp / "h"), str(tmp / "h.cpp")],
+            capture_output=True, text=True, timeout=180)
+
+    @classmethod
+    def tearDownClass(cls):
+        if getattr(cls, "tmp", None):
+            shutil.rmtree(cls.tmp, True)
+
+    def run_h(self, *args):
+        if self.built is None:
+            self.skipTest("needs g++")
+        self.assertEqual(self.built.returncode, 0,
+                         "her face code does not compile:\n" + self.built.stderr[-1500:])
+        got = subprocess.run([str(self.tmp / "h")] + list(args),
+                             capture_output=True, timeout=60)
+        self.assertEqual(got.returncode, 0, got.stderr)
+        return got.stdout
+
+    def frame(self, state, now=0):
+        """(r, g, b) rows of one frame, unswapped and widened from 565."""
+        import struct
+        raw = self.run_h("frame", state, str(now))
+        self.assertEqual(len(raw), self.W * self.H * 2)
+        px = struct.unpack("<%dH" % (self.W * self.H), raw)
+        out = []
+        for v in px:
+            v = ((v >> 8) | (v << 8)) & 0xFFFF
+            out.append(((v >> 8) & 0xF8, (v >> 3) & 0xFC, (v << 3) & 0xF8))
+        return [out[y * self.W:(y + 1) * self.W] for y in range(self.H)]
+
+    def code(self):
+        text = self.MAIN.read_text()
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return re.sub(r"//[^\n]*", "", text)
+
+    def test_every_face_on_her_PAGE_is_a_face_on_her_CUBE(self):
+        """One name for one face on both: the cube resolves faces by the
+        sprite's own name, and the board sends the name. A face the page
+        has and the cube lacks would be her talking face instead."""
+        decoded = self.run_h("decode").decode().split("\n")
+        names = [line.split(" ", 1)[0] for line in decoded if line]
+        sprites = sorted(p.stem for p in (self.ROOT / "ui" / "sprites").glob("*.png"))
+        self.assertEqual(names, sprites, "her cube's faces are not her page's")
+        import yuzu_face
+        for role, face in yuzu_face.roles_for(yuzu_face.sprites()).items():
+            self.assertIn(face, names, "the board can ask for %r, which the "
+                                       "cube does not have" % face)
+        for need in ("idle", "blink", "thinking", "talking", "blush"):
+            self.assertIn(need, names, "the cube has no %s face" % need)
+
+    @unittest.skipUnless(importlib.util.find_spec("PIL"), "needs PIL")
+    def test_every_face_comes_back_EXACTLY_as_baked(self):
+        """The cube's own decoder, run over the committed header, gives
+        back every pixel make_art.py put in -- so a slip in either the
+        coder or the decoder is a face with holes, caught here."""
+        import importlib.util as iu
+        spec = iu.spec_from_file_location("make_art", self.ROOT / "stackchan" / "make_art.py")
+        make_art = iu.module_from_spec(spec)
+        spec.loader.exec_module(make_art)
+        want = {name: "".join("0123456789abcdef"[v] for v in ink)
+                for name, ink in make_art.saya_faces()}
+        got = dict(line.split(" ", 1) for line in
+                   self.run_h("decode").decode().split("\n") if line)
+        self.assertEqual(sorted(got), sorted(want))
+        for name in want:
+            self.assertEqual(got[name], want[name],
+                             "her %s face comes back wrong on the cube" % name)
+            self.assertGreater(len(got[name].strip("0")), 0, name)
+
+    def test_she_wears_the_face_the_moment_ASKS_for(self):
+        """A tap makes her blush (her introduction tells him not to);
+        thinking is her thinking face; while she talks, the face her
+        reply asked for, or her talking one; a pocket line is talking;
+        resting, she blinks -- 120ms, then not again for 2.6-6.4s."""
+        got = dict(line.split() for line in self.run_h("pick").decode().splitlines())
+        self.assertEqual(got, {
+            "resting": "idle", "blinking": "blink", "after": "idle",
+            "before-next": "idle", "next-blink": "blink",
+            "pocket": "talking", "thinking": "thinking", "talking": "talking",
+            "pouting": "pout", "tapped": "blush", "tap-over": "pout",
+            "done": "idle"})
+
+    def test_her_frame_is_GREEN_on_black_with_her_page_s_scanlines(self):
+        """Every lit pixel is her green; across her face, every third row
+        is dimmer (her page's 18% scanline); nothing is lit outside her
+        face but the three corner brackets; and her faces really differ
+        -- a tap shows exactly the blush the board can ask for."""
+        rows = self.frame("idle")
+        lit = [(x, y, p) for y, row in enumerate(rows) for x, p in enumerate(row) if any(p)]
+        self.assertGreater(len(lit), 2000, "her face is not drawn")
+        for x, y, (r, g, b) in lit:
+            self.assertTrue(g > r and g > b, "a pixel at %d,%d is not her green" % (x, y))
+        top, bottom = min(y for x, y, p in lit if 20 < x < 300), \
+            max(y for x, y, p in lit if 20 < x < 300)
+        brightest = {y: max(p[1] for p in rows[y]) for y in range(top, bottom + 1)}
+        scan = [v for y, v in brightest.items() if y % 3 == 2 and v]
+        clear = [v for y, v in brightest.items() if y % 3 != 2 and v]
+        self.assertTrue(scan and clear)
+        self.assertLess(max(scan), max(clear) * 0.9, "her face has no scanlines")
+        stray = [(x, y) for x, y, p in lit
+                 if not (12 <= x < 308 and 24 <= y < 190)
+                 and not ((x >= 300 or x < 20) and (y < 20 or y >= 220))]
+        self.assertFalse(stray, "something is lit outside her face: %s" % stray[:5])
+        self.assertNotEqual(self.frame("pout"), rows, "a pout is her resting face")
+        self.assertEqual(self.frame("tap"), self.frame("blush"),
+                         "a tap is not her blush")
+        self.assertNotEqual(self.frame("thinking", 1300), self.frame("thinking", 0),
+                            "she does not breathe")
+
+    def test_the_cube_ASKS_for_her_face_and_has_ROOM_for_it(self):
+        code = self.code()
+        self.assertIn('#include "saya_art.h"', self.MAIN.read_text())
+        ask = code[code.index("static bool ask("):code.index("static String next_piece")]
+        self.assertRegex(ask, r'if \(asking == SAYA && json_string\(line, "face", face\)\)\s*'
+                              r'saya_mood = saya_face\(face\.c_str\(\)\);',
+                         "the cube never wears the face her reply asked for, "
+                         "or wears it on another girl")
+        turn = code[code.index("static void turn_task"):]
+        self.assertIn("saya_mood = -1;", turn[:turn.index("\n}")],
+                      "her last reply's face carries into the next")
+        self.assertLess(turn.index("saya_mood = -1;"), turn.index("ask(heard"),
+                        "her last reply's face carries into the next")
+        setup = code[code.index("void setup()"):]
+        self.assertIn("saya_ink = (uint8_t*)ps_malloc(SAYA_FACE_W * SAYA_FACE_H);", setup)
+        self.assertRegex(setup, r'!saya_ink \? "Saya\'s face"',
+                         "no room for her face is never said")
+        self.assertIn("girl == SAYA) compose_saya();",
+                      code[code.index("static void draw_frame"):])
+        tapped = code[code.index("static void tapped"):]
+        self.assertIn("else if (girl == SAYA) flash_until = millis() + SAYA_BLUSH_MS;",
+                      tapped[:tapped.index("\n}")])
+        ink = code[code.index("static uint32_t ink_now"):]
+        self.assertIn("girl == GHOST || girl == SAYA ? CRT_GREEN", ink[:ink.index("\n}")],
+                      "her words are not her green")
+
+    def test_the_flash_names_EVERY_girl_it_puts_on_the_cube(self):
+        """`~/YUZU/cube`'s last words are what he reads after a flash. A
+        cast typed there goes stale the day a girl joins (it said "Four,
+        Yuzu and Zero" when Saya landed), so it is held to GIRLS: every
+        girl named, and the ghost one swipe past the LAST of them."""
+        names = [n for _w, n, _h in TestTheCubeCode().girls()]
+        script = (self.ROOT / "cube").read_text()
+        done = re.search(r'echo "DONE\. (.*?) are on the cube\."', script)
+        self.assertTrue(done, "the flash no longer says who it put on")
+        for name in names:
+            self.assertIn(name, done.group(1), "the flash forgets %s" % name)
+        self.assertIn('echo "Swipe past %s for the ghost' % names[-1], script,
+                      "the flash sends him past the wrong girl for the ghost")
+
+    def test_the_board_names_HER_face_and_nobody_else_s(self):
+        """face_for reads her own stage directions, the page's rule, and
+        only for her: on her page, and on any body that is the same girl.
+        The verdict line carries it; Four's carries none."""
+        import json, threading
+        from http.server import ThreadingHTTPServer
+        import yuzu_face
+        blushing = "[blushes] I-it's not like I missed you or anything."
+        for key in ("saya_cube", "saya_deck"):
+            self.assertEqual(yuzu_face.face_for(blushing, key), "blush", key)
+            self.assertEqual(yuzu_face.face_for("Fine. Hi.", key), "talking", key)
+            self.assertEqual(yuzu_face.face_for("*pouts* Whatever.", key), "pout", key)
+        for key in ("four_cube", "yuzu_cube", "zero_cube", "four", "nobody"):
+            self.assertEqual(yuzu_face.face_for(blushing, key), "", key)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        import urllib.request
+        def verdict(who):
+            req = urllib.request.Request(
+                "http://127.0.0.1:%d/stream" % server.server_address[1],
+                data=json.dumps({"text": "hi", "who": who}).encode(),
+                headers={"Content-Type": "application/json"})
+            with mock.patch.object(yuzu_face, "answer", return_value=(blushing, None)):
+                body = urllib.request.urlopen(req, timeout=20).read()
+            return json.loads(body.decode().strip().splitlines()[-1])
+        self.assertEqual(verdict("saya-cube").get("face"), "blush",
+                         "the cube is never told which face she wears")
+        self.assertNotIn("face", verdict("four-cube"), "Four was handed Saya's face")
 
 class TestSheSpeaksOutOfThePage(unittest.TestCase):
     """AUDIO HAS TO TRAVEL. `yuzu_voice.say()` plays on the machine

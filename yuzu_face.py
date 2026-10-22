@@ -627,6 +627,7 @@ DEVICES = {
     "four-cube":     "four_cube",
     "yuzu-cube":     "yuzu_cube",
     "zero-cube":     "zero_cube",
+    "saya-cube":     "saya_cube",
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A
@@ -2162,6 +2163,27 @@ def voice_for(key):
     return _VOICES[key]
 
 
+def face_for(text, key):
+    """WHICH OF SAYA'S FACES a reply of hers asks for, by sprite name --
+    the cube draws it while she says the reply (Oct 22). "" for a girl
+    those faces are not, and never raises.
+
+    Hers is decided the way face.html decides it: her own stage
+    directions (mood_from), resolved to art that exists (roles_for),
+    and `talking` when she wrote none. Whose faces they are is read
+    off the ROSTER -- the girl on face.html, or a body that names her
+    as `same_girl_as` -- never a name typed here."""
+    try:
+        import yuzu_personas
+        twin = yuzu_personas.load(key).settings.get("same_girl_as")
+        if not (owns_face(key) or owns_face(twin)):
+            return ""
+        roles = roles_for(sprites())
+        return roles.get(mood_from(text)) or roles.get("talking", "")
+    except Exception:
+        return ""
+
+
 def spoken_for(text, key):
     """WHAT SHE SAYS OF A REPLY. The one copy: her voice says this, and
     the cube shows this in her chat box while she says it.
@@ -2967,6 +2989,11 @@ class _Handler(SimpleHTTPRequestHandler):
             # the voice can never disagree about a word (spoken_for).
             if error is None and reply:
                 done["spoken"] = spoken_for(reply, persona_for(who))
+                # And which of Saya's faces she wears saying it. Only
+                # ever hers: nobody else's reply names a face.
+                face = face_for(reply, persona_for(who))
+                if face:
+                    done["face"] = face
             push(done)
             return
         if path == "/voice.wav":

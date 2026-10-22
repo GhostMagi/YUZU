@@ -100,6 +100,7 @@
 #include "yuzu_art.h"
 #include "zero_art.h"
 #include "ghost_art.h"
+#include "saya_art.h"
 #include "cube_game.h"
 // Written by `~/YUZU/cube` at flash time from EVERY WiFi the board has
 // saved (its own first) and its name, and never committed: his WiFi
@@ -112,12 +113,13 @@
 // says when she comes on.
 struct Girl { const char* who; const char* name; const char* hint; };
 static const Girl GIRLS[] = {
-  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu or Zero."},
-  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four or Zero."},
-  {"zero-cube", "Zero", "Hold the screen to talk. Swipe for Four or Yuzu."},
+  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu, Zero or Saya."},
+  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four, Zero or Saya."},
+  {"zero-cube", "Zero", "Hold the screen to talk. Swipe for Four, Yuzu or Saya."},
+  {"saya-cube", "Saya", "Hold to talk. Don't tap. Swipe for Four, Yuzu or Zero."},
 };
 static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
-static const int FOUR = 0, YUZU = 1, ZERO = 2;
+static const int FOUR = 0, YUZU = 1, ZERO = 2, SAYA = 3;
 // The ghost's screen comes after the girls; a swipe walks all of them.
 static const int GHOST = GIRL_COUNT, GAME = GIRL_COUNT + 1, SCREENS = GIRL_COUNT + 2;
 static const uint32_t CRT_GREEN = 0x39ff5e;
@@ -227,10 +229,43 @@ static const char* const POCKET_ZERO[] = {
   "Fun fact: a group of flamingos is called a flamboyance.",
   "Aha. Yes. Don't overthink it, I already did.",
 };
+static const char* const POCKET_SAYA[] = {
+  "Hmph. My brain's back on the board, so you get pocket me. Lucky you.",
+  "Yes. Not because you asked. I just felt like it.",
+  "No. Don't make that face at me.",
+  "I can't hear you out here, baka. Ask me when we're home.",
+  "F-fine, yes. Don't read anything into it.",
+  "Absolutely not. ...Okay, maybe. Shut up.",
+  "It's not like I wanted to be in your pocket or anything.",
+  "Swipe for Four if you want somebody nice about it.",
+  "Yes, obviously. Did you even need to ask?",
+  "No way. Not a chance. ...Probably.",
+  "Don't tap me. I'm warning you.",
+  "Hmph. Whatever it is, you'd better not mess it up.",
+  "Sure. But only because I'm bored in here.",
+  "No. And stop looking at me like that, Ghost.",
+  "Out of WiFi, not out of opinions.",
+  "I-it's a yes! Don't make it weird.",
+  "Ehh. Fifty-fifty. Don't blame me if it goes wrong.",
+  "You'll be fine. Not that I was worried.",
+  "Go for it. If it fails, I'm telling everyone I said no.",
+  "Hah! As if. ...Wait, what were we talking about?",
+  "Yes, idiot. Go do it before I change my mind.",
+  "No. Ask Yuzu, she says yes to everything.",
+  "Maybe. I'm not giving you a straight answer out here.",
+  "Take me home and I'll answer properly. Not that I want to.",
+  "Eek, don't shake the cube! The answer is yes, okay?",
+  "Hmph. Fine. You win this one.",
+  "That's a no. A big, proud no.",
+  "Yes. And you owe me one for that.",
+  "Ugh. Do whatever you want. You always do anyway.",
+  "...Yes. That's all you're getting. Don't push it.",
+};
 struct Pocket { const char* const* lines; int count; };
 #define POCKET_OF(a) {a, (int)(sizeof(a) / sizeof(a[0]))}
 static const Pocket POCKET[] = {
   POCKET_OF(POCKET_FOUR), POCKET_OF(POCKET_YUZU), POCKET_OF(POCKET_ZERO),
+  POCKET_OF(POCKET_SAYA),
 };
 // Looking for a WiFi that wasn't there a moment ago costs up to twenty
 // seconds, so for two minutes after a look finds nothing a hold goes
@@ -338,7 +373,7 @@ static int asking = FOUR;                // who the running turn is for
 static Preferences prefs;
 static uint8_t* room_rgb = nullptr;      // Yuzu's room, 8 bits a channel
 static uint8_t* glow_a = nullptr;        // her glow at full strength, 0..255
-static uint32_t flash_until = 0;         // a tap on Yuzu, Zero or the ghost
+static uint32_t flash_until = 0;         // a tap on Yuzu, Zero, Saya or the ghost
 static uint16_t* crt = nullptr;          // the ghost's screen, byte-swapped 565
 struct Sparkle { int16_t x, y; uint32_t born; };
 static const int SPARKS = 10;
@@ -805,12 +840,136 @@ static void compose_ghost() {
   frame.drawString((now / 530) % 2 ? "> _" : ">", 10, H - 22);
 }
 
+// ---- Saya: his kaomoji, neon green on a black CRT -------------------------------
+// Ghost, Oct 21: "bringing Saya the tsundere back but with these as her
+// faces in neon green with the crt effect like she has" -- and Oct 22,
+// with the cube working again: "Saya isnt on there tho .-.". So she is
+// the fourth girl, with her PAGE's faces: all 22 of his kaomoji, baked
+// into saya_art.h by make_art.py at 296x154 out of ONE window (she never
+// changes size between faces), run-length coded in flash (~50KB). The
+// face on screen is opened into PSRAM when it changes, not every frame.
+//
+// Which face, first match wins:
+//   a tap          she blushes (her intro asks him not to, which is why)
+//   thinking       her thinking face, and her breath quickens
+//   her reply      the face HER OWN stage directions ask for, decided on
+//                  the board (yuzu_face.face_for, the page's rule) and
+//                  sent with it; `talking` when she wrote none
+//   a pocket line  talking
+//   otherwise      resting, with a blink at irregular times, like her page
+static uint8_t* saya_ink = nullptr;      // the face on screen, ink 0..15 a pixel
+static int saya_shown = -1;              // which face saya_ink holds
+static volatile int saya_mood = -1;      // the face her reply asked for, or -1
+static uint32_t saya_blink_at = 0;       // when her next blink starts
+static const int SAYA_TOP = 30;          // her window's top; she sits above her box
+static const uint32_t SAYA_BLUSH_MS = 1500;
+
+// A face by its sprite name, or -1. The names are the files in
+// ui/sprites, so her page and her cube can never call one face two names.
+static int saya_face(const char* name) {
+  for (int k = 0; k < SAYA_FACES; k++)
+    if (!strcmp(SAYA_FACE_NAMES[k], name)) return k;
+  return -1;
+}
+static int saya_idle, saya_blink, saya_thinking, saya_talking, saya_blush;
+
+// Opens face k into `out` (SAYA_FACE_W x SAYA_FACE_H, ink 0..15). The
+// coding is make_art._rle: 0x00-0x7F is a run of b+1 clear pixels,
+// 0x80-0xFF is b-0x7F inked ones, two to a byte, high nibble first.
+// A face that comes up short is finished clear, never left half old.
+static void decode_face(int k, uint8_t* out) {
+  const int total = SAYA_FACE_W * SAYA_FACE_H;
+  const uint8_t* p = SAYA_FACE_RLE + SAYA_FACE_AT[k];
+  const uint8_t* end = SAYA_FACE_RLE + SAYA_FACE_AT[k + 1];
+  int n = 0;
+  while (p < end && n < total) {
+    const uint8_t b = *p++;
+    if (b < 0x80) {
+      const int run = min((int)b + 1, total - n);
+      memset(out + n, 0, run);
+      n += run;
+    } else {
+      const int run = b - 0x7F;
+      for (int i = 0; i < run && n < total; i++)
+        out[n++] = (i & 1) ? (p[i >> 1] & 15) : (p[i >> 1] >> 4);
+      p += (run + 1) / 2;
+    }
+  }
+  if (n < total) memset(out + n, 0, total - n);
+}
+
+static bool said_showing() {
+  portENTER_CRITICAL(&said_mux);
+  const bool on = said_text[0] != 0;
+  portEXIT_CRITICAL(&said_mux);
+  return on;
+}
+
+static int saya_pick(uint32_t now) {
+  if (flash_until > now) return saya_blush;
+  if (thinking) return saya_thinking;
+  if (busy) return saya_mood >= 0 ? saya_mood : saya_talking;
+  if (said_showing()) return saya_talking;
+  if ((int32_t)(now - saya_blink_at) >= 0) {
+    if (now - saya_blink_at < 120) return saya_blink;
+    saya_blink_at = now + 2600 + esp_random() % 3800;
+  }
+  return saya_idle;
+}
+
+// Black, her face in neon green, the page's scanlines over her (every
+// third row at 82%) and its four dim corner brackets. She breathes 4px,
+// quicker while she thinks -- her page's 4.6s and 2.6s.
+static void compose_saya() {
+  const uint32_t now = millis();
+  const int face = saya_pick(now);
+  if (face != saya_shown) { decode_face(face, saya_ink); saya_shown = face; }
+  static uint16_t shade[2][16];
+  static bool made = false;
+  if (!made) {
+    for (int v = 0; v < 16; v++)
+      for (int scan = 0; scan < 2; scan++) {
+        const int k = v * (scan ? 82 : 100);
+        shade[scan][v] = swap16(pack565(0x39 * k / 1500, 0xff * k / 1500,
+                                        0x5e * k / 1500));
+      }
+    made = true;
+  }
+  uint16_t* dst = (uint16_t*)frame.getBuffer();
+  memset(dst, 0, W * H * 2);
+  const float period = thinking ? 2600.0f : 4600.0f;
+  const int bob = (int)lroundf(2.0f - 2.0f * cosf(now * (2 * PI / period)));
+  const int ox = (W - SAYA_FACE_W) / 2, oy = SAYA_TOP - bob;
+  for (int y = 0; y < SAYA_FACE_H; y++) {
+    const int sy = oy + y;
+    if (sy < 0 || sy >= H) continue;
+    const uint16_t* lut = shade[sy % 3 == 2];
+    const uint8_t* src = saya_ink + y * SAYA_FACE_W;
+    uint16_t* row = dst + sy * W + ox;
+    for (int x = 0; x < SAYA_FACE_W; x++)
+      if (src[x]) row[x] = lut[src[x]];
+  }
+  // Short enough that the status bar or her box hides a bottom one
+  // whole, never leaving two dots of it poking out above them. The top
+  // left one is the battery's corner.
+  const uint16_t dim = hex565(0x1f8c34);           // her ink at 55%
+  const int in = 8, arm = 12;
+  for (int t = 0; t < 2; t++) {
+    frame.drawFastHLine(W - in - arm, in + t, arm, dim);
+    frame.drawFastVLine(W - in - 1 - t, in, arm, dim);
+    frame.drawFastHLine(in, H - in - 1 - t, arm, dim);
+    frame.drawFastVLine(in + t, H - in - arm, arm, dim);
+    frame.drawFastHLine(W - in - arm, H - in - 1 - t, arm, dim);
+    frame.drawFastVLine(W - in - 1 - t, H - in - arm, arm, dim);
+  }
+}
+
 // Whoever is on screen's colour for words: her pink, Four's ink, or
-// the ghost's phosphor green.
+// the ghost's (and Saya's) phosphor green.
 static uint32_t ink_now() {
   return girl == YUZU ? YUZU_PINK
        : girl == ZERO ? ZERO_PINK
-       : girl == GHOST ? CRT_GREEN
+       : girl == GHOST || girl == SAYA ? CRT_GREEN
        : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
 }
 
@@ -957,6 +1116,7 @@ static void draw_frame() {
   if (girl == FOUR) { rain_step(); compose_four(); }
   else if (girl == YUZU) compose_yuzu();
   else if (girl == ZERO) compose_zero();
+  else if (girl == SAYA) compose_saya();
   else if (girl == GHOST) compose_ghost();
   else {
     // The game page draws itself; this is only ever seen while the
@@ -1140,6 +1300,12 @@ static bool ask(const String& text, String& reply) {
       // empty; either way she shows what she wrote, as her page does.
       String spoken;
       reply = json_string(line, "spoken", spoken) && spoken.length() ? spoken : said;
+      // Which of Saya's faces she wears saying it (yuzu_face.face_for).
+      // Only ever read for her; a face the cube has no art for is no
+      // face, and she talks with her talking one.
+      String face;
+      if (asking == SAYA && json_string(line, "face", face))
+        saya_mood = saya_face(face.c_str());
       return reply.length() > 0;
     }
     line = "";
@@ -1248,6 +1414,7 @@ static void speak(const String& reply) {
 
 static void turn_task(void*) {
   thinking = true;
+  saya_mood = -1;                         // a new reply, a new face
   doing(NOW_SENDING);
   String heard, reply;
   const bool heard_him = listen(rec_buf, rec_len, heard);
@@ -1510,6 +1677,7 @@ void setup() {
   glow_a = (uint8_t*)ps_malloc(W * H);
   crt = (uint16_t*)ps_malloc(W * H * 2);
   rec_buf = (int16_t*)ps_malloc(REC_MAX * sizeof(int16_t));
+  saya_ink = (uint8_t*)ps_malloc(SAYA_FACE_W * SAYA_FACE_H);
   for (auto* c : {&rain, &frame}) {
     c->setColorDepth(16);
     c->setPsram(true);
@@ -1522,12 +1690,18 @@ void setup() {
   const char* missing = !rain.getBuffer() ? "rain" : !frame.getBuffer() ? "frame"
                       : !art_rgb ? "Four's picture" : !room_rgb ? "Yuzu's room"
                       : !glow_a ? "Yuzu's glow" : !crt ? "the ghost's screen"
-                      : !rec_buf ? "the microphone" : nullptr;
+                      : !rec_buf ? "the microphone"
+                      : !saya_ink ? "Saya's face" : nullptr;
   if (missing) out_of_memory(missing);
   notes.tries = 0;
   tint_art();
   make_room();
   make_crt();
+  saya_idle = max(0, saya_face("idle"));
+  saya_blink = max(0, saya_face("blink"));
+  saya_thinking = max(0, saya_face("thinking"));
+  saya_talking = max(0, saya_face("talking"));
+  saya_blush = max(0, saya_face("blush"));
   for (auto& s : sparks) s.born = millis() - SPARK_LIFE - 1;   // all spent
   // Whoever was on the cube when it was last unplugged.
   read_battery();
@@ -1691,6 +1865,7 @@ static void swap_girl(int dx) {
 
 static void tapped() {
   if (girl == FOUR) { skin = (skin + 1) % SKIN_COUNT; tint_art(); }
+  else if (girl == SAYA) flash_until = millis() + SAYA_BLUSH_MS;
   else flash_until = millis() + 500;
 }
 
