@@ -49,6 +49,26 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## "CAN I TALK TO THE GIRLS WITH THE WIFI DOWN?" (Oct 22)
+
+*"is there ways to make it so even if wifis down in general like
+internet or sumn in general is down that i can interact with 'the
+girls' lol? ... i wama be able to plug power in, and interact on
+something."* **Answer given: they never use the internet**; what his
+phone (or the cube) needs is a shared NETWORK to reach the board.
+Internet down with the router on: everything works except Update. Away
+or router off: his phone's hotspot, which the board already knows
+(set to 2.4 GHz for the cube). Nothing at all: the USB serial cable
+and his terminal app, text only. **Offered, NOT built, waiting on his
+yes: the board makes its OWN WiFi when it finds none it knows** (an
+NM hotspot fallback), so power in and the phone joins it. UNVERIFIED:
+that his Orin's WiFi card does AP mode; the cube would need a reflash
+to know that network.
+
+Same message: *"Cyberdecks still on the table btw due to robot dog for
+like 4k catching my eye"*. Recorded verbatim; what it changes is
+UNCLEAR and was not asked. The deck-era code is dormant, not deleted.
+
 ## "SAYA STILL NOT ON IT???" -- THE FLASH BUILT THE OLD CODE (Oct 22)
 
 The morning after Saya went on the cube: *"I updated it. Saya still
