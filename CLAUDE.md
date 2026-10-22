@@ -89,6 +89,11 @@ correctly) and the loop break came back as an ERROR (a timeout); both
 fixed. **984 -> 990.** **His board still has the old `cube`, so this
 one time he pulls first by hand (the Pull button in his terminal).**
 
+**CONFIRMED ON HIS CUBE, same afternoon: *"Okay hey shes on working
+order."*** He pulled by hand and flashed, and Saya is on the cube.
+Still UNREPORTED either way: how fast her faces swap on the real
+panel, and how her voice (Bella) sounds out of it.
+
 ## SAYA IS ON THE CUBE, A FOURTH GIRL WITH HIS KAOMOJI FOR A FACE (Oct 22)
 
 *"Cube works again. Game works. Saya isnt on there tho .-."* -- Oct 21
@@ -145,8 +150,8 @@ Zero for the ghost") -- held to GIRLS now. **Twenty-three breaks, all
 red as failures** -- after one came back as an ERROR (an `.index()` on
 a line the break deleted; asserted first now). **969 -> 984.**
 
-**UNSEEN ON HIS CUBE** until he taps Update and runs `~/YUZU/cube`.
-A cube last left on the ghost's page comes back on Saya's (the pages
+**ON HIS CUBE since Oct 22** (see the entry above: the first flash
+built the old code). A cube last left on the ghost's page comes back on Saya's (the pages
 moved up one), which is harmless. UNVERIFIED: how fast a face swap
 draws on the real panel, and how her voice (Bella, the default) sounds
 out of it.
