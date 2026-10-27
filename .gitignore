@@ -22,4 +22,3 @@ ui/art_out/
 # temporary folder and never writes this here -- this line is the belt
 # to that braces, in case anyone builds the sketch in place by hand.
 stackchan/cube/cube_secrets.h
-stackchan/cube/game_rom.h

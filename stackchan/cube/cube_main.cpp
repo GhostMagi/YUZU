@@ -101,7 +101,6 @@
 #include "zero_art.h"
 #include "ghost_art.h"
 #include "saya_art.h"
-#include "cube_game.h"
 // Written by `~/YUZU/cube` at flash time from EVERY WiFi the board has
 // saved (its own first) and its name, and never committed: his WiFi
 // passwords do not belong in a repository.
@@ -121,7 +120,10 @@ static const Girl GIRLS[] = {
 static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
 static const int FOUR = 0, YUZU = 1, ZERO = 2, SAYA = 3;
 // The ghost's screen comes after the girls; a swipe walks all of them.
-static const int GHOST = GIRL_COUNT, GAME = GIRL_COUNT + 1, SCREENS = GIRL_COUNT + 2;
+// His game was the page after the ghost until Oct 27: "can we pull the
+// gba game from the main screens its too small and my wonderful modded
+// gba showed up". `git show 2d058cd:stackchan/cube/cube_game.cpp` has it.
+static const int GHOST = GIRL_COUNT, SCREENS = GIRL_COUNT + 1;
 static const uint32_t CRT_GREEN = 0x39ff5e;
 
 // ---- away from the board -----------------------------------------------
@@ -430,10 +432,10 @@ static int last_pocket = -1;
 // the boot after an UNPLANNED restart says which kind it was. The next
 // photo names the cause instead of a guess.
 enum Doing : uint8_t { NOW_RESTING, NOW_JOINING, NOW_LISTENING, NOW_SENDING,
-                       NOW_THINKING, NOW_TALKING, NOW_PLAYING, NOW_KINDS };
+                       NOW_THINKING, NOW_TALKING, NOW_KINDS };
 static const char* const DOING[NOW_KINDS] = {
   "resting", "joining WiFi", "listening to you", "sending your words",
-  "thinking", "talking", "playing your game"};
+  "thinking", "talking"};
 struct Notes {
   uint32_t magic;
   uint8_t doing;        // what the cube is doing now
@@ -529,7 +531,7 @@ static void set_said(const char* t) {
 // One of her own lines in the chat box for seven seconds, never the
 // same one twice running.
 static void pocket_reply() {
-  if (girl >= GIRL_COUNT) return;        // the ghost and the game have no lines
+  if (girl >= GIRL_COUNT) return;        // the ghost has no lines
   const Pocket& p = POCKET[girl];
   int k = esp_random() % p.count;
   if (p.count > 1 && k == last_pocket) k = (k + 1) % p.count;
@@ -549,7 +551,6 @@ static void say_status(const char* text, uint32_t ms = 6000) {
 // What whoever is on screen does, said when she (or he) comes on.
 static void say_hint(uint32_t ms) {
   if (girl == GHOST) say_status("Boo. Tap him. Swipe for the girls.", ms);
-  else if (girl == GAME) say_status("", 1);     // the game page draws its own
   else say_status(GIRLS[girl].hint, ms);
 }
 
@@ -1117,16 +1118,7 @@ static void draw_frame() {
   else if (girl == YUZU) compose_yuzu();
   else if (girl == ZERO) compose_zero();
   else if (girl == SAYA) compose_saya();
-  else if (girl == GHOST) compose_ghost();
-  else {
-    // The game page draws itself; this is only ever seen while the
-    // cube is still joining WiFi at boot with his game the last page.
-    frame.fillSprite(TFT_BLACK);
-    frame.setFont(&fonts::Font2);
-    frame.setTextDatum(middle_center);
-    frame.setTextColor(hex565(CRT_GREEN));
-    frame.drawString(game_title(), W / 2, H / 2);
-  }
+  else compose_ghost();
   draw_battery();
   draw_said(H - draw_status());
   frame.pushSprite(0, 0);
@@ -1708,154 +1700,21 @@ void setup() {
   prefs.begin("cube", false);
   girl = prefs.getUChar("girl", FOUR) % SCREENS;
   join_wifi();
-  // An unplanned restart is said, once: in the chat box for half a
-  // minute, or on his game's page (which has no chat box) on the bare
-  // panel for eight seconds first. A photo of it tells what happened.
+  // An unplanned restart is said, once, in the chat box for half a
+  // minute. A photo of it tells what happened.
   char note[120];
   restart_note(note, sizeof note);
-  if (note[0] && girl == GAME) {
-    plain_screen();
-    say_plainly(note);
-    delay(8000);
-  } else if (note[0]) {
+  if (note[0]) {
     set_said(note);
     said_until = millis() + 30000;
   }
   notes.why = 0;
 }
 
-// ---- his game, the page --------------------------------------------------------
-// Ghost, Oct 17: "A tap on right side of screen is right on d pad. Left
-// is left etc. Only visible (clearish) buttons should be the A B and
-// start/select. L R maybe too i spose?" -- a Game Boy Color has no L or
-// R, so there are none. His picture is 1.5x (240x216) in the middle; the
-// 40px either side carry the only things drawn: A and B on the right,
-// START and SELECT on the left, as outlines that light up while held.
-// The picture itself is the d-pad: where a finger is, from its middle,
-// is the direction. Every finger counts, so he can walk and press A.
-// A swipe still changes page, like everywhere on the cube.
-static const int GAME_X = (W - GAME_W) / 2, GAME_Y = (H - GAME_H) / 2;
-static const int PAD_DEAD = 14;             // the very middle presses nothing
-static M5Canvas game_screen(&M5.Display);
-static bool game_shown = false;             // its margins are on screen
-static const char* game_problem = nullptr;
-static uint8_t game_lit = 0xFF;             // the buttons as last drawn
-static uint32_t game_next_us = 0;
-static const uint32_t GAME_FRAME_US = 16742; // the Game Boy's 59.73Hz
-
-// Which buttons a finger at (x, y) holds.
-static uint8_t game_button_at(int x, int y) {
-  if (x < GAME_X) return y < H / 2 ? GAME_START : GAME_SELECT;
-  if (x >= GAME_X + GAME_W) return y < H / 2 ? GAME_A : GAME_B;
-  int dx = x - W / 2, dy = y - H / 2;
-  if (dx * dx + dy * dy < PAD_DEAD * PAD_DEAD) return 0;
-  if (abs(dx) > abs(dy)) return dx > 0 ? GAME_RIGHT : GAME_LEFT;
-  return dy > 0 ? GAME_DOWN : GAME_UP;
-}
-
-static uint8_t game_held() {
-  uint8_t held = 0;
-  for (int i = 0; i < M5.Touch.getCount(); i++) {
-    auto d = M5.Touch.getDetail(i);
-    if (d.isPressed()) held |= game_button_at(d.x, d.y);
-  }
-  return held;
-}
-
-// The four buttons, drawn straight to the panel: clear outlines, lit
-// while held. Only redrawn when one changes.
-static void game_buttons(uint8_t held) {
-  const uint8_t mine = held & (GAME_A | GAME_B | GAME_START | GAME_SELECT);
-  if (mine == game_lit) return;
-  game_lit = mine;
-  const uint16_t dim = hex565(0x6a6f7a), lit = hex565(0xe8ecf2), fill = hex565(0x2c3038);
-  auto round = [&](int cx, int cy, const char* letter, bool on) {
-    M5.Display.fillCircle(cx, cy, 16, on ? fill : TFT_BLACK);
-    M5.Display.drawCircle(cx, cy, 16, on ? lit : dim);
-    M5.Display.setFont(&fonts::Font2);
-    M5.Display.setTextDatum(middle_center);
-    M5.Display.setTextColor(on ? lit : dim);
-    M5.Display.drawString(letter, cx, cy + 1);
-  };
-  auto pill = [&](int cy, const char* word, bool on) {
-    M5.Display.fillRoundRect(8, cy - 6, 24, 12, 6, on ? lit : TFT_BLACK);
-    M5.Display.drawRoundRect(8, cy - 6, 24, 12, 6, on ? lit : dim);
-    M5.Display.setFont(&fonts::Font0);
-    M5.Display.setTextDatum(top_center);
-    M5.Display.setTextColor(on ? lit : dim, TFT_BLACK);
-    M5.Display.drawString(word, GAME_X / 2, cy + 10);
-  };
-  const int right = GAME_X + GAME_W + GAME_X / 2;
-  round(right, H / 2 - 36, "A", held & GAME_A);
-  round(right, H / 2 + 36, "B", held & GAME_B);
-  pill(H / 2 - 40, "START", held & GAME_START);
-  pill(H / 2 + 32, "SELECT", held & GAME_SELECT);
-}
-
-static void game_say(const char* why) {
-  M5.Display.fillRect(GAME_X, GAME_Y, GAME_W, GAME_H, TFT_BLACK);
-  M5.Display.setFont(&fonts::Font2);
-  M5.Display.setTextDatum(middle_center);
-  M5.Display.setTextColor(hex565(CRT_GREEN), TFT_BLACK);
-  M5.Display.drawString(why, W / 2, H / 2);
-}
-
-static void game_enter() {
-  doing(NOW_PLAYING);
-  game_shown = true;
-  game_lit = 0xFF;
-  M5.Display.fillScreen(TFT_BLACK);
-  if (!game_screen.getBuffer()) {
-    game_screen.setColorDepth(16);
-    game_screen.setPsram(true);
-    game_screen.createSprite(GAME_W, GAME_H);
-  }
-  game_say(game_title());               // the first visit formats his save space
-  game_problem = game_screen.getBuffer()
-               ? game_begin((uint16_t*)game_screen.getBuffer())
-               : "Not enough memory for the game.";
-  if (game_problem) game_say(game_problem);
-  else game_screen.pushSprite(GAME_X, GAME_Y);   // where he left off
-  game_buttons(0);
-  game_next_us = micros();
-}
-
-// Leaving: his save is written now rather than in two seconds, and the
-// next girl's frame repaints the whole panel.
-static void game_leave() {
-  doing(NOW_RESTING);
-  game_shown = false;
-  game_save_if_due(true);
-}
-
-// One pass of the loop on his page. Frames run on the Game Boy's own
-// clock; a picture lands every other frame and goes to the panel then.
-// Fallen far behind (a long push, a save), it catches up by skipping
-// time, never by sprinting through it.
-static void game_page(const m5::touch_detail_t& t) {
-  if (!game_shown) game_enter();
-  const uint8_t held = game_held();
-  game_buttons(held);
-  if (game_problem) return;
-  if (game_fault()) {
-    game_say(game_fault());
-    game_problem = game_fault();
-    return;
-  }
-  const uint32_t now = micros();
-  if ((int32_t)(now - game_next_us) < 0) return;
-  if ((int32_t)(now - game_next_us) > 200000) game_next_us = now;
-  game_next_us += GAME_FRAME_US;
-  game_frame(held);
-  if (game_drew()) game_screen.pushSprite(GAME_X, GAME_Y);
-  game_save_if_due(false);
-}
-
 // ---- the three things a finger does --------------------------------------------
 // LEFT brings the next girl, RIGHT the one before -- the way a phone
 // pages, so three girls never take two swipes to go back one.
 static void swap_girl(int dx) {
-  if (girl == GAME) game_leave();
   girl = (girl + (dx < 0 ? 1 : SCREENS - 1)) % SCREENS;
   prefs.putUChar("girl", girl);
   set_said("");
@@ -1880,15 +1739,6 @@ void loop() {
   static uint32_t last_frame = 0;
   M5.update();
   auto t = M5.Touch.getDetail();
-
-  // His game owns every touch on its page: nothing there is a talk.
-  if (girl == GAME) {
-    if (t.wasReleased() && is_swipe(t)) swap_girl(t.distanceX());
-    else {
-      game_page(t);
-      return;
-    }
-  }
 
   if (recording) {
     if (t.isPressed()) feed_recording();

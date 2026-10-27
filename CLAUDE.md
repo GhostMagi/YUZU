@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1011 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1007 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,44 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HIS GAME IS OFF THE CUBE; THE GHOST'S PAGE MAY BECOME A TEXT RPG (Oct 27)
+
+*"can we pull the gba game from the main screens its too small and my
+wonderful modded gba showed up"*. **Deleted, his call** (the V-Pet
+rule, not the cast's): the page after the ghost, `cube_game.cpp/.h`,
+the vendored Walnut-CGB, `stackchan/make_rom.py`, the flash's bake
+step and its `.gitignore` line, `NOW_PLAYING` in the restart notes, and
+the flash's "once more for your game". `git show 2d058cd:<path>` brings
+any of it back. **His ROM stays** in `stackchan/games/` -- it is his
+game, and nothing builds it now. The swipe is Four -> Yuzu -> Zero ->
+Saya -> the ghost. **A cube last left on his game comes back on Four**
+(`5 % SCREENS` is 0), and a stale `NOW_PLAYING` note fails the bounds
+check like noise. His save stays on the cube's flash, harmless.
+
+**Compiled for the cube: 1.80 MB of 3 MB** (was 2.40 with the game),
+no warnings from our code (the 38 are the ESP32 core's). The toolchain
+was rebuilt in the scratchpad from GitHub alone: arduino-cli 1.3.1, the
+esp32 3.3.2 platform zip, `esp32-arduino-libs`, `esp-x32` and
+`esptool_py` unpacked by hand from the core's index, M5Unified/M5GFX by
+`git clone --branch`, a stand-in `ctags` (the .ino holds no code), and
+an EMPTY `packages/arduino/tools/dfu-util/0.11.0-arduino5/` folder --
+without it compile dies on "tool release not found". The discovery and
+library-index errors at start are noise. **Seven game tests and the
+bake test went; `TestHisGameIsOffTheCube` (three) and a no-bake flash
+test came in. Five breaks, all red as failures. 1011 -> 1007.** NOT on
+his cube until he Updates and runs `~/YUZU/cube` (pull says so).
+
+**And the same message asked about the ghost's page:** *"You think the
+undecided ghost screen could be a text based game? like a Zork kinda
+deal? But rpg fantasy"*. Answered YES, NOT BUILT, waiting on his yes.
+The page is already a green CRT with a blinking `>`. The catch is Zork
+is TYPED and the cube has no keyboard, so the recommendation given was
+**tap choices** (the ghost narrates, two or three `> go north` lines to
+tap), the whole game baked into the cube so it works in a pocket with
+no board -- over hold-to-talk commands, which need the board's ears. A
+hand-written story with HP, dice and items in CODE, not the board's
+3B: the parked DM note's lesson (a 3B cannot hold rules) still holds.
 
 ## THE BOARD MAKES ITS OWN WIFI WHEN THERE IS NO OTHER (Oct 22)
 
@@ -421,6 +459,8 @@ her whole file reverted, is red as a failure. Still 959.
 **UNMEASURED**: nobody has said hello to her since.
 
 ## HIS GAME IS ON THE CUBE, ONE SWIPE PAST THE GHOST (Oct 21)
+
+**REMOVED Oct 27, his call -- see the top. This entry is the record.**
 
 *"Can we put my game on my stackchan cores slide-to-able pages? A tap
 on right side of screen is right on d pad. Left is left etc. Only
