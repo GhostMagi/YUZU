@@ -8,6 +8,8 @@
 #                         and give the board its own WiFi for when there
 #                         is no other (own_wifi.sh)
 #   ~/YUZU/face --boot --off    stop doing that
+#   ~/YUZU/face --wifi-password WORD   a password for the board's own
+#                         WiFi he can remember (8 letters at least)
 #
 # The PHONE is the screen here, not the deck. It is a touchscreen
 # already, the face is built for touch, and it needs no VNC, no X
@@ -250,6 +252,11 @@ case "${1:-}" in
     exit 0 ;;
 --status)
     report; exit $? ;;
+--wifi-password)
+    # "$*" after the shift, so `ghost house` is one password, space and all.
+    shift
+    bash "$(cd "$(dirname "$0")" && pwd)/own_wifi.sh" --password "$*"
+    exit $? ;;
 esac
 
 # THE LANDING PAGE IS home.html, so that is what has to exist for the

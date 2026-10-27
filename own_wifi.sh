@@ -8,6 +8,7 @@
 #                          install the boot service, check the card can
 #   own_wifi.sh --off      from `face --boot --off`: stop doing it
 #   own_wifi.sh --show     its name and password, if it has one
+#   own_wifi.sh --password WORD   from `face --wifi-password`: his own
 #
 # Ghost, Oct 22: "i wama be able to plug power in, and interact on
 # something", and "if shtf and i have to live in a cave". He thought it
@@ -61,6 +62,18 @@ board_name() {
     local n; n=$(hostname -s 2>/dev/null)
     case "$n" in localhost|localhost.*|*[!A-Za-z0-9-]*|"") n="" ;; esac
     echo "$n"
+}
+
+# The name and password where `face` reads them back: his eyes only.
+# A `checked: yes` from the card check survives a rewrite.
+keep_it() {
+    local checked=""
+    grep -qx 'checked: yes' "$KEEP" 2>/dev/null && checked=yes
+    mkdir -p "$(dirname "$KEEP")"
+    ( umask 077
+      printf 'name: %s\npassword: %s\n' "$1" "$2" > "$KEEP"
+      chmod 600 "$KEEP"
+      [ -n "$checked" ] && echo "checked: yes" >> "$KEEP" )
 }
 
 # ---- at boot ---------------------------------------------------------------
@@ -145,12 +158,9 @@ setup() {
     name=$(nmcli -e no -g 802-11-wireless.ssid connection show id "$CON" 2>/dev/null)
     pass=$(sudo nmcli -e no -s -g 802-11-wireless-security.psk \
            connection show id "$CON" 2>/dev/null)
+    keep_it "$name" "$pass"
     local checked=""
     grep -qx 'checked: yes' "$KEEP" 2>/dev/null && checked=yes
-    mkdir -p "$(dirname "$KEEP")"
-    ( umask 077
-      printf 'name: %s\npassword: %s\n' "$name" "$pass" > "$KEEP"
-      [ -n "$checked" ] && echo "checked: yes" >> "$KEEP" )
 
     # Type=simple, NOT oneshot: a oneshot holds the boot for its two
     # minutes, and the desktop with it.
@@ -226,6 +236,47 @@ show() {
     return 0
 }
 
+# ---- a password he can remember, Oct 27 -----------------------------------
+# "I dislike pass i needa be able to know it maybe make it 'ghost'". A
+# random one is one he cannot say from memory in a cave. So he picks it,
+# here, on the board -- and like the random one it never goes in the
+# repo. A second `face --boot` keeps it: setup reads NetworkManager back.
+password() {
+    local pass="$1" name said
+    if ! has_con; then
+        echo "  The board has no WiFi of its own yet. Run ~/YUZU/face --boot first."
+        return 1
+    fi
+    if [ -z "$pass" ]; then
+        printf '  Type the password you want for its own WiFi: '
+        IFS= read -r pass || pass=""
+    fi
+    # WPA2's rule, not ours: 8 to 63 plain characters. Said here in his
+    # words, before NetworkManager says it in its own.
+    if [ -n "$(printf '%s' "$pass" | LC_ALL=C tr -d ' -~')" ]; then
+        echo "  Plain letters, digits and symbols only -- no emoji."
+        return 1
+    fi
+    if [ "${#pass}" -lt 8 ] || [ "${#pass}" -gt 63 ]; then
+        echo "  WIFI PASSWORDS HAVE TO BE 8 TO 63 LETTERS LONG."
+        echo "  That is the WiFi rule, not ours. \"$pass\" is ${#pass}."
+        echo "  Say it twice, or put some digits on the end."
+        return 1
+    fi
+    if ! said=$(sudo nmcli connection modify "$CON" wifi-sec.psk "$pass" 2>&1); then
+        echo "  COULD NOT CHANGE IT. NetworkManager said:"
+        printf '%s\n' "$said" | head -3 | sed 's/^/    /'
+        return 1
+    fi
+    name=$(nmcli -e no -g 802-11-wireless.ssid connection show id "$CON" 2>/dev/null)
+    keep_it "$name" "$pass"
+    echo "  DONE. The board's own WiFi is now:"
+    echo "      $name   password: $pass"
+    echo "  YOUR CUBE STILL HAS THE OLD ONE. Plug it into the board and run"
+    echo "  ~/YUZU/cube so it learns this one."
+    return 0
+}
+
 off() {
     sudo systemctl disable yuzu-own-wifi.service >/dev/null 2>&1
     sudo rm -f "$UNIT"
@@ -237,6 +288,7 @@ case "${1:-}" in
     --setup) setup ;;
     --off)   off ;;
     --show)  show ;;
+    --password) password "${2:-}" ;;
     --try)   try_it "${2:-}" "${3:?}" ;;
     *)       boot ;;
 esac

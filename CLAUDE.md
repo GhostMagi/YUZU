@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1007 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1011 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -92,6 +92,15 @@ it has an extension, so `pull` does not call it one). Ghost has to run
   (and `face --status`, and the end of `face --boot`) prints the name,
   the password, `http://10.42.0.1:8081/` and the `.local` name, because
   he will not remember it and that is the screen he lands on.
+- **OR ONE HE PICKS, Oct 27**: *"I dislike pass i needa be able to
+  know it maybe make it 'ghost'"*. `~/YUZU/face --wifi-password WORD`
+  (no word: it asks). **"ghost" itself cannot be one**: WPA2 wants 8 to
+  63 plain characters, and it is refused in those words before
+  NetworkManager sees it. Still made on the board and never in the repo
+  -- the tests use other words on purpose. It keeps the card check's
+  `checked: yes`, a later `face --boot` keeps his word, and it tells him
+  the cube still has the old one (`~/YUZU/cube`). Four tests, nine
+  breaks, all red as failures. **1007 -> 1011.**
 - **THE CARD IS CHECKED ONCE, at setup**: whether his Orin's WiFi card
   can host a network is UNKNOWABLE from here, and a cave is the wrong
   place to find out. The check drops his WiFi ~20s, so it runs DETACHED

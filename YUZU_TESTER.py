@@ -18777,7 +18777,7 @@ class TestOwnWifi(unittest.TestCase):
         path.write_text("#!/bin/bash\n" + body)
         path.chmod(0o755)
 
-    def run_it(self, *args, env_out=()):
+    def run_it(self, *args, env_out=(), script=None, stdin=None):
         st, log = self.state, self.log
         for i, look in enumerate(self.looks, 1):
             (st / ("look.%d" % i)).write_text(look.replace(" ", "\n") + "\n")
@@ -18807,6 +18807,11 @@ case "$*" in
   *"security.psk connection show"*) cat $st/psk ;;
   *"connection up yuzu-own-wifi"*)
     [ -n "$STUB_UP_FAILS" ] && { echo "$STUB_UP_FAILS" >&2; exit 4; } ;;
+  *"connection modify yuzu-own-wifi"*)
+    a=("$@")
+    for ((i = 0; i < ${#a[@]}; i++)); do
+      [ "${a[i]}" = wifi-sec.psk ] && echo "${a[i+1]}" > $st/psk
+    done ;;
 esac
 exit 0
 """ % {"log": log, "st": st})
@@ -18828,9 +18833,11 @@ exit 0
         env.pop("YUZU_OWN_WIFI_KEEP", None)
         for key in env_out:
             env.pop(key, None)
-        got = subprocess.run(["bash", str(self.SCRIPT), *args], env=env,
-                             text=True, capture_output=True, timeout=60,
-                             stdin=subprocess.DEVNULL)
+        got = subprocess.run(["bash", str(script or self.SCRIPT), *args],
+                             env=env, text=True, capture_output=True,
+                             timeout=60, input=stdin,
+                             stdin=None if stdin is not None
+                             else subprocess.DEVNULL)
         self.calls = self.log.read_text() if self.log.exists() else ""
         self.assertNotIn("REFUSED", self.calls,
                          "it wrote outside its sandbox: " + self.calls)
@@ -19027,6 +19034,69 @@ exit 0
             subprocess.run(["bash", str(face), "--off"], env=env,
                            capture_output=True)
         self.assertIn(pw, got.stdout, got.stdout + got.stderr)
+
+    # ---- a password he can remember (Oct 27) -----------------------------
+    # "I dislike pass i needa be able to know it maybe make it 'ghost'".
+    # The words used here are NOT his: his password never goes in the repo.
+
+    def test_he_can_give_it_a_password_he_can_REMEMBER(self):
+        self.run_it("--setup")
+        self.log.unlink()
+        got = self.run_it("--password", "moonlight7")
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertIn("sudo nmcli connection modify yuzu-own-wifi "
+                      "wifi-sec.psk moonlight7", self.calls,
+                      "NetworkManager was never told the new password")
+        keep = self.keep.read_text()
+        self.assertIn("password: moonlight7", keep)
+        self.assertIn("checked: yes", keep,
+                      "changing the password forgot the card check, so "
+                      "the next face --boot drops his WiFi to check again")
+        self.assertEqual(self.keep.stat().st_mode & 0o777, 0o600)
+        self.assertIn("~/YUZU/cube", got.stdout,
+                      "the cube still has the old password and he is "
+                      "not told")
+        self.assertIn("moonlight7", self.run_it("--show").stdout)
+        # And a later face --boot keeps HIS, never a new random one.
+        self.log.unlink()
+        self.run_it("--setup")
+        self.assertNotIn("connection add", self.calls)
+        self.assertIn("password: moonlight7", self.keep.read_text())
+
+    def test_a_password_WIFI_cannot_take_is_refused_in_his_words(self):
+        """WPA2 wants 8 to 63 plain characters. "ghost" is five, so it
+        is refused HERE, saying why, rather than in NetworkManager's
+        words or -- worse -- by a phone that silently will not join."""
+        self.run_it("--setup")
+        before = self.keep.read_text()
+        for bad in ("ghost", "x" * 64, "fantôme12"):
+            self.log.unlink(missing_ok=True)
+            got = self.run_it("--password", bad)
+            self.assertNotEqual(got.returncode, 0, bad)
+            self.assertNotIn("connection modify", self.calls,
+                             "%r reached NetworkManager" % bad)
+        self.assertIn("8 TO 63", self.run_it("--password", "ghost").stdout)
+        self.assertEqual(self.keep.read_text(), before,
+                         "a refused password changed what face shows")
+
+    def test_no_password_before_the_network_EXISTS(self):
+        got = self.run_it("--password", "moonlight7")
+        self.assertNotEqual(got.returncode, 0)
+        self.assertIn("face --boot", got.stdout)
+        self.assertNotIn("connection modify", self.calls)
+
+    def test_face_takes_it_with_a_SPACE_or_asks_when_given_none(self):
+        """`face` is the one word he knows for this. A password with a
+        space in it is one password; with no word at all it asks."""
+        face = Path(__file__).parent / "face"
+        self.run_it("--setup")
+        got = self.run_it("--wifi-password", "moon", "light7", script=face)
+        self.assertEqual(got.returncode, 0, got.stdout + got.stderr)
+        self.assertIn("password: moon light7", self.keep.read_text())
+        got = self.run_it("--wifi-password", script=face,
+                          stdin="starfish99\n")
+        self.assertIn("Type the password", got.stdout)
+        self.assertIn("password: starfish99", self.keep.read_text())
 
     def test_face_boot_sets_it_up_and_boot_off_stops_it(self):
         text = (Path(__file__).parent / "face").read_text()
