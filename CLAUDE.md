@@ -78,7 +78,9 @@ his cube until he Updates and runs `~/YUZU/cube` (pull says so).
 
 **And the same message asked about the ghost's page:** *"You think the
 undecided ghost screen could be a text based game? like a Zork kinda
-deal? But rpg fantasy"*. Answered YES, NOT BUILT, waiting on his yes.
+deal? But rpg fantasy"*. Answered YES, NOT BUILT. **ON HOLD, his call,
+same day:** *"Actually i think were at a good stopping point. Ghostpage
+on hold again"*. Do not start it unasked; the design below is waiting.
 The page is already a green CRT with a blinking `>`. The catch is Zork
 is TYPED and the cube has no keyboard, so the recommendation given was
 **tap choices** (the ghost narrates, two or three `> go north` lines to
