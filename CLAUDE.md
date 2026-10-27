@@ -102,8 +102,17 @@ it has an extension, so `pull` does not call it one). Ghost has to run
   after the board's current network, so the cap of eight can never drop
   it. The cube needs one `~/YUZU/cube` after `face --boot` to learn it.
 
+**CONFIRMED ON HIS BOARD, Oct 27**, his terminal: `face --boot` made
+the network (so his NetworkManager took `ifname '*'`), the card check
+said **WORKS** and put him back on home in ~16 seconds, `face` printed
+the name and password, and `cube` listed `SoapWorld`, `ghostnano`,
+`Ghost` -- the board's own WiFi second, as designed. **The password is
+in that chat and deliberately NOT here.** Still UNVERIFIED: a real
+boot with no known network in reach, and the cube finding the board on
+`ghostnano` (that flash was still building when he wrote).
+
 **UNVERIFIED, all of it on his board:** that the card does AP mode (the
-setup check answers it); that `ghostnano.local` resolves on the board's
+setup check answers it -- ANSWERED above: it does); that `ghostnano.local` resolves on the board's
 own network (it is the AP, so avahi should answer; the numbers always
 work, and the mic's Chrome flag trusts only the `.local` address); that
 `nmcli connection add ... ifname '*'` is accepted by his NetworkManager;
