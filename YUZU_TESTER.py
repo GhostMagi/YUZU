@@ -6428,7 +6428,7 @@ class TestHerEars(unittest.TestCase):
                                      "a forgotten recording runs for too long")
                 self.assertRegex(stop, r"input\.value = r\.heard;\s*form\.requestSubmit\(\)",
                                  "what she heard does not go the way typing goes")
-                self.assertRegex(tap, r"sound\.pause\(\)",
+                self.assertRegex(tap, r"\bhush\(\);",
                                  "her own voice can end up in his recording")
 
     def test_a_refused_mic_says_EXACTLY_how_to_fix_it(self):
@@ -7198,8 +7198,13 @@ class TestYuzuAvatar(unittest.TestCase):
         find whatever the comment discusses."""
         text = (Path(__file__).parent / "ui" / page).read_text()
         text = re.sub(r"^\s*//.*$", "", text, flags=re.M)
-        start = text.index("function hear(words)")
-        return text[start:text.index("\n}", start) + 2]
+        # From her pieces to the end of hear(): the whole voice, since
+        # Oct 28, when she started speaking a piece at a time. Only
+        # hear() was compared before, and pieces() and hush() are where
+        # a copy would now drift.
+        start = text.index("const FIRST_PIECE")
+        end = text.index("\n}", text.index("function hear(words)", start))
+        return text[start:end + 2]
 
     def test_her_page_asks_for_HER_voice_and_not_somebody_elses(self):
         """Ghost, Sept 20: "Can we give Yuzus page the voice like Four
@@ -10229,6 +10234,189 @@ class TestSheSpeaksOutOfThePage(unittest.TestCase):
                       "a 503 would be played as if it were audio")
         self.assertIn("revokeObjectURL", page,
                       "one object url leaks per reply, on a battery")
+
+
+class TestSheStartsTalkingSooner(unittest.TestCase):
+    """Ghost, Oct 28: *"Yea make her talk sooner bet bet."* The page
+    rendered her WHOLE reply into one wav before a sound came out --
+    measured here, 2787 characters took 70 seconds to render -- so a
+    long answer was a long silence first. She speaks in PIECES now: a
+    short first one, then longer ones, each fetched while the one before
+    plays, the way the cube already fetches hers.
+
+    The page's OWN voice code, run under node against a stand-in server
+    and a stand-in speaker, on every page that speaks. What is pinned is
+    behaviour: what is fetched first, that only one render is ever in
+    flight, the order she plays in, that nothing she said is lost, and
+    that a new reply or his mic stops her dead."""
+
+    LONG = ("Aha — love. You’re not coding today. You’re chilling.\n"
+            "And I’m here, not as a robot or a brain, but as a friend who "
+            "knows how to make the world feel warm.\n"
+            "- How to send commands from me to legs, sensors, cameras\n"
+            "- Power usage and safety limits\n" * 6 +
+            "Pi is 3.14, e.g. close enough for a spider. "
+            + "This one sentence runs on and on, " * 14 + "until it stops.\n"
+            "Just say: “Build me a spider.”")
+
+    def run_page(self, page, scenario):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own functions")
+        text = (Path(__file__).parent / "ui" / page).read_text()
+        start = text.index("const FIRST_PIECE")
+        end = text.index("\n}", text.index("function hear(words)", start)) + 2
+        script = r"""
+const URL = { n: 0, live: new Set(),
+  createObjectURL(b) { const u = 'blob:' + (++this.n); this.live.add(u); said[u] = b; return u; },
+  revokeObjectURL(u) { this.live.delete(u); } };
+const said = {}, log = [], pending = [], audios = [];
+function fetch(url, opts) {
+  const text = JSON.parse(opts.body).text;
+  log.push(['fetch', text]);
+  return new Promise(res => pending.push(ok => res({ ok,
+    blob: () => Promise.resolve(text) })));
+}
+class Audio {
+  constructor(src) { this.src = src; this.paused = true; audios.push(this); }
+  play() { this.paused = false; log.push(['play', said[this.src]]); return Promise.resolve(); }
+  pause() { this.paused = true; }
+}
+const tick = async () => { for (let i = 0; i < 5; i++) await new Promise(r => setTimeout(r, 0)); };
+const answer = async (ok = true) => { pending.shift()(ok); await tick(); };
+const end = async () => { const a = audios.find(x => !x.paused && !x.done);
+  a.done = true; a.paused = true; a.onended(); await tick(); };
+""" + text[start:end] + "\n(async () => {\n" + scenario + r"""
+  process.exit(0);
+})().catch(e => { console.error(e.stack || e); process.exit(1); });
+"""
+        import subprocess
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout)
+
+    def speaking_pages(self):
+        pages = [p for p in character_pages()
+                 if "function hear(words)" in
+                 (Path(__file__).parent / "ui" / p).read_text()]
+        self.assertGreaterEqual(len(pages), 3, pages)
+        return pages
+
+    def test_every_word_is_kept_and_the_FIRST_piece_is_short(self):
+        """Joined back with spaces, the pieces are exactly what she said
+        -- the Oct 28 fault was her last line going missing, and cutting
+        her up must never be another way to lose one. The first piece is
+        the short one, because it is the wait he hears."""
+        cases = [self.LONG, "Hi.", "No full stop at all",
+                 "Line one\nLine two\n\n...and three!", "x" * 700,
+                 "Wait... what? 3.14 is pi, e.g. a number."]
+        got = self.run_page("zero.html",
+                            "console.log(JSON.stringify(%s.map(pieces)));"
+                            % json.dumps(cases))
+        for words, cut in zip(cases, got):
+            with self.subTest(words=words[:40]):
+                self.assertEqual("".join("".join(cut).split()),
+                                 "".join(words.split()),
+                                 "a letter was lost or moved")
+                if max(map(len, words.split())) <= 120:
+                    # Nothing had to be cut mid-word, so the pieces are
+                    # her words exactly, spaces and all.
+                    self.assertEqual(" ".join(cut), " ".join(words.split()),
+                                     "a word was lost or moved")
+                self.assertTrue(all(p.strip() for p in cut), cut)
+                self.assertLessEqual(len(cut[0]), 120, "the first piece is "
+                                     "long, so she still starts late")
+                for p in cut[1:]:
+                    self.assertLessEqual(len(p), 300, p)
+        self.assertGreater(len(got[0]), 3, "a long reply is still one wav")
+        self.assertEqual(got[0][-1].split("“")[0][-10:], "Just say: ",
+                         "her last line was cut away from its quote")
+        self.assertTrue(any("3.14" in p for p in got[5]),
+                        "a decimal was cut as if it ended a sentence")
+
+    def test_she_starts_on_the_first_piece_ONE_render_at_a_time(self):
+        for page in self.speaking_pages():
+            with self.subTest(page=page):
+                got = self.run_page(page, r"""
+  const words = %s, cut = pieces(words);
+  hear(words);
+  await tick();
+  const first = log.slice();
+  await answer();
+  const playing = log.slice(), inflight = pending.length;
+  await answer();
+  const queued = log.slice();
+  while (pending.length || audios.some(a => !a.paused)) {
+    if (pending.length) await answer();
+    if (audios.some(a => !a.paused)) await end();
+  }
+  console.log(JSON.stringify({ cut, first, playing, inflight, queued, log,
+                               live: URL.live.size }));
+""" % json.dumps(self.LONG))
+                cut = got["cut"]
+                # Asserted BEFORE indexing, so a reply cut into too few
+                # pieces fails here in words rather than as an IndexError.
+                self.assertGreaterEqual(len(cut), 3, "a long reply is "
+                                        "still nearly one wav: %s" % cut)
+                self.assertEqual(got["first"], [["fetch", cut[0]]],
+                                 "the first ask was not her first piece alone")
+                self.assertEqual(got["playing"][-2:],
+                                 [["play", cut[0]], ["fetch", cut[1]]],
+                                 "she did not start on the first piece")
+                self.assertEqual(got["inflight"], 1,
+                                 "more than one render at once")
+                self.assertEqual(got["queued"][-1], ["fetch", cut[2]])
+                self.assertEqual([x for x in got["queued"] if x[0] == "play"],
+                                 [["play", cut[0]]],
+                                 "the second piece talked over the first")
+                self.assertEqual([x[1] for x in got["log"] if x[0] == "play"],
+                                 cut, "she said her pieces out of order")
+                self.assertEqual(got["live"], 0, "a piece's audio was never freed")
+
+    def test_a_new_reply_or_his_mic_HUSHES_her(self):
+        for page in self.speaking_pages():
+            with self.subTest(page=page):
+                got = self.run_page(page, r"""
+  const words = %s;
+  hear(words); await tick(); await answer();
+  const first = audios[0];
+  hush();
+  const stopped = first.paused, late = log.length;
+  await answer();
+  const afterMic = log.slice(late);
+  hear('Second reply. With two sentences.'); await tick();
+  const fresh = log.slice(-1);
+  hear('Third.'); await tick();
+  await answer();
+  await answer();
+  const plays = log.filter(x => x[0] === 'play').map(x => x[1]);
+  hush();
+  console.log(JSON.stringify({ stopped, afterMic, fresh, plays,
+                               left: pending.length, live: URL.live.size }));
+""" % json.dumps(self.LONG))
+                self.assertTrue(got["stopped"], "his mic did not stop her")
+                self.assertEqual(got["afterMic"], [],
+                                 "a piece that landed after the mic was "
+                                 "played, or asked for more")
+                self.assertEqual(got["fresh"],
+                                 [["fetch", "Second reply. With two sentences."]])
+                self.assertEqual(got["plays"][1:], ["Third."],
+                                 "an old reply talked over the new one")
+                self.assertEqual(got["left"], 0)
+                self.assertEqual(got["live"], 0, "a hushed piece was never freed")
+
+    def test_a_failed_piece_ENDS_her_voice_for_that_reply(self):
+        """No voice installed fails every piece. Asking for the other
+        nine anyway is traffic on his WiFi for a voice that is not there,
+        and the page stays silent, the promise it always made."""
+        got = self.run_page("four.html", r"""
+  hear(%s); await tick();
+  await answer(false);
+  console.log(JSON.stringify({ log, left: pending.length }));
+""" % json.dumps(self.LONG))
+        self.assertEqual(len(got["log"]), 1, got["log"])
+        self.assertEqual(got["left"], 0)
 
 
 class TestKokoro(unittest.TestCase):

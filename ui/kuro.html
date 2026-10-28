@@ -381,24 +381,99 @@ function said(pending, text) {
 // her own `piper_length_scale`, so a copied `who` would hand her
 // somebody else's speaking rate. A test drives the name out of the
 // real fetch, and holds this block to the other speaking pages'.
-let sound = null;
+//
+// SHE STARTS AFTER HER FIRST SENTENCE, NOT AFTER HER LAST. Ghost, Oct
+// 28: "Yea make her talk sooner". The wav used to be rendered WHOLE
+// before a sound came out, and a long reply is a minute or more of
+// rendering. So her words go in PIECES, the way the cube already
+// fetches hers: a short first one so she starts in seconds, then
+// longer ones, each fetched while the one before plays. ONE fetch at a
+// time, never all at once: two renders share the board's processor,
+// and the piece she needs next would wait behind the ones she doesn't.
+//
+// A new reply, or his mic, HUSHES her: whatever is playing stops, what
+// was queued is dropped, and a piece still on its way is thrown away
+// when it lands (`turn` has moved on). Two replies talking over each
+// other, or her voice in his recording, is the fault this prevents.
+const FIRST_PIECE = 120, PIECE = 300;
+let sound = null, queued = [], voiceTurn = 0;
+
+// Her words, cut where a sentence ends (punctuation, then a space or
+// the end -- so 3.14 and e.g. stay whole) or a line ends, then packed
+// into pieces. A sentence too long for a piece is cut at its last
+// comma, else its last space. EVERY WORD IS KEPT, in order: joined back
+// with spaces, the pieces are exactly what she said.
+function pieces(words) {
+  const sentences = [];
+  for (const line of words.split('\n')) {
+    for (const s of line.match(/[^.!?…]+(?:[.!?…]+\S*|$)|[.!?…]+\S*/g) || []) {
+      if (s.trim()) sentences.push(s.trim().replace(/\s+/g, ' '));
+    }
+  }
+  const out = [];
+  const room = () => (out.length ? PIECE : FIRST_PIECE);
+  let piece = '';
+  for (const s of sentences) {
+    if (piece && piece.length + 1 + s.length > room()) { out.push(piece); piece = ''; }
+    piece = piece ? piece + ' ' + s : s;
+    while (piece.length > room()) {
+      let at = piece.lastIndexOf(', ', room());
+      at = at > 0 ? at + 1 : piece.lastIndexOf(' ', room());
+      if (at <= 0) at = room();
+      out.push(piece.slice(0, at).trim());
+      piece = piece.slice(at).trim();
+    }
+  }
+  if (piece) out.push(piece);
+  return out;
+}
+
+function hush() {
+  voiceTurn++;
+  if (sound) { try { sound.pause(); URL.revokeObjectURL(sound.src); } catch (e) {} }
+  sound = null;
+  // The queued urls are revoked too, or a long conversation leaks one
+  // object per piece into a browser on a battery-powered handheld.
+  queued.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
+  queued = [];
+}
+
+function playNext() {
+  if (sound || !queued.length) return;
+  const me = new Audio(queued.shift());
+  sound = me;
+  me.onended = me.onerror = () => {
+    if (sound !== me) return;
+    try { URL.revokeObjectURL(me.src); } catch (e) {}
+    sound = null;
+    playNext();
+  };
+  me.play().catch(() => me.onended());
+}
+
 function hear(words) {
+  hush();
   if (!words) return;
-  fetch('voice.wav', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: words, who: 'kuro' }),
-  })
-    .then(r => (r.ok ? r.blob() : null))
-    .then(blob => {
-      if (!blob) return;
-      // The PREVIOUS url is revoked, or a long conversation leaks one
-      // object per reply into a browser on a battery-powered handheld.
-      if (sound) { try { URL.revokeObjectURL(sound.src); } catch (e) {} }
-      sound = new Audio(URL.createObjectURL(blob));
-      sound.play().catch(() => {});
+  const turn = voiceTurn, rest = pieces(words);
+  const next = () => {
+    if (turn !== voiceTurn || !rest.length) return;
+    fetch('voice.wav', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: rest.shift(), who: 'kuro' }),
     })
-    .catch(() => {});
+      // A piece that fails ends her voice for this reply: no voice
+      // installed fails every piece, and asking again is just traffic.
+      .then(r => (r.ok ? r.blob() : null))
+      .then(blob => {
+        if (!blob || turn !== voiceTurn) return;
+        queued.push(URL.createObjectURL(blob));
+        playNext();
+        next();
+      })
+      .catch(() => {});
+  };
+  next();
 }
 
 form.onsubmit = (event) => {
@@ -482,7 +557,7 @@ mic.onclick = async () => {
     return;
   }
   // Her voice must not end up in his recording.
-  if (sound) { try { sound.pause(); } catch (e) {} }
+  hush();
   clip = [];
   recorder = new MediaRecorder(stream);
   recorder.ondataavailable = (e) => { if (e.data && e.data.size) clip.push(e.data); };

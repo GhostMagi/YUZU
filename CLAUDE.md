@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1009 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1013 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -75,13 +75,46 @@ Oct 22 stars fix was the OTHER reason words went missing; it holds.)
   holds every character's `num_predict` at 8 characters a token, with
   an ABSOLUTE upper bound so removing the cap goes red too. Three
   breaks, all red as failures. **1007 -> 1009.**
-- **A long reply is a long WAIT, and that is not new**: the wav is
-  rendered whole before it plays. Measured HERE (x86, not his Orin):
-  2787 characters took 70s to render, 157s of speech. Speaking it in
-  pieces, the way the cube already fetches hers, would start her in a
-  few seconds. Offered, not built.
+- **A long reply was a long WAIT**: the wav was rendered whole before
+  it played. Measured HERE (x86, not his Orin): 2787 characters took
+  70s to render, 157s of speech.
 
-UNHEARD on his board until he taps Update.
+**SO SHE SPEAKS IN PIECES NOW, same day** (*"Yea make her talk sooner
+bet bet"*). Every speaking page (four, yuzu, zero, face, shiro, kuro;
+one copy, held equal):
+
+- **`pieces()`** cuts her words where a sentence ends (punctuation
+  THEN a space, so 3.14 and e.g. stay whole) or a line ends, and packs
+  them: the FIRST piece at most 120 characters, so she starts in about
+  three seconds' worth of rendering, the rest at most 300. A sentence too
+  long is cut at its last comma, else its last space. Every word kept,
+  in order -- the morning's fault was a lost last line, and cutting her
+  up must never be another way to lose one.
+- **ONE render in flight at a time**: the next piece is asked for the
+  moment the one before lands, never all at once, because two renders
+  share the board's processor and the piece she needs next would wait.
+  Each piece plays when the one before ENDS.
+- **`hush()`**: a new reply or his mic stops what is playing, drops the
+  queue, and throws away a piece that lands late (`voiceTurn`). Before
+  this, a second reply could TALK OVER the first -- the old code never
+  paused the previous Audio. The mic now calls `hush()` rather than
+  pausing one Audio, which would have let the next piece start mid-clip.
+- **A failed piece ends her voice for that reply**: no voice installed
+  fails every piece, and asking for the rest is traffic for nothing.
+
+Four tests run the page's OWN voice code under node against a stand-in
+server and speaker, on every speaking page; the "every page hears the
+same way" test now compares the whole voice (pieces, hush, playNext,
+hear), not just hear(). **Nine breaks, all red as failures** -- after
+one came back as an ERROR (indexing a third piece a broken cut never
+made; asserted first now). **Driven in real Chromium** against a stub
+server: first piece asked at once and playing in ~0.2s, renders one at
+a time, about 0.14s between pieces (they end on sentences anyway).
+**1009 -> 1013.**
+
+**UNVERIFIED on his board**: how fast Kokoro renders on the Orin. If it
+renders slower than she speaks (here it is 0.45x), she pauses between
+pieces rather than waiting at the start. UNHEARD until he taps Update.
 
 **Same message, Zero wrote him a Pydroid script** (a random line from
 seven, two `time.sleep`s, prints only). Run here before he ran it:
