@@ -2128,6 +2128,22 @@ def facts_line(key):
 # `piper --help` for flag detection, which is also not free per reply.
 _VOICES = {}
 
+# HOW MUCH OF A REPLY HER VOICE IS HANDED. Ghost, Oct 28, with a photo
+# of Zero's log: *"Zero didnt speak the quoted words at the end aloud."*
+# It was not the quotes. /voice.wav cut what it was sent at 2000
+# characters -- the same number as the cap on what HE types, copied to
+# a route that carries what SHE wrote -- and her replies are longer:
+# num_predict is 600 tokens, about 2400 characters of English. So a long
+# answer lost its LAST LINE, silently, every time, while the log showed
+# all of it. Her last line is where she sums up, which is why it was
+# the one he missed.
+#
+# The cap stays (the route answers anything on his WiFi, and Kokoro's
+# time grows with what it is handed), but it is set to outrun the reply
+# ceiling: 8 characters a token, twice what English averages. A test
+# holds every character's num_predict inside it.
+SPOKEN_MAX = 8000
+
 
 def voice_for(key):
     """The voice a character speaks in, built once. None if the module
@@ -3003,7 +3019,7 @@ class _Handler(SimpleHTTPRequestHandler):
             try:
                 size = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(size) or b"{}")
-                said = (body.get("text") or "").strip()[:2000]
+                said = (body.get("text") or "").strip()[:SPOKEN_MAX]
                 who = body.get("who", FRONT)
             except Exception:
                 said = who = ""

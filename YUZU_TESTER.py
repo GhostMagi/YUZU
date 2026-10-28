@@ -10040,6 +10040,50 @@ class TestSheSpeaksOutOfThePage(unittest.TestCase):
             self.assertTrue(said and said[0].isupper() or "'" in said,
                             "a failure with no sentence in it: %r" % said)
 
+    @staticmethod
+    def longest_reply_tokens():
+        """The most tokens any character may write in one reply: every
+        persona's own num_predict, and the brain's default for the ones
+        that name none. Read off the files, never typed in here."""
+        import re as _re, yuzu_brain
+        found = [int(n) for f in (Path(__file__).parent / "personas")
+                 .glob("*.persona")
+                 for n in _re.findall(r"num_predict:\s*(\d+)", f.read_text())]
+        return max(found + [yuzu_brain.DEFAULT_OPTIONS["num_predict"]])
+
+    def test_a_LONG_reply_reaches_her_voice_to_its_LAST_LINE(self):
+        """Ghost, Oct 28, with a photo of Zero's log: *"Zero didnt speak
+        the quoted words at the end aloud."* The route cut what it was
+        sent at 2000 characters and a full reply is longer, so her last
+        line -- where she sums up -- never reached the voice. Built at
+        5 characters a token (English runs about 4), so the reply is
+        one a real character can write, and longer than the old cut."""
+        last = 'Just say: “Build me a spider.”'
+        line = "- How to send commands from me to legs, sensors, cameras.\n"
+        reply = line * (self.longest_reply_tokens() * 5 // len(line))
+        self.assertGreater(len(reply), 2000, "the reply is too short to "
+                           "test the thing that went wrong")
+        self.post({"text": reply + last, "who": "four"}).read()
+        self.assertTrue(self.rendered, "nothing reached her voice at all")
+        self.assertIn(last, self.rendered,
+                      "her LAST LINE never reached her voice -- the cut "
+                      "on /voice.wav is shorter than her replies")
+
+    def test_the_voice_cap_outruns_EVERY_reply_ceiling(self):
+        """The cap stays: the route answers anything on his WiFi and
+        Kokoro's time grows with what it is handed. But it has to be
+        longer than any reply a character may write, at a pessimistic
+        8 characters a token, or a long answer loses its ending again
+        the next time somebody raises num_predict. Bounded above as
+        well, ABSOLUTELY, so "fixing" it by removing it goes red."""
+        need = self.longest_reply_tokens() * 8
+        self.assertGreaterEqual(
+            self.face.SPOKEN_MAX, need,
+            "num_predict lets her write %d characters and her voice is "
+            "handed %d" % (need, self.face.SPOKEN_MAX))
+        self.assertLessEqual(self.face.SPOKEN_MAX, 50000,
+                             "the voice route has no real cap any more")
+
     def test_stage_directions_are_never_read_out_loud(self):
         """`*leans in*` spoken is the word "leans" in the middle of a
         sentence -- measured on the board, and the whole reason

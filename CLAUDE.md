@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1007 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1009 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,44 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## HER VOICE WAS HANDED ONLY THE FIRST 2000 CHARACTERS (Oct 28)
+
+*"Mobile view Zero didnt speak the quoted words at the end aloud. How
+should we solve that issue. I cant recall why she does that or why any
+do tbh."* Her reply ended `Just say: "Build me a spider."` and her
+voice stopped before it.
+
+**IT WAS NOT THE QUOTES.** Checked layer by layer: the page sends the
+whole cleaned reply, `spoken_for` and `for_speech` keep curly and
+straight quotes, and **Kokoro itself was run here** (kokoro-onnx 0.6.1,
+the v1.0 model from its GitHub release, Bella at her speed) -- with
+quotes and without, the same length of audio, sound to the end.
+**`/voice.wav` cut what it was sent at `[:2000]`**, the cap on what HE
+types copied onto the route that carries what SHE wrote, and
+`num_predict` 600 is about 2400 characters. So a long answer lost its
+last line, silently, while her log showed all of it. Her last line is
+where she sums up, which is why it was the one he heard missing. (The
+Oct 22 stars fix was the OTHER reason words went missing; it holds.)
+
+- **`SPOKEN_MAX = 8000`** in yuzu_face, on that one route. His input
+  caps on `/say` and `/stream` stay 2000: those are his words.
+- **Two tests**: a reply built from the real `num_predict` at 5
+  characters a token reaches her voice to its last line, and the cap
+  holds every character's `num_predict` at 8 characters a token, with
+  an ABSOLUTE upper bound so removing the cap goes red too. Three
+  breaks, all red as failures. **1007 -> 1009.**
+- **A long reply is a long WAIT, and that is not new**: the wav is
+  rendered whole before it plays. Measured HERE (x86, not his Orin):
+  2787 characters took 70s to render, 157s of speech. Speaking it in
+  pieces, the way the cube already fetches hers, would start her in a
+  few seconds. Offered, not built.
+
+UNHEARD on his board until he taps Update.
+
+**Same message, Zero wrote him a Pydroid script** (a random line from
+seven, two `time.sleep`s, prints only). Run here before he ran it:
+safe, works as she described.
 
 ## HIS GAME IS OFF THE CUBE; THE GHOST'S PAGE MAY BECOME A TEXT RPG (Oct 27)
 
