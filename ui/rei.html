@@ -1,0 +1,725 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rei</title>
+<!--
+  REI -- Zero's twin, the one with eyes.
+
+  Ghost, Oct 29: "Lets start with a Zero clone that can use my zflips
+  camera." So this is ZERO'S PAGE, copied, with one thing she has and
+  Zero does not: the camera button, shown because the roster says she
+  sees (her persona's `sees: yes`). Her model is a vision model; Zero's
+  is not. The camera is his PHONE'S -- the board has none.
+
+  The conversation code below the log is Zero's character for
+  character, the camera included (hidden on Zero's page); a test holds
+  every log page to hers. What is Rei's own is above it: her name, her
+  colour and her picture.
+
+  HER COLOUR IS HIS CYAN (#2ee6ff -- one of the four he picked for
+  Saya's face, the rain on Four's blue skin), beside his green. Zero is
+  his hot pink; two minds on one deck read apart at a glance.
+
+  HER PICTURE IS HER OWN, his pick the same night: "I spose use this for
+  now. Shes charming." White bob, red eyes, a skeleton frame with a blue
+  glow in the ribs -- the cyan of her lines (ui/rei/ART.txt).
+
+  No network, no fonts, no libraries.
+-->
+<style>
+:root {
+  --black: #000;
+  --panel: #050505;
+  --edge:  #262626;
+  --ink:   #efe3c8;           /* her plating                           */
+  --dim:   #8a8a8a;
+  --him:   #39ff5e;           /* neon green, his lines                 */
+  --her:   #2ee6ff;           /* his cyan, hers                        */
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+/* 100dvh after 100vh: on a phone, 100vh is the height with the address
+   bar HIDDEN, so while it shows the bottom row sat under the fold (his
+   Z Flip 6, Sept 26). dvh is what is really visible; an older browser
+   keeps the vh line. */
+html, body { height: 100vh; height: 100dvh; overflow: hidden; }
+body {
+  background: var(--black);
+  color: var(--ink);
+  font: 16px/1.5 'Segoe UI', system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  display: flex; flex-direction: column;
+}
+
+/* ---- top ---------------------------------------------------------- */
+#top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 24px 6px;
+}
+#who { font-size: 21px; letter-spacing: .1em; color: var(--ink);
+       font-weight: 700; }
+#title { font-size: 12.5px; color: var(--dim); letter-spacing: .04em; }
+
+/* ---- the rail ------------------------------------------------------
+   Built from /characters.json, ONE roster in yuzu_face.py, so no page
+   holds a list of the cast and none can drift. */
+#rail { display: flex; gap: 6px; margin-left: 18px; }
+#rail a, #rail span {
+  font-size: 12.5px; letter-spacing: .05em; text-decoration: none;
+  padding: 4px 11px; border-radius: 2px;
+  color: var(--dim); border: 1px solid transparent;
+}
+#rail a { cursor: pointer; }
+#rail a:hover { color: var(--ink); border-color: var(--edge); }
+#rail .here {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--her) 55%, transparent);
+  background: rgba(46,230,255,.10);
+}
+#home {
+  width: 38px; height: 38px; flex: none; margin-left: auto;
+  border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  font-size: 17px; color: var(--ink); background: rgba(255,255,255,.06);
+  border: 1px solid #444;
+}
+
+/* ---- her, and the conversation ------------------------------------
+   Two columns. minmax(0, 1fr) on the ROW is load-bearing: a grid row
+   is `auto` by default and grows to fit a picture, so a percentage
+   height has nothing bounded to resolve against -- measured on Cait's
+   page as a 779px image in a 460px stage. */
+#stage {
+  flex: 1; min-height: 0;
+  display: grid; gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  padding: 6px 24px calc(18px + env(safe-area-inset-bottom));
+}
+#rei {
+  height: 100%; width: auto; max-width: 42vw;
+  object-fit: cover; object-position: top center;
+  border-radius: 3px;
+  /* The right edge fades into the black, so the card and the page
+     read as one screen rather than a picture pasted onto it. */
+  -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+          mask-image: linear-gradient(to right, #000 78%, transparent);
+  transition: filter .6s ease;
+}
+/* THE "SHE IS THINKING" CUE, in her idiom: the machine room brightens
+   while a reply is being worked out, and settles when it lands. No
+   saturate(): the room is grey now, and boosting what colour is left
+   only brings the cables' red up, not the blue back. */
+body.thinking #rei { animation: working 1.6s ease-in-out infinite; }
+@keyframes working {
+  0%, 100% { filter: brightness(1) }
+  50%      { filter: brightness(1.3) }
+}
+
+#chat {
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-top: 2px solid var(--her);
+  border-radius: 3px; padding: 16px;
+}
+#log {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-right: 4px;
+  -webkit-user-select: text; user-select: text;
+  /* A long answer scrolls, and the browser's default bar is a bright
+     white stripe down a black page. Thin and dark, still usable. */
+  scrollbar-width: thin; scrollbar-color: #3a3a3a transparent;
+}
+#log:empty::before {
+  content: 'Tap the camera and show her something, or just ask.';
+  color: var(--dim); font-size: 15px; margin: auto; text-align: center;
+}
+.turn { font-size: 17px; line-height: 1.55; white-space: pre-wrap;
+        overflow-wrap: anywhere; }
+.turn .by { display: block; font-size: 11.5px; letter-spacing: .12em;
+            text-transform: uppercase; margin-bottom: 2px; }
+/* HIS LINES GREEN, HERS PINK, the words as well as the labels -- a
+   log you can read by colour at a glance. A faint glow makes them neon
+   rather than just bright; any more and long answers smear. */
+.him { color: var(--him); text-shadow: 0 0 6px rgba(57,255,94,.28); }
+.her { color: var(--her); text-shadow: 0 0 6px rgba(46,230,255,.30); }
+.turn .by { opacity: .75; }
+.her.pending { color: var(--dim); text-shadow: none; }
+
+/* HER CODE, AS CODE. Ghost, Sept 24, shown her Python lesson with the
+   ``` fences sitting on screen as text: "yes" to proper code boxes. She
+   is the one he brings code to. Monospace, no wrapping -- Python's
+   indentation IS the program -- so a long line scrolls inside its box
+   and never pushes the page sideways. A pink edge says whose it is. */
+.turn pre.code {
+  display: block; max-width: 100%; margin: 8px 0; padding: 10px 12px;
+  background: #0b0b0b; color: #f3e9f0; text-shadow: none;
+  border: 1px solid var(--edge); border-left: 2px solid var(--her);
+  border-radius: 3px;
+  font: 14.5px/1.5 ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  white-space: pre; overflow-x: auto; overflow-wrap: normal;
+}
+.turn code {
+  font: .92em ui-monospace, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  background: #161616; color: #f3e9f0; text-shadow: none;
+  padding: 1px 5px; border-radius: 3px;
+}
+.her.pending .by { color: var(--her); }
+.her.pending .dots { animation: blink 1.2s steps(4) infinite; }
+@keyframes blink { 0% { opacity: .3 } 50% { opacity: 1 } 100% { opacity: .3 } }
+
+#ask { display: flex; gap: 10px; align-items: center; }
+/* min-width: 0 IS LOAD-BEARING: an <input> carries an intrinsic width
+   and will not shrink below it, which is how Speak got shoved off a
+   phone on Four's page. */
+#text {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink);
+  background: #000; padding: 12px 15px; border-radius: 3px;
+  border: 1px solid var(--edge);
+}
+#text::placeholder { color: var(--dim); opacity: .8; }
+#text:focus { outline: none; border-color: var(--him); }
+#send {
+  font: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+  color: #031006; background: var(--him); padding: 12px 22px;
+  border: 0; border-radius: 3px;
+}
+#send:disabled { opacity: .5; cursor: default; }
+
+/* THE MIC. Tap to start, tap to stop -- his spec. Green, because what
+   it records is HIS line. It pulses while it is listening, so a
+   recording he forgot about is impossible to miss. */
+#mic {
+  flex: none; width: 46px; height: 46px; cursor: pointer;
+  display: grid; place-items: center; border-radius: 3px;
+  color: var(--him); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--him) 55%, transparent);
+}
+#mic svg { width: 22px; height: 22px; }
+#mic.on { color: #031006; background: var(--him);
+          animation: live 1.1s ease-in-out infinite; }
+@keyframes live { 50% { box-shadow: 0 0 0 7px rgba(57,255,94,.22); } }
+#mic.busy { opacity: .45; cursor: default; }
+/* THE CAMERA, for a girl who can see (the roster says so; Rei, Oct 29).
+   Absent everywhere else -- `hidden`, and the [hidden] rule is
+   load-bearing: `display: grid` above would otherwise beat it. Green,
+   because the photo is HIS. */
+#cam {
+  flex: none; width: 46px; height: 46px; cursor: pointer;
+  display: grid; place-items: center; border-radius: 3px;
+  color: var(--him); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--him) 55%, transparent);
+}
+#cam[hidden], #attached[hidden], #shot { display: none; }
+#cam svg { width: 22px; height: 22px; }
+#cam.on { color: #031006; background: var(--him); }
+/* The photo waiting to go with his next line, and an x to drop it. */
+#attached { display: flex; align-items: center; gap: 10px;
+            color: var(--him); font-size: 14px; }
+#attached img { height: 54px; border-radius: 3px;
+                border: 1px solid color-mix(in srgb, var(--him) 55%, transparent); }
+#unattach { font: inherit; color: var(--dim); background: none; cursor: pointer;
+            border: 1px solid var(--edge); border-radius: 3px; padding: 4px 10px; }
+/* His photo in the log, with his line: what she was shown stays on
+   screen beside what she said about it. */
+.turn img.snap { display: block; max-width: min(240px, 100%); max-height: 200px;
+                 margin: 4px 0; border-radius: 3px;
+                 border: 1px solid color-mix(in srgb, var(--him) 55%, transparent); }
+/* What the DECK says, not her: how to fix the mic, what went wrong. */
+.note { color: var(--dim); font-size: 14.5px; text-shadow: none; }
+
+@media (max-width: 760px) {
+  /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
+     412px: the home button sat past the right edge on every character
+     page, because the rail is content-width and pushes it. The rail
+     takes the leftover space and scrolls; the exit keeps its corner.
+     `min-width: 0` is the load-bearing half. */
+  #rail { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  #rail::-webkit-scrollbar { display: none; }
+  #who { flex: none; }
+  #home { flex: none; }
+  #title { display: none; }
+  /* A phone is the stand-in screen, not a designed one: she goes on
+     top, small, and the conversation keeps the room. */
+  #stage { grid-template-columns: minmax(0, 1fr);
+           grid-template-rows: 26vh minmax(0, 1fr); padding: 6px 14px 14px; }
+  #rei { max-width: 100%; width: 100%; height: 100%;
+         -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
+                 mask-image: linear-gradient(to bottom, #000 70%, transparent); }
+}
+</style>
+
+<div id="top">
+  <div id="who">Rei</div>
+  <div id="title">the one with eyes</div>
+  <div id="rail"></div>
+  <div id="home" title="home">⌂</div>
+</div>
+
+<div id="stage">
+  <!-- A REAL src, not one JavaScript has to supply: she is on screen
+       before any fetch resolves, so a dead server never costs her. -->
+  <img id="rei" src="rei/rei.jpg" alt="Rei">
+  <div id="chat">
+    <div id="log"></div>
+    <div id="attached" hidden>
+      <img id="preview" alt="your photo">
+      <span>photo ready -- ask about it, or just Speak</span>
+      <button id="unattach" type="button">x</button>
+    </div>
+    <form id="ask" autocomplete="off">
+      <input id="text" placeholder="Ask her something, or show her" maxlength="2000">
+      <button id="mic" type="button" title="talk to her" aria-label="talk to her">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="3" width="6" height="11" rx="3"/>
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
+        </svg>
+      </button>
+      <!-- HIDDEN unless the roster says she sees. capture="user" opens
+           the phone's own camera, front-facing; a laptop shows a file
+           picker instead. A file input needs no trusted page, unlike
+           the mic: it works over plain http. The star in accept is
+           written &#42; on purpose: a literal slash-star reads as the
+           start of a comment to the suite's comment stripper, which then
+           swallows half the page. -->
+      <button id="cam" type="button" title="show her something"
+              aria-label="show her something" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8h3l2-3h6l2 3h3v11H4z"/>
+          <circle cx="12" cy="13" r="3.5"/>
+        </svg>
+      </button>
+      <input id="shot" type="file" accept="image/&#42;" capture="user">
+      <button id="send" type="submit">Speak</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById('ask');
+const input = document.getElementById('text');
+const send = document.getElementById('send');
+const log = document.getElementById('log');
+
+document.getElementById('home').onclick = () => {
+  location.href = 'home.html';
+};
+
+// ---- who else is here ------------------------------------------------
+const ME = 'rei';
+const SHE = 'Rei';           // her lines' label -- one place, not two
+// HIS LINES CARRY HIS NAME, the one SHE knows him by: `user` in the
+// roster is USER_NAME off her persona, so the log and her prompt can
+// never disagree about who he is. "you" only if the roster never answers.
+let HIM = 'you';
+fetch('characters.json', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(cast => {
+    const rail = document.getElementById('rail');
+    cast.forEach(c => {
+      const here = c.who === ME;
+      if (here && c.user) HIM = c.user;
+      // EYES COME WITH HER MODEL, so the roster says who sees -- never a
+      // name typed here. Everyone else never shows the camera.
+      if (here && c.sees) document.getElementById('cam').hidden = false;
+      const el = document.createElement(here ? 'span' : 'a');
+      el.textContent = c.name;
+      el.title = c.blurb;
+      if (here) el.className = 'here';
+      else el.href = c.page;
+      rail.appendChild(el);
+    });
+  })
+  .catch(() => {});
+
+// Stage directions are stripped from what she SAID, the same call
+// yuzu_voice makes for the speaker: they are lovely to write and they
+// are not words, and on a small screen they crowd out the ones that are.
+//
+// EXCEPT HER ASTERISKS, which are EMPHASIS, not stage directions. The
+// Llama characters write *giggles*; Zero, on Qwen, writes "something
+// that *thinks*" -- and the copy of this every other page carries
+// deleted the word. His first real exchange with her came out as
+// "You're building something that , and ." For the one he brings
+// maths to that is the worst possible fault: "17 is *not* prime"
+// loses its "not". So her markers come off and her words stay.
+//
+// Only a span that LOOKS like emphasis: no space just inside either
+// star, and no letter or digit just outside -- so "2 * 3 * 4" and
+// "2*3*4" are left alone as the sums they are.
+function spoken(text) {
+  return text.replace(/\[[^\]]*\]/g, ' ')
+             .replace(/(^|[^\w*])\*\*(?=\S)([^*\n]*?\S)\*\*(?!\w)/g, '$1$2')
+             .replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1$2')
+             .replace(/[ \t]{2,}/g, ' ')
+             .trim();
+}
+
+// ONE TURN IN THE LOG. textContent, never innerHTML: what she writes is
+// shown as text, whatever characters are in it.
+function entry(cls, by, text) {
+  const turn = document.createElement('div');
+  turn.className = 'turn ' + cls;
+  const label = document.createElement('span');
+  label.className = 'by';
+  label.textContent = by;
+  turn.appendChild(label);
+  turn.appendChild(document.createTextNode(text));
+  log.appendChild(turn);
+  log.scrollTop = log.scrollHeight;
+  return turn;
+}
+
+// HER CODE, SHOWN AS CODE. A ``` block becomes a code box holding
+// EXACTLY what she wrote: it skips spoken() entirely, because that
+// strips [brackets] as stage directions -- and `nums = [1, 2, 3]` is
+// Python, not a gesture. The words around it are cleaned as before, and
+// `inline code` gets a small monospace chip. textContent throughout,
+// never innerHTML: what she writes is shown as text, whatever is in it.
+//
+// AN UNCLOSED FENCE IS STILL CODE. Her replies can hit the ceiling
+// mid-block, and the tail of a program shown as prose would lose its
+// indentation and its brackets.
+function fill(turn, text) {
+  text.split('```').forEach((part, i) => {
+    if (i % 2) {
+      const lines = part.replace(/^[ \t]*\n/, '').split('\n');
+      // "```python" -- the language tag is a label, not a line of code.
+      if (lines.length > 1 && /^[\w+#.-]*$/.test(lines[0].trim())) lines.shift();
+      const code = lines.join('\n').replace(/\s+$/, '');
+      if (!code) return;
+      const pre = document.createElement('pre');
+      pre.className = 'code';
+      pre.textContent = code;
+      turn.appendChild(pre);
+      return;
+    }
+    const prose = spoken(part);
+    if (!prose) return;
+    prose.split(/(`[^`\n]+`)/).forEach(bit => {
+      if (/^`[^`\n]+`$/.test(bit)) {
+        const chip = document.createElement('code');
+        chip.textContent = bit.slice(1, -1);
+        turn.appendChild(chip);
+      } else if (bit) {
+        turn.appendChild(document.createTextNode(bit));
+      }
+    });
+  });
+}
+
+function said(pending, text) {
+  const words = spoken(text);
+  pending.remove();
+  const turn = entry('her', SHE, '');
+  fill(turn, text);
+  // Everything cleaned away (a reply that was all stage direction):
+  // show it as it came rather than an empty line.
+  if (turn.childNodes.length <= 2 && !turn.lastChild.textContent.trim()) {
+    turn.appendChild(document.createTextNode(text.trim()));
+  }
+  log.scrollTop = log.scrollHeight;
+  // The server drops ``` blocks before her voice says anything, so the
+  // same text as before goes to it -- she never reads code aloud.
+  hear(words || text.trim());
+}
+
+// ---- SHE SPEAKS OUT OF WHATEVER YOU ARE HOLDING -----------------------
+// The board has no speaker on it. Every device that opens this page
+// does -- the Steam Deck, a phone, the panel -- so the server renders
+// the wav and the BROWSER plays it.
+//
+// AUTOPLAY IS ALLOWED HERE because he tapped Speak to get this reply,
+// and that tap is the user gesture browsers require.
+//
+// A MISSING VOICE IS SILENT, NEVER AN ERROR ON SCREEN. The reply is the
+// product; the audio is a nicety.
+//
+// SHE SENDS HER OWN NAME. The server builds one voice PER CHARACTER off
+// her own `piper_length_scale`, so a copied `who` would hand her
+// somebody else's speaking rate. A test drives the name out of the
+// real fetch, and holds this block to the other speaking pages'.
+//
+// SHE STARTS AFTER HER FIRST SENTENCE, NOT AFTER HER LAST. Ghost, Oct
+// 28: "Yea make her talk sooner". The wav used to be rendered WHOLE
+// before a sound came out, and a long reply is a minute or more of
+// rendering. So her words go in PIECES, the way the cube already
+// fetches hers: a short first one so she starts in seconds, then
+// longer ones, each fetched while the one before plays. ONE fetch at a
+// time, never all at once: two renders share the board's processor,
+// and the piece she needs next would wait behind the ones she doesn't.
+//
+// A new reply, or his mic, HUSHES her: whatever is playing stops, what
+// was queued is dropped, and a piece still on its way is thrown away
+// when it lands (`turn` has moved on). Two replies talking over each
+// other, or her voice in his recording, is the fault this prevents.
+const FIRST_PIECE = 120, PIECE = 300;
+let sound = null, queued = [], voiceTurn = 0;
+
+// Her words, cut where a sentence ends (punctuation, then a space or
+// the end -- so 3.14 and e.g. stay whole) or a line ends, then packed
+// into pieces. A sentence too long for a piece is cut at its last
+// comma, else its last space. EVERY WORD IS KEPT, in order: joined back
+// with spaces, the pieces are exactly what she said.
+function pieces(words) {
+  const sentences = [];
+  for (const line of words.split('\n')) {
+    for (const s of line.match(/[^.!?…]+(?:[.!?…]+\S*|$)|[.!?…]+\S*/g) || []) {
+      if (s.trim()) sentences.push(s.trim().replace(/\s+/g, ' '));
+    }
+  }
+  const out = [];
+  const room = () => (out.length ? PIECE : FIRST_PIECE);
+  let piece = '';
+  for (const s of sentences) {
+    if (piece && piece.length + 1 + s.length > room()) { out.push(piece); piece = ''; }
+    piece = piece ? piece + ' ' + s : s;
+    while (piece.length > room()) {
+      let at = piece.lastIndexOf(', ', room());
+      at = at > 0 ? at + 1 : piece.lastIndexOf(' ', room());
+      if (at <= 0) at = room();
+      out.push(piece.slice(0, at).trim());
+      piece = piece.slice(at).trim();
+    }
+  }
+  if (piece) out.push(piece);
+  return out;
+}
+
+function hush() {
+  voiceTurn++;
+  if (sound) { try { sound.pause(); URL.revokeObjectURL(sound.src); } catch (e) {} }
+  sound = null;
+  // The queued urls are revoked too, or a long conversation leaks one
+  // object per piece into a browser on a battery-powered handheld.
+  queued.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
+  queued = [];
+}
+
+function playNext() {
+  if (sound || !queued.length) return;
+  const me = new Audio(queued.shift());
+  sound = me;
+  me.onended = me.onerror = () => {
+    if (sound !== me) return;
+    try { URL.revokeObjectURL(me.src); } catch (e) {}
+    sound = null;
+    playNext();
+  };
+  me.play().catch(() => me.onended());
+}
+
+function hear(words) {
+  hush();
+  if (!words) return;
+  const turn = voiceTurn, rest = pieces(words);
+  const next = () => {
+    if (turn !== voiceTurn || !rest.length) return;
+    fetch('voice.wav', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: rest.shift(), who: 'rei' }),
+    })
+      // A piece that fails ends her voice for this reply: no voice
+      // installed fails every piece, and asking again is just traffic.
+      .then(r => (r.ok ? r.blob() : null))
+      .then(blob => {
+        if (!blob || turn !== voiceTurn) return;
+        queued.push(URL.createObjectURL(blob));
+        playNext();
+        next();
+      })
+      .catch(() => {});
+  };
+  next();
+}
+
+form.onsubmit = (event) => {
+  event.preventDefault();
+  const asked = input.value.trim();
+  // A photo with no words is a turn: he can just show her something.
+  const image = photo;
+  if (!asked && !image) return;
+  input.value = '';
+  unattach();
+  send.disabled = true;
+  send.textContent = '...';
+  document.body.classList.add('thinking');
+  const mine = entry('him', HIM, asked);
+  if (image) {
+    const snap = document.createElement('img');
+    snap.className = 'snap';
+    snap.alt = 'your photo';
+    snap.src = image;
+    mine.appendChild(snap);
+  }
+  // Where her reply will land, saying so while she works it out.
+  const pending = entry('her pending', SHE, image ? 'looking ' : 'working it out ');
+  const dots = document.createElement('span');
+  dots.className = 'dots';
+  dots.textContent = '...';
+  pending.appendChild(dots);
+
+  // `who` is a NAME. yuzu_face.CHARACTERS turns it into a persona key
+  // and refuses anything that is not in the dict, so nothing typed here
+  // can ever name a file.
+  fetch('say', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: asked, who: 'rei', image: image }),
+  })
+    .then(r => r.json())
+    .then(r => said(pending, r.said || 'She said nothing.'))
+    .catch(() => said(pending, 'No answer from the deck. Is ~/YUZU/face running?'))
+    .then(() => {
+      send.disabled = false;
+      send.textContent = 'Speak';
+      document.body.classList.remove('thinking');
+      input.focus();
+    });
+};
+
+// ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------
+// Ghost: "a button for the touch screen starts listening when i tap it,
+// ends recording when i tap it again and bam". Nothing listens until he
+// taps, and it stops when he taps again -- or after a minute, so a
+// recording he forgot about cannot run forever.
+//
+// THE MICROPHONE IS WHATEVER HE IS HOLDING. This page records on his
+// own device, sends the clip to the board (/listen), and what comes
+// back is sent exactly as if he had typed it. The board has no mic.
+//
+// A BROWSER ONLY HANDS A PAGE THE MIC WHEN IT TRUSTS THE PAGE -- https,
+// or the device's own localhost. His address is plain http on his WiFi,
+// so on his phone or laptop the mic is refused until he tells the
+// browser to trust it, once. The note says exactly how, with this
+// page's own address in it, rather than a mic that silently does
+// nothing.
+const mic = document.getElementById('mic');
+let recorder = null, clip = [], cap = null;
+
+function note(text) { entry('note', 'deck', text); }
+
+mic.onclick = async () => {
+  if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+  // Busy working out the last clip, or she is still answering.
+  if (mic.classList.contains('busy') || send.disabled) return;
+  if (!(window.isSecureContext && navigator.mediaDevices
+        && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
+    note('This browser only lets a page use the microphone once it trusts '
+         + 'the page. One time, in Chrome on this device: open '
+         + 'chrome://flags/#unsafely-treat-insecure-origin-as-secure , '
+         + 'type ' + location.origin + ' in the box, set it to Enabled, '
+         + 'and tap Relaunch (on a Steam Deck in Gaming Mode, restart the '
+         + 'Deck instead -- a relaunched Chrome there goes invisible). '
+         + 'Chrome then shows a warning bar about the flag; that is '
+         + 'expected. Then tap the mic again.');
+    return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    note('The microphone was blocked. Allow it for this page -- the icon '
+         + 'by the address -- then tap the mic again.');
+    return;
+  }
+  // Her voice must not end up in his recording.
+  hush();
+  clip = [];
+  recorder = new MediaRecorder(stream);
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) clip.push(e.data); };
+  recorder.onstop = () => {
+    clearTimeout(cap);
+    stream.getTracks().forEach(t => t.stop());      // the mic goes OFF
+    mic.classList.remove('on');
+    mic.classList.add('busy');
+    mic.title = 'working out what you said';
+    const audio = new Blob(clip, { type: recorder.mimeType || 'audio/webm' });
+    fetch('listen', { method: 'POST',
+                      headers: { 'Content-Type': audio.type },
+                      body: audio })
+      .then(r => r.json())
+      .then(r => {
+        if (r.ok && r.heard) {
+          input.value = r.heard;
+          form.requestSubmit();
+        } else {
+          note(r.said || "I didn't catch that.");
+        }
+      })
+      .catch(() => note('No answer from the deck. Is ~/YUZU/face running?'))
+      .then(() => { mic.classList.remove('busy'); mic.title = 'talk to her'; });
+  };
+  recorder.start();
+  mic.classList.add('on');
+  mic.title = 'listening -- tap again to stop';
+  cap = setTimeout(() => {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+  }, 60000);
+};
+
+// ---- SHOW HER SOMETHING ----------------------------------------------
+// Ghost, Oct 29: "Lets start with a Zero clone that can use my zflips
+// camera." The camera is HIS PHONE'S, the same split as the mic and her
+// voice: the board has none. A tap opens the phone's camera; the photo
+// waits beside the text box until he sends his line (or just Speak).
+//
+// SHRUNK HERE, CHECKED THERE. A phone photo is twelve million pixels
+// and thousands of tokens to her model -- more than her whole memory of
+// the conversation. So it is drawn onto a canvas no bigger than
+// IMAGE_EDGE on its longest side and sent as a JPEG, and the server
+// refuses anything bigger (yuzu_face.IMAGE_EDGE; a test holds the two
+// numbers equal). The photo goes to the board and nowhere else.
+const IMAGE_EDGE = 640;
+const cam = document.getElementById('cam');
+const shot = document.getElementById('shot');
+const attached = document.getElementById('attached');
+let photo = null;          // a data: URL, until it goes with his line
+
+function unattach() {
+  photo = null;
+  attached.hidden = true;
+  cam.classList.remove('on');
+  document.getElementById('preview').removeAttribute('src');
+}
+
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, IMAGE_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src = url;
+  });
+}
+
+cam.onclick = () => { if (!send.disabled) shot.click(); };
+document.getElementById('unattach').onclick = unattach;
+shot.onchange = () => {
+  const file = shot.files && shot.files[0];
+  shot.value = '';           // the same photo can be picked again
+  if (!file) return;
+  shrink(file)
+    .then(url => {
+      photo = url;
+      document.getElementById('preview').src = url;
+      attached.hidden = false;
+      cam.classList.add('on');
+    })
+    .catch(() => note("That photo wouldn't open here. Try taking it again."));
+};
+
+if (location.hash === '#say') input.focus();
+</script>

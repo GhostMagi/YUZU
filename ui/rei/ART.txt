@@ -1,0 +1,15 @@
+REI'S PICTURE -- ui/rei/rei.jpg
+
+Ghost, Oct 29, sent in chat with "I spose use this for now. Shes
+charming." White bob, red eyes, a skeleton frame with a blue glow inside
+the ribs, cables behind her on a dark ground. 736x1108.
+
+ONE EDIT: the picture carried a garbled caption across the top
+("SCRORE & - FRAMLE", rows 56-76), the kind of lettering an image
+generator makes. Rows 50-85 were painted with row 48's colours, column
+by column: the ground there is flat (brightness 27-30), so no seam shows
+and nothing of her was touched (her hair starts at row ~104).
+
+NOT CUT OUT. Her page is Zero's layout, a card down the left whose right
+edge fades into the black, so her dark ground simply meets the page.
+"For now", his words: a new picture is one file swapped.

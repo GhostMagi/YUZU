@@ -600,6 +600,10 @@ CHARACTERS = {
     # has... just a visual makeover." Her faces are his kaomoji sheet
     # (cut_saya.py); her words are the same Saya.
     "saya": ("saya_deck",              "face.html",  "Tsundere"),
+    # REI, Oct 29. Ghost: "Lets start with a Zero clone that can use my
+    # zflips camera." Zero's twin on a VISION model (`sees: yes`), on
+    # Zero's page copied, with the camera her persona earns her.
+    "rei":  ("rei",                    "rei.html",   "the one with eyes"),
 }
 
 # BODIES THAT ASK WITHOUT A PAGE. Oct 2, Ghost, of the StackChan cube:
@@ -748,6 +752,10 @@ def roster():
                     # with the same name. Read off her persona, like
                     # everything else here; "" for a character with none.
                     "user": (persona.settings.get("USER_NAME") or "").strip(),
+                    # Whether her page shows the camera. Read off her
+                    # persona -- eyes come with her model -- so a page
+                    # never holds a list of who can see.
+                    "sees": persona.sees,
                     # The home screen reads this rather than holding a
                     # name of its own. One roster, one truth -- the same
                     # rule that stopped Mimi being invisible.
@@ -2257,7 +2265,109 @@ def voice_wav(text, who=None):
         return None, str(exc)
 
 
-def answer(text, who=None, on_chunk=None, on_suggest=None):
+# ---------------------------------------------------------------------
+# HER EYES -- a photo from HIS phone, for a girl whose model can see.
+#
+# Ghost, Oct 29: *"Lets start with a Zero clone that can use my zflips
+# camera."* The board has no camera (and the cube's is 0.3MP); his phone
+# has a good one, and her page is already open on it. So the PAGE takes
+# the photo, shrinks it, and sends it with his message; this checks it
+# and hands it to her brain for that one turn.
+#
+# THE PROMPT REDUCES, CODE GUARANTEES, applied to pictures. The page
+# shrinks every photo to IMAGE_EDGE on its longest side -- a 12MP phone
+# photo is thousands of tokens to a vision model, more than her whole
+# context -- and this REFUSES anything bigger, read off the file's own
+# header with no image library (the deck installs nothing). So the
+# context guard's worst case is a number, not a hope.
+#
+# A JPEG or a PNG, under IMAGE_BYTES, or a sentence saying why not.
+# Nothing from the photo reaches a path or a command: it is checked,
+# re-encoded and passed to Ollama as data.
+IMAGE_EDGE = 640
+IMAGE_BYTES = 1500000
+# What her turn says beside his words, so her prompt can show the shape
+# in the exact words the code writes (a test holds them together), the
+# way her maths note does. Neutral on purpose: a photo, not a claim
+# about what is in it -- that part is hers to say.
+PHOTO_NOTE = "(A photo came with this message.)"
+# The size of a /say or /stream body is checked BEFORE it is read: a
+# photo in base64 plus his words, and nothing bigger costs anything but
+# the refusal. The /listen discipline.
+SAY_BODY_MAX = IMAGE_BYTES * 4 // 3 + 65536
+
+
+def image_size(data):
+    """(width, height) read off a JPEG's or a PNG's own header, or None
+    when it is neither. No decoding and no library: the PNG keeps it in
+    IHDR, and a JPEG in its start-of-frame marker, walked to segment by
+    segment. Never raises."""
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":
+            return struct.unpack(">II", data[16:24])
+        if data[:3] != b"\xff\xd8\xff":
+            return None
+        at = 2
+        while at + 4 <= len(data):
+            if data[at] != 0xFF:
+                return None
+            marker = data[at + 1]
+            if marker == 0xFF:              # fill byte before a marker
+                at += 1
+                continue
+            if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                at += 2
+                continue
+            length = struct.unpack(">H", data[at + 2:at + 4])[0]
+            # Every start-of-frame marker, and only those: C4, C8 and CC
+            # sit in the same range and are tables, not frames.
+            if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                height, width = struct.unpack(">HH", data[at + 5:at + 9])
+                return width, height
+            if marker == 0xDA:              # the image data, no frame seen
+                return None
+            at += 2 + length
+    except Exception:
+        return None
+    return None
+
+
+def photo_from(raw):
+    """(base64 for Ollama, problem). `raw` is what the page sent: a
+    data: URL or bare base64. One of the two is always None."""
+    import base64
+    import binascii
+    text = str(raw or "").strip()
+    if text.startswith("data:"):
+        text = text.split(",", 1)[-1]
+    if len(text) > IMAGE_BYTES * 4 // 3 + 8:
+        return None, ("That photo is too big for her to look at. Refresh "
+                      "the page and take it again.")
+    try:
+        data = base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError):
+        data = b""
+    size = image_size(data) if data else None
+    if not size:
+        return None, "That photo didn't come through. Take it again."
+    if max(size) > IMAGE_EDGE:
+        return None, ("That photo is %dx%d and she takes %d on the longest "
+                      "side. Refresh the page and take it again."
+                      % (size[0], size[1], IMAGE_EDGE))
+    return base64.b64encode(data).decode("ascii"), None
+
+
+def sees(key):
+    """Can this character see a photo? Never raises; no is the answer
+    when her persona cannot be read."""
+    try:
+        import yuzu_personas
+        return yuzu_personas.load(key).sees
+    except Exception:
+        return False
+
+
+def answer(text, who=None, on_chunk=None, on_suggest=None, image=None):
     """One turn with a character, for the page. (reply, error).
 
     The chat lives in a terminal today, which on a 10" touchscreen with
@@ -2276,6 +2386,13 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
     key = persona_for(who)
     if key is None:
         return None, "This deck has no character by that name."
+    # A PHOTO ONLY GOES TO A GIRL WHO CAN SEE. Her page only shows the
+    # camera when the roster says she sees, so a photo for anyone else
+    # is a stale page or a hand-made request -- and handed to a model
+    # with no eyes it is an error from Ollama at best, and at worst a
+    # confident description of a picture she never saw. Said in words.
+    if image and not sees(key):
+        return "(She can't see photos.)", None
     # `/wiki cats` HAS TO WORK HERE TOO. It was written into the
     # terminal loop and this page was built afterwards, so for two days
     # the chat bar under her face took the literal string and handed it
@@ -2374,6 +2491,13 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
         # not silence, and not a sentence she never said.
         face("idle")
         return "(%s)" % problem, None
+    # The note goes on AFTER the lookup and the sums, so it is never
+    # read as part of a /wiki term. A photo with no words is the note
+    # alone: he can just show her something.
+    images = None
+    if image:
+        text = ("%s %s" % ((text or "").strip(), PHOTO_NOTE)).strip()
+        images = [image]
     try:
         if key not in _BRAINS:
             # A KEY, NOT A PERSONA OBJECT. YuzuBrain's `persona`
@@ -2422,8 +2546,11 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
             pass
 
         face("thinking")
+        # `images` only when there is one: every brain in the suite's
+        # stand-ins, and any older brain, takes a turn without it.
+        extra = {"images": images} if images else {}
         if on_chunk is None:
-            reply = brain.ask(text)
+            reply = brain.ask(text, **extra)
         else:
             # ONE FUNCTION, TWO TRANSPORTS. The wiki grounding, the
             # allowlist, the face state and the memory all live here and
@@ -2431,7 +2558,7 @@ def answer(text, who=None, on_chunk=None, on_suggest=None):
             # would only have created a second place to forget, which is
             # exactly what `ground()` exists to prevent one layer down.
             pieces = []
-            for piece in brain.ask_stream(text):
+            for piece in brain.ask_stream(text, **extra):
                 pieces.append(piece)
                 on_chunk(piece)
             reply = "".join(pieces).strip()
@@ -2894,6 +3021,39 @@ class _Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _turn_body(self):
+        """(his words, who, photo, problem) from a /say or /stream body.
+
+        ONE COPY FOR BOTH ROUTES, the way `answer()` is one turn for
+        both. The size is checked BEFORE the body is read, so a huge
+        upload costs nothing but the refusal; his words are capped at
+        2000 characters as they always were; a photo is checked by
+        `photo_from` and comes back as clean base64 or a sentence. A
+        photo with no words is a turn -- he can just show her something.
+        """
+        try:
+            size = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            size = 0
+        if size > SAY_BODY_MAX:
+            return "", "", None, ("That was too big to send her. Refresh "
+                                  "the page and try again.")
+        try:
+            body = json.loads(self.rfile.read(size) or b"{}")
+            said = str(body.get("text") or "").strip()[:2000]
+            who = body.get("who", FRONT)
+            raw = body.get("image")
+        except Exception:
+            said, who, raw = "", "", None
+        image = None
+        if raw:
+            image, problem = photo_from(raw)
+            if problem:
+                return said, who, None, problem
+        if not said and not image:
+            return said, who, None, "Say something first."
+        return said, who, image, None
+
     def do_POST(self):
         path = self.path.split("?")[0].rstrip("/")
         if path == "/listen":
@@ -2926,21 +3086,15 @@ class _Handler(SimpleHTTPRequestHandler):
                         "said": problem})
             return
         if path == "/say":
-            try:
-                size = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(size) or b"{}")
-                said = body.get("text", "")
-                who = body.get("who", FRONT)
-            except Exception:
-                said = who = ""
-            said = said.strip()[:2000]
-            if not said:
-                self._json({"ok": False, "said": "Say something first."})
+            said, who, image, problem = self._turn_body()
+            if problem:
+                self._json({"ok": False, "said": problem})
                 return
             # `who` is a NAME and gets looked up in CHARACTERS. Nothing
             # from the request reaches a path or a command.
             offered = []
-            reply, error = answer(said, who, on_suggest=offered.extend)
+            reply, error = answer(said, who, on_suggest=offered.extend,
+                                  image=image)
             self._json({"ok": error is None, "said": reply or error,
                         "suggests": offered,
                         "pose": pose_for(reply) if error is None else "idle"})
@@ -2962,13 +3116,7 @@ class _Handler(SimpleHTTPRequestHandler):
             # and for this exact reason: a single-threaded server stops
             # answering /state for the whole generation, so her face
             # would freeze precisely when it is saying `thinking`.
-            try:
-                size = int(self.headers.get("Content-Length") or 0)
-                body = json.loads(self.rfile.read(size) or b"{}")
-                said = (body.get("text") or "").strip()[:2000]
-                who = body.get("who", FRONT)
-            except Exception:
-                said = who = ""
+            said, who, image, problem = self._turn_body()
             self.send_response(200)
             self.send_header("Content-Type", "application/x-ndjson")
             self.send_header("Cache-Control", "no-store")
@@ -2987,8 +3135,8 @@ class _Handler(SimpleHTTPRequestHandler):
                     # finishes the turn and the memory still gets it.
                     return False
 
-            if not said:
-                push({"done": True, "ok": False, "said": "Say something first."})
+            if problem:
+                push({"done": True, "ok": False, "said": problem})
                 return
             gone = []
             def chunk(piece):
@@ -2996,7 +3144,7 @@ class _Handler(SimpleHTTPRequestHandler):
                     gone.append(True)
             offered = []
             reply, error = answer(said, who, on_chunk=chunk,
-                                  on_suggest=offered.extend)
+                                  on_suggest=offered.extend, image=image)
             done = {"done": True, "ok": error is None,
                     "said": reply or error, "suggests": offered,
                     "pose": pose_for(reply) if error is None else "idle"}

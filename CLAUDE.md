@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1013 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1023 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,16 +49,85 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## VISION: ASKED, ANSWERED, NOT BUILT (Oct 29)
+## REI: ZERO'S TWIN, WITH EYES -- HIS PHONE'S CAMERA (Oct 29)
+
+*"Ooooh tough decision. Lets start with a Zero clone that can use my
+zflips camera."* Then, with a picture: *"I spose use this for now.
+Shes charming."* (white bob, red eyes, a skeleton frame with a blue
+glow in the ribs). **Built, UNMEASURED: no model has seen a photo
+here.** Rei is a WORKING NAME (Japanese for zero); his to change.
+
+- **`personas/rei.persona`**: Zero's settings for Zero's reasons (a
+  test holds the twins equal) except her name, `model:
+  huihui_ai/qwen3-vl-abliterated:4b-instruct` (the pick below), `sees:
+  yes`, her laugh (`Wow, Aww, Heh`), `num_ctx: 9216`, and one body
+  sentence: the deck body says "no camera", and a girl told that denies
+  a photo in front of her, so hers says "no camera of your own... eyes
+  for the photos he sends you from his phone". Rule 8 and four examples
+  carry the photo shape: a photo with a question, a photo with no
+  words, a BLURRY one she says she can't make out, and "What do you
+  see?" with no photo, which asks him to tap the camera. 5.6K chars.
+- **`sees` is a CHARACTER setting, not a body one** (`Persona.sees`,
+  default NO): eyes come with the weights, and Zero on the same deck has
+  none. The roster carries it; her page shows the camera because of it.
+- **THE CAMERA IS HIS PHONE'S**, the mic and voice split again. A
+  `<input type=file capture=user>` opens the phone's own camera (no
+  trusted-page flag needed, unlike the mic); the page shrinks the photo
+  on a canvas to `IMAGE_EDGE` (640) and sends it as a JPEG with his line
+  through the same `/say`. A photo with no words is a turn. His photo
+  stays in the log beside her answer.
+- **The server checks, never trusts**: `photo_from()` takes a data: URL
+  or base64, reads the size off the JPEG/PNG header with NO image
+  library (`image_size`, walked marker by marker), refuses anything
+  over 640 on its longest side or 1.5MB, and refuses a /say or /stream
+  body over `SAY_BODY_MAX` BEFORE reading it (`_turn_body`, one reader
+  for both routes). A photo for a girl who does not see is refused in
+  words before her brain is asked.
+- **The photo rides on THAT TURN ONLY**: `images` on the last message
+  (`_messages`), never in her history or memory file; what stays is his
+  words plus `PHOTO_NOTE` -- "(A photo came with this message.)",
+  added AFTER the /wiki lookup so it is never read as part of a term,
+  and held equal to her prompt's examples by a test, like the maths note.
+- **The context guard went red on her** at the deck's 8192: her prompt
+  plus a photo (counted as 28px patches of a 640 square, ~530 tokens,
+  the pessimistic of Qwen2.5-VL's 28 and Qwen3-VL's 32) plus a long
+  conversation. So she has her own `num_ctx: 9216`, and the guard reads
+  a girl's own window. Cost: ~150MB more KV cache than Zero at fp16.
+- **Her page is Zero's, copied**: the camera code lives on BOTH log
+  pages, hidden on Zero's (`#cam[hidden]` is load-bearing: `display:
+  grid` beats the browser's own `hidden`), because a test holds every
+  log page's conversation code to Zero's. Her colour is his cyan
+  `#2ee6ff`; her picture is `ui/rei/rei.jpg` (a garbled generator
+  caption painted out, `ui/rei/ART.txt`). Home icon: an eye. `accept`
+  is written `image/&#42;`: a literal slash-star is the start of a
+  comment to the suite's naive stripper, which then swallowed half the
+  page -- two tests went red for that reason, not a real fault.
+- **Driven in real Chromium** against the real server with `answer`
+  stubbed: a 3000x4000 photo arrived as 480x640, no sideways scroll at
+  412 or 1024, the exit in its corner, the camera hidden on Zero's
+  page. **Thirteen breaks, all red as failures. 1013 -> 1023.**
+
+**TO GET HER ON THE BOARD**: Update, then once in a terminal `ollama
+pull huihui_ai/qwen3-vl-abliterated:4b-instruct` (~3.3GB). Until then
+her page says exactly that (the 404 wording). **UNVERIFIED, all of it on
+his board**: that the tag exists exactly as typed (search results only;
+ollama.com is blocked here); that 3.3GB + a 9216 window fits beside the
+desktop; how well a 4B sees; whether `capture="user"` opens the Z
+Flip's front camera; whether `"think": false` is accepted by this
+model (it is on Zero's). **Save my stuff will carry her model too**
+(another ~3.3GB), because it keeps every model the roster talks on.
+
+### The research behind the pick (asked before it was built)
 
 *"Any similar llm models to what i use with vision so like. Yuzu or
 another persona could see me and such? And take advantage of the cubes
 camera for selfies. Yuzu wanted pretty bad early on to take a selfie
 with me"*, then *"Specifically uncensored or ablitereted styles"*.
-**Nothing was built**; this is the answer he was given, so the next
-session does not re-research it. ollama.com and huggingface.co are
+Nothing was built from that message; this is the answer he was
+given, so the next session does not re-research it. ollama.com and huggingface.co are
 blocked from the container, so every size below is from web search,
-not from the model pages.
+not from the model pages. (Superseded in part by Rei, above: he picked
+"Zero gets eyes" first, as a clone.)
 
 - **THE PICK: `huihui_ai/qwen3-vl-abliterated:4b-instruct`**, in
   Ollama's own library: ~3.3GB, text AND image, abliterated on the text

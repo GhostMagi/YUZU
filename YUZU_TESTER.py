@@ -3377,7 +3377,8 @@ class TestSpiderBodies(unittest.TestCase):
     # so the next girl he keeps home is one line.
     # SAYA, Oct 21: back as her face page, his kaomoji on the deck's
     # screen. He did not ask for legs, and the robot is on hold.
-    STAYS_ON_THE_DECK = {"saya_deck"}
+    # REI, Oct 29: a deck girl with eyes; he asked for a camera, not legs.
+    STAYS_ON_THE_DECK = {"saya_deck", "rei"}
 
     @staticmethod
     def pilots():
@@ -5454,8 +5455,12 @@ class TestSaveMyStuff(unittest.TestCase):
                             for x in made["left_out"]), made["left_out"])
         self.assertEqual(len(made["brains"]), len(self.roster_models()) - 1)
         # Weights he cannot read: named, never a tar with a hole in it.
-        path = self.blobs[self.roster_models()[0]][0]
-        os.remove(path)
+        # EVERY brain still kept, not the first: this assumed two models
+        # on the roster, and Rei (Oct 29) brought a third -- her own,
+        # because eyes come with the weights.
+        for model in self.roster_models():
+            if model in self.blobs and os.path.exists(self.blobs[model][0]):
+                os.remove(self.blobs[model][0])
         data, made, _ = self.saved()
         self.assertEqual(made["brains"], [])
         self.assertTrue(made["ok"])
@@ -6161,6 +6166,283 @@ def drive_route(path, body):
     handler._json = lambda obj, code=200: answered.update(obj, _code=code)
     handler.do_POST()
     return answered
+
+
+def tiny_jpeg(width, height):
+    """The smallest bytes `image_size` reads as a JPEG of that size: the
+    start, an APP0 segment it must walk past, and a start-of-frame. No
+    image library -- the board has none, so neither does this."""
+    import struct as _struct
+    app0 = b"\xff\xe0" + _struct.pack(">H", 16) + b"JFIF\x00" + b"\x01" * 9
+    sof = (b"\xff\xc0" + _struct.pack(">H", 17) + b"\x08"
+           + _struct.pack(">HH", height, width) + b"\x03" + b"\x01" * 9)
+    return b"\xff\xd8" + app0 + sof + b"\xff\xd9"
+
+
+def tiny_png(width, height):
+    import struct as _struct
+    return (b"\x89PNG\r\n\x1a\n" + _struct.pack(">I", 13) + b"IHDR"
+            + _struct.pack(">II", width, height) + b"\x08\x02\x00\x00\x00")
+
+
+class TestReiSees(BrainTestCase):
+    """REI, Oct 29. Ghost: "Lets start with a Zero clone that can use my
+    zflips camera."
+
+    Zero's twin on a VISION model. Her page shows a camera because her
+    persona says `sees: yes`; his PHONE takes the photo, the page shrinks
+    it, the server checks it, and her brain gets it for that one turn.
+    Each step is pinned, because each is a way for the photo to go
+    wrong quietly: a page that sends twelve megapixels, a server that
+    passes a stranger's file along, a brain that keeps every photo in
+    her memory, or a girl with no eyes handed one and describing it
+    anyway."""
+
+    def b64(self, data):
+        import base64
+        return base64.b64encode(data).decode("ascii")
+
+    def page(self, name):
+        return (Path(__file__).parent / "ui" / name).read_text()
+
+    def test_eyes_are_HERS_and_nobody_else_has_them(self):
+        """Read off the personas, not listed: whoever says `sees: yes`
+        sees, and on the roster that is Rei and only Rei today. Zero,
+        on weights with no eyes, must not."""
+        import yuzu_face
+        seeing = {c["who"] for c in yuzu_face.roster() if c["sees"]}
+        self.assertEqual(seeing, {"rei"})
+        self.assertTrue(yuzu_personas.load("rei").sees)
+        self.assertFalse(yuzu_personas.load("zero").sees)
+        for key in yuzu_personas.available():
+            persona = yuzu_personas.load(key)
+            if persona.sees:
+                self.assertIn("vl", persona.settings.get("model", "").lower(),
+                              "%s says she sees on a model with no eyes" % key)
+
+    def test_rei_is_zeros_twin_on_her_OWN_eyes(self):
+        """Every one of Zero's settings, for Zero's reasons, except the
+        ones that make her Rei: her name, her weights, her eyes, her
+        laugh and her body's one sentence. A setting that drifts between
+        the twins is one nobody chose."""
+        zero = yuzu_personas.load("zero").settings
+        rei = yuzu_personas.load("rei").settings
+        own = {"name", "archetype", "description", "model", "sees",
+               "SOUND_EXAMPLES", "DECK_BODY", "num_ctx"}
+        for key in set(zero) | set(rei):
+            if key in own:
+                continue
+            self.assertEqual(rei.get(key), zero.get(key),
+                             "the twins differ on %s" % key)
+        self.assertNotEqual(rei["model"], zero["model"])
+        self.assertNotEqual(rei["SOUND_EXAMPLES"], zero["SOUND_EXAMPLES"],
+                            "two minds on one deck share a laugh")
+        self.assertIn("instruct", rei["model"],
+                      "the default tags think out loud")
+
+    def test_her_body_never_tells_her_she_has_NO_camera(self):
+        """The deck body says "no camera", and a girl told that denies a
+        photo sitting in front of her. Hers says whose camera she sees
+        through."""
+        prompt = yuzu_personas.load("rei").prompt
+        self.assertNotIn("no arms, no camera and no face", prompt)
+        self.assertIn("no camera of your own", prompt)
+        self.assertIn("photos he sends you from his phone", prompt)
+
+    def test_her_prompt_shows_the_note_in_the_CODES_OWN_words(self):
+        """The maths note's discipline: what her examples show beside his
+        line is exactly what the server writes there, so she learns the
+        shape she will really be handed. A photo with a question, a photo
+        with no words, and a blurry one -- and a "What do you see?" with
+        no photo, which asks him to tap the camera rather than invent."""
+        import yuzu_face
+        persona = yuzu_personas.load("rei")
+        note = yuzu_face.PHOTO_NOTE
+        lines = persona.prompt.splitlines()
+        shown = [ln for ln in lines if ln.endswith(note)
+                 and not ln.startswith(persona.name + ":")]
+        self.assertGreaterEqual(len(shown), 3, "too few photo turns shown")
+        self.assertTrue(any(ln.split(":", 1)[1].strip() == note
+                            for ln in shown),
+                        "nothing shows a photo with no words")
+        self.assertTrue(any("blurry" in ln for ln in lines
+                            if ln.startswith(persona.name + ":")),
+                        "nothing shows her saying she can't make it out")
+        see = [b for a, b in zip(lines, lines[1:])
+               if a.endswith("What do you see?")]
+        self.assertTrue(see and "camera" in see[0],
+                        "with no photo she does not ask for one")
+
+    def test_a_photo_rides_on_THIS_turn_only(self):
+        """Ollama's way: base64 in the turn's `images`. Never in her
+        history -- a photo is hundreds of tokens on every later turn and
+        ~100KB in a memory file built for sentences -- and never on the
+        next turn's request. Both the plain and the streamed path."""
+        photo = self.b64(tiny_jpeg(4, 4))
+        brain = self.brain(persona="rei")
+        brain.ask("look (A photo came with this message.)", images=[photo])
+        sent = MockOllama.seen["last"]["messages"]
+        self.assertEqual(sent[-1].get("images"), [photo])
+        self.assertTrue(all("images" not in m for m in sent[:-1]))
+        self.assertTrue(all("images" not in m for m in brain.history),
+                        "the photo went into her memory")
+        brain.ask("and now?")
+        self.assertTrue(all("images" not in m
+                            for m in MockOllama.seen["last"]["messages"]),
+                        "the photo rode along on a later turn")
+        list(brain.ask_stream("again", images=[photo]))
+        self.assertEqual(MockOllama.seen["last"]["messages"][-1].get("images"),
+                         [photo])
+        self.assertTrue(all("images" not in m for m in brain.history))
+
+    def test_it_reads_a_photos_SIZE_off_its_own_header(self):
+        """No image library on the board, so the size is read the way the
+        file states it -- and checked against real JPEGs from this repo,
+        whose markers a hand-made fixture would not have."""
+        import yuzu_face
+        ui = Path(__file__).parent / "ui"
+        self.assertEqual(yuzu_face.image_size(tiny_jpeg(640, 480)), (640, 480))
+        self.assertEqual(yuzu_face.image_size(tiny_png(300, 200)), (300, 200))
+        self.assertEqual(yuzu_face.image_size(
+            (ui / "rei" / "rei.jpg").read_bytes()), (736, 1108))
+        self.assertIsNone(yuzu_face.image_size(b"GIF89a" + b"\x00" * 20))
+        self.assertIsNone(yuzu_face.image_size(b"\xff\xd8\xff"))
+        self.assertIsNone(yuzu_face.image_size(b""))
+
+    def test_only_a_SMALL_REAL_photo_gets_through(self):
+        """A JPEG or a PNG no bigger than IMAGE_EDGE on its longest side,
+        as a data: URL or bare base64, comes back as clean base64.
+        Anything else is a sentence, never an exception: too big, not a
+        picture, not base64."""
+        import yuzu_face
+        edge = yuzu_face.IMAGE_EDGE
+        ok = tiny_jpeg(edge, edge * 3 // 4)
+        got, problem = yuzu_face.photo_from(
+            "data:image/jpeg;base64," + self.b64(ok))
+        self.assertIsNone(problem)
+        self.assertEqual(got, self.b64(ok))
+        self.assertIsNone(yuzu_face.photo_from(self.b64(tiny_png(10, 10)))[1])
+        for bad in (self.b64(tiny_jpeg(edge + 1, 10)),
+                    self.b64(tiny_png(10, edge + 1)),
+                    self.b64(b"this is not a picture"),
+                    "not base64 at all!!",
+                    "A" * (yuzu_face.IMAGE_BYTES * 2)):
+            got, problem = yuzu_face.photo_from(bad)
+            self.assertIsNone(got)
+            self.assertTrue(problem and problem.endswith("."), problem)
+        big = (Path(__file__).parent / "ui" / "rei" / "rei.jpg").read_bytes()
+        self.assertIn("takes %d" % edge, yuzu_face.photo_from(self.b64(big))[1])
+
+    def test_she_gets_the_photo_AND_the_note_and_a_girl_without_eyes_gets_neither(self):
+        """Through the real answer(): the note goes on AFTER the /wiki
+        lookup (or it would be read as part of the term), a photo with no
+        words is the note alone, and a photo for Zero is refused in words
+        before her brain is ever asked."""
+        import yuzu_face, yuzu_brain
+        asked = []
+
+        class Brain:
+            history, system_prompt = [], ""
+            def __init__(self, **kw): pass
+            def ask(self, text, images=None):
+                asked.append((text, images))
+                return "A cat on a keyboard."
+
+        photo = self.b64(tiny_jpeg(8, 8))
+        grounded = []
+        def ground(text, maths=False):
+            grounded.append(text)
+            return text, None
+        was = dict(yuzu_face._BRAINS)
+        try:
+            yuzu_face._BRAINS.clear()
+            with mock.patch.object(yuzu_brain, "YuzuBrain", Brain), \
+                 mock.patch.object(yuzu_brain, "ground", ground), \
+                 mock.patch.object(yuzu_face, "load_memory", lambda *a: None), \
+                 mock.patch.object(yuzu_face, "save_memory", lambda *a: None):
+                reply, error = yuzu_face.answer("/wiki cats", "rei", image=photo)
+                self.assertIsNone(error)
+                self.assertEqual(grounded, ["/wiki cats"])
+                self.assertEqual(asked[-1],
+                                 ("/wiki cats " + yuzu_face.PHOTO_NOTE, [photo]))
+                yuzu_face.answer("", "rei", image=photo)
+                self.assertEqual(asked[-1], (yuzu_face.PHOTO_NOTE, [photo]))
+                yuzu_face.answer("hi", "rei")
+                self.assertEqual(asked[-1], ("hi", None))
+                before = len(asked)
+                reply, error = yuzu_face.answer("look", "zero", image=photo)
+                self.assertEqual(reply, "(She can't see photos.)")
+                self.assertEqual(len(asked), before, "Zero's brain was asked")
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+
+    def test_the_ROUTES_take_a_photo_and_refuse_a_huge_body_UNREAD(self):
+        """/say and /stream share one reader. A photo with no words is a
+        turn; a bad photo is refused in words; a body bigger than any
+        photo is refused BEFORE it is read -- the /listen discipline."""
+        import io, yuzu_face
+        photo = self.b64(tiny_jpeg(16, 16))
+        seen = []
+        def answer(said, who, on_suggest=None, on_chunk=None, image=None):
+            seen.append((said, who, image))
+            return "ok", None
+        with mock.patch.object(yuzu_face, "answer", answer):
+            got = drive_route("/say", {"text": "", "who": "rei",
+                                       "image": "data:image/jpeg;base64," + photo})
+            self.assertTrue(got["ok"], got)
+            self.assertEqual(seen[-1], ("", "rei", photo))
+            got = drive_route("/say", {"text": "hi", "who": "rei",
+                                       "image": self.b64(b"nope")})
+            self.assertFalse(got["ok"])
+            self.assertIn("didn't come through", got["said"])
+            got = drive_route("/say", {"text": "", "who": "rei"})
+            self.assertEqual(got["said"], "Say something first.")
+
+            class Unreadable(io.BytesIO):
+                def read(self, *a):
+                    raise AssertionError("the huge body was read")
+            handler = object.__new__(yuzu_face._Handler)
+            handler.path = "/say"
+            handler.headers = {"Content-Length": str(yuzu_face.SAY_BODY_MAX + 1)}
+            handler.rfile = Unreadable()
+            answered = {}
+            handler._json = lambda obj, code=200: answered.update(obj)
+            handler.do_POST()
+            self.assertFalse(answered["ok"])
+            self.assertIn("too big", answered["said"])
+        self.assertEqual(len(seen), 1, "a refused turn still reached her")
+        # The photo's own ceiling fits under the body's.
+        self.assertGreater(yuzu_face.SAY_BODY_MAX, yuzu_face.IMAGE_BYTES * 4 // 3)
+
+    def test_her_PAGE_shows_the_camera_only_because_the_ROSTER_says(self):
+        """The camera is in every log page's markup, HIDDEN, and the one
+        line that shows it reads `c.sees` for this page's own girl --
+        never a name. The [hidden] rule is load-bearing: `display: grid`
+        beats the browser's own `hidden` without it. And the page shrinks
+        a photo to the SAME edge the server refuses past."""
+        import yuzu_face
+        logs = sorted({c["page"] for c in yuzu_face.roster()
+                       if "// ONE TURN IN THE LOG" in self.page(c["page"])})
+        self.assertIn("rei.html", logs)
+        for name in logs:
+            with self.subTest(page=name):
+                page = self.page(name)
+                tag = re.search(r'<button[^>]*id="cam"[^>]*>', page)
+                self.assertTrue(tag and " hidden" in tag.group(0),
+                                "the camera shows before the roster says so")
+                self.assertIn('type="button"', tag.group(0))
+                self.assertRegex(page, r"#cam\[hidden\][^{]*\{\s*display:\s*none")
+                self.assertRegex(page, r"if \(here && c\.sees\) "
+                                       r"document\.getElementById\('cam'\)\.hidden = false")
+                edge = re.search(r"const IMAGE_EDGE = (\d+);", page)
+                self.assertTrue(edge, "the page does not shrink his photo")
+                self.assertEqual(int(edge.group(1)), yuzu_face.IMAGE_EDGE)
+                self.assertIn("toDataURL('image/jpeg'", page)
+                self.assertRegex(page, r'<input id="shot" type="file" '
+                                       r'accept="image/&#42;" capture="user">')
+                self.assertRegex(page, r"JSON\.stringify\(\{ text: asked, "
+                                       r"who: '\w+', image: image \}\)")
 
 
 class TestExactMaths(unittest.TestCase):
@@ -11936,7 +12218,8 @@ class TestFour(unittest.TestCase):
         # make on purpose. Zero joined Sept 24 -- the brainy one wants
         # the encyclopedia. Shiro and Kuro joined Sept 26: they live on
         # the deck until the chassis is built, and /wiki comes with it.
-        deck = {"four", "saya", "zero", "shiro", "kuro"}
+        # Rei joined Oct 29: Zero's twin, on the deck with her, with eyes.
+        deck = {"four", "saya", "zero", "shiro", "kuro", "rei"}
         for who in yuzu_face.CHARACTERS:
             key = yuzu_face.persona_for(who)
             on_deck = yuzu_personas.load(key).hardware == "cyberdeck"
@@ -17565,15 +17848,26 @@ class TestWikiBrevity(unittest.TestCase):
             with mock.patch.object(yuzu_face, "load_facts",
                                    lambda k: ["x" * yuzu_face.FACTS_BUDGET]):
                 system += len(yuzu_face.facts_line(key)) / CHARS_PER_TOKEN
+            # AND A PHOTO, for a girl who sees (Rei, Oct 29). It rides on
+            # the turn it came with, never in history, so it is counted
+            # once -- at the largest the server lets through, and as
+            # 28-pixel patches (Qwen2.5-VL's; Qwen3-VL's are 32, so 28 is
+            # the pessimistic of the two), square, rounded up.
+            if persona.sees:
+                patches = -(-yuzu_face.IMAGE_EDGE // 28)
+                system += patches * patches
             need = system + turns * (int(cap) + HIS_TURN) + int(cap)
             if worst is None or need > worst[1]:
                 worst = (key, need)
+            # HER OWN WINDOW when she names one (Rei, Oct 29: a photo
+            # needs the room), the deck's otherwise.
+            window = int(persona.settings.get("num_ctx") or num_ctx)
             self.assertLessEqual(
-                need, num_ctx,
+                need, window,
                 "%s needs ~%d tokens of context in a long conversation "
                 "and num_ctx is %d -- she will silently forget the "
                 "start of it. Raise num_ctx with num_predict, or lower "
-                "one of them." % (key, need, num_ctx))
+                "one of them." % (key, need, window))
         self.assertIsNotNone(worst, "nobody sets num_predict any more")
 
     def test_num_predict_has_a_CEILING_and_every_character_shares_it(self):

@@ -580,10 +580,18 @@ class YuzuBrain:
 
     # -- generation -----------------------------------------------------
 
-    def _messages(self, user_text):
+    def _messages(self, user_text, images=None):
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(self.history[-self.history_turns * 2:])
-        messages.append({"role": "user", "content": user_text})
+        turn = {"role": "user", "content": user_text}
+        # A PHOTO RIDES ON THIS TURN ONLY: base64, the way Ollama's chat
+        # takes one. It is never put in her history -- a photo is a few
+        # hundred tokens on EVERY later turn, and ~100KB of text in a
+        # memory file built to hold sentences. What stays is his words,
+        # the note saying a photo came, and what she said about it.
+        if images:
+            turn["images"] = list(images)
+        messages.append(turn)
         return messages
 
     # Telling her face what she is doing. GUARDED, like Piper and the
@@ -604,12 +612,13 @@ class YuzuBrain:
         except Exception:
             pass
 
-    def ask(self, user_text, remember=True):
+    def ask(self, user_text, remember=True, images=None):
         """One turn in, Yuzu's raw reply out -- brackets and all. Feed
-        the result straight to handle_yuzu_reply()."""
+        the result straight to handle_yuzu_reply(). `images` is a list
+        of base64 photos for this turn only (see _messages)."""
         payload = {
             "model": self.model,
-            "messages": self._messages(user_text),
+            "messages": self._messages(user_text, images),
             "stream": False,
             "options": self.options,
             "keep_alive": self.keep_alive,
@@ -711,7 +720,7 @@ class YuzuBrain:
                 f"  Or allow longer:  export YUZU_TIMEOUT=600"
             ) from exc
 
-    def ask_stream(self, user_text, remember=True):
+    def ask_stream(self, user_text, remember=True, images=None):
         """Yield the reply in chunks as the model produces it.
 
         Worth using on the robot: a 3B on a Jetson takes a couple of
@@ -721,7 +730,7 @@ class YuzuBrain:
         """
         payload = {
             "model": self.model,
-            "messages": self._messages(user_text),
+            "messages": self._messages(user_text, images),
             "stream": True,
             "options": self.options,
             "keep_alive": self.keep_alive,

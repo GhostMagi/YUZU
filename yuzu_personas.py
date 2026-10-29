@@ -145,6 +145,24 @@ class Persona:
             "yes", "true", "1")
 
     @property
+    def sees(self):
+        """Can she see a photo he sends -- does her MODEL take pictures?
+
+        A CHARACTER setting, not a body one, and that is the difference
+        from `looks_up`. Eyes come with the weights: Rei runs a vision
+        model and Zero, on the same deck, does not -- so the body file
+        cannot answer it, and a photo handed to a model that cannot
+        read one is either an error from Ollama or, worse, a confident
+        description of a picture she never saw.
+
+        Defaulting to NO, for the same reason the encyclopedia does: a
+        character has to ASK for eyes. Ghost, Oct 29: "Lets start with
+        a Zero clone that can use my zflips camera."
+        """
+        return str(self.settings.get("sees", "")).strip().lower() in (
+            "yes", "true", "1")
+
+    @property
     def retired(self):
         """Is this character out of the cast?
 
