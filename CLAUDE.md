@@ -95,11 +95,29 @@ model has looked at a photo for her yet.
   one stayed GREEN: "never says described" looked for `describ`, which
   "description" does not contain. **1026 -> 1033.**
 
-**UNMEASURED, all on his board:** how long a photo takes (the eyes
-load, look, unload, then her Llama loads back: two swaps, tens of
-seconds -- her page says "looking..." meanwhile); whether a 4B's
-description is good enough for her to react well; and whether she
-says "from the description" anyway. Text turns are unchanged.
+**CONFIRMED ON HIS BOARD, same day**, his screenshots: a selfie from
+the gallery button (brown bucket hat, sunglasses, chain, grey sweater)
+and she answered *"I LOVE THE BUCKET HAT AND THE SUNGLASSES"* -- the
+eyes looked, the description reached her, she reacted as Yuzu, and
+**she never said "from the description"**. *"Hahahaha what do you
+think?"* What the screenshots also show, NONE of it changed:
+
+- **Her replies were ALL CAPS**, the photo one and the text one after
+  it. **His call: *"You dont have to correct that."*** Do not fix it
+  unasked. (Her own saved replies are what keep a register going; her
+  page has no `start fresh`, unlike Four's, Zero's and Rei's -- that is
+  the lever if he ever wants it gone.)
+- **"Those eyes... so deep and intense"** -- he is wearing dark
+  sunglasses in it. Her Llama invented that, not the eyes: the palmtop
+  fault, through a borrowed lens.
+- **She called him "sis"**, twice. The gyaru prior, Mimi's "good girl"
+  the other way round. Not raised by him; offered, not changed.
+- **She asked to steal his look, then later asked if HE was stealing
+  HERS** -- his next line said "you basically steal Reis eyes", so a 3B
+  pinned her own word on him. His read: *"Prolly just her usual quirk i
+  luv her."* Left alone.
+
+**Still UNMEASURED:** how long a photo takes on the board.
 
 ## "WHATS THE CLOSEST TO YUZU WITH VISION" -- ANSWERED; ROUTE A BUILT ABOVE (Oct 29)
 
