@@ -49,6 +49,70 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## HE IS LEANING TO A TANK: WAVESHARE UGV BEAST (Oct 29)
+
+*"ngl im starting to lean towards the attached image. I can afford it
+in a couple months easier than any of the spiders and i cant afford to
+be replacing 16-32 servos"* -- his screenshot of waveshare.com, the
+**UGV Beast PT Jetson Orin AI Kit Acce, SKU 27985** (US plug, no
+Jetson). A LEAN, not a purchase; nothing was built. He then allowed
+www.waveshare.com and robotshop.com in the environment. **Everything
+below is from Waveshare's own product page and wiki, read here**
+(robotshop.com answers 403 from its own bot wall, not the proxy).
+
+- **$369.99** is the low end of the AI Kit page's range ($369.99 -
+  $870.99); the top adds their Orin Nano 4GB kit, so the low end is
+  almost certainly the Acce he picked (the page does not print a price
+  per option). Shipping and tax on top. The ROS2 kit (adds a D500
+  LiDAR and OAK-D Lite depth camera) starts at $554.99.
+- **His servo point is right**: the tracks run on 2 geared DC motors
+  with encoders; the ONLY servos are the 2 ST3215 bus servos (30kg.cm)
+  in the pan-tilt head. Against the spiders' 18.
+- **Three 18650 cells are NOT included** (they recommend 2200mAh+ at
+  4C), behind a 3S UPS module, charged at 12.6V 2A. The WRONG-WAY LED
+  on the battery module lights when a cell is in backwards; their wiki
+  says never charge it like that. A bigger pack can replace the UPS
+  module (XH2.54) or plug in (DC5521). Runtime is NOT stated.
+- **A speaker and a microphone are built in** (audio driver board,
+  dual speaker, onboard mic, 3.5mm jack). That is "her voice out of
+  the robot itself", which the spider needed bought.
+- **The ESP32 below the Orin reads the battery voltage** (INA219): the
+  real reading the robot body's board line was waiting for.
+- **The ESP32 takes JSON over serial and STOPS BY ITSELF.**
+  `{"T":1,"L":0.2,"R":0.2}` drives (m/s per side), `{"T":0}` is the
+  emergency stop, and `{"T":136,"cmd":3000}` sets a HEARTBEAT: no new
+  motion command in that many ms and it stops the motors. That is the
+  dropped kill switch's heartbeat, in the robot's own firmware -- the
+  opposite of Hiwonder's `cmd_vel` that walks forever.
+- **Bring-your-own Orin is the design**: "the Acce Version if you've
+  got a Jetson Orin module (including its baseboard)", and their
+  flashing steps say "If you are using the official kit, select
+  Developer Kit", 8GB or 4GB. Whether the SUPER devkit with its fan
+  (~1.9-2" tall, measured) clears the plate above it is UNVERIFIED.
+- **NO FORCED WIPE, unlike Hiwonder**: their wiki offers flashing their
+  image OR "configure the software manually" (Ubuntu 22.04, ROS2
+  Humble, open source: `waveshareteam/ugv_jetson`, `ugv_ws`,
+  `ugv_base_ros`). His board is already 22.04. Save my stuff first
+  either way.
+- **What would collide on his board, for whoever installs it**: their
+  `AccessPopup` makes its OWN hotspot (`AccessPopup` / `1234567890`,
+  192.168.50.5) -- ours is `own_wifi.sh`, and two of those fight;
+  their main program owns the ESP32's serial port, so the girls'
+  bridge and their app cannot both drive it at once; their web app is
+  on 5000 and JupyterLab on 8888 (ours are 8081 and kiwix's 8080, no
+  clash); their image's user is `jetson`, so a flash means
+  `~/YUZU/name ghostnano` again for the mic's Chrome flag.
+- **For the girls**: their robot selves are written as six-legged
+  spiders (`_hardware_jethexa.txt`, "a metal spider"). A tank is a new
+  body file -- roll, turn, spin, stop, the head looks around -- and
+  NOT built until it is coming. The camera on the head is a real one
+  on the Orin, so Rei could one day see through it, not only his
+  phone.
+
+**To ask Waveshare before buying**: does the Acce fit the Orin Nano
+SUPER Developer Kit with its stock fan; and is "configure manually"
+a full install onto an existing Ubuntu 22.04.
+
 ## REI: ZERO'S TWIN, WITH EYES -- HIS PHONE'S CAMERA (Oct 29)
 
 *"Ooooh tough decision. Lets start with a Zero clone that can use my
