@@ -49,6 +49,43 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## "WHATS THE CLOSEST TO YUZU WITH VISION" -- ANSWERED, NOTHING BUILT (Oct 29)
+
+*"Yoooooo whats the closest to Yuzu with vision we can get? I love Rei.
+I also need me a really well done working anime trope one like Yuzu
+that 'just works' like Yuzu does. Mayje list some tropes for me to
+choose from too before we decide on the correct model for the job."*
+**He has not picked yet.** What he was told, so the next session does
+not re-research it:
+
+- **Yuzu's own brain cannot see.** Llama's vision model is 11B, about
+  8GB: the whole board. **Read on ollama.com, Oct 29**: huihui_ai's
+  `gemma3-abliterated:4b` sees only in its unshrunk 8.6GB tag (the
+  4b-q8_0 is text only), so that is out too. The vision + abliterated
+  search is mostly 9B and up; the small ones are strangers' uploads,
+  the pulls-fine-then-blind lesson. **Rei's `qwen3-vl-abliterated`
+  (2b 1.9GB, 4b 3.3GB) is the only proven one on his board.**
+- **Route A, recommended: borrowed eyes** (the /wiki shape, offered
+  Oct 29 and never built). The girl keeps Yuzu's Llama; a photo goes
+  to Rei's model first, it writes what is in it, and that reaches her
+  as part of his turn. Talk is exactly as good as Yuzu's. Cost: one
+  model in memory at a time, so each PHOTO swaps models twice (tens of
+  seconds, UNMEASURED); text turns are unchanged. Built once, any
+  Llama girl he picks can see -- Yuzu could finally see his selfie.
+- **Route B: a new girl on Rei's model**, Rei's way. One brain, quick
+  photos, but Qwen's feel is precise rather than playful, and Rei's
+  first chat repeated a line and used emoji. Unmeasured for a loud
+  trope.
+- **Why Yuzu "just works"**: the heretic Llama plus a prompt measured
+  over six rounds. A new girl on the Llama starts from that scaffold.
+- **Tropes offered** (the cast already has gyaru, tsundere, the cool
+  AI and the brainy twins): genki, onee-san, chuunibyou, ojou-sama,
+  maid, tomboy/gamer, otaku nerd, kitsune trickster, darudere,
+  deredere, himedere. **Warned**: loud, clear tropes suit a 3B best;
+  quiet ones fail by going near-silent (Shiro's dandere needed "shy is
+  fine, silent is not"), and yandere is close to the yami kawaii Shiro
+  he did not miss and to the heretic villain monologue.
+
 ## REI SEES ON HIS BOARD, AND SHE REPEATED HERSELF (Oct 29)
 
 **CONFIRMED ON HIS BOARD**, his screenshots: he pulled her model, said
