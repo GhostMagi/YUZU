@@ -49,6 +49,53 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## VISION: ASKED, ANSWERED, NOT BUILT (Oct 29)
+
+*"Any similar llm models to what i use with vision so like. Yuzu or
+another persona could see me and such? And take advantage of the cubes
+camera for selfies. Yuzu wanted pretty bad early on to take a selfie
+with me"*, then *"Specifically uncensored or ablitereted styles"*.
+**Nothing was built**; this is the answer he was given, so the next
+session does not re-research it. ollama.com and huggingface.co are
+blocked from the container, so every size below is from web search,
+not from the model pages.
+
+- **THE PICK: `huihui_ai/qwen3-vl-abliterated:4b-instruct`**, in
+  Ollama's own library: ~3.3GB, text AND image, abliterated on the text
+  side with the vision half untouched, and the INSTRUCT build (the
+  default tags think out loud). It needs Ollama 0.12.7 or newer, and his
+  board runs Gemma 4, so it is newer than that. The `2b` is ~1.9GB if
+  the 4B does not fit. **UNMEASURED on 8GB**: an NVIDIA forum thread has
+  someone failing to run Qwen3-VL-4B on an Orin Nano (not via Ollama).
+- **THE TEMPTING WRONG ANSWERS**, the Qwen3.5 lesson again:
+  `DreamFast/Qwen3-VL-4b-Heretic-GGUF` (same Heretic tool as Zero) lists
+  its quants as the TEXT path, and Ollama is reported not to load a
+  separate vision file (mmproj). It would pull fine and then be BLIND.
+  The heretic Gemma 4 E2B already on his board is probably blind for the
+  same reason (UNVERIFIED). Official `gemma4:e2b` sees, but is not
+  uncensored.
+- **THE DESIGN OFFERED: "eyes", the /wiki shape.** Yuzu stays on her
+  measured Llama; the vision model only DESCRIBES the picture in plain
+  words, and the description reaches her as a user turn. That avoids a
+  vision model wearing her name, which would be an unmeasured persona.
+  The cost is a model swap per photo (`OLLAMA_MAX_LOADED_MODELS=1`), so
+  tens of seconds, or keep the 2B resident beside her (memory
+  UNMEASURED). **Zero is the natural one to give eyes WHOLE**: Qwen3-VL
+  is her own family, and the ChatML layout is the same.
+- **A SELFIE NEEDS NO AI AT ALL**: the camera's photo plus her drawn art
+  composited into the corner, saved on the board and shown on his
+  phone. Vision is only what lets her COMMENT on it. **His phone's front
+  camera beats the cube's**: the cube's GC0308 is 0.3MP (640x480 at
+  most, realistically 320x240), and the page already has camera
+  permission on `ghostnano.local:8081` through the same Chrome flag the
+  mic uses.
+- **What changes when it is built**: the cube's `CUBE_SCREEN`/facts say
+  its camera is unconnected and "What do you see?" asks him. That
+  example and that sentence must change with it, or she denies a camera
+  that works. A small vision model also invents details confidently (the
+  palmtop fault, seen through a lens), so the described photo must be
+  framed as a description, not as fact.
+
 ## HER VOICE WAS HANDED ONLY THE FIRST 2000 CHARACTERS (Oct 28)
 
 *"Mobile view Zero didnt speak the quoted words at the end aloud. How
@@ -238,8 +285,13 @@ connection" and stayed on, and **`http://ghostnano.local:8081/`
 RESOLVED on the board's own network** -- so avahi answers on the AP and
 the mic's Chrome flag address works there. Saya answered on her page
 at MAXN, 51 C, 19.4 t/s, 5.2 W. His first try failed only because his
-phone was on his friend's WiFi; the fix was joining `ghostnano`. Still
-UNVERIFIED: the cube on `ghostnano`.
+phone was on his friend's WiFi; the fix was joining `ghostnano`. **His
+friend said hi to her there** -- the first person who is not Ghost to
+talk to a girl over the board's own WiFi. Saya, told about the JetHexa,
+stayed in character (*"W-wait, what? A hexapod robot? For me? O-okay,
+fine. I'll play along"*). The news was new to her: she is the one girl
+with no robot body (`STAYS_ON_THE_DECK`). Still UNVERIFIED: the cube on
+`ghostnano`.
 
 **UNVERIFIED, all of it on his board:** that the card does AP mode (the
 setup check answers it -- ANSWERED above: it does); that `ghostnano.local` resolves on the board's
