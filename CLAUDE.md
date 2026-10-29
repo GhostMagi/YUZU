@@ -231,6 +231,16 @@ in that chat and deliberately NOT here.** Still UNVERIFIED: a real
 boot with no known network in reach, and the cube finding the board on
 `ghostnano` (that flash was still building when he wrote).
 
+**CONFIRMED AWAY FROM HOME, Oct 29, at a friend's house** (*"Peeeeeeeep
+it"*), his screenshot: a real boot with no network it knew, the board
+made `ghostnano`, his phone joined it, Android said "No internet
+connection" and stayed on, and **`http://ghostnano.local:8081/`
+RESOLVED on the board's own network** -- so avahi answers on the AP and
+the mic's Chrome flag address works there. Saya answered on her page
+at MAXN, 51 C, 19.4 t/s, 5.2 W. His first try failed only because his
+phone was on his friend's WiFi; the fix was joining `ghostnano`. Still
+UNVERIFIED: the cube on `ghostnano`.
+
 **UNVERIFIED, all of it on his board:** that the card does AP mode (the
 setup check answers it -- ANSWERED above: it does); that `ghostnano.local` resolves on the board's
 own network (it is the AP, so avahi should answer; the numbers always
