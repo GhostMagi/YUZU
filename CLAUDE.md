@@ -299,6 +299,15 @@ below is from Waveshare's own product page and wiki, read here**
 SUPER Developer Kit with its stock fan; and is "configure manually"
 a full install onto an existing Ubuntu 22.04.
 
+**Oct 29, later: *"I think i may try to squeeze the tank in soon .-."***
+Still a lean, not an order. Told him: the price is before shipping and
+tax, the three 18650 cells are an extra buy, Save my stuff before
+anything of theirs touches the board, and the tank body file for the
+girls gets built when it is ORDERED, not before. Same message: his
+Orin is not on a screen yet (*"no displayport cord yet"*) -- the
+devkit's only video out is DisplayPort, so it needs a DP-to-HDMI cable
+or adapter for his TV (the old parts list had a passive one).
+
 ## REI: ZERO'S TWIN, WITH EYES -- HIS PHONE'S CAMERA (Oct 29)
 
 *"Ooooh tough decision. Lets start with a Zero clone that can use my
