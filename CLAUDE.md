@@ -214,6 +214,34 @@ her old replies keep teaching the aside. Two tests; eight breaks, all
 red as failures. **1024 -> 1026.** UNMEASURED: whether the aside stays
 gone.
 
+**FIRST REPLY AFTER, same day, his screenshots** (*"She likes her art
+♡ Rei is interesting xD like. Zero with eyes hahaha"*). He sent her
+her own picture from the gallery button. She got it right: *"White
+hair, red eyes, skeleton ribs visible through a black-and-grey
+mechanical frame"*. She liked it, and the reply finished whole.
+**The "Zero's twin soul" aside did NOT come back** (n=1; whether he
+tapped `start fresh` is unknown). The page is as designed at phone
+width: his photo in the log beside his line, and `start fresh` under
+Speak. Seen and NOT changed:
+
+- **A blur over who is who**: *"that's not just 'me,' that's you"*.
+  It came back the next turn: *"the frame is just like yours: a
+  machine that sees"*. Four's "I'm Ghost" in a milder form. Watch it.
+  If it grows, the fix is the Sept 26 shape, not a new rule.
+- **Every reply ends "Aww. 😊"**, twice in a row. `Aww` is one of her
+  taught sounds, so this is Four's "Ah," tic forming. If it wears
+  thin, swap the sound; that change comes with a paste. He has not
+  asked about the emoji either.
+- **She described as much as she reacted** (*"Every line, every bone,
+  every joint? Perfectly rendered."*). For a picture of herself that
+  is natural, so it is not the meme-caption fault.
+
+**The code box works on his phone.** He asked for "an ascii art of
+something that means a lot to you". She drew her own frame and put it
+in a fence, and Zero's `fill()` rendered it as a monospace box, every
+line kept. Then she wrote *"Because I'm here — because I love you."*
+His reaction: *"😭🖤 Rei is so sweet"*.
+
 ## REI'S CAMERA DID NOTHING, AND A BUTTON FOR MEMES (Oct 29)
 
 His first try: *"Camera button wont do anything >.> so far wut do. Also
