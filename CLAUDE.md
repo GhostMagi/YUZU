@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1024 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1026 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,48 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## REI SEES ON HIS BOARD, AND SHE REPEATED HERSELF (Oct 29)
+
+**CONFIRMED ON HIS BOARD**, his screenshots: he pulled her model, said
+hello, and sent pictures from the gallery button -- a selfie, the
+Waveshare tank (*"a robot. A big one, with tanks and cameras and
+wires"*) and a backpack with a face (*"Purple, sharp ears, red eyes,
+and that grin?"*). **So the 3.3GB model loads beside the desktop with
+her 9216 window, `"think": false` is accepted, and a 4B sees well
+enough to be fun.** The Oct 29 phone layout is confirmed too: text box
+on its own row, then mic, camera, gallery and Speak. The camera button
+was still refused by Chrome's own camera permission; whether
+`capture="user"` opens the FRONT camera is still UNVERIFIED.
+
+*"Shes repeating that a bit."* Reply after reply closed on the same
+aside, *"(And yes -- I've got Zero's twin soul inside this thing. So
+even if I get new hardware, I'm still Rei.)"*, plus 🖼️❤️. Earlier she
+called herself *"the tiny guy on your screen"*.
+
+- **"Zero's twin" was in her prompt FOUR times** (a rule and three
+  examples), so it was the identity she reached for. It is ONCE now,
+  in the rule; the three examples say it other ways.
+- **Nothing said she was a girl**, so a 4B filled the gap (Mimi's
+  "good girl", the other way round). Told once (*"You are Rei, a girl
+  whose mind lives..."*) and shown once (her look answer opens *"I'm
+  the girl in the picture on your screen"*). 5383 -> 5390 chars. Not
+  LIVE_PERSONA, so nothing to paste.
+- **Her saved chat is what keeps the repeat alive**: her own replies
+  are her strongest example, and the memory survives an Update. **Zero's
+  and Rei's pages had no way to clear it** (Four's has had one since
+  Sept 26). **`start fresh` under the ask bar on every log page**, one
+  copy held equal by the log-page test: two taps, refused while she
+  answers, asks `/forget` by her own NAME (`ME`, so the line is the
+  same on both pages), then clears the log and stops her voice.
+  Rendered at 412 and 1024: under Speak, no sideways scroll.
+- **Emoji NOT changed**: the Qwen prior, harmless (her voice skips
+  them). One line if he wants them gone.
+
+**He has to tap `start fresh` twice on her page after Updating**, or
+her old replies keep teaching the aside. Two tests; eight breaks, all
+red as failures. **1024 -> 1026.** UNMEASURED: whether the aside stays
+gone.
 
 ## REI'S CAMERA DID NOTHING, AND A BUTTON FOR MEMES (Oct 29)
 
@@ -216,10 +258,10 @@ network settings, and ollama.com's own tag list has `4b-instruct`
 exactly as typed (digest `1d98f19258b7`, the same file as
 `4b-instruct-q4_K_M`), 3.3GB, "Text, Image input"; `2b-instruct` is
 there too if the 4B does not fit. `registry.ollama.ai` is still refused
-here, so nothing was pulled. **UNVERIFIED, all of it on his board**:
-that 3.3GB + a 9216 window fits beside the desktop; how well a 4B sees; whether `capture="user"` opens the Z
-Flip's front camera; whether `"think": false` is accepted by this
-model (it is on Zero's). **Save my stuff will carry her model too**
+here, so nothing was pulled. **ANSWERED ON HIS BOARD, same day** (see
+"REI SEES ON HIS BOARD" above): the model and her window fit, `"think":
+false` is accepted, and she sees. Still UNVERIFIED: whether
+`capture="user"` opens the Z Flip's front camera. **Save my stuff will carry her model too**
 (another ~3.3GB), because it keeps every model the roster talks on.
 
 ### The research behind the pick (asked before it was built)

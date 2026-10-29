@@ -234,6 +234,15 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
                  border: 1px solid color-mix(in srgb, var(--him) 55%, transparent); }
 /* What the DECK says, not her: how to fix the mic, what went wrong. */
 .note { color: var(--dim); font-size: 14.5px; text-shadow: none; }
+/* START FRESH. Small and dim under the ask bar, the way Four's is: a
+   thing he needs now and then, not a control he reaches for each turn.
+   Armed, it turns his green and says in words what the next tap does. */
+#fresh {
+  align-self: flex-end; font: inherit; font-size: 12.5px;
+  letter-spacing: .02em; color: var(--dim); background: none;
+  border: 0; padding: 0; margin-top: -4px; cursor: pointer;
+}
+#fresh.armed { color: var(--him); }
 
 @media (max-width: 760px) {
   /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
@@ -322,6 +331,7 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
       <input id="pick" type="file" accept="image/&#42;">
       <button id="send" type="submit">Speak</button>
     </form>
+    <button id="fresh" type="button">start fresh</button>
   </div>
 </div>
 
@@ -608,6 +618,52 @@ form.onsubmit = (event) => {
       document.body.classList.remove('thinking');
       input.focus();
     });
+};
+
+// ---- START FRESH -------------------------------------------------------
+// Ghost, Oct 29, of Rei: "Shes repeating that a bit." She closed reply
+// after reply on the same aside about Zero's twin soul. Her saved
+// conversation is her strongest example of what to say next, so a line
+// she has said twice teaches the third -- and it survives an Update,
+// because her memory is saved on the board. Four's page has had this
+// since Sept 26; Zero's and Rei's had no way out but a terminal.
+//
+// TWO TAPS, because it cannot be undone: the first arms it and says in
+// words what the second will do, and it disarms itself if he does
+// nothing. Not while she is answering: that reply is saved when it
+// lands, straight back into the memory just cleared. `who` is her own
+// NAME (ME), so this one line is the same on every log page.
+const fresh = document.getElementById('fresh');
+let armed = null;
+
+function disarm() {
+  clearTimeout(armed);
+  armed = null;
+  fresh.textContent = 'start fresh';
+  fresh.classList.remove('armed');
+}
+
+fresh.onclick = () => {
+  if (send.disabled) return;
+  if (!armed) {
+    fresh.textContent = 'tap again: she forgets this chat';
+    fresh.classList.add('armed');
+    armed = setTimeout(disarm, 4000);
+    return;
+  }
+  disarm();
+  fetch('forget', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ who: ME }),
+  })
+    .then(r => r.json())
+    .then(r => {
+      if (!r || !r.ok) return;
+      hush();
+      log.textContent = '';
+    })
+    .catch(() => note('No answer from the deck, so she still remembers.'));
 };
 
 // ---- TALK TO HER, ONLY WHEN HE WANTS TO ------------------------------

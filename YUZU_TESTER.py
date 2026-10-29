@@ -6532,6 +6532,103 @@ function Image() { const me = this; setTimeout(() => {
         self.assertEqual(got["after"], {"photo": None, "hidden": True, "lit": False})
 
 
+    def test_she_is_a_GIRL_and_Zero_is_named_ONCE(self):
+        """Her first conversation on his board, Oct 29: she called herself
+        "the tiny guy on your screen", and closed reply after reply with
+        "(And yes -- I've got Zero's twin soul inside this thing...)".
+        Nothing in her prompt said she was a girl, so a 4B filled the gap
+        (Mimi's "good girl", the other way round), and "Zero's twin" was
+        in it FOUR times -- a rule and three examples -- so it was the
+        identity she reached for. Told once, shown once; twin once."""
+        prompt = yuzu_personas.load("rei").prompt
+        self.assertEqual(prompt.count("Zero's twin"), 1,
+                         "she is taught 'Zero's twin' as a catchphrase")
+        self.assertRegex(prompt, r"You are Rei, a girl\b",
+                         "her prompt never says she is a girl")
+        self.assertRegex(prompt, r"\nRei: I'm the girl in the picture",
+                         "no example SHOWS her as a girl")
+        self.assertNotRegex(prompt.lower(), r"\bguy\b")
+
+    def test_every_LOG_page_can_START_FRESH_in_two_taps_DRIVEN(self):
+        """Ghost, Oct 29: "Shes repeating that a bit." Her saved chat is
+        her strongest example, so a line said twice teaches the third,
+        and it survives an Update. Four's page could clear it; Zero's and
+        Rei's could not. The page's own handler, under node, on EVERY log
+        page the roster has: the first tap only arms it, Send busy
+        refuses it, the second asks the deck to forget HER (by her own
+        name), and then her log and her voice stop."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own handler")
+        import subprocess
+        import yuzu_face
+        logs = {c["who"]: c["page"] for c in yuzu_face.roster()
+                if "// ONE TURN IN THE LOG" in self.page(c["page"])}
+        self.assertIn("rei", logs)
+        for me, name in logs.items():
+            with self.subTest(page=name):
+                page = self.page(name)
+                self.assertRegex(page, r'<button id="fresh" type="button">'
+                                       r'start fresh</button>')
+                block = page[page.index("// ---- START FRESH"):]
+                block = block[:block.index("// ---- TALK TO HER")]
+                script = r"""
+function El() { this._t = ''; this.cls = new Set(); }
+Object.defineProperty(El.prototype, 'textContent', {
+  get() { return this._t; }, set(v) { this._t = v; } });
+Object.defineProperty(El.prototype, 'classList', { get() { const c = this.cls; return {
+  add: x => c.add(x), remove: x => c.delete(x), contains: x => c.has(x) }; } });
+const els = { fresh: new El() };
+const document = { getElementById: id => els[id] };
+const ME = %s;
+const send = { disabled: false };
+const log = new El(); log._t = "(And yes, I've got Zero's twin soul)";
+let hushed = 0;
+function hush() { hushed++; }
+const notes = [];
+function note(t) { notes.push(t); }
+const posts = [];
+function fetch(route, opts) { posts.push([route, JSON.parse(opts.body)]);
+  return Promise.resolve({ json: () => ({ ok: true }) }); }
+""" % json.dumps(me) + block + r"""
+(async () => {
+  send.disabled = true;
+  els.fresh.onclick();
+  const busy = { posts: posts.length, armed: els.fresh.cls.has('armed') };
+  send.disabled = false;
+  els.fresh.onclick();
+  const first = { posts: posts.length, text: els.fresh.textContent,
+                  armed: els.fresh.cls.has('armed') };
+  els.fresh.onclick();
+  await new Promise(r => setTimeout(r, 20));
+  console.log(JSON.stringify({ busy, first, posts, log: log._t, hushed, notes,
+    text: els.fresh.textContent, armed: els.fresh.cls.has('armed') }));
+  process.exit(0);
+})();
+"""
+                out = subprocess.run([node, "-e", script], capture_output=True,
+                                     text=True, timeout=30)
+                self.assertEqual(out.returncode, 0, out.stderr)
+                got = json.loads(out.stdout)
+                self.assertEqual(got["busy"], {"posts": 0, "armed": False},
+                                 "it forgot while she was mid-reply, so her "
+                                 "reply walks straight back into the memory")
+                self.assertEqual(got["first"]["posts"], 0,
+                                 "ONE tap wiped her memory -- nothing undoes it")
+                self.assertTrue(got["first"]["armed"])
+                self.assertIn("again", got["first"]["text"],
+                              "the armed button does not say what the next tap does")
+                self.assertEqual(got["posts"], [["forget", {"who": me}]],
+                                 "the second tap did not ask the deck to "
+                                 "forget HER")
+                self.assertEqual(got["log"], "", "her old chat is still on screen")
+                self.assertEqual(got["hushed"], 1,
+                                 "she goes on reading out the chat he cleared")
+                self.assertEqual(got["notes"], [])
+                self.assertEqual((got["text"], got["armed"]), ("start fresh", False),
+                                 "it stays armed after it fired")
+
+
 class TestExactMaths(unittest.TestCase):
     """Ghost, Sept 24: "1 and 5 are approooooved" -- 1 being exact
     maths for Zero. She runs on a 4B, which explains a sum well and can
