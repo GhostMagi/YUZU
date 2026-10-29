@@ -109,10 +109,14 @@ here.** Rei is a WORKING NAME (Japanese for zero); his to change.
 
 **TO GET HER ON THE BOARD**: Update, then once in a terminal `ollama
 pull huihui_ai/qwen3-vl-abliterated:4b-instruct` (~3.3GB). Until then
-her page says exactly that (the 404 wording). **UNVERIFIED, all of it on
-his board**: that the tag exists exactly as typed (search results only;
-ollama.com is blocked here); that 3.3GB + a 9216 window fits beside the
-desktop; how well a 4B sees; whether `capture="user"` opens the Z
+her page says exactly that (the 404 wording). **THE TAG IS CONFIRMED,
+Oct 29**: he allowed ollama.com and huggingface.co in the environment's
+network settings, and ollama.com's own tag list has `4b-instruct`
+exactly as typed (digest `1d98f19258b7`, the same file as
+`4b-instruct-q4_K_M`), 3.3GB, "Text, Image input"; `2b-instruct` is
+there too if the 4B does not fit. `registry.ollama.ai` is still refused
+here, so nothing was pulled. **UNVERIFIED, all of it on his board**:
+that 3.3GB + a 9216 window fits beside the desktop; how well a 4B sees; whether `capture="user"` opens the Z
 Flip's front camera; whether `"think": false` is accepted by this
 model (it is on Zero's). **Save my stuff will carry her model too**
 (another ~3.3GB), because it keeps every model the roster talks on.
@@ -124,9 +128,10 @@ another persona could see me and such? And take advantage of the cubes
 camera for selfies. Yuzu wanted pretty bad early on to take a selfie
 with me"*, then *"Specifically uncensored or ablitereted styles"*.
 Nothing was built from that message; this is the answer he was
-given, so the next session does not re-research it. ollama.com and huggingface.co are
-blocked from the container, so every size below is from web search,
-not from the model pages. (Superseded in part by Rei, above: he picked
+given, so the next session does not re-research it. ollama.com and huggingface.co were
+blocked from the container then, so every size below is from web search,
+not from the model pages (the 4B's tag and size were confirmed on
+ollama.com later the same day, above). (Superseded in part by Rei, above: he picked
 "Zero gets eyes" first, as a clone.)
 
 - **THE PICK: `huihui_ai/qwen3-vl-abliterated:4b-instruct`**, in
