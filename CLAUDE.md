@@ -117,6 +117,17 @@ think?"* What the screenshots also show, NONE of it changed:
   pinned her own word on him. His read: *"Prolly just her usual quirk i
   luv her."* Left alone.
 
+**SECOND PHOTO, same evening: his black cat Spooky on the Orin's box**
+(*"She tried"*). She called the box a "Developer Kit pillow" -- **the
+eyes READ THE WORDS on the box**, `EYES_ASK`'s "word for word" working
+(large print; small meme text at 640px is still unmeasured). She
+claimed the cat's green eyes are "just like me" (hers are pink: her
+Llama, again) and offered to name the cat "Zero" -- nobody had told
+her he is Spooky. **Yuzu's page has no "remember that" button** (Four's
+does), so a name she is told lasts only her 8-turn memory; offered,
+not built. The caps were already easing: one shouted sentence, then
+normal case.
+
 **Still UNMEASURED:** how long a photo takes on the board.
 
 ## "WHATS THE CLOSEST TO YUZU WITH VISION" -- ANSWERED; ROUTE A BUILT ABOVE (Oct 29)
