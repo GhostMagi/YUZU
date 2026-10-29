@@ -275,6 +275,8 @@ below is from Waveshare's own product page and wiki, read here**
   flashing steps say "If you are using the official kit, select
   Developer Kit", 8GB or 4GB. Whether the SUPER devkit with its fan
   (~1.9-2" tall, measured) clears the plate above it is UNVERIFIED.
+  **ANSWERED from the specs, same day** (see "THE TANK IS THE FIRST
+  BODY" below): same footprint and height as the board it is built for.
 - **NO FORCED WIPE, unlike Hiwonder**: their wiki offers flashing their
   image OR "configure the software manually" (Ubuntu 22.04, ROS2
   Humble, open source: `waveshareteam/ugv_jetson`, `ugv_ws`,
@@ -298,6 +300,41 @@ below is from Waveshare's own product page and wiki, read here**
 **To ask Waveshare before buying**: does the Acce fit the Orin Nano
 SUPER Developer Kit with its stock fan; and is "configure manually"
 a full install onto an existing Ubuntu 22.04.
+
+**THE TANK IS THE FIRST BODY, his call, same day** (*"i think i decided
+the 1st body for them"*, with Waveshare's dimension drawing). Not
+ordered yet. He asked for the two questions to Waveshare to be answered
+WITHOUT messaging them (*"Im shy .-."*), and both were, from their own
+pages:
+
+- **"Configure manually" IS an install onto his existing Ubuntu.**
+  Their own README (`waveshareteam/ugv_jetson`, read here, nothing run):
+  *"You can use this tutorial to install this program on a pure
+  Ubuntu(22.04) on Jetson."* So no wipe. What its `setup.sh` and
+  `autorun.sh` DO, to walk through with him on the day, not blind:
+  `apt upgrade -y` (everything on the board); disables `nvgetty` (a
+  serial login on the robot's UART pins -- his phone's cable is the
+  USB-C port, a different login, UNVERIFIED that it is untouched);
+  installs `hostapd` and `dnsmasq` (a system dnsmasq may fight
+  NetworkManager's shared mode, i.e. `own_wifi.sh` -- check on the
+  day); `sudo pip install` (his Ubuntu refuses those, PEP 668, and the
+  script has no `set -e`, so it carries on); a cron job that starts
+  their app at boot, which owns the ESP32's serial port; and JupyterLab
+  on 8888 with an EMPTY token and password -- skip those steps, it is
+  code execution for anyone on his WiFi. Skip AccessPopup too (ours
+  makes the board's own WiFi; two fight).
+- **His board's SIZE matches the board the robot is built for.**
+  Waveshare's own Orin Nano kit (what their Jetson option ships, and
+  their page says *"This is not the NVIDIA official Developer Kit"*)
+  is 103 x 90.5 x 34 mm. The official devkit is 103 x 90.5 x 34.77 mm
+  including feet, module and cooler (Switch Science's spec table;
+  NVIDIA's own datasheet not read). Same footprint, under a millimetre
+  apart. His Sept measurement of ~1.9-2" (48-51 mm) disagrees with that
+  spec, so a ruler from desk to fan top (should be ~3.5 cm) settles it.
+  The drawing's gap from chassis top to top plate reads ~43 mm (my
+  reading of their drawing, estimated).
+- Their Jetson-option kit lists "Comes with a 256 GB NVMe" -- not his
+  concern on the Acce.
 
 **Oct 29, later: *"I think i may try to squeeze the tank in soon .-."***
 Still a lean, not an order. Told him: the price is before shipping and
