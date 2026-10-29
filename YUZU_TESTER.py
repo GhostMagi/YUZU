@@ -6428,21 +6428,108 @@ class TestReiSees(BrainTestCase):
         for name in logs:
             with self.subTest(page=name):
                 page = self.page(name)
-                tag = re.search(r'<button[^>]*id="cam"[^>]*>', page)
-                self.assertTrue(tag and " hidden" in tag.group(0),
-                                "the camera shows before the roster says so")
-                self.assertIn('type="button"', tag.group(0))
-                self.assertRegex(page, r"#cam\[hidden\][^{]*\{\s*display:\s*none")
-                self.assertRegex(page, r"if \(here && c\.sees\) "
-                                       r"document\.getElementById\('cam'\)\.hidden = false")
+                for button in ("cam", "pic"):
+                    tag = re.search(r'<button[^>]*id="%s"[^>]*>' % button, page)
+                    self.assertTrue(tag and " hidden" in tag.group(0),
+                                    "#%s shows before the roster says so" % button)
+                    self.assertIn('type="button"', tag.group(0))
+                    self.assertRegex(page, r"#%s\[hidden\][^{]*\{\s*display:\s*none"
+                                     % button)
+                self.assertRegex(page, r"if \(here && c\.sees\)\s*"
+                                       r"\['cam', 'pic'\]\.forEach\(id => "
+                                       r"\{ document\.getElementById\(id\)\.hidden = false; \}\)")
                 edge = re.search(r"const IMAGE_EDGE = (\d+);", page)
                 self.assertTrue(edge, "the page does not shrink his photo")
                 self.assertEqual(int(edge.group(1)), yuzu_face.IMAGE_EDGE)
                 self.assertIn("toDataURL('image/jpeg'", page)
                 self.assertRegex(page, r'<input id="shot" type="file" '
                                        r'accept="image/&#42;" capture="user">')
+                # Four buttons and a text box squeezed the box to "Ask
+                # he" at 412px: with the gallery showing, a phone gives
+                # the box its own row.
+                narrow = page[page.index("@media (max-width: 760px)"):]
+                self.assertRegex(narrow, r"#ask:has\(#pic:not\(\[hidden\]\)\) "
+                                         r"#text \{ flex: 1 1 100%; \}")
+                # The meme button opens his GALLERY: capture would send
+                # it straight to the camera instead.
+                self.assertRegex(page, r'<input id="pick" type="file" '
+                                       r'accept="image/&#42;">')
                 self.assertRegex(page, r"JSON\.stringify\(\{ text: asked, "
                                        r"who: '\w+', image: image \}\)")
+
+    def test_a_tap_ALWAYS_opens_the_picker_even_while_she_answers_DRIVEN(self):
+        """Ghost's first try on the board, Oct 29: "Camera button wont do
+        anything". The tap waited for Send, so a tap while her slow first
+        reply loaded did NOTHING and said nothing -- reproduced in real
+        Chromium. The page's own camera code, under node, with Send busy:
+        both buttons open their picker, a picture from either lands in
+        the same waiting slot, and only the button he used lights up."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("no node here to run the page's own code")
+        page = self.page("rei.html")
+        block = page[page.index("// ---- SHOW HER SOMETHING"):]
+        block = block[:block.index("if (location.hash === '#say')")]
+        script = r"""
+function El(id) { this.id = id; this.cls = new Set(); this.hidden = true;
+  this.clicks = 0; this.files = null; this.value = 'x'; this.src = '';
+  this.attrs = {}; }
+El.prototype.click = function () { this.clicks++; };
+El.prototype.removeAttribute = function (k) { if (k === 'src') this.src = ''; };
+Object.defineProperty(El.prototype, 'classList', { get() { const c = this.cls; return {
+  add: x => c.add(x), remove: x => c.delete(x), contains: x => c.has(x) }; } });
+const els = {};
+['cam', 'shot', 'pic', 'pick', 'attached', 'preview', 'unattach'].forEach(
+  id => { els[id] = new El(id); });
+const document = { getElementById: id => els[id],
+  createElement: () => ({ getContext: () => ({ drawImage() {} }),
+                          toDataURL: () => 'data:image/jpeg;base64,AAAA' }) };
+const send = { disabled: true };          // she is still answering
+const notes = [];
+function note(t) { notes.push(t); }
+const URL = { createObjectURL: f => 'blob:' + f, revokeObjectURL() {} };
+function Image() { const me = this; setTimeout(() => {
+  me.naturalWidth = 3000; me.naturalHeight = 4000; me.onload(); }, 1); }
+""" + block + r"""
+(async () => {
+  els.cam.onclick();
+  els.pic.onclick();
+  const opened = { shot: els.shot.clicks, pick: els.pick.clicks };
+  els.pick.files = ['meme.png'];
+  els.pick.onchange();
+  await new Promise(r => setTimeout(r, 20));
+  const meme = { photo, shown: !els.attached.hidden, preview: els.preview.src,
+                 pic: els.pic.cls.has('on'), cam: els.cam.cls.has('on'),
+                 cleared: els.pick.value };
+  els.shot.files = ['selfie.jpg'];
+  els.shot.onchange();
+  await new Promise(r => setTimeout(r, 20));
+  const selfie = { pic: els.pic.cls.has('on'), cam: els.cam.cls.has('on') };
+  els.unattach.onclick();
+  console.log(JSON.stringify({ opened, meme, selfie, notes,
+    after: { photo, hidden: els.attached.hidden,
+             lit: els.cam.cls.has('on') || els.pic.cls.has('on') } }));
+  process.exit(0);
+})();
+"""
+        import subprocess
+        out = subprocess.run([node, "-e", script], capture_output=True,
+                             text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        got = json.loads(out.stdout)
+        self.assertEqual(got["opened"], {"shot": 1, "pick": 1},
+                         "a tap while she answers opened NOTHING")
+        meme = got["meme"]
+        self.assertTrue(meme["photo"].startswith("data:image/jpeg"))
+        self.assertTrue(meme["shown"])
+        self.assertEqual(meme["preview"], meme["photo"])
+        self.assertEqual((meme["pic"], meme["cam"]), (True, False),
+                         "the gallery picture lit the wrong button")
+        self.assertEqual(meme["cleared"], "", "the same meme cannot be picked twice")
+        self.assertEqual((got["selfie"]["cam"], got["selfie"]["pic"]), (True, False),
+                         "a selfie after a meme left the meme's button lit")
+        self.assertEqual(got["notes"], [])
+        self.assertEqual(got["after"], {"photo": None, "hidden": True, "lit": False})
 
 
 class TestExactMaths(unittest.TestCase):

@@ -211,15 +211,15 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
    Absent everywhere else -- `hidden`, and the [hidden] rule is
    load-bearing: `display: grid` above would otherwise beat it. Green,
    because the photo is HIS. */
-#cam {
+#cam, #pic {
   flex: none; width: 46px; height: 46px; cursor: pointer;
   display: grid; place-items: center; border-radius: 3px;
   color: var(--him); background: transparent;
   border: 1px solid color-mix(in srgb, var(--him) 55%, transparent);
 }
-#cam[hidden], #attached[hidden], #shot { display: none; }
-#cam svg { width: 22px; height: 22px; }
-#cam.on { color: #031006; background: var(--him); }
+#cam[hidden], #pic[hidden], #attached[hidden], #shot, #pick { display: none; }
+#cam svg, #pic svg { width: 22px; height: 22px; }
+#cam.on, #pic.on { color: #031006; background: var(--him); }
 /* The photo waiting to go with his next line, and an x to drop it. */
 #attached { display: flex; align-items: center; gap: 10px;
             color: var(--him); font-size: 14px; }
@@ -250,6 +250,13 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
      top, small, and the conversation keeps the room. */
   #stage { grid-template-columns: minmax(0, 1fr);
            grid-template-rows: 26vh minmax(0, 1fr); padding: 6px 14px 14px; }
+  /* FOUR BUTTONS AND A TEXT BOX DO NOT FIT ONE PHONE ROW. With the
+     camera and the gallery both showing, the box was squeezed to "Ask
+     he" at 412px, so only then does it take a row of its own above
+     them. Zero's page shows neither, and keeps her one row. */
+  #ask:has(#pic:not([hidden])) { flex-wrap: wrap; }
+  #ask:has(#pic:not([hidden])) #text { flex: 1 1 100%; }
+  #ask:has(#pic:not([hidden])) #send { flex: 1 1 auto; }
   #zero { max-width: 100%; width: 100%; height: 100%;
          -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent);
                  mask-image: linear-gradient(to bottom, #000 70%, transparent); }
@@ -271,7 +278,7 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
     <div id="log"></div>
     <div id="attached" hidden>
       <img id="preview" alt="your photo">
-      <span>photo ready -- ask about it, or just Speak</span>
+      <span>picture ready -- ask about it, or just Speak</span>
       <button id="unattach" type="button">x</button>
     </div>
     <form id="ask" autocomplete="off">
@@ -299,6 +306,20 @@ body.thinking #zero { animation: working 1.6s ease-in-out infinite; }
         </svg>
       </button>
       <input id="shot" type="file" accept="image/&#42;" capture="user">
+      <!-- MEMES, and anything else already on his phone, Oct 29: "can i
+           have an option to send her memes lmao". The same input with NO
+           capture, so the phone opens its gallery rather than the camera.
+           Hidden for the same reason, shown by the same roster line. -->
+      <button id="pic" type="button" title="send her a picture"
+              aria-label="send her a picture" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="2"/>
+          <circle cx="9" cy="9.5" r="1.6"/>
+          <path d="M21 15.5l-5-5L5 20"/>
+        </svg>
+      </button>
+      <input id="pick" type="file" accept="image/&#42;">
       <button id="send" type="submit">Speak</button>
     </form>
   </div>
@@ -330,7 +351,8 @@ fetch('characters.json', { cache: 'no-store' })
       if (here && c.user) HIM = c.user;
       // EYES COME WITH HER MODEL, so the roster says who sees -- never a
       // name typed here. Everyone else never shows the camera.
-      if (here && c.sees) document.getElementById('cam').hidden = false;
+      if (here && c.sees)
+        ['cam', 'pic'].forEach(id => { document.getElementById(id).hidden = false; });
       const el = document.createElement(here ? 'span' : 'a');
       el.textContent = c.name;
       el.title = c.blurb;
@@ -683,6 +705,8 @@ mic.onclick = async () => {
 const IMAGE_EDGE = 640;
 const cam = document.getElementById('cam');
 const shot = document.getElementById('shot');
+const pic = document.getElementById('pic');      // his gallery: memes
+const pick = document.getElementById('pick');
 const attached = document.getElementById('attached');
 let photo = null;          // a data: URL, until it goes with his line
 
@@ -690,6 +714,7 @@ function unattach() {
   photo = null;
   attached.hidden = true;
   cam.classList.remove('on');
+  pic.classList.remove('on');
   document.getElementById('preview').removeAttribute('src');
 }
 
@@ -711,21 +736,33 @@ function shrink(file) {
   });
 }
 
-cam.onclick = () => { if (!send.disabled) shot.click(); };
+// A TAP ALWAYS OPENS IT, even while she is answering. It used to wait
+// for Send, so his first try on the board -- say hi, then tap the
+// camera while her slow first reply loaded -- did nothing and said
+// nothing, which reads as a broken button. Refusing protected nothing:
+// the picture waits beside the text box until he sends his next line.
+cam.onclick = () => shot.click();
+pic.onclick = () => pick.click();
 document.getElementById('unattach').onclick = unattach;
-shot.onchange = () => {
-  const file = shot.files && shot.files[0];
-  shot.value = '';           // the same photo can be picked again
+// One way in for both: the camera's photo and a picture from his
+// gallery are shrunk, waited and sent the same way. The button he used
+// lights up, so he can see which kind is waiting.
+function took(input, button) {
+  const file = input.files && input.files[0];
+  input.value = '';          // the same picture can be picked again
   if (!file) return;
   shrink(file)
     .then(url => {
+      unattach();
       photo = url;
       document.getElementById('preview').src = url;
       attached.hidden = false;
-      cam.classList.add('on');
+      button.classList.add('on');
     })
-    .catch(() => note("That photo wouldn't open here. Try taking it again."));
-};
+    .catch(() => note("That picture wouldn't open here. Try another one."));
+}
+shot.onchange = () => took(shot, cam);
+pick.onchange = () => took(pick, pic);
 
 if (location.hash === '#say') input.focus();
 </script>

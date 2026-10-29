@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1023 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1024 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,43 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## REI'S CAMERA DID NOTHING, AND A BUTTON FOR MEMES (Oct 29)
+
+His first try: *"Camera button wont do anything >.> so far wut do. Also
+can i have an option to send her memes lmao"*. **Reproduced in real
+Chromium**: the tap was `if (!send.disabled) shot.click()`, so a tap
+while she was still answering opened NOTHING and said nothing -- and
+her first reply on a freshly pulled 3.3GB model is the slow one, which
+is exactly when he tapped. An idle tap opened the picker fine. Refusing
+protected nothing: the picture waits beside the text box until his next
+line anyway. **The tap always opens it now.**
+
+- **A gallery button beside the camera** (`#pic` / `#pick`): the same
+  file input with NO `capture`, so the phone opens its gallery instead
+  of the camera. Both go through one `took(input, button)`: shrunk to
+  `IMAGE_EDGE`, waiting in the same slot, and only the button he used
+  lights up. Hidden unless the roster says she sees, by the same line.
+  On both log pages (Zero's hides them), held equal as before.
+- **Four buttons squeezed the text box to "Ask he" at 412px**, found by
+  rendering. On a phone, and only when the gallery button shows
+  (`#ask:has(#pic:not([hidden]))`), the box takes its own row above the
+  buttons; Zero's page and the 1024 panel keep one row. Rendered at
+  412, 360 and 1024: nothing off the edge, no sideways scroll, a picker
+  opens mid-reply and a picked picture lights the gallery button.
+- **One driven test** runs the page's own camera code under node with
+  Send busy: both pickers open, a meme then a selfie light the right
+  button each time, the x clears both. **Nine breaks, all red as
+  failures. 1023 -> 1024.**
+
+**Her prompt did not move**: a meme reaches her as a picture with the
+same `PHOTO_NOTE`, and her photo examples already show her reacting
+rather than describing. **UNMEASURED**: whether a 4B reads a meme as a
+joke or describes it like a caption ("The image shows..."); if it does,
+ONE meme example is the lever. Also UNMEASURED: whether 640px keeps a
+tall meme's small text readable to her (a 1080x2400 screenshot arrives
+as 288x640); cropping the meme is the workaround, and raising the edge
+is a context-guard decision first.
 
 ## HE IS LEANING TO A TANK: WAVESHARE UGV BEAST (Oct 29)
 
