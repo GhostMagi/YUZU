@@ -122,10 +122,15 @@ think?"* What the screenshots also show, NONE of it changed:
 eyes READ THE WORDS on the box**, `EYES_ASK`'s "word for word" working
 (large print; small meme text at 640px is still unmeasured). She
 claimed the cat's green eyes are "just like me" (hers are pink: her
-Llama, again) and offered to name the cat "Zero" -- nobody had told
-her he is Spooky. **Yuzu's page has no "remember that" button** (Four's
-does), so a name she is told lasts only her 8-turn memory; offered,
-not built. The caps were already easing: one shouted sentence, then
+Llama, again) and offered to name the cat "Zero" -- **although his own
+line in that same turn named Spooky** (I first said nobody had told
+her; he corrected me). Likely cause, a hypothesis: his short line came
+first and the eyes' longer description came last, and a 3B answered
+the last thing it read. Not changed, his call: *"its okay she does her
+best and has great energy."* (Putting his words AFTER the note is the
+lever if it keeps happening; her examples would move with it.) **Her
+page has no "remember that" button** (Four's does), so a name lasts
+only her 8-turn memory; offered, not built. The caps were already easing: one shouted sentence, then
 normal case.
 
 **Still UNMEASURED:** how long a photo takes on the board.
