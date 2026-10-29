@@ -753,9 +753,10 @@ def roster():
                     # everything else here; "" for a character with none.
                     "user": (persona.settings.get("USER_NAME") or "").strip(),
                     # Whether her page shows the camera. Read off her
-                    # persona -- eyes come with her model -- so a page
-                    # never holds a list of who can see.
-                    "sees": persona.sees,
+                    # persona -- eyes come with her model, or are
+                    # BORROWED from one (Yuzu, Oct 29) -- so a page never
+                    # holds a list of who can see.
+                    "sees": persona.sees or bool(persona.eyes),
                     # The home screen reads this rather than holding a
                     # name of its own. One roster, one truth -- the same
                     # rule that stopped Mimi being invisible.
@@ -2291,6 +2292,12 @@ IMAGE_BYTES = 1500000
 # way her maths note does. Neutral on purpose: a photo, not a claim
 # about what is in it -- that part is hers to say.
 PHOTO_NOTE = "(A photo came with this message.)"
+# BORROWED EYES (Yuzu, Oct 29): the same note, with what a model that
+# can see said is in it. Her prompt shows it in these exact words, the
+# way it shows PHOTO_NOTE (a test holds them together). "What it shows",
+# not "what you were told": she is looking at it with him, and a note
+# saying a stranger described it is how she would end up saying so.
+EYES_NOTE = "(A photo came with this message. What it shows: %s)"
 # The size of a /say or /stream body is checked BEFORE it is read: a
 # photo in base64 plus his words, and nothing bigger costs anything but
 # the refusal. The /listen discipline.
@@ -2358,13 +2365,25 @@ def photo_from(raw):
 
 
 def sees(key):
-    """Can this character see a photo? Never raises; no is the answer
-    when her persona cannot be read."""
+    """Can this character see a photo -- with her own eyes or borrowed
+    ones? Never raises; no is the answer when her persona cannot be
+    read."""
     try:
         import yuzu_personas
-        return yuzu_personas.load(key).sees
+        persona = yuzu_personas.load(key)
+        return persona.sees or bool(persona.eyes)
     except Exception:
         return False
+
+
+def borrowed_eyes(key):
+    """The vision model this character borrows to see with, or "". See
+    Persona.eyes. Never raises."""
+    try:
+        import yuzu_personas
+        return yuzu_personas.load(key).eyes
+    except Exception:
+        return ""
 
 
 def answer(text, who=None, on_chunk=None, on_suggest=None, image=None):
@@ -2495,9 +2514,31 @@ def answer(text, who=None, on_chunk=None, on_suggest=None, image=None):
     # read as part of a /wiki term. A photo with no words is the note
     # alone: he can just show her something.
     images = None
+    remember = None
     if image:
-        text = ("%s %s" % ((text or "").strip(), PHOTO_NOTE)).strip()
-        images = [image]
+        eyes = borrowed_eyes(key)
+        mine = (text or "").strip()
+        if eyes:
+            # BORROWED EYES: the photo goes to a model that can see, and
+            # what it says is in it rides in beside his line. She answers
+            # on her own model, so the photo never reaches it. A failure
+            # is said in the bubble, never handed to her as a photo she
+            # cannot see -- she would only ask "what photo?".
+            face("thinking")
+            try:
+                seen = yuzu_brain.look_at(image, eyes)
+            except Exception as exc:
+                face("idle")
+                return "(She couldn't make out the photo. %s)" % exc, None
+            text = ("%s %s" % (mine, EYES_NOTE % seen)).strip()
+            # HER MEMORY KEEPS THE SHORT NOTE, Rei's rule: his words and
+            # that a photo came. The description is a few hundred
+            # characters on every later turn otherwise, and her own
+            # reply already says what she saw.
+            remember = ("%s %s" % (mine, PHOTO_NOTE)).strip()
+        else:
+            text = ("%s %s" % (mine, PHOTO_NOTE)).strip()
+            images = [image]
     try:
         if key not in _BRAINS:
             # A KEY, NOT A PERSONA OBJECT. YuzuBrain's `persona`
@@ -2618,6 +2659,10 @@ def answer(text, who=None, on_chunk=None, on_suggest=None, image=None):
             if brain.history and brain.history[-1].get("role") == "assistant":
                 brain.history[-1]["content"] = by_name(suggestions(
                     brain.history[-1]["content"])[0], name)
+            # The borrowed eyes' words stay on THIS turn (see above).
+            if (remember and len(brain.history) >= 2
+                    and brain.history[-2].get("content") == text):
+                brain.history[-2]["content"] = remember
         except Exception:
             pass
         # The brain already wrote `talking` WITH the token rate it just

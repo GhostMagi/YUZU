@@ -3380,6 +3380,19 @@ class TestSpiderBodies(unittest.TestCase):
     # REI, Oct 29: a deck girl with eyes; he asked for a camera, not legs.
     STAYS_ON_THE_DECK = {"saya_deck", "rei"}
 
+    # HOW A PHOTO FROM HIS PHONE REACHES HER, and only her PAGE has a
+    # phone on the other end. Yuzu borrows Rei's eyes there (Oct 29); a
+    # cube and a robot have no way to send her a photo, so they carry
+    # neither the setting nor a turn showing her one -- a body shown
+    # receiving what it can never receive is the void rule for photos.
+    PHONE_ONLY = {"eyes"}
+
+    @staticmethod
+    def photo(ask):
+        """Is this example turn HIM showing her a photo?"""
+        import yuzu_face
+        return yuzu_face.PHOTO_NOTE[:-2] in ask
+
     @staticmethod
     def pilots():
         """Every girl with a robot body, found by her BODY, not listed."""
@@ -3425,11 +3438,16 @@ class TestSpiderBodies(unittest.TestCase):
             twin = yuzu_personas.load(bot.settings["same_girl_as"])
             body = set(yuzu_personas._parse_hardware(twin.hardware))
             body.discard("SOUND_EXAMPLES")      # a character setting
-            skip = body | {"hardware", "description", "same_girl_as"}
+            skip = body | {"hardware", "description", "same_girl_as"} \
+                | self.PHONE_ONLY
             hers = {k: v for k, v in twin.settings.items() if k not in skip}
             mine = {k: v for k, v in bot.settings.items() if k not in skip}
             self.assertEqual(mine, hers, "%s is not the same girl as %s"
                              % (key, twin.key))
+            self.assertFalse(self.PHONE_ONLY & set(bot.settings),
+                             "%s borrows eyes the robot cannot use" % key)
+            self.assertFalse(any(self.photo(a) for a, _b in self.turns(bot)),
+                             "%s is shown a photo the robot cannot send" % key)
             self.assertEqual(bot.blocks["SOUND_EXAMPLES"],
                              twin.blocks["SOUND_EXAMPLES"],
                              "%s makes different sounds" % key)
@@ -3659,8 +3677,8 @@ class TestStackChanCube(unittest.TestCase):
         skip = (set(yuzu_personas._parse_hardware(cube.hardware))
                 | set(yuzu_personas._parse_hardware(twin.hardware))
                 | {k for k in cube.settings if k.startswith("CUBE_")}
-                | {"hardware", "description", "same_girl_as"}) - {
-                    "SOUND_EXAMPLES"}
+                | {"hardware", "description", "same_girl_as"}
+                | TestSpiderBodies.PHONE_ONLY) - {"SOUND_EXAMPLES"}
         hers = {k: v for k, v in twin.settings.items() if k not in skip}
         mine = {k: v for k, v in cube.settings.items() if k not in skip}
         self.assertEqual(mine, hers, "the cube is not the same %s"
@@ -3697,9 +3715,15 @@ class TestStackChanCube(unittest.TestCase):
         self.assertTrue({q for q, _a in deck} >= self.REWRITTEN,
                         "a rewritten turn is no longer one of hers")
         for ask, said in deck:
-            if ask not in self.REWRITTEN:
+            # A photo from his phone is a PAGE turn: the cube cannot send
+            # her one, so it is not carried -- and must not be.
+            if ask not in self.REWRITTEN and not TestSpiderBodies.photo(ask):
                 self.assertIn((ask, said), cube,
                               "the cube lost or changed: %s" % ask)
+        self.assertFalse(any(TestSpiderBodies.photo(a) for a, _b in cube),
+                         "the cube is shown a photo it can never be sent")
+        self.assertFalse(TestSpiderBodies.PHONE_ONLY & set(self.cube().settings),
+                         "the cube borrows eyes it cannot use")
 
     def test_she_knows_what_the_CUBE_is_and_not_what_the_deck_was(self):
         """Her mind is on the Orin and the cube reaches it over WiFi, so
@@ -3783,7 +3807,10 @@ class TestYuzuCube(TestStackChanCube):
     her page self was never a machine in the first place."""
 
     KEY, NAME, TWIN = "yuzu_cube", "yuzu-cube", "yuzu_avatar"
-    REWRITTEN = set()
+    # Her page's "What do you see?" asks him to tap HIS PHONE'S camera
+    # (borrowed eyes, Oct 29); the cube's own camera is not hooked up,
+    # and the cube's answer says so.
+    REWRITTEN = {"What do you see?"}
 
     def test_she_keeps_her_DRAWN_body_on_the_cube(self):
         """The fault Ghost named for her by hand, Sept 11: "in case i
@@ -6207,18 +6234,37 @@ class TestReiSees(BrainTestCase):
 
     def test_eyes_are_HERS_and_nobody_else_has_them(self):
         """Read off the personas, not listed: whoever says `sees: yes`
-        sees, and on the roster that is Rei and only Rei today. Zero,
-        on weights with no eyes, must not."""
+        sees with her OWN model, and on the roster that is Rei and only
+        Rei today. Zero, on weights with no eyes, must not.
+
+        And since Oct 29 a girl can BORROW them ("Lets go with
+        Yuzu+Borrowed Eyes to start"): `eyes:` names a vision model that
+        looks for her. The roster says she sees either way, so her page
+        shows the camera -- and the eyes she borrows must really be a
+        vision model, or a photo for her is an error at best."""
         import yuzu_face
         seeing = {c["who"] for c in yuzu_face.roster() if c["sees"]}
-        self.assertEqual(seeing, {"rei"})
+        self.assertEqual(seeing, {"rei", "yuzu"})
         self.assertTrue(yuzu_personas.load("rei").sees)
         self.assertFalse(yuzu_personas.load("zero").sees)
+        self.assertFalse(yuzu_personas.load("yuzu_avatar").sees,
+                         "Yuzu's own Llama has no eyes")
+        self.assertEqual(yuzu_personas.load("yuzu_avatar").eyes,
+                         yuzu_personas.load("rei").settings["model"],
+                         "Yuzu should borrow the eyes already on his board")
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
             if persona.sees:
                 self.assertIn("vl", persona.settings.get("model", "").lower(),
                               "%s says she sees on a model with no eyes" % key)
+                self.assertEqual(persona.eyes, "",
+                                 "%s borrows eyes she already has" % key)
+            if persona.eyes:
+                self.assertIn("vl", persona.eyes.lower(),
+                              "%s borrows eyes that cannot see" % key)
+                self.assertNotIn("vl", (persona.settings.get("model")
+                                        or "").lower(),
+                                 "%s borrows eyes on a model that sees" % key)
 
     def test_rei_is_zeros_twin_on_her_OWN_eyes(self):
         """Every one of Zero's settings, for Zero's reasons, except the
@@ -6422,9 +6468,15 @@ class TestReiSees(BrainTestCase):
         beats the browser's own `hidden` without it. And the page shrinks
         a photo to the SAME edge the server refuses past."""
         import yuzu_face
+        # Every log page carries it hidden, AND every page whose girl the
+        # roster says can see -- Yuzu's bubble page since Oct 29, with
+        # borrowed eyes. A girl who sees on a page with no camera is a
+        # feature nobody can reach.
         logs = sorted({c["page"] for c in yuzu_face.roster()
-                       if "// ONE TURN IN THE LOG" in self.page(c["page"])})
+                       if "// ONE TURN IN THE LOG" in self.page(c["page"])
+                       or c["sees"]})
         self.assertIn("rei.html", logs)
+        self.assertIn("yuzu.html", logs)
         for name in logs:
             with self.subTest(page=name):
                 page = self.page(name)
@@ -6627,6 +6679,251 @@ function fetch(route, opts) { posts.push([route, JSON.parse(opts.body)]);
                 self.assertEqual(got["notes"], [])
                 self.assertEqual((got["text"], got["armed"]), ("start fresh", False),
                                  "it stays armed after it fired")
+
+
+class TestBorrowedEyes(BrainTestCase):
+    """Ghost, Oct 29: "Lets go with Yuzu+Borrowed Eyes to start." He
+    loves Rei, and wanted the girl who "just works" to see too. Yuzu's
+    Llama has no eyes and the small vision models talk less like her, so
+    she BORROWS them: a photo goes to Rei's model first, it says plainly
+    what is in it, and those words ride in beside his line to Yuzu on
+    her own model. The /wiki shape -- the looking is somebody else's,
+    the answer is hers."""
+
+    EYES = "huihui_ai/qwen3-vl-abliterated:4b-instruct"
+
+    def b64(self, data):
+        import base64
+        return base64.b64encode(data).decode("ascii")
+
+    def page(self, name):
+        return (Path(__file__).parent / "ui" / name).read_text()
+
+    def drive(self, *calls):
+        """The real answer() and the real brain against the stand-in
+        Ollama, every request it got, and what her memory kept."""
+        import yuzu_face, yuzu_brain
+        real, host = yuzu_brain.YuzuBrain, self.host
+
+        class Pointed(real):
+            def __init__(self, **kw):
+                kw.setdefault("host", host)
+                super().__init__(**kw)
+
+        kept = []
+        MockOllama.seen["all"] = []
+        was = dict(yuzu_face._BRAINS)
+        out = []
+        try:
+            yuzu_face._BRAINS.clear()
+            with mock.patch.object(yuzu_brain, "YuzuBrain", Pointed), \
+                 mock.patch.object(yuzu_brain, "DEFAULT_HOST", host), \
+                 mock.patch.object(yuzu_face, "load_memory", lambda *a: None), \
+                 mock.patch.object(yuzu_face, "save_memory",
+                                   lambda b, k: kept.append(
+                                       [dict(m) for m in b.history])), \
+                 mock.patch.object(yuzu_face, "facts_line", lambda k: ""):
+                for args, kw in calls:
+                    out.append(yuzu_face.answer(*args, **kw))
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+        return out, MockOllama.seen["all"], kept
+
+    def test_she_BORROWS_rei_eyes_and_answers_on_her_OWN_model_DRIVEN(self):
+        """Two requests for one photo, in order: the eyes, with the photo,
+        asked only to say what is in it, cool and short, letting go of
+        their memory at once (one model at a time on his board); then
+        HER model, with his line and the eyes' words in the code's own
+        note -- and no photo anywhere in her request. Her memory keeps
+        the short note: the description rode on that turn only."""
+        import yuzu_face, yuzu_brain
+        MockOllama.replies = itertools.cycle([
+            "The image shows a man with short dark hair holding his phone "
+            "up.\n- **He is smiling.**",
+            "Cute selfie, Ghost!"])
+        photo = self.b64(tiny_jpeg(8, 8))
+        (reply,), sent, kept = self.drive((("Rate my fit.", "yuzu"),
+                                           {"image": photo}))
+        self.assertEqual(reply, ("Cute selfie, Ghost!", None))
+        self.assertEqual(len(sent), 2, "one photo, one look, one answer")
+        eyes, hers = sent
+        self.assertEqual(eyes["model"], self.EYES)
+        self.assertEqual(eyes["messages"], [{
+            "role": "user", "content": yuzu_brain.EYES_ASK, "images": [photo]}],
+            "the eyes were handed her character or his words")
+        self.assertEqual(eyes["keep_alive"], 0,
+                         "the eyes keep their memory while her model waits")
+        self.assertIs(eyes["think"], False)
+        self.assertLessEqual(eyes["options"]["num_ctx"], 4096)
+        self.assertNotEqual(hers["model"], self.EYES,
+                            "Yuzu answered on the eyes' model")
+        self.assertTrue(all("images" not in m for m in hers["messages"]),
+                        "the photo reached a model with no eyes")
+        seen = ("A man with short dark hair holding his phone up. "
+                "He is smiling.")
+        self.assertEqual(hers["messages"][-1]["content"],
+                         "Rate my fit. " + yuzu_face.EYES_NOTE % seen)
+        self.assertEqual(kept[-1][-2]["content"],
+                         "Rate my fit. " + yuzu_face.PHOTO_NOTE,
+                         "the description stayed in her memory")
+
+    def test_the_STREAM_and_a_photo_with_NO_words_borrow_them_too(self):
+        """The page's other route, and the turn that is only a photo: the
+        note alone, the same as Rei's."""
+        import yuzu_face
+        MockOllama.replies = itertools.cycle(["A cat asleep on a keyboard.",
+                                              "Ehehe~ that cat owns you now."])
+        photo = self.b64(tiny_jpeg(8, 8))
+        chunks = []
+        (reply,), sent, _kept = self.drive((("", "yuzu"),
+                                            {"image": photo,
+                                             "on_chunk": chunks.append}))
+        self.assertIsNone(reply[1])
+        self.assertEqual("".join(chunks).strip(), "Ehehe~ that cat owns you now.")
+        self.assertEqual(sent[0]["model"], self.EYES)
+        self.assertEqual(sent[1]["messages"][-1]["content"],
+                         yuzu_face.EYES_NOTE % "A cat asleep on a keyboard.")
+        self.assertTrue(all("images" not in m for m in sent[1]["messages"]))
+
+    def test_eyes_that_FAIL_are_said_plainly_and_she_is_never_asked(self):
+        """Not pulled, timed out, or said nothing: the bubble says so in
+        words, and she is not handed a photo she cannot see -- she would
+        only ask "what photo?". The pull line names the EYES, not her."""
+        import yuzu_face, yuzu_brain
+        asked = []
+
+        class Brain:
+            history, system_prompt = [], ""
+            def __init__(self, **kw): pass
+            def ask(self, text, images=None):
+                asked.append(text)
+                return "hi"
+
+        def missing(image, model, **kw):
+            raise yuzu_brain.BrainError(
+                "Her eyes are not on this board yet. Pull it once in a "
+                "terminal:\n  ollama pull %s" % model)
+
+        photo = self.b64(tiny_jpeg(8, 8))
+        was = dict(yuzu_face._BRAINS)
+        try:
+            yuzu_face._BRAINS.clear()
+            with mock.patch.object(yuzu_brain, "YuzuBrain", Brain), \
+                 mock.patch.object(yuzu_brain, "look_at", missing), \
+                 mock.patch.object(yuzu_face, "load_memory", lambda *a: None), \
+                 mock.patch.object(yuzu_face, "save_memory", lambda *a: None):
+                reply, error = yuzu_face.answer("look", "yuzu", image=photo)
+        finally:
+            yuzu_face._BRAINS.clear()
+            yuzu_face._BRAINS.update(was)
+        self.assertIsNone(error)
+        self.assertTrue(reply.startswith("(She couldn't make out the photo."))
+        self.assertIn("ollama pull " + self.EYES, reply)
+        self.assertEqual(asked, [], "she was asked about a photo nobody saw")
+        # And the brain's own 404 wording, pointed at the EYES: "Her
+        # model is not on this board" would send him after a model that
+        # is fine.
+        def refused(brain, payload):
+            raise yuzu_brain.BrainError(
+                brain._refused(404, '{"error":"model not found"}'))
+        with mock.patch.object(yuzu_brain.YuzuBrain, "_chat", refused):
+            with self.assertRaises(yuzu_brain.BrainError) as caught:
+                yuzu_brain.look_at(photo, self.EYES)
+        self.assertIn("Her eyes are not on this board", str(caught.exception))
+        self.assertIn("ollama pull " + self.EYES, str(caught.exception))
+
+    def test_what_the_eyes_say_reaches_her_PLAIN_and_SHORT(self):
+        """These models open with "The image shows", write lists and bold,
+        and can run long. Handed to her, that is how SHE would talk. So it
+        is flattened, the opener goes, and it stops at a sentence's end
+        no later than EYES_MAX."""
+        import yuzu_brain
+        plain = yuzu_brain.plain_description
+        self.assertEqual(plain("The image shows a dog on a sofa."),
+                         "A dog on a sofa.")
+        self.assertEqual(plain("In this photo, a red car."), "A red car.")
+        self.assertEqual(plain("**Description:**\n- A cat.\n- It is orange.\n"
+                               "1. ### A bowl."),
+                         "A cat. It is orange. A bowl.")
+        self.assertEqual(plain("<think>hmm</think>A tank on a desk."),
+                         "A tank on a desk.")
+        long = " ".join("Sentence number %d is here." % i for i in range(60))
+        cut = plain(long)
+        self.assertLessEqual(len(cut), yuzu_brain.EYES_MAX)
+        self.assertTrue(cut.endswith("here."), "she was handed half a sentence")
+        self.assertGreater(len(cut), yuzu_brain.EYES_MAX // 2)
+        self.assertEqual(plain(""), "")
+
+    def test_her_prompt_shows_the_note_in_the_CODES_OWN_words(self):
+        """Rei's discipline: her examples show exactly what the server
+        writes beside his line, so she learns the shape she will really
+        be handed -- a photo with a question, a photo with no words, a
+        blurry one she asks him to take again, and "What do you see?"
+        with no photo, which asks for the camera rather than inventing.
+        And nothing tells her the photo was DESCRIBED: she is looking at
+        it with him, and a girl told a stranger described it says so."""
+        import yuzu_face
+        persona = yuzu_personas.load("yuzu_avatar")
+        before, after = yuzu_face.EYES_NOTE.split("%s")
+        shape = re.compile(re.escape(before) + r"[A-Z][^()]+[.!?]"
+                           + re.escape(after) + "$")
+        me = persona.name + ":"
+        lines = persona.prompt.splitlines()
+        shown = [(a, b) for a, b in zip(lines, lines[1:])
+                 if shape.search(a) and not a.startswith(me)]
+        self.assertGreaterEqual(len(shown), 3, "too few photo turns shown")
+        self.assertTrue(all(b.startswith(me) for _a, b in shown))
+        self.assertTrue(any(shape.match(a.split(":", 1)[1].strip())
+                            for a, _b in shown),
+                        "nothing shows a photo with no words")
+        self.assertTrue(any("blurry" in a and "again" in b for a, b in shown),
+                        "nothing shows her asking for a photo she can't make out")
+        see = [b for a, b in zip(lines, lines[1:]) if a.endswith("What do you see?")]
+        self.assertTrue(see and "camera" in see[0],
+                        "with no photo she does not ask for one")
+        # "describe", "described" AND "description": the first version
+        # of this check looked for "describ", which "description" does
+        # not contain -- its own break-check stayed green.
+        self.assertNotRegex(persona.prompt.lower(), r"descri(b|p)",
+                            "her prompt tells her the photo was described")
+
+    def test_every_page_that_shows_her_something_does_it_with_the_SAME_code(self):
+        """No build step, so each page carries its own copy of the camera
+        code -- Rei's page drives it (the picker test above), and every
+        other copy is held to it character for character."""
+        def block(name):
+            page = self.page(name)
+            if "// ---- SHOW HER SOMETHING" not in page:
+                return None
+            b = page[page.index("// ---- SHOW HER SOMETHING"):]
+            return b[:b.index("if (location.hash === '#say')")]
+        pages = sorted(n.name for n in (Path(__file__).parent / "ui").glob("*.html")
+                       if block(n.name))
+        self.assertIn("yuzu.html", pages)
+        for name in pages:
+            with self.subTest(page=name):
+                self.assertEqual(block(name), block("rei.html"),
+                                 "%s takes a photo differently" % name)
+
+    def test_her_PAGE_sends_the_photo_and_keeps_it_beside_his_line(self):
+        """Her bubble shows his photo with his words, and the turn says
+        so while the eyes look -- a photo is the slow kind of turn. The
+        line comes back from the ONE copy of his() every bubble page
+        shares, so the photo hangs on his own line."""
+        code = self.page("yuzu.html")
+        send = code[code.index("form.onsubmit"):]
+        send = send[:send.index("\n};")]
+        self.assertIn("if (!asked && !image) return;", send)
+        self.assertIn("const mine = his(asked);", send)
+        self.assertIn("mine.appendChild(snap);", send)
+        self.assertIn("waiting.textContent = 'looking...';", send)
+        self.assertIn("who: 'yuzu', image: image", send)
+        for name in ("four.html", "face.html", "yuzu.html"):
+            with self.subTest(page=name):
+                body = self.page(name)
+                his = body[body.index("function his(text)"):]
+                self.assertIn("return mine;", his[:his.index("\n}\n")])
 
 
 class TestExactMaths(unittest.TestCase):
@@ -18040,6 +18337,14 @@ class TestWikiBrevity(unittest.TestCase):
             if persona.sees:
                 patches = -(-yuzu_face.IMAGE_EDGE // 28)
                 system += patches * patches
+            # AND WHAT BORROWED EYES SAY (Yuzu, Oct 29): the description
+            # rides in HIS turn, at most EYES_MAX inside the note's own
+            # frame -- on that turn only, because her memory keeps the
+            # short note. So it is counted once, like a photo.
+            if persona.eyes:
+                import yuzu_brain as _brain
+                system += (_brain.EYES_MAX + len(yuzu_face.EYES_NOTE)) \
+                    / CHARS_PER_TOKEN
             need = system + turns * (int(cap) + HIS_TURN) + int(cap)
             if worst is None or need > worst[1]:
                 worst = (key, need)

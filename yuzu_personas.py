@@ -163,6 +163,21 @@ class Persona:
             "yes", "true", "1")
 
     @property
+    def eyes(self):
+        """The model she BORROWS to see with, or "" -- for a girl whose
+        own model has no eyes. Ghost, Oct 29: "Lets go with Yuzu+Borrowed
+        Eyes to start." `eyes: <a vision model>` in her settings: a photo
+        he sends goes to that model first, it says plainly what is in
+        it, and she answers from those words on her OWN model -- so she
+        talks exactly as well as she always has. The /wiki shape.
+
+        Never for a girl who sees for herself: her own eyes win, and a
+        second look would only be a slower, worse one."""
+        if self.sees:
+            return ""
+        return str(self.settings.get("eyes", "")).strip()
+
+    @property
     def retired(self):
         """Is this character out of the cast?
 

@@ -1197,6 +1197,92 @@ def wants_exact_maths(persona):
         return False
 
 
+# ---------------------------------------------------------------------
+# BORROWED EYES. Ghost, Oct 29: "Lets go with Yuzu+Borrowed Eyes to
+# start." Yuzu's Llama has no eyes, and every vision model small enough
+# for his board talks less like her than she does. So a photo for her
+# goes to a model that CAN see (Rei's, already on his board), which
+# says plainly what is in it, and those words ride in beside his line --
+# the /wiki shape: the lookup is somebody else's, the answer is hers.
+#
+# WHAT THE EYES ARE ASKED FOR IS A DESCRIPTION AND NOTHING ELSE. Not a
+# reaction, not a character: a model wearing no name, writing plain
+# sentences she can react to in her own voice. Words written in the
+# picture are asked for word for word, because half of what he sends
+# her will be memes. Blurry is said, never guessed past -- a small
+# vision model invents details as confidently as it sees them.
+EYES_ASK = ("Say plainly what is in this photo, for a friend who cannot "
+            "see it: who or what is in it, what they are doing, the "
+            "colours, and any words written in it, word for word. Three "
+            "or four short sentences, no list. Only what you can really "
+            "see; if part of it is blurry or too dark to tell, say so.")
+# What reaches her, at most. It rides in HIS turn, so it is counted in
+# her context like a photo is -- and on THIS turn only: her history
+# keeps his words and the note, and her own reply carries the rest.
+EYES_MAX = 500
+# Cool and short: a description is not the place for invention. And a
+# small window, because the whole job is one photo and a few sentences,
+# and on 8GB the cache it reserves is memory her own model wants back.
+EYES_OPTIONS = {"temperature": 0.2, "num_predict": 200, "num_ctx": 2048}
+# "The image shows..." is how these models open, and handed to her it
+# is how SHE would open. Taken off in code; the ask reduces, this
+# guarantees.
+_EYES_OPENER = re.compile(
+    r"^(?:description\s*:\s*)?"
+    r"(?:(?:in\s+)?(?:the|this)\s+(?:image|photo|picture|photograph)"
+    r"(?:\s+(?:shows|depicts|features|contains|is\s+of))?[\s,:]*)?", re.I)
+
+
+def plain_description(text):
+    """The eyes' words as plain sentences: no thought, no markdown, no
+    list, no "The image shows", and no longer than EYES_MAX -- cut at
+    the end of a sentence, so she is never handed half of one."""
+    text = strip_thought(text or "")
+    text = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s+", "", text, flags=re.M)
+    text = re.sub(r"[*#_`]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    text = _EYES_OPENER.sub("", text, count=1).strip()
+    if text:
+        text = text[0].upper() + text[1:]
+    if len(text) > EYES_MAX:
+        cut = text[:EYES_MAX]
+        end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+        text = cut[:end + 1] if end > 0 else cut.rsplit(" ", 1)[0] + "..."
+    return text
+
+
+def look_at(image, model, host=None, timeout=None):
+    """What is in a photo, in a few plain sentences, from a model that
+    can see. `image` is base64, already checked by the face server.
+    BrainError, in words he can act on, when it cannot be had.
+
+    `keep_alive: 0`: the eyes let go of their memory the moment they
+    have spoken. On his board one model is loaded at a time, so her own
+    model is about to come back either way -- this just means it never
+    waits for the eyes to time out first."""
+    eyes = YuzuBrain(model=model, host=host or DEFAULT_HOST,
+                     system_prompt="", timeout=timeout)
+    try:
+        data = eyes._chat({
+            "model": model,
+            "messages": [{"role": "user", "content": EYES_ASK,
+                          "images": [image]}],
+            "stream": False,
+            "think": False,
+            "options": dict(EYES_OPTIONS),
+            "keep_alive": 0,
+        })
+    except BrainError as exc:
+        # The brain's words say "Her model", and her model is fine: it is
+        # the EYES that are missing or slow, and the pull line names them.
+        raise BrainError(str(exc).replace("Her model is", "Her eyes are", 1)
+                         .replace("Her model", "Her eyes", 1)) from exc
+    said = plain_description(_words(data.get("message")))
+    if not said:
+        raise BrainError("Her eyes looked and said nothing.")
+    return said
+
+
 def ground(text, maths=False):
     """Substitute a `/wiki` lookup into what he typed. (text, problem).
 

@@ -237,6 +237,33 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--pink) 25%, transparent); }
 }
 #mic.busy { opacity: .45; cursor: default; }
+/* SHOW HER SOMETHING, Oct 29: borrowed eyes. Ghost: "Lets go with
+   Yuzu+Borrowed Eyes to start." The camera and his gallery, the same
+   two buttons Rei has, in Yuzu's pink like her mic. HIDDEN until the
+   roster says she can see, and the [hidden] rule is load-bearing:
+   `display: grid` would otherwise beat the browser's own `hidden`. */
+#cam, #pic {
+  flex: none; width: 46px; height: 46px; cursor: pointer;
+  display: grid; place-items: center; border-radius: 3px;
+  color: var(--pink); background: rgba(0,0,0,.32);
+  border: 1px solid color-mix(in srgb, var(--pink) 55%, transparent);
+}
+#cam[hidden], #pic[hidden], #attached[hidden], #shot, #pick { display: none; }
+#cam svg, #pic svg { width: 22px; height: 22px; }
+#cam.on, #pic.on { color: #2a0a1a; background: var(--pink); }
+/* The photo waiting to go with his next line, and an x to drop it.
+   Above her, like the ask bar, or her picture paints over it. */
+#attached { position: relative; z-index: 2; display: flex; align-items: center;
+            gap: 10px; padding: 6px 26px 0; color: var(--dim); font-size: 14px; }
+#attached img { height: 54px; border-radius: 3px;
+                border: 1px solid color-mix(in srgb, var(--pink) 55%, transparent); }
+#unattach { font: inherit; color: var(--dim); background: none; cursor: pointer;
+            border: 1px solid var(--edge); border-radius: 3px; padding: 4px 10px; }
+/* His photo in the bubble, with his line: what she was shown stays on
+   screen beside what she said about it. Small: the bubble is small. */
+#says img.snap { display: block; max-width: min(180px, 100%); max-height: 120px;
+                 margin: 4px 0; border-radius: 3px;
+                 border: 1px solid color-mix(in srgb, var(--pink) 45%, transparent); }
 
 @media (max-width: 760px) {
   /* THE WAY OUT MUST NEVER BE THE THING THAT FALLS OFF. Measured at
@@ -261,6 +288,14 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
           max-height: 34vh; }
   #says::after { display: none; }
   #stage { justify-items: center; padding-right: 0; }
+  /* FIVE THINGS IN ONE ROW DO NOT FIT A PHONE. Rei's page found it:
+     with the camera and the gallery showing, the text box was squeezed
+     to "Ask he" at 412px. So only then does it take a row of its own
+     above the buttons. */
+  #ask:has(#pic:not([hidden])) { flex-wrap: wrap; }
+  #ask:has(#pic:not([hidden])) #text { flex: 1 1 100%; }
+  #ask:has(#pic:not([hidden])) #send { flex: 1 1 auto; }
+  #attached { padding: 6px 18px 0; }
 }
 </style>
 
@@ -281,6 +316,12 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
   <div id="says"></div>
 </div>
 
+<div id="attached" hidden>
+  <img id="preview" alt="your photo">
+  <span>picture ready -- ask about it, or just Speak</span>
+  <button id="unattach" type="button">x</button>
+</div>
+
 <form id="ask" autocomplete="off">
   <input id="text" placeholder="Say something to her..." maxlength="2000">
   <button id="mic" type="button" title="talk to her" aria-label="talk to her">
@@ -290,6 +331,29 @@ body.thinking #glow { animation: sparkle 1.7s ease-in-out infinite; }
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"/>
     </svg>
   </button>
+  <!-- HIDDEN unless the roster says she can see -- with BORROWED eyes,
+       for Yuzu (Rei's model looks, she answers). The same two buttons
+       and inputs as Rei's page, character for character; the star in
+       accept is &#42; for the suite's comment stripper. -->
+  <button id="cam" type="button" title="show her something"
+          aria-label="show her something" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 8h3l2-3h6l2 3h3v11H4z"/>
+      <circle cx="12" cy="13" r="3.5"/>
+    </svg>
+  </button>
+  <input id="shot" type="file" accept="image/&#42;" capture="user">
+  <button id="pic" type="button" title="send her a picture"
+          aria-label="send her a picture" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <circle cx="9" cy="9.5" r="1.6"/>
+      <path d="M21 15.5l-5-5L5 20"/>
+    </svg>
+  </button>
+  <input id="pick" type="file" accept="image/&#42;">
   <button id="send" type="submit">Speak</button>
 </form>
 
@@ -312,6 +376,10 @@ fetch('characters.json', { cache: 'no-store' })
     cast.forEach(c => {
       const here = c.who === ME;
       if (here && c.user) HIM = c.user;
+      // SHE CAN SEE when the roster says so -- her own eyes or borrowed
+      // ones -- never a name typed here.
+      if (here && c.sees)
+        ['cam', 'pic'].forEach(id => { document.getElementById(id).hidden = false; });
       const el = document.createElement(here ? 'span' : 'a');
       el.textContent = c.name;
       el.title = c.blurb;
@@ -372,6 +440,7 @@ function his(text) {
   const mine = line('him', HIM, text);
   waiting = line('her pending', '', '...');
   show(mine);
+  return mine;            // so a page that sends a photo can hang it here
 }
 
 function said(text) {
@@ -510,9 +579,21 @@ function hear(words) {
 form.onsubmit = (event) => {
   event.preventDefault();
   const asked = input.value.trim();
-  if (!asked) return;
+  // A photo with no words is a turn: he can just show her something.
+  const image = photo;
+  if (!asked && !image) return;
   input.value = '';
-  his(asked);
+  unattach();
+  const mine = his(asked);
+  if (image) {
+    const snap = document.createElement('img');
+    snap.className = 'snap';
+    snap.alt = 'your photo';
+    snap.src = image;
+    mine.appendChild(snap);
+    // A photo is the slow kind of turn: her eyes look first.
+    waiting.textContent = 'looking...';
+  }
   send.disabled = true;
   send.textContent = '...';
   document.body.classList.add('thinking');
@@ -523,7 +604,7 @@ form.onsubmit = (event) => {
   fetch('say', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: asked, who: 'yuzu' }),
+    body: JSON.stringify({ text: asked, who: 'yuzu', image: image }),
   })
     .then(r => r.json())
     .then(r => said(r.said || 'She said nothing.'))
@@ -614,6 +695,80 @@ mic.onclick = async () => {
     if (recorder && recorder.state === 'recording') recorder.stop();
   }, 60000);
 };
+
+// ---- SHOW HER SOMETHING ----------------------------------------------
+// Ghost, Oct 29: "Lets start with a Zero clone that can use my zflips
+// camera." The camera is HIS PHONE'S, the same split as the mic and her
+// voice: the board has none. A tap opens the phone's camera; the photo
+// waits beside the text box until he sends his line (or just Speak).
+//
+// SHRUNK HERE, CHECKED THERE. A phone photo is twelve million pixels
+// and thousands of tokens to her model -- more than her whole memory of
+// the conversation. So it is drawn onto a canvas no bigger than
+// IMAGE_EDGE on its longest side and sent as a JPEG, and the server
+// refuses anything bigger (yuzu_face.IMAGE_EDGE; a test holds the two
+// numbers equal). The photo goes to the board and nowhere else.
+const IMAGE_EDGE = 640;
+const cam = document.getElementById('cam');
+const shot = document.getElementById('shot');
+const pic = document.getElementById('pic');      // his gallery: memes
+const pick = document.getElementById('pick');
+const attached = document.getElementById('attached');
+let photo = null;          // a data: URL, until it goes with his line
+
+function unattach() {
+  photo = null;
+  attached.hidden = true;
+  cam.classList.remove('on');
+  pic.classList.remove('on');
+  document.getElementById('preview').removeAttribute('src');
+}
+
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, IMAGE_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src = url;
+  });
+}
+
+// A TAP ALWAYS OPENS IT, even while she is answering. It used to wait
+// for Send, so his first try on the board -- say hi, then tap the
+// camera while her slow first reply loaded -- did nothing and said
+// nothing, which reads as a broken button. Refusing protected nothing:
+// the picture waits beside the text box until he sends his next line.
+cam.onclick = () => shot.click();
+pic.onclick = () => pick.click();
+document.getElementById('unattach').onclick = unattach;
+// One way in for both: the camera's photo and a picture from his
+// gallery are shrunk, waited and sent the same way. The button he used
+// lights up, so he can see which kind is waiting.
+function took(input, button) {
+  const file = input.files && input.files[0];
+  input.value = '';          // the same picture can be picked again
+  if (!file) return;
+  shrink(file)
+    .then(url => {
+      unattach();
+      photo = url;
+      document.getElementById('preview').src = url;
+      attached.hidden = false;
+      button.classList.add('on');
+    })
+    .catch(() => note("That picture wouldn't open here. Try another one."));
+}
+shot.onchange = () => took(shot, cam);
+pick.onchange = () => took(pick, pic);
 
 if (location.hash === '#say') input.focus();
 </script>

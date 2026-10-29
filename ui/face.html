@@ -578,6 +578,7 @@ function his(text) {
   const mine = line('him', HIM, text);
   waiting = line('her pending', '', '...');
   show(mine);
+  return mine;            // so a page that sends a photo can hang it here
 }
 
 function said(text) {

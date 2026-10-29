@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1026 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1033 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,7 +49,59 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## "WHATS THE CLOSEST TO YUZU WITH VISION" -- ANSWERED, NOTHING BUILT (Oct 29)
+## YUZU SEES WITH BORROWED EYES -- ROUTE A, BUILT (Oct 29)
+
+*"Lets go with Yuzu+Borrowed Eyes to start."* Built, UNMEASURED: no
+model has looked at a photo for her yet.
+
+- **`eyes: huihui_ai/qwen3-vl-abliterated:4b-instruct`** in
+  `yuzu_avatar` (`Persona.eyes`; "" for a girl who `sees` herself).
+  Rei's model, already on his board, so **nothing new to pull**.
+- **A photo goes to the eyes first** (`yuzu_brain.look_at`): only the
+  photo and `EYES_ASK` (say plainly what is in it, words in it word for
+  word, say blurry rather than guess), `think: false`, temperature 0.2,
+  `num_ctx` 2048, **`keep_alive: 0`** so the eyes let go the moment they
+  have spoken. `plain_description` flattens lists and bold, drops "The
+  image shows" (handed to her, it is how SHE would open) and cuts at a
+  sentence end by `EYES_MAX` (500).
+- **She answers on her own Llama**, handed `EYES_NOTE` --
+  `(A photo came with this message. What it shows: ...)` -- and the
+  photo never reaches her model. **Her memory keeps the short
+  `PHOTO_NOTE`**: the description is on that turn only (her own reply
+  carries what she saw), so the context guard counts it once. 321
+  tokens spare, counted pessimistically.
+- **Eyes that fail are said in the bubble**, `(She couldn't make out
+  the photo. ...)`, and she is never asked about a photo nobody saw.
+  The pull line names the EYES ("Her eyes are not on this board yet").
+  A test caught "Her eyes **is**" before it shipped.
+- **Her prompt: rule 9 and four examples** in the code's exact note: a
+  selfie with a question, a meme with no words, a blurry one she asks
+  him to retake, and "What do you see?" asking for the camera. **Nothing
+  says the photo was described** -- she looks at it with him. 3624 ->
+  4951 chars. Not LIVE_PERSONA, so nothing pasted.
+- **Her page**: the camera and gallery buttons, Rei's camera code
+  character for character (a test holds every copy to Rei's), his photo
+  in the bubble beside his line, "looking..." while the eyes work.
+  `his()` returns his line now, on all three bubble pages, held equal.
+  On a phone the text box takes its own row, as on Rei's.
+- **The cube and the robot do not borrow them**: neither can send her
+  a photo. `PHONE_ONLY` and photo turns are left out of the twin
+  checks, and a test holds that neither carries them.
+- **Driven in real Chromium** against the real `answer()` with only
+  the two models stood in for: a 3000x4000 photo reached the eyes as
+  480x640, her turn carried the note with no photo, her memory kept
+  the short note. Rendered at 412, 360 and 1024: no sideways scroll,
+  exit in its corner. **Eighteen breaks, all red as failures** -- after
+  one stayed GREEN: "never says described" looked for `describ`, which
+  "description" does not contain. **1026 -> 1033.**
+
+**UNMEASURED, all on his board:** how long a photo takes (the eyes
+load, look, unload, then her Llama loads back: two swaps, tens of
+seconds -- her page says "looking..." meanwhile); whether a 4B's
+description is good enough for her to react well; and whether she
+says "from the description" anyway. Text turns are unchanged.
+
+## "WHATS THE CLOSEST TO YUZU WITH VISION" -- ANSWERED; ROUTE A BUILT ABOVE (Oct 29)
 
 *"Yoooooo whats the closest to Yuzu with vision we can get? I love Rei.
 I also need me a really well done working anime trope one like Yuzu
