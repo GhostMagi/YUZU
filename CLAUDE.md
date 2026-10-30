@@ -49,6 +49,112 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## REI REPEATS HERSELF: WHAT IS WRONG (Oct 30) -- DIAGNOSED, NOT FIXED
+
+*"Hmmm so she seems to repeat alot of things. The 2 antaenae is what
+she said about the Waveshare Beast earlier... and the building/saving
+money bit is a repeat too. Can you look at her really intricately and
+figure out whats wrong?"* His screenshots: a photo of the Orin on his
+desk, then two replies carrying "You're not just X -- you're Y" three
+times, "What do you want to build next?" twice, a parenthetical aside
+alone on a line ("(And I'm right here -- with my eyes open.)", then
+"(And if you tap the camera again -- I can see it.)"), the sign-off
+"Rei. / Always. 💡" on both, a bullet list, and "Two 5G antennas" on a
+board with none in the picture. **Nothing changed yet**: he was near
+his usage limit, and the diagnosis was the ask.
+
+**Three causes, stacked:**
+
+1. **HER OWN SAVED REPLIES ARE HER STRONGEST EXAMPLE**, measured here
+   many times (Four's "user", Kuro's name tag, Rei's own "Zero's twin
+   soul"). `history_turns` is 8 and her replies run long, so every turn
+   she re-reads up to eight of her own long replies -- each with the
+   sign-off, the aside and the "not just X" frame -- and copies them.
+   **The aside is the SAME SLOT as the Oct 29 "Zero's twin soul" line
+   with new words**: that fix took the words out of her prompt, and her
+   habit kept the shape.
+2. **NOTHING IN HER SAMPLING PUSHES BACK, and the one setting that
+   would is not applied.** Qwen's own card for Qwen3-VL Instruct says
+   `presence_penalty` 1.5, because it loops without it. Rei gets
+   DEFAULT_OPTIONS' `repeat_penalty` 1.1, and per ollama/ollama#14493 (a
+   public bug report; UNVERIFIED on his Ollama version) the Go runner
+   that runs qwen3-vl has NO penalty sampling at all: accepted,
+   ignored. So on her model repetition is fought by her prompt alone.
+   Sending `presence_penalty` costs nothing and is expected to do
+   nothing on that runner -- try it only as a measurement.
+3. **EVERY PHOTO LOOKS THE SAME IN HER MEMORY.** A photo rides on its
+   own turn only; her history keeps PHOTO_NOTE, identical for every
+   photo, plus her own description of it. The Beast's antennas were in
+   her memory as HER words with nothing saying which picture they were
+   about, and a 4B handed a new photo of a board reused them. "Saving
+   money" is the same: something she said earlier, re-read, re-said.
+
+**What to do, in order:**
+- **Now, no Update: `start fresh` on her page, two taps.** It clears
+  every saved reply at once: the sign-off, the aside, the antennas.
+  Whether he tapped it after the Oct 29 Update is unknown.
+- **Recommended next, NOT BUILT: take her SIGN-OFF off in code**, the
+  `_without_own_label` mirror -- a line that is only her own name at
+  the END of a reply, and one short line after it, dropped from the
+  bubble, her voice and her memory, so a sign-off is never saved to be
+  copied. **And a shorter memory for her**: `history_turns` as a
+  persona setting, 4 for Rei -- half as much of herself to copy (the
+  context guard only gains). Both hers only; the Llama girls do not
+  loop like this.
+- **NOT recommended**: a rule saying "don't repeat yourself" or naming
+  the sign-off -- the pink-elephant shape, measured three times here.
+
+## CUBE REI: DESIGNED AND RESEARCHED, NOT BUILT (Oct 30)
+
+*"Hey brobro can Rei use the cubes camera? A cuberei if you will?"*
+Paused for the repetition question above before any file was written.
+**Fix her repetition first: a cube Rei inherits it.** What was settled,
+so the next session starts here rather than re-researching:
+
+- **HIS CUBE HAS THE CAMERA, from M5Stack's own code.** M5GFX's
+  autodetect calls a board `board_M5StackChan` ONLY when a GC0308
+  answers on the internal I2C (reg 0x00 == 0x9b) and an M5IOE1 at 0x6F
+  has firmware >= 4; with no camera it is a CoreS3 SE. M5Unified powers
+  it as on the CoreS3 (AXP2101 ALDO3 3.3V "for camera").
+- **THE CAMERA SHARES THE TOUCH AND POWER I2C BUS** (SDA 12, SCL 11,
+  I2C_NUM_1: the touch chip, the AXP2101, the AW9523, the mic and amp
+  codecs). M5Stack's GC0308 code (`m5stack/M5CoreS3`,
+  src/utility/GC0308.cpp) calls `M5.In_I2C.release()` then
+  `esp_camera_init`: pin_xclk -1, SCCB 12/11, D7..D0 =
+  47,48,16,15,42,41,40,39, VSYNC 46, HREF 38, PCLK 45, RGB565, QVGA,
+  fb_count 2 in PSRAM, GRAB_WHEN_EMPTY -- and never gives the bus back.
+  **The plan**: capture INSIDE loop(), so M5.update() never polls touch
+  while the camera owns the bus; release, init, throw away ~8 frames
+  while exposure settles, `frame2jpg`, `esp_camera_deinit` (its
+  SCCB_Deinit deletes the bus it created -- read in esp32-camera at the
+  bundled commit dfeaa71), then `M5.In_I2C.begin(port, sda, scl)` with
+  the values read before the release. The toolchain's sdkconfig has
+  `CONFIG_GC0308_SUPPORT=y` and the NEW I2C driver on port 1.
+  UNVERIFIED on hardware, all of it, and the picture's orientation
+  (hmirror/vflip) is unknown.
+- **TAP = SHE LOOKS, HOLD = TALK.** A tap on her face sends a QVGA
+  photo with no words (a photo with no words is already a turn). The
+  board needs only `DEVICES["rei-cube"] = "rei_cube"` and her
+  `sees: yes`: /stream reads `"image"` (base64) from the JSON body, and
+  SAY_BODY_MAX is far above a QVGA JPEG. Photo AND words cannot both
+  come from the cube, so "does this shirt work?" is two steps -- she
+  asks him to point and tap, and the tap's turn has his question in
+  her history. A photo on every hold was rejected: a 4B shown a picture
+  every turn describes the room every turn.
+- **What the build touches**: `rei_cube.persona` (same_girl_as rei,
+  sees: yes, CUBE_SCREEN saying a tap takes a photo; "What do you see?"
+  -> tap my screen; a photo of him; a too-dark one -- a 0.3MP camera in
+  his room will be dark often); `[CUBE_FACTS]`'s camera sentence tokened
+  out as `CUBE_CAMERA` with today's sentence as the default, so the
+  other four move only by their CUBE_COMPANY and introductions naming
+  Rei; `TestStackChanCube`'s "never shown a photo" and "Tell me" checks
+  made conditional on the girl seeing, and TestTheCubeIsSHARED's facts
+  check taught the new token; firmware: a GIRLS entry AFTER Saya (only
+  the ghost's page moves), `rei_art.h` from make_art (her rei.jpg close
+  up, Zero's pattern), compose_rei in her cyan, POCKET_REI, the camera,
+  and the photo body built in PSRAM, not an Arduino String. Swiping to
+  her is a model swap (Qwen3-VL), like Zero.
+
 ## YUZU SEES WITH BORROWED EYES -- ROUTE A, BUILT (Oct 29)
 
 *"Lets go with Yuzu+Borrowed Eyes to start."* Built, UNMEASURED: no
