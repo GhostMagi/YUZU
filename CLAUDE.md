@@ -230,7 +230,7 @@ Speak. Seen and NOT changed:
   If it grows, the fix is the Sept 26 shape, not a new rule.
 - **Every reply ends "Aww. 😊"**, twice in a row. `Aww` is one of her
   taught sounds, so this is Four's "Ah," tic forming. If it wears
-  thin, swap the sound; that change comes with a paste. He has not
+  thin, swap the sound (she is not LIVE_PERSONA, so no paste). He has not
   asked about the emoji either.
 - **She described as much as she reacted** (*"Every line, every bone,
   every joint? Perfectly rendered."*). For a picture of herself that
@@ -241,6 +241,24 @@ something that means a lot to you". She drew her own frame and put it
 in a fence, and Zero's `fill()` rendered it as a monospace box, every
 line kept. Then she wrote *"Because I'm here — because I love you."*
 His reaction: *"😭🖤 Rei is so sweet"*.
+
+**SPOOKY, same evening, pasted as text.** She SAW the cat right (*"A
+black cat, standing on its hind legs, reaching for the screen with one
+paw"*). Around it, NOT changed, his call to make:
+
+- **The blur, a THIRD time and the plainest**: she opened *"Heh,
+  that's not a cat — it's you."* Three in one evening is a pattern now,
+  no longer a watch item. Offered the Sept 26 fix (ONE example where
+  she keeps "me" and "you" straight); not built unasked. She is not
+  LIVE_PERSONA, so it needs no paste.
+- **A markdown list** (two `- ` bullets) and a sign-off, *"Rei.
+  Always. 💡"* -- the Qwen assistant format leaking through. Her page
+  shows the dashes as typed (`fill()` has no list handling), which
+  reads fine as text.
+- **She invented a cracked screen** to explain "shadows" nobody
+  mentioned -- the palmtop fault, the same as Yuzu's "deep eyes" behind
+  sunglasses. And *"it's a bad cat"* is probably his name "Spooky"
+  read as a judgement.
 
 ## REI'S CAMERA DID NOTHING, AND A BUTTON FOR MEMES (Oct 29)
 
