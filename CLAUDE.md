@@ -166,8 +166,10 @@ with it, so which way up the camera's picture sits was not reported as
 wrong (not seen either). Then he took the board and the cube to a
 friend's to show off the offline version; *"The homie wasnt really
 paying attention like usual"* -- and his verdict: *"I think the girls
-are cool as heck!"*. **Still UNVERIFIED: the cube joining `ghostnano`**
-away from home -- asked, not yet answered.
+are cool as heck!"*, then *"She does work tho on the cube and such"*.
+**Still UNVERIFIED: the cube joining `ghostnano`** away from home. "She
+works" does not settle it: pocket mode answers a hold with NO board at
+all. A tap that got Rei a photo there would (her look needs the board).
 
 ## CUBE REI: BUILT (Oct 30)
 
