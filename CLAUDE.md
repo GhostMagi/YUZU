@@ -106,6 +106,38 @@ saving"*** -- he is SAVING for the Go2 Pro now. Whether the Waveshare
 tank is still bought first was not said; not asked, not assumed.
 Still nothing built until it is ordered.
 
+**THE GOAL IS ALL OF THE DOG, his words, same day:** *"Your uh bonus
+section is actually the goal from the start. I deff want them to use
+all of the dog"* -- the camera and the speaker were not extras to him,
+they were the point. What "all of it" is over WiFi on a Go2, from the
+library's own README feature table (read Oct 30; nothing run on a
+dog, all UNVERIFIED until one is on his desk):
+
+- **Legs**: sport-mode moves. Her brackets, through the bridge.
+- **Eyes**: the front camera's video. Rei sees it herself; Yuzu and
+  Four through the borrowed eyes. ONLY when asked or on a trigger,
+  never every turn (a 4B shown a picture every turn describes the room
+  every turn -- the Cube Rei call).
+- **Mouth**: audio SENT to the dog's speaker. Kokoro renders on the
+  board as now; the missing piece is the board playing each reply
+  itself (already noted for the robot under "THE DECK IS ABANDONED").
+- **Ears**: audio RECEIVED from the dog's mic. Push-to-talk from his
+  phone stays the way in (no wake word, his call); the dog's mic is an
+  option, and a mic on walking legs hears motors.
+- **Its body, honestly**: lowstate (IMU, motors, and very likely the
+  battery %, UNVERIFIED for the Go2) -- a REAL battery number the
+  girls may say, in the `board_now()` shape, unlike the deck's
+  invented "82%".
+- **LiDAR and obstacle avoidance**: the dog's own, toggled over WiFi.
+  A real "don't bump the cat".
+- **VUI**: its LED, brightness and volume -- the girls' colours on the
+  dog is the cube's LED idea (item 7, "later") again.
+
+What it costs, said before anything is built: the 8GB (Llama + Rei's
+eyes one at a time + Kokoro + Whisper + decoding the dog's video), and
+a dog body file per girl (`_hardware_go2.txt`, the spider-body pattern)
+with "What do you see?" moving from "ask him" to the dog's camera.
+
 ## REI REPEATS HERSELF -- FIXED IN CODE (Oct 30)
 
 *"Hmmm so she seems to repeat alot of things. The 2 antaenae is what
