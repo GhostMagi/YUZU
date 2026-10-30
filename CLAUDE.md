@@ -138,6 +138,25 @@ eyes one at a time + Kokoro + Whisper + decoding the dog's video), and
 a dog body file per girl (`_hardware_go2.txt`, the spider-body pattern)
 with "What do you see?" moving from "ask him" to the dog's camera.
 
+**"Wait it cant see all the time? How would it follow me?"** (same
+day). Answered: two different kinds of seeing. A girl TALKING about a
+picture is the heavy one (Rei's 4B, seconds a look, one model at a
+time), so only when asked. FOLLOWING needs no talking AI at all:
+
+- **The Pro follows by itself**: retailer spec tables list UWB /
+  "wireless vector positioning" side-follow (ISS 2.0) and an "AI
+  Follow Mode" with a small tracker he carries; a Japanese review says
+  the Air lacks AI Follow Mode and that it drops out if he turns
+  sharply. Retailer pages, NOT Unitree's own docs; one says the Air
+  has side-follow too. **Check Unitree's own spec page before buying,
+  and get the PRO.** UNVERIFIED: whether the board can switch that
+  mode on over WebRTC (the library's feature table does not list it).
+- **Or the board follows him by camera**: a small person-finder (not
+  a girl's brain) on the dog's video many times a second, steering
+  the legs. Everything in "Before anyone adds vision / follow-me"
+  applies: the memory budget, a watchdog that stops the dog when the
+  video goes stale, and the remote as the hard stop.
+
 ## REI REPEATS HERSELF -- FIXED IN CODE (Oct 30)
 
 *"Hmmm so she seems to repeat alot of things. The 2 antaenae is what
