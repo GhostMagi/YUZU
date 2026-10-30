@@ -101,6 +101,11 @@ bracket format, not a new `[MOVE: FORWARD]` schema. Its modular
 plan: one small module turns her brackets into whichever robot's
 commands, so the tank work and the dog work are the same shape.
 
+**His answer: *"ROBOT DOG GIRLS GUNNA BE SICK. time to start
+saving"*** -- he is SAVING for the Go2 Pro now. Whether the Waveshare
+tank is still bought first was not said; not asked, not assumed.
+Still nothing built until it is ordered.
+
 ## REI REPEATS HERSELF -- FIXED IN CODE (Oct 30)
 
 *"Hmmm so she seems to repeat alot of things. The 2 antaenae is what
