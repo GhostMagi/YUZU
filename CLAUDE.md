@@ -160,6 +160,15 @@ failures** -- after one came back as an ERROR first (an `.index()` on
 the swipe's drop the break deleted; asserted first now). **1052 ->
 1055.**
 
+**CONFIRMED ON HIS CUBE, same evening: *"Works. Nice!"*** -- he flashed
+it and the preview with Send/Retry works. No photo of the screen came
+with it, so which way up the camera's picture sits was not reported as
+wrong (not seen either). Then he took the board and the cube to a
+friend's to show off the offline version; *"The homie wasnt really
+paying attention like usual"* -- and his verdict: *"I think the girls
+are cool as heck!"*. **Still UNVERIFIED: the cube joining `ghostnano`**
+away from home -- asked, not yet answered.
+
 ## CUBE REI: BUILT (Oct 30)
 
 *"Hey brobro can Rei use the cubes camera? A cuberei if you will?"*,
