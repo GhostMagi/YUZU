@@ -49,6 +49,58 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## A UNITREE GO2 PRO, DRIVEN BY THE BOARD OVER WIFI -- ANSWERED, NOT BUILT (Oct 30)
+
+He sent a Gemini-written handoff ("Jetson to Unitree Go2 Pro"): the
+board rides on a Go2 PRO's back and drives it over the network, so he
+does not need the EDU. *"i wana confirm before i spend 3k in the
+future"*. **A future buy, not an order; nothing was built**, the
+tank's rule (the body file and the bridge come when it is ordered).
+
+**Answer given: yes, very likely, over WIFI, not the cable.** Read
+here, not run:
+
+- **The Pro is driven the way the Unitree phone app drives it: WebRTC
+  over WiFi.** `legion1581/unitree_webrtc_connect` (MIT) lists Go2
+  AIR/PRO/EDU: sport-mode movement, the front camera's VIDEO, AUDIO to
+  the dog's speaker, LiDAR, obstacle avoidance. So Rei could one day
+  see through it and the girls talk out of it (UNVERIFIED on a dog).
+- **What only the EDU has: the cable** (unitree_sdk2 over DDS,
+  192.168.123.161) **and low-level motor control.** Neither is needed:
+  her thirteen measured bracket moves are high-level (walk, turn, sit,
+  stand, wave, dance).
+- **Firmware 1.1.15+ needs a per-dog AES-128 key**, fetched ONCE with
+  internet and the Unitree account the dog is registered to (the
+  library's `unitree-fetch-aes-key`). The key appeared when the
+  firmware changed, so a future update could break it again: check
+  the library supports a version BEFORE updating the dog.
+- **ONE WiFi client at a time**: the board OR the Unitree app. His
+  phone talks to the girls, not to the dog, so that is fine. The
+  handheld remote is the stop (a control panel's notes: L2+B goes
+  soft); buy the bundle WITH the controller.
+- **Power and mount**: no accessory power port was found on the
+  Air/Pro (UNVERIFIED), so the board needs its own bank (the old JSAUX
+  65W + PD-to-barrel idea) and a plate. ~1 kg against ~8 kg payload.
+- **"The signal the board gives"**: the dog joins `ghostnano` like
+  the cube does. UNVERIFIED that the Unitree app lets it join a WiFi
+  with no internet. Fallbacks: the board joins the dog's own hotspot
+  (192.168.12.1), or a cheap USB WiFi stick for a second network.
+- **Security, said once**: UniPwn (CVE-2025-35027, Bluetooth WiFi
+  setup -> root, published Sept 2025) and a Go1 phone-home tunnel
+  (CVE-2025-2894); a July 2026 report says UniPwn was still unfixed
+  (one source). His offline-by-default board helps: on `ghostnano`
+  there is no internet to phone home to.
+- **Price**: $3,790 US for the Pro per one Aug 2026 source, $2,800 per
+  another. Told to check Unitree's own store; "3k" may be low.
+
+**The Gemini doc's slips, corrected for him**: `stnano.local` is
+`ghostnano.local`; her voice is Kokoro, not Piper; the girls think on
+Llama (Qwen-VL is Rei's and the eyes'); and we keep OUR measured
+bracket format, not a new `[MOVE: FORWARD]` schema. Its modular
+"mock / tank / Go2" bridge idea is right and matches the going-live
+plan: one small module turns her brackets into whichever robot's
+commands, so the tank work and the dog work are the same shape.
+
 ## REI REPEATS HERSELF -- FIXED IN CODE (Oct 30)
 
 *"Hmmm so she seems to repeat alot of things. The 2 antaenae is what
