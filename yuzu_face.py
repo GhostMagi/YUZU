@@ -632,6 +632,10 @@ DEVICES = {
     "yuzu-cube":     "yuzu_cube",
     "zero-cube":     "zero_cube",
     "saya-cube":     "saya_cube",
+    # Oct 30: "Hey brobro can Rei use the cubes camera? A cuberei if you
+    # will?" The one girl in the cube who sees: a tap on her face sends
+    # a photo from the cube's own camera through this same name.
+    "rei-cube":      "rei_cube",
 }
 
 # MIMI IS THE FIRST CHARACTER WHOSE PICTURE CHANGES DURING A

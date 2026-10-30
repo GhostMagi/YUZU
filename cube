@@ -1,13 +1,14 @@
 #!/bin/bash
-# ~/YUZU/cube -- put Four, Yuzu, Zero and Saya on the StackChan cube.
+# ~/YUZU/cube -- put Four, Yuzu, Zero, Saya and Rei on the StackChan cube.
 #
 #   1. Plug the cube into one of the board's USB-A ports.
 #   2. Run:  ~/YUZU/cube
 #
 # Ghost, Oct 2: "can we put Four in it? Her art on the screen?" This is
 # the one word that does it. Then, the same day: "Can you squeeze Yuzu
-# on too?", then Zero, then Saya (Oct 22) -- so the cube carries all
-# four, and a swipe moves between them. Run it
+# on too?", then Zero, then Saya (Oct 22), then Rei with the cube's
+# camera (Oct 30) -- so the cube carries all five, and a swipe moves
+# between them. Run it
 # again any time the cube code changes. It pulls the newest code itself
 # first (Oct 22), so it never puts an old cube back on.
 #
@@ -319,7 +320,8 @@ if ! cli compile -b "$FQBN" --build-path "$build/out" --upload -p "$cube" \
     exit 1
 fi
 
-echo "DONE. Four, Yuzu, Zero and Saya are on the cube."
+echo "DONE. Four, Yuzu, Zero, Saya and Rei are on the cube."
 echo "It restarts by itself; give it about ten seconds to join your WiFi."
 echo "Hold the screen to talk, let go to send. Swipe across it to change girls."
-echo "Swipe past Saya for the ghost."
+echo "On Rei, a tap takes a photo with the cube's camera and she looks at it."
+echo "Swipe past Rei for the ghost."

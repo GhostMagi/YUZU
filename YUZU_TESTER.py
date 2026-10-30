@@ -3720,8 +3720,18 @@ class TestStackChanCube(unittest.TestCase):
             if ask not in self.REWRITTEN and not TestSpiderBodies.photo(ask):
                 self.assertIn((ask, said), cube,
                               "the cube lost or changed: %s" % ask)
-        self.assertFalse(any(TestSpiderBodies.photo(a) for a, _b in cube),
-                         "the cube is shown a photo it can never be sent")
+        if self.cube().sees:
+            # REI, Oct 30: the cube's own camera is hers. A tap sends the
+            # photo with NO words -- the cube cannot send both at once --
+            # so every photo turn she is shown is the bare note.
+            import yuzu_face
+            shots = [a for a, _b in cube if TestSpiderBodies.photo(a)]
+            self.assertTrue(shots, "nothing shows her a photo from the cube")
+            self.assertTrue(all(a == yuzu_face.PHOTO_NOTE for a in shots),
+                            "the cube is shown a photo WITH words: %r" % shots)
+        else:
+            self.assertFalse(any(TestSpiderBodies.photo(a) for a, _b in cube),
+                             "the cube is shown a photo it can never be sent")
         self.assertFalse(TestSpiderBodies.PHONE_ONLY & set(self.cube().settings),
                          "the cube borrows eyes it cannot use")
 
@@ -3748,7 +3758,11 @@ class TestStackChanCube(unittest.TestCase):
         self.assertTrue(seen, "nothing shows her what to say when asked "
                               "what she sees")
         self.assertIn("camera", seen[0])
-        self.assertIn("Tell me", seen[0], "she does not ask him instead")
+        if cube.sees:
+            # The one girl the camera is connected to asks for a tap.
+            self.assertIn("tap", seen[0], "she does not say how to show her")
+        else:
+            self.assertIn("Tell me", seen[0], "she does not ask him instead")
 
     def test_her_introduction_says_how_to_USE_the_cube(self):
         """Strangers get told how to use the cube, by her: hold to talk,
@@ -3871,6 +3885,85 @@ class TestSayaCube(TestStackChanCube):
         self.assertNotIn("no face", cube.prompt)
 
 
+class TestReiCube(TestStackChanCube):
+    """REI ON THE CUBE, Oct 30. Ghost: "Hey brobro can Rei use the cubes
+    camera? A cuberei if you will?" Then, once her repeating was fixed:
+    "Then do cube rei". Every test of the cube's Four, run again for her
+    -- and the camera, which is hers alone: a tap on her face takes a
+    photo and she looks at it. Her page's turns that are about HIS
+    PHONE'S camera, or about the deck, are rewritten; the rest are the
+    measured girl word for word."""
+
+    KEY, NAME, TWIN = "rei_cube", "rei-cube", "rei"
+    REWRITTEN = {"Hey Rei.", "What do you see?", "What do you look like?",
+                 "Introduce yourself."}
+
+    def test_the_cubes_CAMERA_is_hers_and_she_knows_how_it_is_used(self):
+        """Told it is connected (her own CUBE_CAMERA, never the default
+        that says it is not), told what a tap does, and shown the
+        two-step a photo AND a question needs on a cube: his question,
+        her asking him to point the cube and tap, then the photo alone
+        -- answered as the answer to his question. And a dark one,
+        because a 0.3MP camera in his room will often be dark."""
+        import yuzu_face
+        cube = self.cube()
+        self.assertTrue(cube.sees, "the girl the camera is for cannot see")
+        self.assertIn("CUBE_CAMERA", cube.settings)
+        self.assertIn("it is yours", cube.prompt)
+        self.assertNotIn("nothing connects it", cube.prompt)
+        self.assertIn("tap", cube.settings["CUBE_SCREEN"])
+        turns = TestSpiderBodies.turns(cube)
+        asks = [a for a, _b in turns]
+        first = asks.index(yuzu_face.PHOTO_NOTE)
+        self.assertIn("tap", turns[first - 1][1],
+                      "his question before a photo does not ask for a tap")
+        self.assertFalse(TestSpiderBodies.photo(asks[first - 1]))
+        shots = [b for a, b in turns if a == yuzu_face.PHOTO_NOTE]
+        self.assertTrue(any("dark" in b and "tap" in b for b in shots),
+                        "nothing shows her a photo too dark to see")
+        for word in ("described", "description", "the image shows"):
+            self.assertNotIn(word, " ".join(shots).lower())
+
+    def test_she_brings_her_REPEAT_FIX_to_the_cube(self):
+        """A cube Rei inherits her repeating, so she inherits the fix
+        (Oct 30): half the memory, and Qwen's penalty."""
+        brain = YuzuBrain(persona=self.KEY, host="http://127.0.0.1:9")
+        self.assertEqual(brain.history_turns, 4)
+        self.assertEqual(brain.options.get("presence_penalty"), 1.5)
+
+
+class TestReiCubeLooks(BrainTestCase):
+    """What the cube sends when he taps Rei's face, through the board.
+    The cube posts exactly what her page posts -- {"text": "", "who":
+    "rei-cube", "image": <base64>} -- to /stream, so the board side
+    needed nothing but her name in DEVICES."""
+
+    def drive(self, *calls):
+        # Defined further down the file; looked up when it is called.
+        return TestBorrowedEyes.drive(self, *calls)
+
+    def test_a_tap_photo_reaches_HER_model_through_the_real_answer(self):
+        """Driven through the real answer() and the real brain against
+        the stand-in Ollama: a QVGA photo is accepted, her own model is
+        handed it with the bare note, and her memory keeps the PAST
+        note, the repeat fix carried onto the cube."""
+        import base64, yuzu_face
+        MockOllama.replies = itertools.cycle(["A desk, a lamp, and you."])
+        photo = base64.b64encode(tiny_jpeg(320, 240)).decode("ascii")
+        self.assertIsNotNone(yuzu_face.photo_from(photo)[0],
+                             "a QVGA photo from the cube is refused")
+        (reply,), sent, kept = self.drive((("", "rei-cube"),
+                                           {"image": photo}))
+        self.assertEqual(reply[0], "A desk, a lamp, and you.")
+        hers = sent[-1]
+        self.assertEqual(hers["model"],
+                         YuzuBrain(persona="rei", host=self.host).model)
+        self.assertEqual(hers["messages"][-1]["content"],
+                         yuzu_face.PHOTO_NOTE)
+        self.assertEqual(hers["messages"][-1]["images"], [photo])
+        self.assertEqual(kept[-1][-2]["content"], yuzu_face.PAST_PHOTO_NOTE)
+
+
 class TestTheCubeIsSHARED(unittest.TestCase):
     """Two girls, one cube, a swipe between them. What is true of the
     CUBE is one copy in the body file; what is true of ONE GIRL is hers,
@@ -3934,10 +4027,42 @@ class TestTheCubeIsSHARED(unittest.TestCase):
         for girl in self.cube_girls():
             self.assertEqual(girl.hardware, "stackchan")
             facts = body["CUBE_FACTS"].replace(
-                "{CUBE_COMPANY}", girl.settings["CUBE_COMPANY"])
+                "{CUBE_COMPANY}", girl.settings["CUBE_COMPANY"]).replace(
+                "{CUBE_CAMERA}", girl.settings.get("CUBE_CAMERA")
+                or body["CUBE_CAMERA"])
             self.assertIn(facts, girl.prompt,
                           "%s's cube facts are not the shared ones"
                           % girl.key)
+
+
+class TestTheCubesCAMERA(unittest.TestCase):
+    """Oct 30: the cube's camera is connected to Rei and nobody else. The
+    sentence that says so is a token, [CUBE_CAMERA], with today's
+    "nothing connects it" as its default -- so a girl who cannot see is
+    told the truth with no line of her own, and the girl who can says
+    her own. Both directions are pinned: a girl who sees and forgets
+    hers would be told her camera is not hooked up and deny a photo in
+    front of her; a girl who cannot see and claims one would invent a
+    room."""
+
+    def test_the_camera_is_said_CONNECTED_only_to_a_girl_who_SEES(self):
+        import yuzu_face
+        body = yuzu_personas._parse_hardware("stackchan")
+        self.assertIn("nothing connects it", body["CUBE_CAMERA"])
+        self.assertIn("{CUBE_CAMERA}", body["CUBE_FACTS"])
+        seers = 0
+        for key in yuzu_face.DEVICES.values():
+            girl = yuzu_personas.load(key)
+            if girl.sees:
+                seers += 1
+                self.assertIn("CUBE_CAMERA", girl.settings,
+                              "%s sees and is told her camera is off" % key)
+                self.assertNotIn("nothing connects it", girl.prompt)
+            else:
+                self.assertNotIn("CUBE_CAMERA", girl.settings,
+                                 "%s cannot see and is given a camera" % key)
+                self.assertIn(body["CUBE_CAMERA"], girl.prompt)
+        self.assertEqual(seers, 1, "the camera is one girl's: Rei's")
 
 
 class TestTheCubeCode(unittest.TestCase):
@@ -4107,8 +4232,11 @@ class TestTheCubeCode(unittest.TestCase):
         which girl asked before it starts -- or a swipe would send a
         clip of nothing to the board, or Yuzu's question to Four."""
         code = self.code()
-        release = code[code.index("stop_recording();\n      if"):
-                       code.index("xTaskCreatePinnedToCore")]
+        # From the release to the turn IT starts: Rei's tap starts one
+        # of its own further up (look()), so the first in the file is
+        # not this one.
+        at = code.index("stop_recording();\n      if")
+        release = code[at:code.index("xTaskCreatePinnedToCore", at)]
         self.assertIn("is_swipe(t)", release.split("wasClicked")[0],
                       "the swipe is checked after a turn could start")
         self.assertIn("asking = girl;", release,
@@ -4339,22 +4467,108 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertIn("draw_battery();", code[code.index("static void draw_frame"):],
                       "nothing draws the battery")
 
-    def test_zeros_face_on_the_cube_is_her_PAGES(self):
-        """Her pink and her working cue, two copies that must agree: the
-        page brightens her picture to 1.3 while she works, and so does
-        the cube."""
-        page = (self.ROOT / "ui" / "zero.html").read_text()
-        her = re.search(r"--her:\s*#([0-9a-fA-F]{6})", page).group(1)
-        cube_pink = re.search(r"ZERO_PINK\s*=\s*0x([0-9a-f]{6})", self.code())
-        self.assertTrue(cube_pink, "the cube has no pink for her")
-        self.assertEqual(int(cube_pink.group(1), 16), int(her, 16))
-        working = re.search(r"@keyframes working\s*\{(.*?)\n\}", page, re.S)
-        peak = max(float(b) for b in
-                   re.findall(r"brightness\(([\d.]+)\)", working.group(1)))
-        cube = re.search(r"ZERO_WORKING\s*=\s*([\d.]+)f", self.code())
-        self.assertTrue(cube, "the cube has no working cue for her")
-        self.assertAlmostEqual(float(cube.group(1)), peak,
-                               msg="she works at a different brightness")
+    def test_the_TWINS_faces_on_the_cube_are_their_PAGES(self):
+        """Each twin's colour and working cue, two copies that must agree:
+        her page brightens her picture to 1.3 while she works, and so
+        does the cube. Zero is pink; Rei (Oct 30) is his cyan."""
+        for page, colour, cue in (("zero.html", "ZERO_PINK", "ZERO_WORKING"),
+                                  ("rei.html", "REI_CYAN", "REI_WORKING")):
+            page = (self.ROOT / "ui" / page).read_text()
+            her = re.search(r"--her:\s*#([0-9a-fA-F]{6})", page).group(1)
+            cube_ink = re.search(colour + r"\s*=\s*0x([0-9a-f]{6})",
+                                 self.code())
+            self.assertTrue(cube_ink, "the cube has no %s" % colour)
+            self.assertEqual(int(cube_ink.group(1), 16), int(her, 16),
+                             "%s is not her page's colour" % colour)
+            working = re.search(r"@keyframes working\s*\{(.*?)\n\}", page,
+                                re.S)
+            peak = max(float(b) for b in
+                       re.findall(r"brightness\(([\d.]+)\)",
+                                  working.group(1)))
+            cube = re.search(cue + r"\s*=\s*([\d.]+)f", self.code())
+            self.assertTrue(cube, "the cube has no %s" % cue)
+            self.assertAlmostEqual(float(cube.group(1)), peak,
+                                   msg="%s works at a different brightness"
+                                       % cue)
+
+    def fn(self, name):
+        """One function's body, out of the code with comments gone."""
+        code = self.code()
+        at = re.search(r"\n(?:static )?[\w*]+[ *]+%s\([^)]*\)\s*\{" % name,
+                       code)
+        self.assertTrue(at, "no function %s" % name)
+        depth, i = 0, code.index("{", at.start())
+        for j in range(i, len(code)):
+            depth += {"{": 1, "}": -1}.get(code[j], 0)
+            if depth == 0:
+                return code[i:j + 1]
+
+    def test_a_tap_on_REI_is_a_LOOK_and_only_on_her(self):
+        """Ghost, Oct 30: "can Rei use the cubes camera?" A tap on her
+        face takes a photo; on nobody else's. Never mid-reply -- a tap
+        then is how he stops her -- and never with the board out of
+        reach, because her eyes are her model and her model is on the
+        board. And the girl the tap looks for is the one who SEES."""
+        import yuzu_face
+        tap = self.fn("tapped")
+        self.assertRegex(tap, r"girl == REI && !busy\) look\(\);",
+                         "a tap on Rei does not look, or looks mid-reply")
+        self.assertEqual(self.code().count("look();"), 1,
+                         "something other than a tap on Rei takes a photo")
+        rei = [row for row in self.table("GIRLS") if row[1] == "Rei"]
+        self.assertEqual(len(rei), 1, "Rei is not on the cube")
+        self.assertIn("Tap and I'll look", rei[0][2])
+        self.assertTrue(yuzu_personas.load(
+            yuzu_face.DEVICES[rei[0][0]]).sees,
+            "the cube looks for a girl who cannot see")
+        look = self.fn("look")
+        self.assertLess(look.index("away"), look.index("take_photo()"),
+                        "she takes a photo with nobody to show it to")
+        self.assertIn("asking = girl;", look)
+        self.assertIn("busy = true;", look)
+
+    def test_the_camera_GIVES_THE_BUS_BACK(self):
+        """The camera shares the bus touch, power and audio live on. So:
+        the bus's port and pins are read BEFORE it is let go, it is let go
+        before the camera starts, the camera is shut down before the bus
+        begins again -- on those same pins -- and nothing returns in
+        between with the bus still let go. Get one wrong and the cube's
+        screen stops answering a finger."""
+        shot = self.fn("take_photo")
+        order = [shot.index(x) for x in (
+            "M5.In_I2C.getPort()", "M5.In_I2C.release()", "esp_camera_init",
+            "esp_camera_deinit()", "M5.In_I2C.begin(port, sda, scl)")]
+        self.assertEqual(order, sorted(order),
+                         "the camera does not give the bus back in order")
+        held = shot[order[1]:order[4]]
+        self.assertNotRegex(held, r"\breturn\b",
+                            "a failed photo leaves the bus let go")
+        self.assertIn("esp_camera_fb_return(old)", shot,
+                      "no frames are thrown away while the light settles")
+        settle = re.search(r"SETTLE_FRAMES\s*=\s*(\d+)", self.code())
+        self.assertTrue(settle and int(settle.group(1)) >= 4)
+        # Taken on the drawing core: look() is reached from the touch,
+        # in loop(), never from the turn on the other core.
+        self.assertNotIn("take_photo", self.fn("turn_task"))
+        self.assertNotIn("look()", self.fn("turn_task"))
+
+    def test_the_PHOTO_lives_in_PSRAM_and_goes_when_the_turn_does(self):
+        """A QVGA JPEG in base64 is tens of KB: built in PSRAM, never an
+        Arduino String (which wants it twice in internal memory while
+        it grows), and freed when the turn ends, answered or not -- or
+        the next hold would send the old photo again."""
+        body = self.fn("photo_body")
+        self.assertIn("ps_malloc", body)
+        self.assertNotRegex(body, r"String\([^)]*photo_b64",
+                            "the photo is copied into a String")
+        self.assertIn("ps_malloc", self.fn("take_photo"))
+        turn = self.fn("turn_task")
+        self.assertIn("free(photo_b64)", turn,
+                      "the photo is never freed: the next hold resends it")
+        free_at = turn.index("free(photo_b64)")
+        self.assertLess(turn.index("ask(heard, reply)"), free_at)
+        self.assertLess(free_at, turn.index("busy = false"))
+        self.assertIn("photo_b64 = nullptr", turn[free_at:])
 
     def test_the_sketch_file_holds_no_CODE(self):
         """Every function lives in the .cpp. The Arduino build runs ctags
@@ -4391,6 +4605,9 @@ class TestTheCubeCode(unittest.TestCase):
         self.assertEqual(make_art.render_saya(),
                          (cube / "saya_art.h").read_text(),
                          "saya_art.h is stale -- run stackchan/make_art.py")
+        self.assertEqual(make_art.render_rei(),
+                         (cube / "rei_art.h").read_text(),
+                         "rei_art.h is stale -- run stackchan/make_art.py")
 
     def test_yuzu_keeps_her_PAGES_fades_on_the_cube(self):
         """Her bust is cropped at the bottom and both sleeves, and her

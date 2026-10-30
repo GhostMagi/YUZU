@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1038 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1052 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -118,56 +118,63 @@ two art-rebuild tests ERROR under plain `python3` here -- an
 environment fault, not a code one: `python3.12 YUZU_TESTER.py` runs
 them green.
 
-## CUBE REI: DESIGNED AND RESEARCHED, NOT BUILT (Oct 30)
+## CUBE REI: BUILT, NOT YET ON HIS CUBE (Oct 30)
 
-*"Hey brobro can Rei use the cubes camera? A cuberei if you will?"*
-Paused for the repetition question above before any file was written.
-**Fix her repetition first: a cube Rei inherits it.** What was settled,
-so the next session starts here rather than re-researching:
+*"Hey brobro can Rei use the cubes camera? A cuberei if you will?"*,
+then, once her repeating was fixed: *"Then do cube rei"*. **Built and
+compiled, UNVERIFIED on hardware**: no cube has run it, and nothing of
+the camera has been seen.
 
-- **HIS CUBE HAS THE CAMERA, from M5Stack's own code.** M5GFX's
-  autodetect calls a board `board_M5StackChan` ONLY when a GC0308
-  answers on the internal I2C (reg 0x00 == 0x9b) and an M5IOE1 at 0x6F
-  has firmware >= 4; with no camera it is a CoreS3 SE. M5Unified powers
-  it as on the CoreS3 (AXP2101 ALDO3 3.3V "for camera").
-- **THE CAMERA SHARES THE TOUCH AND POWER I2C BUS** (SDA 12, SCL 11,
-  I2C_NUM_1: the touch chip, the AXP2101, the AW9523, the mic and amp
-  codecs). M5Stack's GC0308 code (`m5stack/M5CoreS3`,
-  src/utility/GC0308.cpp) calls `M5.In_I2C.release()` then
-  `esp_camera_init`: pin_xclk -1, SCCB 12/11, D7..D0 =
-  47,48,16,15,42,41,40,39, VSYNC 46, HREF 38, PCLK 45, RGB565, QVGA,
-  fb_count 2 in PSRAM, GRAB_WHEN_EMPTY -- and never gives the bus back.
-  **The plan**: capture INSIDE loop(), so M5.update() never polls touch
-  while the camera owns the bus; release, init, throw away ~8 frames
-  while exposure settles, `frame2jpg`, `esp_camera_deinit` (its
-  SCCB_Deinit deletes the bus it created -- read in esp32-camera at the
-  bundled commit dfeaa71), then `M5.In_I2C.begin(port, sda, scl)` with
-  the values read before the release. The toolchain's sdkconfig has
-  `CONFIG_GC0308_SUPPORT=y` and the NEW I2C driver on port 1.
-  UNVERIFIED on hardware, all of it, and the picture's orientation
-  (hmirror/vflip) is unknown.
-- **TAP = SHE LOOKS, HOLD = TALK.** A tap on her face sends a QVGA
-  photo with no words (a photo with no words is already a turn). The
-  board needs only `DEVICES["rei-cube"] = "rei_cube"` and her
-  `sees: yes`: /stream reads `"image"` (base64) from the JSON body, and
-  SAY_BODY_MAX is far above a QVGA JPEG. Photo AND words cannot both
-  come from the cube, so "does this shirt work?" is two steps -- she
-  asks him to point and tap, and the tap's turn has his question in
-  her history. A photo on every hold was rejected: a 4B shown a picture
-  every turn describes the room every turn.
-- **What the build touches**: `rei_cube.persona` (same_girl_as rei,
-  sees: yes, CUBE_SCREEN saying a tap takes a photo; "What do you see?"
-  -> tap my screen; a photo of him; a too-dark one -- a 0.3MP camera in
-  his room will be dark often); `[CUBE_FACTS]`'s camera sentence tokened
-  out as `CUBE_CAMERA` with today's sentence as the default, so the
-  other four move only by their CUBE_COMPANY and introductions naming
-  Rei; `TestStackChanCube`'s "never shown a photo" and "Tell me" checks
-  made conditional on the girl seeing, and TestTheCubeIsSHARED's facts
-  check taught the new token; firmware: a GIRLS entry AFTER Saya (only
-  the ghost's page moves), `rei_art.h` from make_art (her rei.jpg close
-  up, Zero's pattern), compose_rei in her cyan, POCKET_REI, the camera,
-  and the photo body built in PSRAM, not an Arduino String. Swiping to
-  her is a model swap (Qwen3-VL), like Zero.
+    swipe:  Four -> Yuzu -> Zero -> Saya -> Rei -> the ghost
+
+- **TAP = SHE LOOKS, HOLD = TALK.** A tap on her face takes a QVGA photo
+  with the cube's own GC0308 and sends it with NO words (a photo with
+  no words is already a turn). Photo AND words cannot both come from
+  the cube, so "does this shirt work?" is two steps -- she asks him to
+  point and tap, and his question is in her history when the photo
+  lands. A photo on every hold was rejected: a 4B shown a picture every
+  turn describes the room every turn. Only with the board in reach
+  ("I can only see with the board in reach.") and never mid-reply (a
+  tap then still stops her).
+- **The board side is one line**: `DEVICES["rei-cube"] = "rei_cube"`.
+  The cube posts `{"text": "", "who": "rei-cube", "image": <base64>}`
+  to /stream, exactly what her page posts; a test drives a 320x240
+  photo through the real answer() onto her own model.
+- **`rei_cube.persona`**, `same_girl_as: rei`, every setting equal
+  (her Qwen, `sees: yes`, the repeat fix's `history_turns: 4` and
+  `presence_penalty`), `{CUBE_SELF}`. Rewritten: hello, "What do you
+  see?" (tap my screen), her look (the girl on this little screen) and
+  her introduction; added: his shirt question -> "point the cube and
+  tap", the photo, and a too-dark photo (0.3MP in his room). The rest
+  is rei.persona word for word.
+- **[CUBE_CAMERA] is a token** in `_hardware_stackchan.txt`, defaulting
+  to today's "nothing connects it" sentence, so the other four girls'
+  prompts moved ONLY by their CUBE_COMPANY and introductions naming
+  Rei. A test holds the pair: the one girl who sees declares her own,
+  and a girl who cannot never does. None is LIVE_PERSONA: nothing to
+  paste.
+- **The capture is inside loop()**, on the drawing core, because the
+  camera shares the touch/power/audio bus: read the port and pins,
+  `M5.In_I2C.release()`, `esp_camera_init` (M5Stack's own pins and
+  settings), throw away 8 frames while the light settles, `frame2jpg`
+  at 80, `esp_camera_deinit()`, then `M5.In_I2C.begin(port, sda, scl)`
+  -- and nothing returns while the bus is let go. Base64 and the POST
+  body are built in PSRAM, never an Arduino String, and the photo is
+  freed when the turn ends.
+- **Her face is her page's picture close up** (`rei_art.h`, Zero's
+  shape via `compose_close`), his cyan `#2ee6ff`, brightness 1.3 while
+  she works, a cyan frame while she looks. 30 pocket lines of hers.
+- **Compiled for the cube: 2.03 MB of 3 MB, no warnings from our
+  code.** UNVERIFIED: that the camera starts at all on his cube, which
+  way up and which way round the picture comes out (hmirror/vflip),
+  that touch, power and audio still answer after a photo, and how dark
+  his room comes out.
+
+Sixteen breaks, all red as failures -- after one came back as an
+ERROR first (an `.index()` on a free the break deleted; asserted first
+now). A cube test also sliced to the FIRST task creation in the file,
+which Rei's look() now is; it slices from the release onward.
+**1038 -> 1052.**
 
 ## YUZU SEES WITH BORROWED EYES -- ROUTE A, BUILT (Oct 29)
 

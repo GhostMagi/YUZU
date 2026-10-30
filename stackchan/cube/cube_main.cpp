@@ -1,4 +1,4 @@
-// FOUR, YUZU AND ZERO IN THE STACKCHAN CUBE -- the cube's whole program.
+// FOUR, YUZU, ZERO, SAYA AND REI IN THE STACKCHAN CUBE -- the cube's whole program.
 // =====================================================================
 // THREE GIRLS, ONE CUBE, A SWIPE BETWEEN THEM. Four came first (below);
 // then, the same day: "Can you squeeze Yuzu on too?", and "Can the qwen
@@ -20,6 +20,15 @@
 //         reads at a glance. A tap flashes it. She thinks on her own Qwen,
 //         so the first reply after swiping to or from her is a model
 //         swap on the board: slower, and the thinking cue covers it.
+//   SAYA  her page's kaomoji in neon green lines; a tap makes her blush.
+//   REI   her picture close up, like Zero's -- and the one girl the
+//         cube's CAMERA belongs to. Ghost, Oct 30: "Hey brobro can Rei
+//         use the cubes camera? A cuberei if you will?" A TAP ON HER
+//         FACE IS A LOOK: the camera takes a photo and it goes to her
+//         as a turn with no words. Holding is still talking. A photo
+//         and his words cannot come from the cube at once, so "does this
+//         shirt work?" is two steps, and her prompt shows her asking him
+//         to point the cube and tap.
 //
 // Each girl asks the board under her OWN name (yuzu_face.DEVICES), so
 // each has her own brain, memory and voice speed on the board.
@@ -95,12 +104,19 @@
 #include <Preferences.h>
 #include <esp_system.h>
 #include <esp_sleep.h>
+// Rei's eyes. The camera driver and its JPEG encoder ship inside the
+// ESP32 core (esp32-camera, CONFIG_GC0308_SUPPORT=y in its sdkconfig),
+// and base64 is mbedtls's, also in the core: nothing new to install.
+#include <esp_camera.h>
+#include <img_converters.h>
+#include <mbedtls/base64.h>
 
 #include "four_art.h"
 #include "yuzu_art.h"
 #include "zero_art.h"
 #include "ghost_art.h"
 #include "saya_art.h"
+#include "rei_art.h"
 // Written by `~/YUZU/cube` at flash time from EVERY WiFi the board has
 // saved (its own first) and its name, and never committed: his WiFi
 // passwords do not belong in a repository.
@@ -112,13 +128,16 @@
 // says when she comes on.
 struct Girl { const char* who; const char* name; const char* hint; };
 static const Girl GIRLS[] = {
-  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu, Zero or Saya."},
-  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four, Zero or Saya."},
-  {"zero-cube", "Zero", "Hold the screen to talk. Swipe for Four, Yuzu or Saya."},
-  {"saya-cube", "Saya", "Hold to talk. Don't tap. Swipe for Four, Yuzu or Zero."},
+  {"four-cube", "Four", "Hold to talk. Tap for colours. Swipe for Yuzu, Zero, Saya or Rei."},
+  {"yuzu-cube", "Yuzu", "Hold the screen to talk. Swipe for Four, Zero, Saya or Rei."},
+  {"zero-cube", "Zero", "Hold the screen to talk. Swipe for Four, Yuzu, Saya or Rei."},
+  {"saya-cube", "Saya", "Hold to talk. Don't tap. Swipe for Four, Yuzu, Zero or Rei."},
+  {"rei-cube", "Rei", "Hold to talk. Tap and I'll look. Swipe for Four, Yuzu, Zero or Saya."},
 };
 static const int GIRL_COUNT = sizeof(GIRLS) / sizeof(GIRLS[0]);
-static const int FOUR = 0, YUZU = 1, ZERO = 2, SAYA = 3;
+// Rei AFTER Saya, so only the ghost's page moves: a cube last left on
+// him comes back on her, which is harmless.
+static const int FOUR = 0, YUZU = 1, ZERO = 2, SAYA = 3, REI = 4;
 // The ghost's screen comes after the girls; a swipe walks all of them.
 // His game was the page after the ghost until Oct 27: "can we pull the
 // gba game from the main screens its too small and my wonderful modded
@@ -263,11 +282,45 @@ static const char* const POCKET_SAYA[] = {
   "Ugh. Do whatever you want. You always do anyway.",
   "...Yes. That's all you're getting. Don't push it.",
 };
+// Rei's: her eyes are on the board too, so out here she cannot look --
+// and says so, warmly, and answers anyway.
+static const char* const POCKET_REI[] = {
+  "My eyes are back on the board, so out here I'm guessing. My guess is yes.",
+  "Can't see a thing without the board. Sounds like a yes anyway.",
+  "No board, no eyes. But I'd say no, and I'd say it with confidence.",
+  "Pocket mode. I can't look, but I can still have an opinion: go for it.",
+  "Out of range of my mind, still in range of my opinions. Yes.",
+  "I'd need to see it to be sure, and I can't from here. Probably not.",
+  "Bring me back to the board and I'll look properly. Until then: yes.",
+  "Without the board I'm a picture with a nice haircut. Still, yes.",
+  "Hard to say without eyes. Easy to say without eyes: try it.",
+  "I can't work it out from in here. Ask me again by the board.",
+  "My guess, with zero data: yes. Zero would be proud.",
+  "Short answer, no evidence: not yet.",
+  "Yes. I'd show my working, but it's all back on the board.",
+  "No. Gut feeling. I don't technically have a gut.",
+  "I'm saving my eyes for when the board's in range. For now: maybe.",
+  "Pocket Rei says yes. Real Rei will check the numbers later.",
+  "Probably. Precise answers resume when the WiFi does.",
+  "Can't look, can't listen, can still root for you. Do it.",
+  "That's a no from me, and I didn't even need to look.",
+  "Out here I run on instinct, and instinct says wait.",
+  "Point me at it later. Right now I'd say it's fine.",
+  "I'd ask for a photo, but my camera needs the board too. Yes.",
+  "Ask me something easier. Kidding. Yes.",
+  "The answer's in there somewhere. I just can't reach it from here.",
+  "Not a chance. Said warmly.",
+  "Yes, and I'd bet my blue light on it.",
+  "I can't see you, but I can tell you're about to do it anyway. Fine. Yes.",
+  "Later. Some things want a second look, and I'll have eyes again soon.",
+  "Absolutely. That one didn't need eyes.",
+  "Heh. No. But nicely.",
+};
 struct Pocket { const char* const* lines; int count; };
 #define POCKET_OF(a) {a, (int)(sizeof(a) / sizeof(a[0]))}
 static const Pocket POCKET[] = {
   POCKET_OF(POCKET_FOUR), POCKET_OF(POCKET_YUZU), POCKET_OF(POCKET_ZERO),
-  POCKET_OF(POCKET_SAYA),
+  POCKET_OF(POCKET_SAYA), POCKET_OF(POCKET_REI),
 };
 // Looking for a WiFi that wasn't there a moment ago costs up to twenty
 // seconds, so for two minutes after a look finds nothing a hold goes
@@ -345,6 +398,17 @@ static const uint32_t SPARK = 0xffd0e8;
 // while she works. Her lines on her page are hot pink, so is her status.
 static const uint32_t ZERO_PINK = 0xff2d95;
 static const float ZERO_WORKING = 1.30f;
+
+// ---- Rei -------------------------------------------------------------------
+// Her page's: black, her picture, the same `brightness(1) -> (1.3)` while
+// she works (her page is Zero's, copied), and her lines his cyan. And the
+// cube's camera, which is hers: QVGA, the GC0308's own size, as a JPEG.
+// A few frames are thrown away first, while its exposure settles -- the
+// first frame out of a camera that has just woken is dark.
+static const uint32_t REI_CYAN = 0x2ee6ff;
+static const float REI_WORKING = 1.30f;
+static const int PHOTO_QUALITY = 80;
+static const int SETTLE_FRAMES = 8;
 // The glow is stronger and wider than her page's (peak .26, opacity up
 // to .8): rendered at the cube's real size, her page's numbers made a
 // thinking Yuzu look like an idle one.
@@ -390,6 +454,10 @@ static bool recording = false;
 static volatile bool busy = false;       // a turn is running on core 0
 static volatile bool thinking = false;   // the rain turns
 static volatile bool stop_her = false;   // he held the screen mid-reply
+// A photo for Rei's turn: the cube's camera, a JPEG in base64, in PSRAM.
+// Set by look() on the drawing core, read and freed by the turn.
+static char* photo_b64 = nullptr;
+static size_t photo_b64_len = 0;
 
 static String base_url;                  // http://<board>:<port>
 // Set by a turn that could not reach the board, so the next one asks
@@ -432,10 +500,10 @@ static int last_pocket = -1;
 // the boot after an UNPLANNED restart says which kind it was. The next
 // photo names the cause instead of a guess.
 enum Doing : uint8_t { NOW_RESTING, NOW_JOINING, NOW_LISTENING, NOW_SENDING,
-                       NOW_THINKING, NOW_TALKING, NOW_KINDS };
+                       NOW_THINKING, NOW_TALKING, NOW_LOOKING, NOW_KINDS };
 static const char* const DOING[NOW_KINDS] = {
   "resting", "joining WiFi", "listening to you", "sending your words",
-  "thinking", "talking"};
+  "thinking", "talking", "looking through the camera"};
 struct Notes {
   uint32_t magic;
   uint8_t doing;        // what the cube is doing now
@@ -752,19 +820,23 @@ static void compose_yuzu() {
 
 // Her picture IS the screen, so it must be exactly the screen's size.
 static_assert(ZERO_ART_W == 320 && ZERO_ART_H == 240, "zero_art.h is not 320x240");
+static_assert(REI_ART_W == 320 && REI_ART_H == 240, "rei_art.h is not 320x240");
 
-static void compose_zero() {
+// A picture that IS the screen, brightening to `working` while she works
+// and flashing when tapped -- Zero's page's cue, and Rei's, whose page is
+// Zero's copied. One copy for both twins.
+static void compose_close(const uint16_t* art, float working) {
   uint32_t now = millis();
   float b = 1.0f;
   if (thinking)
-    b += (ZERO_WORKING - 1.0f) * (0.5f - 0.5f * cosf(now * (2 * PI / 1600.0f)));
+    b += (working - 1.0f) * (0.5f - 0.5f * cosf(now * (2 * PI / 1600.0f)));
   if (flash_until > now)
-    b = max(b, 1.0f + (ZERO_WORKING - 1.0f) * (flash_until - now) / 500.0f);
+    b = max(b, 1.0f + (working - 1.0f) * (flash_until - now) / 500.0f);
   const int b256 = (int)(b * 256);
   uint16_t* dst = (uint16_t*)frame.getBuffer();
-  for (int i = 0; i < ZERO_ART_W * ZERO_ART_H; i++) {
+  for (int i = 0; i < W * H; i++) {
     int r, g, bl;
-    unpack565(ZERO_ART[i], r, g, bl);
+    unpack565(art[i], r, g, bl);
     if (b256 != 256) {
       r = min(255, r * b256 >> 8);
       g = min(255, g * b256 >> 8);
@@ -772,6 +844,18 @@ static void compose_zero() {
     }
     dst[i] = swap16(pack565(r, g, bl));
   }
+}
+
+static void compose_zero() { compose_close(ZERO_ART, ZERO_WORKING); }
+
+// Rei, and while the camera is taking his photo, a frame in her cyan
+// round the screen: the cube is looking, so the screen says so.
+static volatile bool looking = false;
+static void compose_rei() {
+  compose_close(REI_ART, REI_WORKING);
+  if (looking)
+    for (int i = 0; i < 4; i++)
+      frame.drawRect(i, i, W - 2 * i, H - 2 * i, hex565(REI_CYAN));
 }
 
 // The status line, only while there is something to say, in her colour.
@@ -966,10 +1050,11 @@ static void compose_saya() {
 }
 
 // Whoever is on screen's colour for words: her pink, Four's ink, or
-// the ghost's (and Saya's) phosphor green.
+// the ghost's (and Saya's) phosphor green, Rei's cyan.
 static uint32_t ink_now() {
   return girl == YUZU ? YUZU_PINK
        : girl == ZERO ? ZERO_PINK
+       : girl == REI ? REI_CYAN
        : girl == GHOST || girl == SAYA ? CRT_GREEN
        : SKINS[skin].ink ? SKINS[skin].ink : 0x39ff5e;
 }
@@ -1118,6 +1203,7 @@ static void draw_frame() {
   else if (girl == YUZU) compose_yuzu();
   else if (girl == ZERO) compose_zero();
   else if (girl == SAYA) compose_saya();
+  else if (girl == REI) compose_rei();
   else compose_ghost();
   draw_battery();
   draw_said(H - draw_status());
@@ -1196,12 +1282,17 @@ static bool json_true(const String& js, const char* key) {
 
 // ---- asking the board ----------------------------------------------------------
 // The HTTP status, or <= 0 when the board could not be reached at all.
-static int post_json(HTTPClient& http, const char* path, const String& body) {
+static int post_bytes(HTTPClient& http, const char* path,
+                      const uint8_t* body, size_t len) {
   http.begin(base_url + path);
   http.setConnectTimeout(5000);
   http.setTimeout(60000);
   http.addHeader("Content-Type", "application/json");
-  return http.POST((uint8_t*)body.c_str(), body.length());
+  return http.POST((uint8_t*)body, len);
+}
+
+static int post_json(HTTPClient& http, const char* path, const String& body) {
+  return post_bytes(http, path, (const uint8_t*)body.c_str(), body.length());
 }
 
 // Who is asking is fixed when the turn starts: a swipe is refused while
@@ -1209,6 +1300,22 @@ static int post_json(HTTPClient& http, const char* path, const String& body) {
 static String turn_body(const String& text) {
   return String("{\"text\": ") + json_quote(text) + ", \"who\": \""
          + GIRLS[asking].who + "\"}";
+}
+
+// Rei's look: the same turn with no words and the photo -- yuzu_face's
+// /stream reads "image" as base64 -- built in PSRAM rather than an
+// Arduino String, which would want the whole photo twice in the
+// cube's small internal memory while it grew.
+static uint8_t* photo_body(size_t& len) {
+  String head = String("{\"text\": \"\", \"who\": \"") + GIRLS[asking].who
+                + "\", \"image\": \"";
+  len = head.length() + photo_b64_len + 2;
+  uint8_t* body = (uint8_t*)ps_malloc(len);
+  if (!body) return nullptr;
+  memcpy(body, head.c_str(), head.length());
+  memcpy(body + head.length(), photo_b64, photo_b64_len);
+  memcpy(body + head.length() + photo_b64_len, "\"}", 2);
+  return body;
 }
 
 static bool listen(const int16_t* pcm, size_t samples, String& heard) {
@@ -1255,7 +1362,18 @@ static bool listen(const int16_t* pcm, size_t samples, String& heard) {
 // Her reply, read off /stream's last line with this cube's own clock.
 static bool ask(const String& text, String& reply) {
   HTTPClient http;
-  if (post_json(http, "/stream", turn_body(text)) != 200) {
+  int code;
+  if (photo_b64) {
+    // POST sends the whole body before it returns, so it can go at once.
+    size_t len = 0;
+    uint8_t* body = photo_body(len);
+    if (!body) { say_status("Out of memory for that photo."); return false; }
+    code = post_bytes(http, "/stream", body, len);
+    free(body);
+  } else {
+    code = post_json(http, "/stream", turn_body(text));
+  }
+  if (code != 200) {
     say_status("Can't reach the board. Is it on?");
     lost_board = true;
     http.end();
@@ -1409,10 +1527,13 @@ static void turn_task(void*) {
   saya_mood = -1;                         // a new reply, a new face
   doing(NOW_SENDING);
   String heard, reply;
-  const bool heard_him = listen(rec_buf, rec_len, heard);
+  // A LOOK has no words to hear: the photo is the turn (a photo with no
+  // words is a turn on the board too).
+  const bool heard_him = photo_b64 || listen(rec_buf, rec_len, heard);
   if (heard_him) doing(NOW_THINKING);
   if (heard_him && ask(heard, reply)) speak(reply);
   else if (lost_board) pocket_reply();    // the board is off or gone
+  if (photo_b64) { free(photo_b64); photo_b64 = nullptr; photo_b64_len = 0; }
   doing(NOW_RESTING);
   thinking = false;
   stop_her = false;
@@ -1711,6 +1832,116 @@ void setup() {
   notes.why = 0;
 }
 
+// ---- Rei's eyes: the cube's own camera -------------------------------------------
+// Ghost, Oct 30: "Hey brobro can Rei use the cubes camera? A cuberei if
+// you will?" His cube HAS one: M5GFX names a board `board_M5StackChan`
+// only when a GC0308 answers on the internal bus.
+//
+// THE CAMERA SHARES THE TOUCH AND POWER BUS (SDA 12, SCL 11: the touch
+// chip, the power chip, the I/O expander and the audio chips), and the
+// camera driver makes a bus of its own on those pins. So the photo is
+// taken HERE, on the drawing core inside loop(), where nothing else asks
+// the bus anything: M5.update() is not polling touch and the battery is
+// not being read while the camera owns it. M5Stack's own GC0308 code
+// releases M5's bus and never gives it back; this gives it back --
+// esp_camera_deinit() deletes the camera's bus, and M5's begins again on
+// the same port and pins, read before it was let go.
+//
+// The pins and the settings are M5Stack's own (m5stack/M5CoreS3,
+// src/utility/GC0308.cpp). UNVERIFIED ON HIS CUBE, all of it, and so is
+// which way up the picture comes out.
+static const char* photo_why = "";
+
+static bool take_photo() {
+  const i2c_port_t port = M5.In_I2C.getPort();
+  const int sda = M5.In_I2C.getSDA(), scl = M5.In_I2C.getSCL();
+  camera_config_t cfg = {};
+  cfg.pin_pwdn = -1;
+  cfg.pin_reset = -1;
+  cfg.pin_xclk = -1;
+  cfg.pin_sccb_sda = 12;
+  cfg.pin_sccb_scl = 11;
+  cfg.pin_d7 = 47; cfg.pin_d6 = 48; cfg.pin_d5 = 16; cfg.pin_d4 = 15;
+  cfg.pin_d3 = 42; cfg.pin_d2 = 41; cfg.pin_d1 = 40; cfg.pin_d0 = 39;
+  cfg.pin_vsync = 46;
+  cfg.pin_href = 38;
+  cfg.pin_pclk = 45;
+  cfg.xclk_freq_hz = 20000000;
+  cfg.ledc_timer = LEDC_TIMER_0;
+  cfg.ledc_channel = LEDC_CHANNEL_0;
+  cfg.pixel_format = PIXFORMAT_RGB565;
+  cfg.frame_size = FRAMESIZE_QVGA;
+  cfg.jpeg_quality = 0;
+  cfg.fb_count = 2;
+  cfg.fb_location = CAMERA_FB_IN_PSRAM;
+  cfg.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  cfg.sccb_i2c_port = -1;
+
+  uint8_t* jpg = nullptr;
+  size_t jpg_len = 0;
+  bool ok = false;
+  M5.In_I2C.release();
+  if (esp_camera_init(&cfg) != ESP_OK) {
+    photo_why = "My camera didn't start. Tap me again?";
+  } else {
+    for (int i = 0; i < SETTLE_FRAMES; i++) {
+      camera_fb_t* old = esp_camera_fb_get();
+      if (old) esp_camera_fb_return(old);
+    }
+    camera_fb_t* fb = esp_camera_fb_get();
+    if (!fb) photo_why = "My camera took nothing. Tap me again?";
+    else {
+      ok = frame2jpg(fb, PHOTO_QUALITY, &jpg, &jpg_len) && jpg && jpg_len;
+      if (!ok) photo_why = "Out of memory for that photo.";
+      esp_camera_fb_return(fb);
+    }
+    esp_camera_deinit();
+  }
+  // M5's bus back, before anything can ask it -- touch, battery, audio.
+  M5.In_I2C.begin(port, sda, scl);
+  if (ok) {
+    size_t room = 4 * ((jpg_len + 2) / 3) + 1, out = 0;
+    photo_b64 = (char*)ps_malloc(room);
+    ok = photo_b64 && mbedtls_base64_encode((unsigned char*)photo_b64, room,
+                                            &out, jpg, jpg_len) == 0;
+    if (ok) photo_b64_len = out;
+    else {
+      free(photo_b64);
+      photo_b64 = nullptr;
+      photo_why = "Out of memory for that photo.";
+    }
+  }
+  if (jpg) free(jpg);
+  return ok;
+}
+
+// A tap on Rei: she looks. Only with the board in reach -- her eyes are
+// her model, and her model is on the board -- and never mid-reply.
+static void look() {
+  if (away && millis() - away_at < AWAY_MS) {
+    say_status("I can only see with the board in reach.", 5000);
+    return;
+  }
+  if (!join_wifi()) return;              // it already said why
+  say_status("Looking...", 0);
+  looking = true;
+  draw_frame();
+  doing(NOW_LOOKING);
+  const bool took = take_photo();
+  looking = false;
+  doing(NOW_RESTING);
+  if (!took) {
+    say_status(photo_why, 6000);
+    return;
+  }
+  flash_until = millis() + 500;          // the shutter
+  busy = true;
+  asking = girl;
+  set_said("");
+  say_status("", 1);
+  xTaskCreatePinnedToCore(turn_task, "turn", 16384, nullptr, 1, nullptr, 0);
+}
+
 // ---- the three things a finger does --------------------------------------------
 // LEFT brings the next girl, RIGHT the one before -- the way a phone
 // pages, so three girls never take two swipes to go back one.
@@ -1725,6 +1956,7 @@ static void swap_girl(int dx) {
 static void tapped() {
   if (girl == FOUR) { skin = (skin + 1) % SKIN_COUNT; tint_art(); }
   else if (girl == SAYA) flash_until = millis() + SAYA_BLUSH_MS;
+  else if (girl == REI && !busy) look();
   else flash_until = millis() + 500;
 }
 
