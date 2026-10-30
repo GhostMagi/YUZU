@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1033 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1038 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,60 +49,74 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## REI REPEATS HERSELF: WHAT IS WRONG (Oct 30) -- DIAGNOSED, NOT FIXED
+## REI REPEATS HERSELF -- FIXED IN CODE (Oct 30)
 
 *"Hmmm so she seems to repeat alot of things. The 2 antaenae is what
 she said about the Waveshare Beast earlier... and the building/saving
-money bit is a repeat too. Can you look at her really intricately and
-figure out whats wrong?"* His screenshots: a photo of the Orin on his
-desk, then two replies carrying "You're not just X -- you're Y" three
-times, "What do you want to build next?" twice, a parenthetical aside
-alone on a line ("(And I'm right here -- with my eyes open.)", then
-"(And if you tap the camera again -- I can see it.)"), the sign-off
-"Rei. / Always. 💡" on both, a bullet list, and "Two 5G antennas" on a
-board with none in the picture. **Nothing changed yet**: he was near
-his usage limit, and the diagnosis was the ask.
+money bit is a repeat too."* Then, the same day: *"Please fix her
+repeats if possible. I really like her."* His screenshots: two replies
+carrying "You're not just X -- you're Y" three times, "What do you want
+to build next?" twice, a parenthetical aside alone on a line ("(And I'm
+right here -- with my eyes open.)"), the sign-off "Rei. / Always. 💡"
+on both, and "Two 5G antennas" on a board with none in the picture.
 
-**Three causes, stacked:**
+**Three causes, stacked, and what each got:**
 
-1. **HER OWN SAVED REPLIES ARE HER STRONGEST EXAMPLE**, measured here
-   many times (Four's "user", Kuro's name tag, Rei's own "Zero's twin
-   soul"). `history_turns` is 8 and her replies run long, so every turn
-   she re-reads up to eight of her own long replies -- each with the
-   sign-off, the aside and the "not just X" frame -- and copies them.
-   **The aside is the SAME SLOT as the Oct 29 "Zero's twin soul" line
-   with new words**: that fix took the words out of her prompt, and her
-   habit kept the shape.
-2. **NOTHING IN HER SAMPLING PUSHES BACK, and the one setting that
-   would is not applied.** Qwen's own card for Qwen3-VL Instruct says
-   `presence_penalty` 1.5, because it loops without it. Rei gets
-   DEFAULT_OPTIONS' `repeat_penalty` 1.1, and per ollama/ollama#14493 (a
-   public bug report; UNVERIFIED on his Ollama version) the Go runner
-   that runs qwen3-vl has NO penalty sampling at all: accepted,
-   ignored. So on her model repetition is fought by her prompt alone.
-   Sending `presence_penalty` costs nothing and is expected to do
-   nothing on that runner -- try it only as a measurement.
-3. **EVERY PHOTO LOOKS THE SAME IN HER MEMORY.** A photo rides on its
-   own turn only; her history keeps PHOTO_NOTE, identical for every
-   photo, plus her own description of it. The Beast's antennas were in
-   her memory as HER words with nothing saying which picture they were
-   about, and a 4B handed a new photo of a board reused them. "Saving
-   money" is the same: something she said earlier, re-read, re-said.
+1. **HER OWN SAVED REPLIES ARE HER STRONGEST EXAMPLE** (Four's "user",
+   Kuro's name tag, Rei's own "Zero's twin soul"). With 8 turns of
+   long replies she re-read eight copies of every habit. The aside is
+   the SAME SLOT as the Oct 29 "Zero's twin soul" line with new words:
+   that fix took the words out of her prompt and her habit kept the
+   shape.
+   - **Her sign-off never reaches the bubble, her voice or her memory**
+     (`yuzu_brain.without_sign_off`, inside `cut_his_turn`, so `ask`,
+     the stream's tail and `load_memory` all get it). Only a line that
+     IS her name signed ("Rei.", "-- Rei", "Love, Rei", "Rei. Always.
+     💡"), at the END, after something of hers, with at most one short
+     line after it. Her name in a sentence ("Rei is here"), a question
+     ("Rei, can you see?") and a reply that is only her name (an
+     answer) are kept. The stream HOLDS a forming one back
+     (`_sign_off_forming`), so "Rei." is never shown and then taken
+     back. Read off the persona, so every girl gets it; only Rei signs.
+   - **A closing aside is shown once and never remembered**
+     (`without_closing_aside`, in `_remember` and `load_memory`): a
+     last line that is wholly a parenthesis. He reads it in the
+     bubble; she never re-reads it as her own example.
+   - **Half the memory: `history_turns: 4`** in her settings, a new
+     per-persona setting (`DEFAULT_HISTORY_TURNS` 8 for everyone else;
+     an explicit argument still wins; a test holds that nobody keeps
+     MORE, since the context guard counts it, and the guard now reads
+     each girl's own number).
+2. **NOTHING IN HER SAMPLING PUSHES BACK.** Qwen's card asks for
+   `presence_penalty` 1.5; ollama/ollama#14493 says the runner her model
+   uses ignores penalties (UNVERIFIED on his Ollama). **Set anyway**
+   (`presence_penalty` is parsed as a number now): it does nothing
+   today and starts working the day Ollama applies it.
+3. **EVERY PHOTO LOOKED THE SAME IN HER MEMORY.** Her memory kept
+   PHOTO_NOTE -- the very words that mean "you can see it" on the turn
+   a photo rides on -- so the Beast's antennas, in HER words, read as
+   being about the new board. **Her memory keeps `PAST_PHOTO_NOTE`
+   now**: "(An earlier photo came with this message. You can't see it
+   now.)". Yuzu's borrowed eyes too. An old memory is converted on
+   load, so nothing has to be run on his board.
 
-**What to do, in order:**
-- **Now, no Update: `start fresh` on her page, two taps.** It clears
-  every saved reply at once: the sign-off, the aside, the antennas.
-  Whether he tapped it after the Oct 29 Update is unknown.
-- **Recommended next, NOT BUILT: take her SIGN-OFF off in code**, the
-  `_without_own_label` mirror -- a line that is only her own name at
-  the END of a reply, and one short line after it, dropped from the
-  bubble, her voice and her memory, so a sign-off is never saved to be
-  copied. **And a shorter memory for her**: `history_turns` as a
-  persona setting, 4 for Rei -- half as much of herself to copy (the
-  context guard only gains). Both hers only; the Llama girls do not
-  loop like this.
-- **NOT recommended**: a rule saying "don't repeat yourself" or naming
-  the sign-off -- the pink-elephant shape, measured three times here.
+**Her prompt did not move** (both settings are above the `---`), and
+she is not LIVE_PERSONA, so there was nothing to paste. No rule names
+the sign-off or says "don't repeat yourself": the pink elephant,
+measured three times here.
+
+**Still worth doing on his board after the Update: `start fresh` on
+her page, two taps.** The code cleans an old memory of the sign-off,
+the aside and the photo note as it loads it, but "You're not just X"
+and "What do you want to build next?" are words no code can tell from
+a sentence -- the shorter memory is what fights those. UNMEASURED: no
+model has answered through any of this yet.
+
+Five tests; eight breaks, all red as failures. **1033 -> 1038.** The
+container's `python3` is 3.11 and its Pillow is built for 3.12, so the
+two art-rebuild tests ERROR under plain `python3` here -- an
+environment fault, not a code one: `python3.12 YUZU_TESTER.py` runs
+them green.
 
 ## CUBE REI: DESIGNED AND RESEARCHED, NOT BUILT (Oct 30)
 

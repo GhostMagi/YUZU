@@ -1035,8 +1035,10 @@ def load_memory(brain, key):
             try:
                 import yuzu_brain
                 cut = yuzu_brain.cut_his_turn
+                closing = yuzu_brain.without_closing_aside
             except Exception:
                 cut = lambda text, who="", her="": (text, False)
+                closing = lambda text: text
             kept = []
             for m in past:
                 if (isinstance(m, dict)
@@ -1054,7 +1056,13 @@ def load_memory(brain, key):
                             if kept and kept[-1].get("role") == "user":
                                 kept.pop()
                             continue
-                        m = dict(m, content=by_name(said, name))
+                        m = dict(m, content=by_name(
+                            closing(said), name))
+                    elif PHOTO_NOTE in m["content"]:
+                        # A photo saved before PAST_PHOTO_NOTE existed
+                        # is an old photo too.
+                        m = dict(m, content=m["content"].replace(
+                            PHOTO_NOTE, PAST_PHOTO_NOTE))
                     kept.append(m)
             brain.history = kept[-brain.history_turns * 2:]
     except Exception:
@@ -2298,6 +2306,14 @@ PHOTO_NOTE = "(A photo came with this message.)"
 # not "what you were told": she is looking at it with him, and a note
 # saying a stranger described it is how she would end up saying so.
 EYES_NOTE = "(A photo came with this message. What it shows: %s)"
+# WHAT HER MEMORY KEEPS where a photo came, once the turn is over.
+# Ghost, Oct 30: Rei handed a photo of his Orin talked about "two 5G
+# antennas" -- the Waveshare tank's, from a photo days before. Every
+# remembered photo said PHOTO_NOTE, the very words that mean "you can
+# see it" on the turn it rides on, so a 4B shown a NEW board read her
+# own words about an OLD one as if they were about this. Past tense,
+# and plainly gone: what is in front of her is only ever the newest.
+PAST_PHOTO_NOTE = "(An earlier photo came with this message. You can't see it now.)"
 # The size of a /say or /stream body is checked BEFORE it is read: a
 # photo in base64 plus his words, and nothing bigger costs anything but
 # the refusal. The /listen discipline.
@@ -2535,10 +2551,11 @@ def answer(text, who=None, on_chunk=None, on_suggest=None, image=None):
             # that a photo came. The description is a few hundred
             # characters on every later turn otherwise, and her own
             # reply already says what she saw.
-            remember = ("%s %s" % (mine, PHOTO_NOTE)).strip()
         else:
             text = ("%s %s" % (mine, PHOTO_NOTE)).strip()
             images = [image]
+        # In the PAST tense, for both: see PAST_PHOTO_NOTE.
+        remember = ("%s %s" % (mine, PAST_PHOTO_NOTE)).strip()
     try:
         if key not in _BRAINS:
             # A KEY, NOT A PERSONA OBJECT. YuzuBrain's `persona`

@@ -74,7 +74,8 @@ LIVE_PERSONA = "four_bot"
 
 # Numbers get parsed as numbers; everything else stays a string.
 _NUMERIC = {"temperature", "top_p", "top_k", "min_p", "repeat_penalty",
-            "num_predict", "num_ctx", "piper_length_scale"}
+            "presence_penalty", "num_predict", "num_ctx",
+            "piper_length_scale"}
 
 
 class PersonaError(RuntimeError):

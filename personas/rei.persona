@@ -23,6 +23,22 @@ stop: <|im_start|>, <|im_end|>, <|endoftext|>
 temperature: 0.7
 top_p: 0.8
 top_k: 20
+# AND QWEN'S OWN ANTI-LOOP SETTING for this model, Oct 30: "she seems to
+# repeat alot of things". Qwen's card for Qwen3-VL Instruct asks for
+# presence_penalty 1.5, because the model loops without it. A public
+# Ollama bug report (ollama/ollama#14493) says the runner her model uses
+# accepts penalties and ignores them -- UNVERIFIED on his Ollama -- so
+# this is expected to do nothing today and to start working the day
+# Ollama applies it. What fights her repeating NOW is in code: her
+# sign-off is never kept (yuzu_brain.without_sign_off), a closing aside
+# is never remembered, an old photo is remembered as old -- and the
+# line after this one.
+presence_penalty: 1.5
+# HALF THE MEMORY. Her own replies are the strongest example in her
+# context, and she copies them: the sign-off, the aside, "You're not
+# just X -- you're Y", "What do you want to build next?". Four turns is
+# half as much of herself to copy, and the context guard only gains.
+history_turns: 4
 piper_length_scale: 0.95
 num_predict: 600
 # A BIGGER WINDOW THAN ZERO'S, because a photo rides on the turn it came

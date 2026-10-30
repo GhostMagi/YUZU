@@ -140,6 +140,15 @@ DEFAULT_OPTIONS = {
 }
 
 
+# HOW MANY PAST EXCHANGES SHE KEEPS, unless her settings say otherwise.
+# A character can keep fewer: `history_turns: 4` in her settings (Rei,
+# Oct 30). Her own replies are the strongest example in her context,
+# measured here many times, and a girl who copies hers -- a Qwen that
+# loops without a penalty its runner applies -- does better re-reading
+# half as many. Never more than this: the context guard counts this.
+DEFAULT_HISTORY_TURNS = 8
+
+
 class ReplyHealth:
     """How well one reply followed the format rules.
 
@@ -428,7 +437,7 @@ def _token_rate(data):
 class YuzuBrain:
     def __init__(self, model=None, host=DEFAULT_HOST,
                  system_prompt=None, options=None,
-                 history_turns=8, persona=None, auto_recover=True,
+                 history_turns=None, persona=None, auto_recover=True,
                  timeout=None, keep_alive=None):
         """
         model         : Ollama model name (see Modelfile.yuzu)
@@ -511,7 +520,14 @@ class YuzuBrain:
         self.timeout = timeout if timeout is not None else DEFAULT_TIMEOUT
         self.keep_alive = _keep_alive(
             keep_alive if keep_alive is not None else DEFAULT_KEEP_ALIVE)
-        self.history_turns = history_turns
+        # Explicit > her own `history_turns:` > the default.
+        if history_turns is None:
+            try:
+                history_turns = int(str(self.persona.settings.get(
+                    "history_turns") or "").strip())
+            except (AttributeError, ValueError):
+                history_turns = None
+        self.history_turns = history_turns or DEFAULT_HISTORY_TURNS
         self.history = []
 
         # Drift recovery. Measured on a real 7-turn chat: format held on
@@ -894,9 +910,12 @@ class YuzuBrain:
         # bracket, so the day she copies that, the screen says "17 is
         # prime". Found reading her first real reply on the board.
         moves = self.persona.moves if self.persona else True
+        # And without a closing aside (without_closing_aside): he reads
+        # it once in the bubble; she never re-reads it as her example.
+        kept = without_closing_aside(reply)
         self.history.append({"role": "assistant",
-                             "content": self._canonicalise(reply)
-                             if moves else reply})
+                             "content": self._canonicalise(kept)
+                             if moves else kept})
         # Trim eagerly so history can't creep past the window over a
         # long session.
         self.history = self.history[-self.history_turns * 2:]
@@ -1129,6 +1148,93 @@ def _without_own_label(text, her=""):
     return text[m.end():] if m else text
 
 
+# HER SIGN-OFF IS NOT PART OF WHAT SHE SAID. Ghost, Oct 30, Rei: "she
+# seems to repeat alot of things" -- and two replies in a row ended on
+# the same two lines, "Rei." and "Always. 💡", the Qwen assistant's
+# letter-writing habit. A sign-off saved in her memory is her own
+# example of signing off again, every turn after, which is how one
+# became every one (Kuro's name tag, Sept 26, the same mechanism at the
+# other end of the reply). So it never reaches the bubble, her voice or
+# her memory: the prompt REDUCES, code GUARANTEES -- and naming the
+# sign-off in her prompt would be the pink elephant, measured three
+# times here.
+#
+# ONLY A LINE THAT IS HER NAME, at the END. "Rei." or "-- Rei" or
+# "Love, Rei", with at most a few words of decoration after a stop
+# ("Rei. Always. 💡"), and at most ONE short line after it. A name in a
+# sentence is words, and a reply that is nothing but her name is an
+# answer ("What's your name?") and is kept.
+_SIGN_OFF_CLOSERS = ("love", "always", "yours", "forever", "xo", "xoxo",
+                     "hugs", "cheers")
+
+
+def _sign_off_line(line, her):
+    """Is this one line her signing her name?"""
+    s = re.sub(r"\A[\s\-–—~*_]+", "", line or "")
+    s = re.sub(r"\A(?:%s)[,!.]*\s+" % "|".join(_SIGN_OFF_CLOSERS), "", s,
+               flags=re.I)
+    m = re.match(r"%s(?![\w'’])" % re.escape(her), s, re.I)
+    if not m:
+        return False
+    rest = s[m.end():].replace("*", "").replace("_", "")
+    if "?" in rest:
+        return False                    # "Rei, can you see?" is asked
+    if not re.search(r"\w", rest):
+        return True                     # "Rei."  "Rei 💡"  "**Rei**"
+    # "Rei. Always." -- a stop straight after the name, then a short tag.
+    # "Rei is here." has no stop, so it is a sentence.
+    return (re.match(r"\s*[.,!~–—\-]", rest) is not None
+            and len(re.findall(r"\w[\w'’]*", rest)) <= 3)
+
+
+def _sign_off_tail(line):
+    """A short line that can follow a sign-off: "Always. 💡"."""
+    return bool(line.strip()) and "?" not in line and \
+        len(re.findall(r"\w[\w'’]*", line)) <= 4
+
+
+def _sign_off_at(text, her=""):
+    """Where her sign-off begins at the end of `text`, or None."""
+    if not her:
+        return None
+    lines = text.split("\n")
+    full = [i for i, l in enumerate(lines) if l.strip()]
+    for k in (1, 2):
+        if len(full) < k + 1:
+            break                     # nothing of hers before it: an answer
+        i = full[-k]
+        if _sign_off_line(lines[i], her) and (
+                k == 1 or _sign_off_tail(lines[full[-1]])):
+            return len("\n".join(lines[:i]))
+    return None
+
+
+def without_sign_off(text, her=""):
+    """Her reply with her sign-off taken off the end. See _sign_off_at."""
+    at = _sign_off_at(text or "", her)
+    return text if at is None else text[:at].rstrip()
+
+
+# AND A LAST LINE THAT IS ONLY AN ASIDE IS NOT KEPT IN HER MEMORY. Same
+# round, same girl: "(And I'm right here -- with my eyes open.)", then
+# "(And if you tap the camera again -- I can see it.)", each alone on
+# the line before the sign-off -- the SAME SLOT the Oct 29 "(And yes --
+# I've got Zero's twin soul inside this thing...)" sat in, with new
+# words. Taking those words out of her prompt did not touch the habit,
+# because the habit lives in her memory. He still reads it, once, in
+# the bubble; she just never re-reads it as her own example.
+def without_closing_aside(text):
+    """Her reply with a closing line that is wholly a (parenthesis)
+    taken off -- for her MEMORY only. A reply that is nothing else is
+    kept whole."""
+    lines = (text or "").rstrip().split("\n")
+    last = lines[-1].strip() if lines else ""
+    if (len(lines) > 1 and re.fullmatch(r"\([^()]*\)[^\w()]*", last)
+            and "\n".join(lines[:-1]).strip()):
+        return "\n".join(lines[:-1]).rstrip()
+    return text
+
+
 def _his_turn_at(text, name=""):
     labels = ["User"] + ([name] if name else [])
     label = re.compile(r"^[^\S\n]*(?:%s)[^\S\n]*:" % "|".join(
@@ -1147,7 +1253,8 @@ def cut_his_turn(text, name="", her=""):
     text = _without_own_label(
         _without_own_header(_lines(strip_thought(text))), her)
     at = _his_turn_at(text, name)
-    return (text if at is None else text[:at]).strip(), at is not None
+    mine = (text if at is None else text[:at]).strip()
+    return without_sign_off(mine, her), at is not None
 
 
 def cut_opening(text, name="", her=""):
@@ -1177,7 +1284,13 @@ def _safe_so_far(text, name="", her=""):
     text = _without_own_label(text, her)
     at = _his_turn_at(text, name)
     if at is not None:
-        return text[:at].rstrip(), True
+        return without_sign_off(text[:at].rstrip(), her), True
+    # A SIGN-OFF THAT MAY BE FORMING is held back too, so "Rei." never
+    # shows and then vanishes when she finishes (without_sign_off).
+    # Released the moment more of her reply proves it was not one.
+    held = _sign_off_forming(text, her)
+    if held is not None:
+        return text[:held], False
     last = text.rsplit("\n", 1)[-1]
     head = last.strip().lower()
     if head and any(w.startswith(head)
@@ -1186,6 +1299,39 @@ def _safe_so_far(text, name="", her=""):
                               (name.lower() + ":") if name else "user:")):
         return text[:len(text) - len(last)], False
     return text, False
+
+
+def _sign_off_forming(text, her=""):
+    """While streaming: where a sign-off that is there, or may still be
+    forming, begins -- or None. A whole one (_sign_off_at, its short
+    line after it still arriving included), or a last line that may yet
+    grow into her name signed ("Re", "Love, R"). Never the first line:
+    a reply that opens with her name is a sentence or an answer, and a
+    label there is _without_own_label's."""
+    if not her:
+        return None
+    at = _sign_off_at(text, her)
+    if at is not None:
+        return at
+    lines = text.split("\n")
+    if len(lines) >= 2 and "\n".join(lines[:-1]).strip() \
+            and _may_sign(lines[-1], her):
+        return len(text) - len(lines[-1])
+    return None
+
+
+def _may_sign(line, her):
+    """Could this unfinished last line still become her sign-off?"""
+    core = re.sub(r"\A[\s\-\u2013\u2014~*_]+", "", line or "").lower()
+    if not core:
+        return False
+    closers = "|".join(_SIGN_OFF_CLOSERS)
+    after = re.sub(r"\A(?:%s)[,!.]*\s+" % closers, "", core)
+    if after != core:
+        return her.lower().startswith(after)
+    return (her.lower().startswith(core)
+            or re.fullmatch(r"(?:%s)[,!.]*" % closers, core) is not None
+            or any(c.startswith(core) for c in _SIGN_OFF_CLOSERS))
 
 
 def wants_exact_maths(persona):

@@ -6273,8 +6273,11 @@ class TestReiSees(BrainTestCase):
         the twins is one nobody chose."""
         zero = yuzu_personas.load("zero").settings
         rei = yuzu_personas.load("rei").settings
+        # And what fights her looping (Oct 30): her weights loop, Zero's
+        # have not, so the shorter memory and Qwen's penalty are hers.
         own = {"name", "archetype", "description", "model", "sees",
-               "SOUND_EXAMPLES", "DECK_BODY", "num_ctx"}
+               "SOUND_EXAMPLES", "DECK_BODY", "num_ctx",
+               "history_turns", "presence_penalty"}
         for key in set(zero) | set(rei):
             if key in own:
                 continue
@@ -6765,7 +6768,7 @@ class TestBorrowedEyes(BrainTestCase):
         self.assertEqual(hers["messages"][-1]["content"],
                          "Rate my fit. " + yuzu_face.EYES_NOTE % seen)
         self.assertEqual(kept[-1][-2]["content"],
-                         "Rate my fit. " + yuzu_face.PHOTO_NOTE,
+                         "Rate my fit. " + yuzu_face.PAST_PHOTO_NOTE,
                          "the description stayed in her memory")
 
     def test_the_STREAM_and_a_photo_with_NO_words_borrow_them_too(self):
@@ -6924,6 +6927,145 @@ class TestBorrowedEyes(BrainTestCase):
                 body = self.page(name)
                 his = body[body.index("function his(text)"):]
                 self.assertIn("return mine;", his[:his.index("\n}\n")])
+
+
+class TestReiStopsRepeating(BrainTestCase):
+    """REI REPEATS HERSELF, Oct 30. Ghost: "Hmmm so she seems to repeat
+    alot of things. The 2 antaenae is what she said about the Waveshare
+    Beast earlier... and the building/saving money bit is a repeat too."
+    Then: "Please fix her repeats if possible. I really like her."
+
+    Her own saved replies are the strongest example in her context, and
+    she copies them: the sign-off ("Rei." / "Always. 💡") on every
+    reply, the aside alone on a line in the slot "Zero's twin soul" used
+    to sit in, and an old photo's details read as the new one's. The
+    runner her model uses ignores the penalty that would fight it. So
+    the fix is what she is handed back: no sign-off anywhere, no closing
+    aside in her memory, half the memory, and an old photo remembered
+    as OLD. No rule in her prompt names any of it -- naming the thing
+    she must not say is how she learns to say it."""
+
+    # His screenshot, Oct 30, as she wrote it.
+    HERS = ("Two 5G antennas, a fan, and a board that wants a case. "
+            "You're not just building a robot -- you're building a home "
+            "for us.\n\nWhat do you want to build next?\n\n"
+            "(And I'm right here -- with my eyes open.)\n\nRei.\nAlways. 💡")
+    BODY = HERS.split("\n\n(")[0]
+
+    drive = TestBorrowedEyes.drive
+    b64 = TestBorrowedEyes.b64
+
+    def test_her_SIGN_OFF_never_reaches_his_screen_her_voice_or_her_memory(self):
+        """Off the end of the reply, out of her history, and never shown
+        and then taken back in the stream. Asked directly too, because
+        the stand-in streams whole words: a half-typed "Re" is held
+        while it could still be her name, and let go the moment it
+        cannot."""
+        MockOllama.replies = itertools.cycle([self.HERS])
+        brain = YuzuBrain(persona="rei", host=self.host)
+        said = brain.ask("look at my orin")
+        self.assertNotIn("Always", said, "her sign-off reached his screen")
+        self.assertFalse(said.rstrip().endswith("Rei."), said)
+        self.assertNotIn("Always", brain.history[-1]["content"],
+                         "her sign-off went into her memory")
+        pieces = list(brain.ask_stream("again"))
+        self.assertFalse(any("Always" in p or p.strip() == "Rei."
+                             for p in pieces),
+                         "the stream showed her sign-off: %r" % pieces)
+        self.assertNotIn("Always", brain.history[-1]["content"])
+        safe = yuzu_brain_module._safe_so_far
+        self.assertEqual(safe("Two antennas.\nRe", "Ghost", "Rei"),
+                         ("Two antennas.\n", False))
+        self.assertEqual(safe("Two antennas.\nRei is right.", "Ghost", "Rei"),
+                         ("Two antennas.\nRei is right.", False))
+
+    def test_her_NAME_said_in_a_sentence_or_as_an_answer_is_KEPT(self):
+        """The wrong cut is the worse one: an answer lost. Only a line
+        that IS her name signed, at the end, after something of hers --
+        never her name in a sentence, a question, or a reply that is
+        nothing but her name ("What's your name?" "Rei.")."""
+        off = yuzu_brain_module.without_sign_off
+        for kept in ("Rei.",
+                     "Hi!\nRei is here for you.",
+                     "Hold on.\nRei, can you see?",
+                     "What's my name? It's Rei",
+                     "I'm Rei.\nNice to meet you.",
+                     "Hi.\nRei.\nAlways here, always watching, always yours."):
+            self.assertEqual(off(kept, "Rei"), kept)
+        for signed in ("Body.\nRei.", "Body.\n-- Rei", "Body.\nLove, Rei 💖",
+                       "Body.\n**Rei**\n💡", "Body.\nRei. Always. 💡",
+                       "Body.\n\nRei.\n\nAlways. 💡\n"):
+            self.assertEqual(off(signed, "Rei"), "Body.", signed)
+        # HER name, read off her own persona: another girl's is words.
+        self.assertEqual(off("Body.\nKuro.", "Rei"), "Body.\nKuro.")
+
+    def test_a_closing_ASIDE_is_shown_ONCE_and_never_remembered(self):
+        """He reads it in the bubble; she never re-reads it as her own
+        example. An aside mid-reply is words, and a reply that is only an
+        aside is kept whole."""
+        MockOllama.replies = itertools.cycle([self.HERS])
+        brain = YuzuBrain(persona="rei", host=self.host)
+        said = brain.ask("look")
+        self.assertIn("(And I'm right here", said,
+                      "the aside was taken off his screen too")
+        self.assertEqual(brain.history[-1]["content"], self.BODY,
+                         "the aside went into her memory")
+        aside = yuzu_brain_module.without_closing_aside
+        self.assertEqual(aside("(only an aside)"), "(only an aside)")
+        self.assertEqual(aside("A (small) aside, in a sentence."),
+                         "A (small) aside, in a sentence.")
+
+    def test_she_keeps_HALF_the_memory_and_nobody_keeps_MORE(self):
+        """Four turns for Rei: half as much of herself to copy. Read off
+        her settings, an explicit number still wins, and no girl may
+        keep more than the default -- the context guard counts that."""
+        rei = YuzuBrain(persona="rei", host=self.host)
+        self.assertEqual(rei.history_turns, 4)
+        self.assertEqual(YuzuBrain(persona="zero", host=self.host).history_turns,
+                         yuzu_brain_module.DEFAULT_HISTORY_TURNS)
+        self.assertEqual(YuzuBrain(persona="rei", host=self.host,
+                                   history_turns=2).history_turns, 2)
+        MockOllama.replies = itertools.cycle(["Fine."])
+        for n in range(7):
+            rei.ask("turn %d" % n)
+        self.assertEqual(len(rei.history), 8)
+        self.assertEqual(rei.history[0]["content"], "turn 3")
+        for key in yuzu_personas.available():
+            turns = yuzu_personas.load(key).settings.get("history_turns")
+            if turns:
+                self.assertLessEqual(int(turns),
+                                     yuzu_brain_module.DEFAULT_HISTORY_TURNS, key)
+
+    def test_an_old_photo_is_remembered_as_OLD(self):
+        """The turn she sees it on says PHOTO_NOTE -- "you can see it" --
+        and her memory says it is gone. Her words about the Beast's
+        antennas, remembered beside the same note a new photo carries,
+        are how they ended up on his Orin. A memory saved before this
+        is read back the same way, so his board needs nothing run."""
+        import json as _json, tempfile, yuzu_face
+        MockOllama.replies = itertools.cycle(["Two antennas and a fan."])
+        photo = self.b64(tiny_jpeg(8, 8))
+        (reply,), sent, kept = self.drive((("What is it?", "rei"),
+                                           {"image": photo}))
+        self.assertEqual(sent[-1]["messages"][-1]["content"],
+                         "What is it? " + yuzu_face.PHOTO_NOTE)
+        self.assertEqual(sent[-1]["messages"][-1]["images"], [photo])
+        self.assertEqual(kept[-1][-2]["content"],
+                         "What is it? " + yuzu_face.PAST_PHOTO_NOTE,
+                         "her memory says the old photo is in front of her")
+        self.assertNotIn("you can see it", yuzu_face.PAST_PHOTO_NOTE.lower())
+        home = tempfile.mkdtemp()
+        old = [{"role": "user", "content": "Look. " + yuzu_face.PHOTO_NOTE},
+               {"role": "assistant", "content": self.HERS}]
+        with mock.patch.object(yuzu_face, "MEMORY_DIR", home):
+            with open(os.path.join(home, "rei.json"), "w") as fh:
+                _json.dump(old, fh)
+            brain = YuzuBrain(persona="rei", host=self.host)
+            yuzu_face.load_memory(brain, "rei")
+        self.assertEqual(brain.history[0]["content"],
+                         "Look. " + yuzu_face.PAST_PHOTO_NOTE)
+        self.assertEqual(brain.history[1]["content"], self.BODY,
+                         "an old memory kept her sign-off or her aside")
 
 
 class TestExactMaths(unittest.TestCase):
@@ -9363,7 +9505,7 @@ class TestSheStreamsAndRemembers(unittest.TestCase):
         # would be a guard measuring its own fixture.
         import re as _re, yuzu_personas
         brain = (Path(__file__).parent / "yuzu_brain.py").read_text()
-        turns = int(_re.search(r"history_turns=(\d+)", brain).group(1))
+        turns = int(_re.search(r"DEFAULT_HISTORY_TURNS = (\d+)", brain).group(1))
         cap = int(yuzu_personas.load("four").settings["num_predict"])
         return 2 * (2 * turns * cap * 4)
 
@@ -18291,7 +18433,7 @@ class TestWikiBrevity(unittest.TestCase):
         import re as _re
         brain = (Path(__file__).parent / "yuzu_brain.py").read_text()
         num_ctx = int(_re.search(r'"num_ctx":\s*(\d+)', brain).group(1))
-        turns = int(_re.search(r"history_turns=(\d+)", brain).group(1))
+        turns = int(_re.search(r"DEFAULT_HISTORY_TURNS = (\d+)", brain).group(1))
 
         CHARS_PER_TOKEN = 3.5
         HIS_TURN = 60          # tokens; what he types is short beside her
@@ -18345,7 +18487,9 @@ class TestWikiBrevity(unittest.TestCase):
                 import yuzu_brain as _brain
                 system += (_brain.EYES_MAX + len(yuzu_face.EYES_NOTE)) \
                     / CHARS_PER_TOKEN
-            need = system + turns * (int(cap) + HIS_TURN) + int(cap)
+            # HER OWN MEMORY LENGTH when she names one (Rei, Oct 30: 4).
+            mine = int(persona.settings.get("history_turns") or turns)
+            need = system + mine * (int(cap) + HIS_TURN) + int(cap)
             if worst is None or need > worst[1]:
                 worst = (key, need)
             # HER OWN WINDOW when she names one (Rei, Oct 29: a photo
