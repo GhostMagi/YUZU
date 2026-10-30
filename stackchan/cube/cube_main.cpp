@@ -430,6 +430,7 @@ static const uint32_t REPLY_WAIT_MS = 180000;       // a cold model loading
 
 static M5Canvas rain(&M5.Display);
 static M5Canvas frame(&M5.Display);
+static M5Canvas shot(&M5.Display);       // Rei's photo, while he decides
 static uint8_t* art_rgb = nullptr;       // Four's picture, tinted, 8 bits a channel
 static int skin = 0;
 static float drops[COLS];
@@ -858,6 +859,39 @@ static void compose_rei() {
       frame.drawRect(i, i, W - 2 * i, H - 2 * i, hex565(REI_CYAN));
 }
 
+// ---- the photo, before she sees it -----------------------------------------------
+// Ghost, Oct 30, the first evening Cube Rei looked: "Any chance we can
+// make it show the image it took in a preview before it sends i can
+// maybe have a confirmation or a Retry button?" So the photo fills the
+// screen first -- the very JPEG she will be sent, so what he sees is
+// what she gets -- with Send and Retry for his thumb and an X in the
+// corner. A swipe drops it too: a screen with no way off it is the one
+// thing this cube never ships.
+struct PreviewButton { int x, y, w, h; const char* label; };
+static const PreviewButton RETRY_BOX = {8, 192, 140, 42, "Retry"};
+static const PreviewButton SEND_BOX = {172, 192, 140, 42, "Send"};
+static const PreviewButton DROP_BOX = {270, 8, 42, 42, "X"};
+static bool previewing = false;
+
+static void draw_button(const PreviewButton& b) {
+  frame.fillRoundRect(b.x, b.y, b.w, b.h, 10, (uint16_t)0);
+  frame.drawRoundRect(b.x, b.y, b.w, b.h, 10, hex565(REI_CYAN));
+  frame.drawRoundRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2, 9, hex565(REI_CYAN));
+  frame.setFont(&fonts::Font2);
+  frame.setTextSize(1);
+  frame.setTextColor(hex565(REI_CYAN));
+  frame.setTextDatum(middle_center);
+  frame.drawString(b.label, b.x + b.w / 2, b.y + b.h / 2);
+  frame.setTextDatum(top_left);
+}
+
+static void compose_preview() {
+  shot.pushSprite(&frame, 0, 0);
+  draw_button(RETRY_BOX);
+  draw_button(SEND_BOX);
+  draw_button(DROP_BOX);
+}
+
 // The status line, only while there is something to say, in her colour.
 // ONE line when it fits and TWO when it does not, split at the space
 // that balances them: a sentence from the board clipped at both edges
@@ -1199,14 +1233,15 @@ static void draw_battery() {
 
 // One frame of whoever is on the cube.
 static void draw_frame() {
-  if (girl == FOUR) { rain_step(); compose_four(); }
+  if (previewing) compose_preview();
+  else if (girl == FOUR) { rain_step(); compose_four(); }
   else if (girl == YUZU) compose_yuzu();
   else if (girl == ZERO) compose_zero();
   else if (girl == SAYA) compose_saya();
   else if (girl == REI) compose_rei();
   else compose_ghost();
   draw_battery();
-  draw_said(H - draw_status());
+  if (!previewing) draw_said(H - draw_status());   // her buttons, not her words
   frame.pushSprite(0, 0);
 }
 
@@ -1797,6 +1832,10 @@ void setup() {
     c->createSprite(W, H);
     c->fillSprite(TFT_BLACK);
   }
+  // Made only while a photo waits for him, and let go after: a cube
+  // that never looks never spends it.
+  shot.setColorDepth(16);
+  shot.setPsram(true);
   rain.setFont(&fonts::Font0);
   rain.setTextSize(2);
   for (int i = 0; i < COLS; i++) drops[i] = -(float)(esp_random() % (ROWS * 100)) / 100;
@@ -1851,6 +1890,13 @@ void setup() {
 // src/utility/GC0308.cpp). UNVERIFIED ON HIS CUBE, all of it, and so is
 // which way up the picture comes out.
 static const char* photo_why = "";
+
+// Lets go of a photo he did not send: its bytes and its preview.
+static void drop_photo() {
+  if (photo_b64) { free(photo_b64); photo_b64 = nullptr; photo_b64_len = 0; }
+  shot.deleteSprite();
+  previewing = false;
+}
 
 static bool take_photo() {
   const i2c_port_t port = M5.In_I2C.getPort();
@@ -1911,6 +1957,12 @@ static bool take_photo() {
       photo_why = "Out of memory for that photo.";
     }
   }
+  // The preview is drawn from the same JPEG she is sent, once.
+  if (ok && !(shot.createSprite(W, H) && shot.drawJpg(jpg, jpg_len, 0, 0))) {
+    drop_photo();
+    ok = false;
+    photo_why = "Out of memory for that photo.";
+  }
   if (jpg) free(jpg);
   return ok;
 }
@@ -1934,12 +1986,34 @@ static void look() {
     say_status(photo_why, 6000);
     return;
   }
-  flash_until = millis() + 500;          // the shutter
+  previewing = true;                     // he sees it first
+  say_status("", 1);
+}
+
+// Send: the photo he has just seen goes to her, as a turn with no words.
+static void send_photo() {
+  shot.deleteSprite();
+  previewing = false;
+  flash_until = millis() + 500;
   busy = true;
   asking = girl;
   set_said("");
   say_status("", 1);
   xTaskCreatePinnedToCore(turn_task, "turn", 16384, nullptr, 1, nullptr, 0);
+}
+
+static bool inside(const PreviewButton& b, int x, int y) {
+  return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+}
+
+// A tap on the preview: one of its three buttons, or nothing at all.
+static void previewed(int x, int y) {
+  if (inside(SEND_BOX, x, y)) send_photo();
+  else if (inside(RETRY_BOX, x, y)) { drop_photo(); look(); }
+  else if (inside(DROP_BOX, x, y)) {
+    drop_photo();
+    say_status("Dropped. Tap me to look again.", 4000);
+  }
 }
 
 // ---- the three things a finger does --------------------------------------------
@@ -1972,7 +2046,15 @@ void loop() {
   M5.update();
   auto t = M5.Touch.getDetail();
 
-  if (recording) {
+  if (previewing) {
+    // Rei's photo waits for him: a tap is one of its buttons, a swipe
+    // drops it and moves on, and nothing starts recording.
+    if (t.wasClicked()) previewed(t.x, t.y);
+    else if (t.wasReleased() && is_swipe(t)) {
+      drop_photo();
+      swap_girl(t.distanceX());
+    }
+  } else if (recording) {
     if (t.isPressed()) feed_recording();
     else {
       stop_recording();

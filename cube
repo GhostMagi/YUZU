@@ -323,5 +323,5 @@ fi
 echo "DONE. Four, Yuzu, Zero, Saya and Rei are on the cube."
 echo "It restarts by itself; give it about ten seconds to join your WiFi."
 echo "Hold the screen to talk, let go to send. Swipe across it to change girls."
-echo "On Rei, a tap takes a photo with the cube's camera and she looks at it."
+echo "On Rei, a tap takes a photo. You see it first: Send gives it to her, Retry takes another."
 echo "Swipe past Rei for the ghost."

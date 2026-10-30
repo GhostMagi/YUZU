@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1052 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1055 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -118,7 +118,49 @@ two art-rebuild tests ERROR under plain `python3` here -- an
 environment fault, not a code one: `python3.12 YUZU_TESTER.py` runs
 them green.
 
-## CUBE REI: BUILT, NOT YET ON HIS CUBE (Oct 30)
+## CUBE REI IS ON HIS CUBE, AND HE SEES THE PHOTO BEFORE SHE DOES (Oct 30)
+
+**ON HIS CUBE, same evening**, his photo: her face close up, the cyan
+chat box, and her line *"(If you want to know more about me or
+anything else in the room, just point and tap again--I'm always ready
+for a new look.)"* -- the answer to a TAP, so **the camera started and
+a photo reached her** (n=1; what the photo showed, and which way up it
+came out, was not seen). The chat box showed the closing aside, as
+designed: shown once, never remembered. **The battery reading is
+CONFIRMED too: 38% top left** -- the AXP2101 does see the battery in
+his base, which had been UNVERIFIED since Oct 21. He was taking her to
+a friend's house to show her off.
+
+Then: *"Any chance we can make it show the image it took in a preview
+before it sends i can maybe have a confirmation or a Retry button?"*
+Built, compiled, NOT on his cube until `~/YUZU/cube` again:
+
+- **A tap takes the photo and SHOWS it, full screen**: the very JPEG
+  she is sent, decoded once into its own picture (`shot`, made only
+  while a photo waits and let go after) BEFORE the JPEG is freed. What
+  he sees is what she gets -- **so the preview is also how the
+  photo's orientation gets answered**, the last unverified camera
+  question.
+- **Send** and **Retry** along the bottom (140x42 each, her cyan, the
+  chat box's rounded look) and an **X** top right, clear of the
+  battery. Send starts her turn (`send_photo`, the only caller of the
+  turn for a look); Retry drops it and looks again; X drops it and
+  says "Dropped. Tap me to look again."
+- **A swipe drops it too** and moves on: every screen has a way off.
+  While it waits, a touch never starts a recording, and the status
+  bar and chat box are not drawn over it.
+- **No timeout**: a photo left waiting is never sent by itself.
+- Compiled: 2.04 MB of 3 MB, no warnings from our code. The layout was
+  checked on a mock drawn from the code's own button numbers (a stand-in
+  font, not M5GFX's own drawing).
+
+Three tests, the tap test repointed (the turn now starts in Send, and
+Retry is the second caller of `look()`). **Twelve breaks, all red as
+failures** -- after one came back as an ERROR first (an `.index()` on
+the swipe's drop the break deleted; asserted first now). **1052 ->
+1055.**
+
+## CUBE REI: BUILT (Oct 30)
 
 *"Hey brobro can Rei use the cubes camera? A cuberei if you will?"*,
 then, once her repeating was fixed: *"Then do cube rei"*. **Built and

@@ -4513,7 +4513,11 @@ class TestTheCubeCode(unittest.TestCase):
         tap = self.fn("tapped")
         self.assertRegex(tap, r"girl == REI && !busy\) look\(\);",
                          "a tap on Rei does not look, or looks mid-reply")
-        self.assertEqual(self.code().count("look();"), 1,
+        # A tap on her, and the preview's Retry -- nothing else looks.
+        callers = [name for name in ("tapped", "previewed")
+                   if "look();" in self.fn(name)]
+        self.assertEqual(callers, ["tapped", "previewed"])
+        self.assertEqual(self.code().count("look();"), 2,
                          "something other than a tap on Rei takes a photo")
         rei = [row for row in self.table("GIRLS") if row[1] == "Rei"]
         self.assertEqual(len(rei), 1, "Rei is not on the cube")
@@ -4524,8 +4528,97 @@ class TestTheCubeCode(unittest.TestCase):
         look = self.fn("look")
         self.assertLess(look.index("away"), look.index("take_photo()"),
                         "she takes a photo with nobody to show it to")
-        self.assertIn("asking = girl;", look)
-        self.assertIn("busy = true;", look)
+        send = self.fn("send_photo")
+        self.assertIn("asking = girl;", send)
+        self.assertIn("busy = true;", send)
+
+    def preview_buttons(self):
+        """The preview's buttons as {name: (x, y, w, h, label)}."""
+        return {name: (int(x), int(y), int(w), int(h), label)
+                for name, x, y, w, h, label in re.findall(
+                    r"(\w+_BOX)\s*=\s*\{(\d+),\s*(\d+),\s*(\d+),\s*"
+                    r"(\d+),\s*\"([^\"]+)\"\}", self.code())}
+
+    def test_he_SEES_the_photo_before_she_does(self):
+        """Ghost, Oct 30, his first photo through Cube Rei: "Any chance we
+        can make it show the image it took in a preview before it sends
+        i can maybe have a confirmation or a Retry button?" A tap takes
+        the photo and SHOWS it; only Send starts her turn. And the
+        preview is the very JPEG she is sent, decoded before it is let
+        go -- so what he sees is what she gets, orientation included."""
+        look = self.fn("look")
+        self.assertNotIn("xTaskCreatePinnedToCore", look,
+                         "a photo goes to her before he has seen it")
+        self.assertNotIn("busy = true", look)
+        self.assertIn("previewing = true", look)
+        send = self.fn("send_photo")
+        self.assertIn("xTaskCreatePinnedToCore(turn_task", send)
+        self.assertIn("previewing = false", send)
+        self.assertIn("shot.deleteSprite()", send)
+        self.assertEqual(self.code().count("send_photo();"), 1)
+        self.assertIn("send_photo();", self.fn("previewed"))
+        shot = self.fn("take_photo")
+        for step in ("frame2jpg(", "shot.drawJpg(jpg, jpg_len", "free(jpg)"):
+            self.assertIn(step, shot)
+        self.assertLess(shot.index("frame2jpg("), shot.index("shot.drawJpg("))
+        self.assertLess(shot.index("shot.drawJpg("), shot.index("free(jpg)"),
+                        "the preview is drawn from a JPEG already let go")
+        self.assertIn("compose_preview()", self.fn("draw_frame"))
+
+    def test_the_preview_has_SEND_RETRY_and_a_way_OUT(self):
+        """Send and Retry big enough for a thumb on a 2" screen, an X in
+        the corner, nothing off the screen or on top of each other or of
+        the battery -- and while it waits, a tap is a button, a swipe
+        drops it, and nothing starts recording. Every screen on this
+        cube has a way off it."""
+        boxes = self.preview_buttons()
+        self.assertEqual({b[4] for b in boxes.values()},
+                         {"Send", "Retry", "X"})
+        W, H = (int(re.search(r"\b" + name + r"\s*=\s*(\d+)",
+                                self.code()).group(1))
+                for name in ("W", "H"))
+        for name, (x, y, w, h, label) in boxes.items():
+            self.assertTrue(0 <= x and x + w <= W and 0 <= y and y + h <= H,
+                            "%s is off the screen" % name)
+            self.assertGreaterEqual(min(w, h), 40,
+                                    "%s is too small for a thumb" % name)
+            self.assertFalse(x < 90 and y < 28,
+                             "%s sits on the battery" % name)
+        rects = list(boxes.values())
+        for i, (x, y, w, h, _a) in enumerate(rects):
+            for (x2, y2, w2, h2, _b) in rects[i + 1:]:
+                self.assertFalse(x < x2 + w2 and x2 < x + w
+                                 and y < y2 + h2 and y2 < y + h,
+                                 "two of the preview's buttons overlap")
+        tap = self.fn("previewed")
+        self.assertRegex(tap, r"inside\(SEND_BOX[^;]*\)\) send_photo\(\);")
+        self.assertRegex(tap, r"inside\(RETRY_BOX[^;]*\)\)\s*\{\s*"
+                              r"drop_photo\(\);\s*look\(\);")
+        drop = tap[tap.index("DROP_BOX"):]
+        self.assertIn("drop_photo();", drop)
+        loop = self.fn("loop")
+        self.assertIn("if (previewing)", loop)
+        self.assertLess(loop.index("if (previewing)"),
+                        loop.index("start_recording()"),
+                        "a touch on the preview starts a recording")
+        waiting = loop[loop.index("if (previewing)"):
+                       loop.index("else if (recording)")]
+        self.assertIn("previewed(t.x, t.y)", waiting)
+        self.assertNotIn("start_recording", waiting)
+        self.assertIn("drop_photo()", waiting,
+                      "a swipe leaves the photo waiting for nobody")
+        self.assertLess(waiting.index("drop_photo()"),
+                        waiting.index("swap_girl("),
+                        "a swipe leaves the photo waiting for nobody")
+
+    def test_a_photo_he_DROPS_is_let_go(self):
+        """X, Retry and a swipe all let go of the photo's bytes and its
+        preview, or the next Send would carry the photo he threw away."""
+        drop = self.fn("drop_photo")
+        for step in ("free(photo_b64)", "photo_b64 = nullptr",
+                     "photo_b64_len = 0", "shot.deleteSprite()",
+                     "previewing = false"):
+            self.assertIn(step, drop)
 
     def test_the_camera_GIVES_THE_BUS_BACK(self):
         """The camera shares the bus touch, power and audio live on. So:
