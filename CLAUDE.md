@@ -167,9 +167,12 @@ wrong (not seen either). Then he took the board and the cube to a
 friend's to show off the offline version; *"The homie wasnt really
 paying attention like usual"* -- and his verdict: *"I think the girls
 are cool as heck!"*, then *"She does work tho on the cube and such"*.
-**Still UNVERIFIED: the cube joining `ghostnano`** away from home. "She
-works" does not settle it: pocket mode answers a hold with NO board at
-all. A tap that got Rei a photo there would (her look needs the board).
+Pocket mode answers a hold with no board at all, so I asked whether a
+tap got Rei a photo there (her look needs the board). His answer: *"Yes
+she takes pics"*. **CONFIRMED: THE CUBE JOINS `ghostnano` AWAY FROM
+HOME** and talks to the board through it. The camera, the preview, the
+board's own WiFi and the cube finding the board are all proven on his
+hardware now. Still unreported: which way up her photo comes out.
 
 ## CUBE REI: BUILT (Oct 30)
 
@@ -887,9 +890,10 @@ the network (so his NetworkManager took `ifname '*'`), the card check
 said **WORKS** and put him back on home in ~16 seconds, `face` printed
 the name and password, and `cube` listed `SoapWorld`, `ghostnano`,
 `Ghost` -- the board's own WiFi second, as designed. **The password is
-in that chat and deliberately NOT here.** Still UNVERIFIED: a real
-boot with no known network in reach, and the cube finding the board on
-`ghostnano` (that flash was still building when he wrote).
+in that chat and deliberately NOT here.** Still UNVERIFIED then: a real
+boot with no known network in reach (ANSWERED Oct 29, below), and the
+cube finding the board on `ghostnano` (ANSWERED Oct 30: Cube Rei took
+photos at his friend's, see the top).
 
 **CONFIRMED AWAY FROM HOME, Oct 29, at a friend's house** (*"Peeeeeeeep
 it"*), his screenshot: a real boot with no network it knew, the board
@@ -903,8 +907,9 @@ friend said hi to her there** -- the first person who is not Ghost to
 talk to a girl over the board's own WiFi. Saya, told about the JetHexa,
 stayed in character (*"W-wait, what? A hexapod robot? For me? O-okay,
 fine. I'll play along"*). The news was new to her: she is the one girl
-with no robot body (`STAYS_ON_THE_DECK`). Still UNVERIFIED: the cube on
-`ghostnano`.
+with no robot body (`STAYS_ON_THE_DECK`). The cube on `ghostnano` was
+still UNVERIFIED that day. **CONFIRMED Oct 30**, same friend's house:
+Cube Rei took photos there, which only works through the board.
 
 **UNVERIFIED, all of it on his board:** that the card does AP mode (the
 setup check answers it -- ANSWERED above: it does); that `ghostnano.local` resolves on the board's
