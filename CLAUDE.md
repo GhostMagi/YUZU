@@ -257,8 +257,9 @@ paw"*). Around it, NOT changed, his call to make:
   reads fine as text.
 - **She invented a cracked screen** to explain "shadows" nobody
   mentioned -- the palmtop fault, the same as Yuzu's "deep eyes" behind
-  sunglasses. And *"it's a bad cat"* is probably his name "Spooky"
-  read as a judgement.
+  sunglasses. *"You're right — it's a bad cat"* was her AGREEING WITH
+  HIM: he had called Spooky bad in his own turn. (I first guessed she
+  misread the name; he corrected me. His words beat my reading of them.)
 
 ## REI'S CAMERA DID NOTHING, AND A BUTTON FOR MEMES (Oct 29)
 
