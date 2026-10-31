@@ -49,6 +49,34 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## CHEAP UPGRADES WHILE HE SAVES -- OFFERED, NOT PICKED (Oct 31)
+
+*"what would be some cool upgrades tenporarily? I was thinking an
+adapter.. i do have a 5000mah random powerbank.. (ill get the fancy
+$90ish anker ones later) idk or a display to hdmi port or like. Mayne
+a camera?"* Offered, ranked by what each also prepares for the dog or
+tank; nothing bought or built:
+
+1. **A USB webcam on the board**: the girls' own eyes without his
+   phone (Rei, Yuzu through the borrowed eyes). The same "board grabs
+   a picture" code serves the tank's head camera later. Needs code.
+2. **His 5000mAh bank**: runs the board ONLY if it does USB-C PD at
+   12V or 15V (5V-only cannot run a 9-20V barrel jack), through a
+   PD-to-barrel trigger cable, 5.5x2.5 centre-positive. ~18Wh, so
+   maybe an hour or two (arithmetic, UNMEASURED). Asked for a photo
+   of the bank's label before anything is bought. Board on its own
+   bank is exactly the dog's power plan, so it is real practice.
+3. **A DisplayPort-to-HDMI adapter**: the board on his TV (still no
+   DP cord, Oct 29). Passive is fine.
+4. **A USB speaker**: the girls talk out of the board itself. Needs
+   the board-plays-its-own-reply code that the robot needs anyway.
+
+Free, already owned: **the cube's LED base glowing each girl's
+colour** (item 7, "later", Oct 2), and **offline maps** (#3, he asked
+to be reminded -- reminded here). The right-angle barrel adapter
+reminder was given too: a cable on a moving robot is leverage on the
+board's jack.
+
 ## A UNITREE GO2 PRO, DRIVEN BY THE BOARD OVER WIFI -- ANSWERED, NOT BUILT (Oct 30)
 
 He sent a Gemini-written handoff ("Jetson to Unitree Go2 Pro"): the
