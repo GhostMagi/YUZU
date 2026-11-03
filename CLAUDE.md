@@ -49,6 +49,43 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## WAVESHARE ANSWERED HIS EMAIL (Nov 3)
+
+He emailed them after all (the Oct 29 "Im shy" questions were answered
+from their pages then). Xueting Ye, Waveshare, Nov 3 06:12 UTC, his
+screenshot. **His questions were not seen, only the answers**; #1 is
+most likely "does the Acce kit work with my Orin Nano Super devkit".
+
+1. *"In theory, yes."* A careful yes; they have not tried his board.
+2. **The power lead IS in the Acce kit**: *"an XH2.54 dual-connector
+   to DC5525 adapter cable"* from the robot to *"the Jetson's DC power
+   input"*. DC5525 is 5.5x2.5, the Orin's own barrel. So the tank's
+   3S pack powers the board and no separate bank is needed.
+   **MAXN SUPER on it: *"requires testing on your side, as we have not
+   tested this configuration."*** Arithmetic, UNMEASURED: 3S is 12.6V
+   full and ~9V near empty, the Orin takes 9-20V, so near empty with
+   the motors pulling it can sag past the edge and REBOOT. If it does,
+   a lower power mode while driving is the fix (the nvpmodel reminder
+   stays: MAXN at the desk). Three 2200mAh cells are ~24Wh; the Orin
+   alone at MAXN is under an hour on that. Bigger cells, longer.
+3. **Their image is JetPack 6.0**, *"unlikely to be directly
+   compatible with JetPack 7.2.1"*, and they suggest reflashing to 6.0.
+   **They were told 7.2.1; this file says his board is JetPack 6
+   (Ubuntu 22.04). UNRESOLVED which.** On the board, `cat
+   /etc/nv_tegra_release` answers it (R36 is JetPack 6). **It does not
+   change the plan**, because of their next sentence:
+   *"the Jetson can control the UGV Beast by sending JSON commands to
+   the ESP32 controller over the serial port."* That is the girls'
+   bridge exactly (`{"T":1,"L":..,"R":..}`, `{"T":0}`, the `T:136`
+   heartbeat, from Oct 29): a small script on his EXISTING system.
+   **No reflash, no wipe, nothing of theirs installed.** Their reflash
+   would wipe the girls, the wiki and the memories, so it is never the
+   first move (Save my stuff first if it ever is).
+
+Still UNVERIFIED for robot day: which serial port the ESP32 is on
+(their software uses the 40-pin UART, likely `/dev/ttyTHS1`) and
+whether `nvgetty` holds it. Still a lean, not an order: nothing built.
+
 ## CHEAP UPGRADES WHILE HE SAVES -- OFFERED, NOT PICKED (Oct 31)
 
 *"what would be some cool upgrades tenporarily? I was thinking an
