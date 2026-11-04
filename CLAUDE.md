@@ -293,12 +293,25 @@ roster came back, five girls, Four first as `front`), her baked picture
 drawn whole, and the foot `board 192.168.4.163  MAXN 48C 4.4W` -- so
 /stats answers too. Then *"how do i switch between Ais?"*: left/right
 on the D-pad or the circle pad (the help line's `<>` and the top's
-`< 2/5 >` were the only hint, and they were not enough for him). Not
-yet reported: a turn, her voice, the mic.
+`< 2/5 >` were the only hint, and they were not enough for him).
 
-UNVERIFIED, all of it on his 3DS: a turn and its reply; that the mic
-and ndsp answer as a .cia; whether his 3DS has `dspfirm.cdc`; and that
-the 3DS keeps a saved connection to a WiFi with no internet.
+**AND SHE TALKS OUT LOUD ON IT, minutes later** (*"Sayas speaking
+outloud hell ye good job ♡"*), his photo: Saya at `< 4/5 >`, her
+resting kaomoji (two dots and a line) drawn in her neon green, his
+typed `GHOST: hiiii i missed you`, and her reply in green, whole and
+in character (*"O-oh no, stop it! You're really going to make me
+blush.. I-it's not like I missed you or anything..."*). So a typed turn
+(swkbd -> /stream -> the screen), her voice in pieces through ndsp,
+and **`dspfirm.cdc` IS on his 3DS** are all CONFIRMED. The log also
+shows `(Stopped.)` (B works) and `(Too short -- hold L or R the whole
+time you talk.)`: the mic path ran and refused a tap-length hold, as
+designed. A spoken turn has not been seen yet. Her face does NOT
+change with her mood on the 3DS (one baked resting face per girl);
+nobody has asked for that.
+
+UNVERIFIED, all of it on his 3DS: a spoken turn through the mic and
+Whisper; and that the 3DS keeps a saved connection to a WiFi with no
+internet (the ghostnano fix, away from home).
 
 ## WAVESHARE ANSWERED HIS EMAIL (Nov 3)
 
