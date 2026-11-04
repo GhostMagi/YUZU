@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1055 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1072 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,82 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## THE GIRLS ON HIS 3DS -- WRITTEN, NOT YET COMPILED (Nov 4)
+
+*"Could we make an app or .cia for my 3ds that is a way to see and talk
+to the board and her girls? But i want it to be able to connect to the
+boards own "ghostnano" signal too forsure"*, then *"Id want it to be on
+homescreen too"*, then *"make sure i can type to them with the 3ds
+keyboard and stylus too"*. His 3DS: CFW, Luma/Rosalina, the Homebrew
+Launcher (ChatGPT3DS, Emerald 3DS and an NDS forwarder on it, his photo).
+
+**`3ds/`, the cube's shape: her picture on the top screen, the
+conversation on the bottom one, her brain on the board.** It asks as
+the girls' PAGE selves (`four`, `yuzu`...), like his phone, so it is
+one more window onto the same girl: same memory, same /wiki. **Nothing
+on the board changed for it.**
+
+- **Finding the board, cheapest first** (`board_find`): the address it
+  remembered (`sdmc:/3ds/yuzu3ds.txt`), then **10.42.0.1 straight away
+  when the 3DS itself is on 10.42.0.x** (ghostnano), then the cube's
+  own broadcast question (`yuzu? where is the board`, held EQUAL to
+  `CUBE_ASK`), then its /24 broadcast, then 10.42.0.1 anyway. Every
+  answer is checked against `/boot.json` before it counts. Y types an
+  address by hand.
+- **Typing: A, or a stylus TAP anywhere on the bottom screen**, opens
+  the 3DS's own keyboard (swkbd), Send / Cancel, 500 characters.
+  **Hold L or R to talk**, let go to send: the 3DS mic at its real
+  16364 Hz, at most 30s, as a WAV to `/listen`, and what Whisper heard
+  is shown as his line. B stops her, left/right is the next girl,
+  up/down scrolls back, SELECT mutes her voice, START quits.
+- **Her voice**: `/voice.wav` in pieces (120 characters first, 220
+  after, cut where a sentence ends), two at a time through ndsp. **It
+  needs the 3DS's sound firmware dumped once (DSP1)**; without it the
+  app says so and she talks in text.
+- **The roster is read off `/characters.json`**: main.c names no girl
+  (a test holds it). **Her picture is baked** by `3ds/make_art.py`
+  (PIL, workbench only) into `3ds/data/<who>.bin`, already in the top
+  screen's own byte order: Four whole on black, Zero and Rei close-up as
+  on the cube, Yuzu on her lavender room, Saya's resting kaomoji in neon
+  green with the scanlines. A girl with no picture gets a plain screen
+  with her name. The HOME menu icon is Yuzu's face; the banner is all
+  five side by side, with a two-note chime.
+- **The .cia**: `make cia` -> bannertool + makerom, `3ds/yuzu.rsf` (the
+  standard homebrew template's system calls, services and dependencies,
+  unchanged; UniqueId 0xF5C1D, Logo Homebrew).
+
+**`board.c` IS PORTABLE ON PURPOSE**, so `TestThe3DS` compiles it with
+the ordinary gcc (`3ds/tests/harness.c`) and drives the REAL face
+server with only the model, ears and voice stood in: found by asking,
+the remembered board checked (an impostor answering 200 is refused), the
+roster equal to `roster()`, his words arriving exactly as typed, her
+words folded to ASCII with the stage direction gone, his WAV opened by
+Python's own reader at 16364 Hz, her voice back as PCM or as the
+board's sentence, pieces that keep every word. **main.c and board.c
+pass a syntax check against the real libctru and newlib headers** (host
+gcc, `-fsyntax-only -Wall`, no warnings) -- which reads headers and runs
+nothing. Seventeen tests; **eighteen breaks, all red as failures** --
+after one stayed GREEN twice: the voice-pieces text never needed the
+space-cut fallback, then its no-punctuation run was 24 characters a
+phrase, so a blind cut at 120 landed on a word boundary by luck. And two
+breaks of mine came back as ERRORs (they tripped `-Werror`, not the
+tests); redone cleanly. **1055 -> 1072.**
+
+**NOT COMPILED FOR THE 3DS.** devkitPro's toolchain was fetched into
+the scratchpad (pkg.devkitpro.org is behind a bot wall; the
+`devkitpro/devkitarm` image came from mirror.gcr.io), but **running it
+here, and building makerom/bannertool from source, were refused by this
+session's safety rules** ("code from external"). So the build route is
+HIS CALL, asked, not assumed: a GitHub Actions workflow on the
+`devkitpro/devkitarm` container (nothing for him to do but download),
+a permission for this session, or a build script on the board.
+
+UNVERIFIED, all of it on his 3DS: that it builds at all; that the 3DS
+keeps a saved connection to a WiFi with no internet (its connection
+test fails on ghostnano); that UDP broadcast leaves a 3DS; that the
+mic and ndsp answer under the Homebrew Launcher and as a .cia; and
+whether his 3DS has `dspfirm.cdc`.
 
 ## WAVESHARE ANSWERED HIS EMAIL (Nov 3)
 

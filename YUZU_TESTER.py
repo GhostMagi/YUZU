@@ -20843,6 +20843,368 @@ class TestFaceServer(unittest.TestCase):
 
 
 
+class TestThe3DS(unittest.TestCase):
+    """A WINDOW ONTO THE BOARD FOR HIS CFW 3DS. Ghost, Nov 4: "Could we
+    make an app or .cia for my 3ds that is a way to see and talk to the
+    board and her girls? But i want it to be able to connect to the boards
+    own "ghostnano" signal too forsure", then "Id want it to be on
+    homescreen too", then "make sure i can type to them with the 3ds
+    keyboard and stylus too".
+
+    The app is the cube's shape: her face on a screen, her brain on the
+    board. Everything that talks to the board is 3ds/source/board.c, which
+    is PORTABLE ON PURPOSE -- so these tests compile it with the ordinary
+    gcc (3ds/tests/harness.c is the driver) and run it against the REAL
+    face server, with only her model, her ears and her voice stood in for.
+    main.c is the 3DS half and cannot run here; what it can be held to
+    from its source, it is."""
+
+    HERE = Path(__file__).resolve().parent / "3ds"
+
+    @classmethod
+    def setUpClass(cls):
+        import io, wave
+        import yuzu_face, yuzu_ears
+        cls.face = yuzu_face
+        cls.tmp = tempfile.mkdtemp()
+        cls.h = None
+        if shutil.which("gcc"):
+            out = os.path.join(cls.tmp, "h")
+            built = subprocess.run(
+                ["gcc", "-std=gnu99", "-Wall", "-Wextra",
+                 "-Wno-unused-parameter", "-Werror",
+                 str(cls.HERE / "source" / "board.c"),
+                 str(cls.HERE / "tests" / "harness.c"), "-lm", "-o", out],
+                capture_output=True, text=True)
+            if built.returncode != 0:
+                raise AssertionError("board.c did not build:\n" + built.stderr)
+            cls.h = out
+
+        cls.asked = []
+
+        def fake_answer(text, who=None, on_chunk=None, on_suggest=None,
+                        image=None):
+            cls.asked.append((text, who))
+            if on_chunk:
+                on_chunk("Hi ")
+            return ("[waves] Hi there, \u201cGhost\u201d \u2014 that\u2019s "
+                    "everything\u2026", None)
+
+        def fake_wav(text, who=None):
+            b = io.BytesIO()
+            w = wave.open(b, "wb")
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(24000)
+            w.writeframes(b"\x00\x01" * 2400)
+            w.close()
+            return b.getvalue(), None
+
+        cls.heard = []
+
+        def fake_ears(audio, content_type=""):
+            cls.heard.append((audio, content_type))
+            if audio[:4] == b"RIFF" and "wav" in content_type:
+                return "hello four", None
+            return "", "That was not a recording."
+
+        cls.patches = [
+            mock.patch.object(yuzu_face, "answer", fake_answer),
+            mock.patch.object(yuzu_face, "voice_wav", fake_wav),
+            mock.patch.object(yuzu_face, "stats", lambda: {
+                "power": "MAXN", "temp": 51.2, "watts": 5.24}),
+            mock.patch.object(yuzu_ears, "transcribe", fake_ears)]
+        for one in cls.patches:
+            one.start()
+        from http.server import ThreadingHTTPServer
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), yuzu_face._Handler)
+        cls.port = cls.server.server_address[1]
+        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+        cls.cube = yuzu_face.answer_the_cube(cls.port, "127.0.0.1")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        if cls.cube is not None:
+            cls.cube.close()
+        for one in cls.patches:
+            one.stop()
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def run_h(self, *args):
+        if not self.h:
+            self.skipTest("no gcc to build board.c with")
+        got = subprocess.run([self.h] + [str(a) for a in args],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(got.returncode, 0, got.stderr)
+        return got.stdout
+
+    def code(self, name):
+        """A source file with its comments gone, so a comment naming a
+        thing never reads as the thing being there."""
+        text = (self.HERE / "source" / name).read_text()
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return re.sub(r"//[^\n]*", "", text)
+
+    def define(self, name):
+        m = re.search(r'#define\s+%s\s+(.+)' % name,
+                      (self.HERE / "source" / "board.h").read_text())
+        self.assertIsNotNone(m, name)
+        return m.group(1).strip()
+
+    # ---- finding the board ---------------------------------------------
+
+    def test_it_asks_for_the_board_in_the_CUBES_own_words(self):
+        """The board already answers the cube's broadcast; the 3DS asks
+        the same question, so nothing on the board changes for it. Held
+        EQUAL, the way the cube's two strings are."""
+        self.assertEqual(self.define("BOARD_ASK").strip('"').encode(),
+                         self.face.CUBE_ASK)
+        self.assertEqual(self.define("BOARD_ANSWER").strip('"').encode(),
+                         self.face.CUBE_ANSWER)
+        self.assertEqual(int(self.define("BOARD_PORT")),
+                         inspect.signature(self.face.serve).parameters["port"].default)
+        own = self.define("BOARD_OWN_WIFI_HOST").strip('"')
+        wifi = (Path(__file__).resolve().parent / "own_wifi.sh").read_text()
+        self.assertIn("http://%s:$PORT/" % own, wifi,
+                      "the 3DS looks for the board's own WiFi somewhere else")
+
+    def test_it_FINDS_the_board_by_asking(self):
+        if self.cube is None:
+            self.skipTest("the cube's UDP port was taken")
+        out = self.run_h("ask", "127.0.0.1", self.port, 1500)
+        self.assertEqual(out.split(), ["FOUND", "127.0.0.1", str(self.port)])
+
+    def test_a_REMEMBERED_board_is_tried_first_and_CHECKED(self):
+        out = self.run_h("find", "127.0.0.1:%d" % self.port, "-", 1)
+        self.assertEqual(out.split(), ["FOUND", "127.0.0.1", str(self.port),
+                                       "remembered"])
+        # Remembered with no port: the port it was asked for.
+        out = self.run_h("find", "127.0.0.1", "-", self.port)
+        self.assertIn("remembered", out)
+        # Something answering that is NOT the face server is not the board.
+        from http.server import ThreadingHTTPServer
+        class Impostor(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+            def log_message(self, *a):
+                pass
+        other = ThreadingHTTPServer(("127.0.0.1", 0), Impostor)
+        self.addCleanup(other.server_close)
+        self.addCleanup(other.shutdown)
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        self.assertEqual(self.run_h("alive", "127.0.0.1",
+                                    other.server_address[1]).split(),
+                         ["ALIVE", "0"])
+        self.assertEqual(self.run_h("alive", "127.0.0.1", self.port).split(),
+                         ["ALIVE", "1"])
+        self.assertEqual(self.run_h("alive", "127.0.0.1", 1).split(),
+                         ["ALIVE", "0"], "a dead port read as the board")
+
+    def test_on_the_boards_own_WIFI_it_looks_there_before_asking(self):
+        """On ghostnano the board is always 10.42.0.1, so the 3DS goes
+        straight there; only a 3DS on some other network has to ask."""
+        code = self.code("board.c")
+        body = code[code.index("int board_find("):]
+        own = body.index('"10.42.0."')
+        ask = body.index('board_ask("255.255.255.255"')
+        self.assertLess(body.index("parse_at(remembered"), own)
+        self.assertLess(own, ask, "on his own WiFi it asks out loud first")
+        self.assertIn("found_at(", body[ask:ask + 120],
+                      "an answer to a broadcast is trusted unchecked")
+
+    # ---- talking to her ------------------------------------------------
+
+    def test_the_girls_on_the_3DS_are_the_ROSTERS(self):
+        out = self.run_h("roster", "127.0.0.1", self.port).splitlines()
+        want = self.face.roster()
+        self.assertEqual(out[0], "COUNT %d" % len(want))
+        got = [line[5:].split("|") for line in out[1:]]
+        self.assertEqual([g[0] for g in got], [w["who"] for w in want],
+                         "the 3DS asks as somebody the board does not know")
+        for g, w in zip(got, want):
+            self.assertEqual(g[1], w["name"])
+            self.assertEqual(g[3], w["user"])
+            self.assertEqual(g[4], str(int(w["front"])))
+            self.assertEqual(g[5], str(int(w["sees"])))
+
+    def test_a_turn_reaches_her_WHOLE_and_her_words_fit_the_screen(self):
+        type(self).asked.clear()
+        out = self.run_h("turn", "127.0.0.1", self.port, "four",
+                         'he said "hi"\\ok\nnew line')
+        lines = dict(l.split(" ", 1) for l in out.splitlines() if " " in l)
+        self.assertTrue(lines["GOT"].startswith("1 OK 1 REACHED 1"), out)
+        self.assertEqual(self.asked, [('he said "hi"\\ok\nnew line', "four")],
+                         "his words did not arrive as he typed them")
+        shown = lines["SHOWN"]
+        self.assertNotIn("[waves]", shown, "a stage direction on the screen")
+        self.assertTrue(shown.isascii(), "the 3DS font cannot draw " + shown)
+        self.assertIn('"Ghost" - that\'s everything...', shown)
+        self.assertNotEqual(lines["SPOKEN"], "(null)")
+
+    def test_a_failed_turn_says_WHY_and_is_not_her(self):
+        with mock.patch.object(self.face, "answer",
+                               return_value=(None, "Can't reach Ollama.")):
+            out = self.run_h("turn", "127.0.0.1", self.port, "four", "hi")
+        self.assertIn("OK 0 REACHED 1", out)
+        self.assertIn("SHOWN Can't reach Ollama.", out)
+        out = self.run_h("turn", "127.0.0.1", 1, "four", "hi")
+        self.assertIn("REACHED 0", out, "a dead board read as an answer")
+
+    def test_his_VOICE_reaches_her_ears_as_a_real_WAV(self):
+        import io, wave
+        type(self).heard.clear()
+        out = self.run_h("listen", "127.0.0.1", self.port, 16364, 1.0)
+        self.assertEqual(out.strip(), "HEARD hello four")
+        audio, ctype = self.heard[-1]
+        self.assertIn("wav", ctype)
+        w = wave.open(io.BytesIO(audio))
+        self.assertEqual((w.getframerate(), w.getnchannels(),
+                          w.getsampwidth()), (16364, 1, 2))
+        self.assertEqual(w.getnframes(), 16364)
+
+    def test_the_mic_recording_is_a_WAV_any_reader_opens(self):
+        import wave
+        path = os.path.join(self.tmp, "mic.wav")
+        self.assertEqual(self.run_h("wav", path, 16364, 0.5).split(),
+                         ["WROTE", "8182"])
+        with wave.open(path) as w:
+            self.assertEqual((w.getframerate(), w.getnchannels(),
+                              w.getsampwidth(), w.getnframes()),
+                             (16364, 1, 2, 8182))
+
+    def test_her_VOICE_comes_back_as_sound_or_as_a_SENTENCE(self):
+        out = self.run_h("voice", "127.0.0.1", self.port, "four", "Hello.")
+        self.assertEqual(out.split()[:4], ["WAV", "1", "24000", "1"])
+        with mock.patch.object(self.face, "voice_wav",
+                               return_value=(None, "No voice on this board.")):
+            out = self.run_h("voice", "127.0.0.1", self.port, "four", "Hi.")
+        self.assertEqual(out.strip(), "PROBLEM No voice on this board.")
+
+    def test_her_voice_PIECES_keep_every_word_and_split_none(self):
+        text = ("Okay. So the board makes its own WiFi when there is none, "
+                "and it is called ghostnano \u2014 caf\u00e9 r\u00e9sum\u00e9 "
+                "na\u00efve. " * 4 + "3.14 stays whole, e.g. like this. "
+                # A run with no full stop and no comma: only a space can
+                # cut it, and cutting it anywhere else splits a word.
+                + "and then she kept on going " * 9 + "until it ended. "
+                "Last line here!")
+        out = self.run_h("pieces", 120, text).splitlines()
+        self.assertEqual(out[-1], "END")
+        pieces = [l[len("PIECE "):] for l in out[:-1]]
+        self.assertGreater(len(pieces), 3)
+        for one in pieces:
+            self.assertLessEqual(len(one.encode()), 120, one)
+            one.encode().decode("utf-8")       # never half a character
+        self.assertEqual(" ".join(pieces).split(), text.split(),
+                         "a word was lost or cut in half")
+        self.assertTrue(pieces[0].endswith("."), "it did not cut at a sentence")
+        self.assertNotIn("3.", [p.split()[-1] for p in pieces])
+
+    def test_the_small_pieces_FOLD_PARSE_and_ESCAPE(self):
+        out = self.run_h("fold", "\u201chi\u201d \u2014 it\u2019s \u2026 ok \U0001F49C")
+        self.assertEqual(out, 'FOLD "hi" - it\'s ... ok \n')
+        # A key-looking string inside a VALUE never matches.
+        out = self.run_h("json", '{"a": "\\"b\\": 1", "b": "real"}', "b")
+        self.assertEqual(out, "JSON 1 real\n")
+        out = self.run_h("json", '{"s": "caf\\u00e9 \\ud83d\\udc9c"}', "s")
+        self.assertEqual(out, "JSON 1 caf\u00e9 \U0001F49C\n")
+        self.assertEqual(self.run_h("json", '{"a": 1}', "b"), "JSON 0 \n")
+        nasty = 'he said "hi"\\\n\t\x01 ok'
+        out = self.run_h("escape", nasty)
+        self.assertEqual(json.loads('"%s"' % out[len("ESC "):-1]), nasty)
+
+    # ---- the app itself --------------------------------------------------
+
+    def test_he_can_TYPE_with_the_keyboard_and_the_STYLUS(self):
+        """His words: "make sure i can type to them with the 3ds keyboard
+        and stylus too". The 3DS's own keyboard is the stylus one; A opens
+        it, and so does a tap anywhere on the bottom screen."""
+        code = self.code("main.c")
+        self.assertIn("swkbdInputText", code)
+        self.assertRegex(code, r"\(down & KEY_A\)\s*\|\|\s*\(down & KEY_TOUCH\)"
+                               r"\)\s*type_to_her\(\)")
+        body = code[code.index("static void type_to_her"):]
+        body = body[:body.index("\n}\n")]
+        self.assertIn("order(T_TURN)", body)
+
+    def test_the_app_holds_NO_LIST_of_the_girls(self):
+        """The roster decides who is on the 3DS -- the hardcoded-cast rule.
+        A girl added to the board is on the 3DS with nothing rebuilt but
+        her picture."""
+        code = self.code("main.c")
+        for who in self.face.CHARACTERS:
+            self.assertNotIn('"%s"' % who, code, who + " is typed into main.c")
+        self.assertIn("board_roster(", code)
+
+    def test_every_girl_on_the_board_has_her_PICTURE_on_the_3DS(self):
+        spec = importlib.util.spec_from_file_location(
+            "make_art_3ds", self.HERE / "make_art.py")
+        art = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(art)
+        roster = [g["who"] for g in self.face.roster()]
+        self.assertEqual(set(art.GIRLS), set(roster),
+                         "run python3 3ds/make_art.py after changing the cast")
+        header = (self.HERE / "source" / "art.h").read_text()
+        for who in roster:
+            self.assertIn('{ "%s", %s_bin,' % (who, who), header)
+            data = self.HERE / "data" / (who + ".bin")
+            self.assertEqual(data.stat().st_size, 400 * 240 * 2, who)
+
+    def test_the_pictures_are_what_make_art_MAKES(self):
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("PIL is not here")
+        spec = importlib.util.spec_from_file_location(
+            "make_art_3ds", self.HERE / "make_art.py")
+        art = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(art)
+        for who in art.GIRLS:
+            self.assertEqual(art.framebuffer(art.compose(who)),
+                             (self.HERE / "data" / (who + ".bin")).read_bytes(),
+                             who + "'s picture drifted from her art")
+        self.assertEqual(art.header(),
+                         (self.HERE / "source" / "art.h").read_text())
+        for name, made in (("icon.png", art.icon()), ("banner.png", art.banner())):
+            self.assertEqual(Image.open(self.HERE / name).convert("RGB").tobytes(),
+                             made.convert("RGB").tobytes(), name)
+
+    def test_the_HOME_MENU_copy_is_wired(self):
+        """The .cia is what puts her on his home screen: makerom builds it
+        from yuzu.rsf with an icon, a banner and its chime."""
+        import wave
+        make = (self.HERE / "Makefile").read_text()
+        cia = make[make.index("\ncia:"):make.index("\nclean:")]
+        for need in ("yuzu.rsf", "icon.png", "banner.png", "banner.wav"):
+            self.assertIn(need, cia)
+            self.assertTrue((self.HERE / need).exists(), need)
+        def size(png):
+            head = (self.HERE / png).read_bytes()[:24]
+            self.assertEqual(head[:8], b"\x89PNG\r\n\x1a\n")
+            return struct.unpack(">II", head[16:24])
+        self.assertEqual(size("icon.png"), (48, 48))
+        self.assertEqual(size("banner.png"), (256, 128))
+        with wave.open(str(self.HERE / "banner.wav")) as w:
+            self.assertLessEqual(w.getnframes() / w.getframerate(), 3.0,
+                                 "the HOME menu cuts a banner sound at 3s")
+        rsf = (self.HERE / "yuzu.rsf").read_text()
+        uid = int(re.search(r"UniqueId\s*:\s*(0x[0-9A-Fa-f]+)", rsf).group(1), 16)
+        self.assertTrue(0xF0000 <= uid <= 0xFFFFF, "not a homebrew id")
+        self.assertRegex(rsf, r"Logo\s*:\s*Homebrew")
+        services = re.findall(r"^\s+- (\S+)\s*$",
+                              rsf[rsf.index("ServiceAccessControl"):
+                                  rsf.index("SystemControlInfo")], re.M)
+        self.assertLessEqual(len(services), 34, "the 3DS takes 34 at most")
+        for need in ("soc:U", "ac:u", "mic:u", "dsp::DSP", "hid:USER",
+                     "gsp::Gpu", "APT:U", "fs:USER"):
+            self.assertIn(need, services)
+
+
 def _shuffled(seed=None):
     """Run every test in a RANDOM order.
 
