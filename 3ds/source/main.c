@@ -429,7 +429,7 @@ static void do_find(void)
     dirty_top = dirty_art = dirty_log = 1;
     LightLock_Unlock(&lk);
     set_status("");
-    char line[96];
+    char line[128];             /* room for any host and any `how` */
     snprintf(line, sizeof line, "(Found the board at %s -- %s.)",
              found.host, how);
     note(line);
@@ -566,7 +566,8 @@ static void draw_art(void)
 
 static void draw_top(int frame)
 {
-    char bar[TOP_W + 16], foot[TOP_W + 16];
+    /* Wide enough for anything put in them; row() cuts to the screen. */
+    char bar[160], foot[160];
     int colour = 35;
     if (girl_count) {
         Girl *g = &girls[cur];
@@ -578,7 +579,7 @@ static void draw_top(int frame)
                      (frame / 20) % 4, "...");
         else
             snprintf(bar, sizeof bar, " %s  %s", name, g->blurb);
-        char where[12];
+        char where[32];
         snprintf(where, sizeof where, "< %d/%d >", cur + 1, girl_count);
         size_t bl = strlen(bar), wl = strlen(where);
         if (bl + wl + 1 < TOP_W - 1) {

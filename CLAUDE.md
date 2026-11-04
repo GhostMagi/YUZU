@@ -120,7 +120,7 @@ session's safety rules refused to run devkitPro's toolchain here.
 - **build**: devkitPro's own `devkitpro/devkitarm` image runs `make -C
   3ds` -> `yuzu3ds.elf` and `.3dsx`.
 - **package**: a plain Ubuntu 24.04 machine builds **makerom (tag
-  makerom-v0.18.4) and bannertool (diasurgical's, one pinned commit)
+  makerom-v0.18.4) and bannertool (carstene1ns's maintained fork, one pinned commit)
   from source** -- bannertool wants CMake 3.28, newer than that image --
   then runs `3ds/package.sh`, **the one copy of the recipe** (`make cia`
   runs it too; a test holds that the workflow has none of its own), and
