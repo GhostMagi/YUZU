@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1084 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1085 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,7 +49,7 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## THE GIRLS ON HIS 3DS -- BUILT ON GITHUB, NOT YET RUN ON HIS 3DS (Nov 4)
+## THE GIRLS ON HIS 3DS -- INSTALLED ON HIS 3DS; THE FIRST OPEN CRASHED, FIXED (Nov 4)
 
 *"Could we make an app or .cia for my 3ds that is a way to see and talk
 to the board and her girls? But i want it to be able to connect to the
@@ -198,6 +198,42 @@ GREEN: http.client fills the Host from a whole URL by itself, so the
 proxy-form case never tested the request line until its Host was
 something else. And a bare-built handler (no `headers`) made `/boot.json`
 fall through: no headers at all is not the 3DS now. **1076 -> 1084.**
+
+**INSTALLED ON HIS 3DS, Nov 4, at home** -- FBI > Remote Install >
+Scan QR Code, a QR of `http://192.168.4.163:8081/yuzu3ds.cia` (made
+here with the `qrcode` package and read back with OpenCV before it was
+sent). So the CIA, the board's FBI route and the HOME menu entry are
+CONFIRMED on real hardware (*"it installed lol"*). His 3DS is an
+ORIGINAL 3DS (circle pad, no C-stick), from his photos.
+
+**AND IT CRASHED THE MOMENT IT OPENED**, his photo of Luma's screen:
+data abort, Translation - Section, Write, process YUZU
+(000400000F5C1D00), PC 0x001062BC, FAR = R0 = 0x13FFF210, R1 0xF81F,
+R3 0x80. **Found without the toolchain**: the built `.3dsx` (in
+`3ds/built/`) has its code at 0x00100000, so it was cut out and
+disassembled with `capstone` (pip, into the scratchpad); the code at
+the PC is libctru's console character drawing, and libctru's own
+`console.o` (out of `libctru.a`, symbols read with `pyelftools`) says
+how it counts. **libctru's console counts rows and columns FROM 1**:
+consoleSetWindow clamps x and y to at least 1 and homes the cursor to
+1,1, consoleClear homes to 1,1, and a character lands at ((cursor +
+window) - 2) * 8 pixels. Its header's example still says 0,0 -- which
+is what I wrote from. `row()` and `draw_help()` set the cursor to 0, so
+the very first draw -- "YUZU" in bold magenta (35+bold = 0xF81F) on
+the top's middle row before the roster arrives -- landed one column
+LEFT of the screen: 0xDF0 bytes before the top framebuffer at
+0x14000000, exactly the FAR. **The same mistake put every window one
+row high**: the foot on row 29 of 30, and the bottom's status line ON
+the log's last row.
+
+Fixed: `HOME` is 1, both homes use it, and the windows are written
+1-based (top 1 / 15 / 30; bottom log 1-27, status 28, help 29-30). A
+test models libctru's own rules and holds every window inside its
+screen, none overlapping, the foot and the help on the last row, and no
+cursor set below 1. Seven breaks, all red as failures. main.c passes
+the host syntax check against libctru's and newlib's headers again.
+**1084 -> 1085.** Not on his 3DS until GitHub rebuilds it, he taps
+Update on the board, and FBI installs it again (the same QR).
 
 UNVERIFIED, all of it on his 3DS: that it builds at all; that the 3DS
 keeps a saved connection to a WiFi with no internet (its connection

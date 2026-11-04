@@ -535,12 +535,22 @@ static void order(int t)
 
 static PrintConsole top_bar, top_mid, top_foot, bot_log, bot_status, bot_help;
 
+/* LIBCTRU'S CONSOLE COUNTS FROM 1, rows and columns both. Nov 4, his
+ * first run on the 3DS: a data abort writing bright magenta (0xF81F, the
+ * "YUZU" this draws before the roster arrives) 0xDF0 bytes BEFORE the top
+ * screen's memory. The cursor was set to 0 here, and libctru draws a
+ * character at ((cursor + window) - 2) * 8 pixels, so column 0 is one
+ * character left of the screen. Read off libctru's own code, not its
+ * header (whose example still says 0,0): consoleSetWindow clamps x and y
+ * to at least 1 and homes the cursor to 1,1, and so does consoleClear. */
+#define HOME 1
+
 /* One row, overwritten whole: home, the words, spaces to the end. Never a
  * newline, so a one-row window can never scroll. */
 static void row(PrintConsole *c, int width, int colour, const char *text)
 {
     consoleSelect(c);
-    c->cursorX = c->cursorY = 0;    /* home, without trusting an escape */
+    c->cursorX = c->cursorY = HOME;    /* home, without trusting an escape */
     char buf[64];
     snprintf(buf, sizeof buf, "%-*.*s", width - 1, width - 1, text);
     printf("\x1b[%d;1m%s\x1b[0m", colour, buf);
@@ -622,7 +632,7 @@ static void draw_log(void)
 static void draw_help(void)
 {
     consoleSelect(&bot_help);
-    bot_help.cursorX = bot_help.cursorY = 0;
+    bot_help.cursorX = bot_help.cursorY = HOME;
     printf("\x1b[37m%-39s\n%-39s\x1b[0m",
            "A/tap:type  L/R hold:talk  B:stop  <>",
            voice_on ? "X:find  Y:addr  SEL:mute  START:quit"
@@ -758,19 +768,20 @@ int main(int argc, char **argv)
 
     /* Three windows on the top screen: the name bar, the middle (only
      * for a girl with no picture) and the foot. Her picture goes under
-     * them; a one-row window never scrolls, so it never moves her. */
+     * them; a one-row window never scrolls, so it never moves her.
+     * Rows and columns count from 1 (see HOME): the screen is rows 1-30. */
     consoleInit(GFX_TOP, &top_bar);
     consoleInit(GFX_TOP, &top_mid);
     consoleInit(GFX_TOP, &top_foot);
-    consoleSetWindow(&top_bar, 0, 0, TOP_W, 1);
-    consoleSetWindow(&top_mid, 0, 14, TOP_W, 1);
-    consoleSetWindow(&top_foot, 0, 29, TOP_W, 1);
+    consoleSetWindow(&top_bar, 1, 1, TOP_W, 1);
+    consoleSetWindow(&top_mid, 1, 15, TOP_W, 1);
+    consoleSetWindow(&top_foot, 1, 30, TOP_W, 1);
     consoleInit(GFX_BOTTOM, &bot_log);
     consoleInit(GFX_BOTTOM, &bot_status);
     consoleInit(GFX_BOTTOM, &bot_help);
-    consoleSetWindow(&bot_log, 0, 0, BOT_W, LOG_ROWS);
-    consoleSetWindow(&bot_status, 0, 27, BOT_W, 1);
-    consoleSetWindow(&bot_help, 0, 28, BOT_W, 2);
+    consoleSetWindow(&bot_log, 1, 1, BOT_W, LOG_ROWS);
+    consoleSetWindow(&bot_status, 1, LOG_ROWS + 1, BOT_W, 1);
+    consoleSetWindow(&bot_help, 1, LOG_ROWS + 2, BOT_W, 2);
 
     aptHookCookie cookie;
     aptHook(&cookie, on_apt, NULL);

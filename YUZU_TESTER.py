@@ -21261,6 +21261,62 @@ class TestThe3DS(unittest.TestCase):
         body = body[:body.index("\n}\n")]
         self.assertIn("order(T_TURN)", body)
 
+    def test_its_screens_count_from_ONE_the_way_libctru_does(self):
+        """Nov 4, his first run on the 3DS: a data abort inside libctru's
+        drawing code, writing bright magenta (0xF81F -- the "YUZU" the top
+        screen shows before the roster arrives) 0xDF0 bytes BEFORE the top
+        screen's memory. row() set the cursor to 0, and libctru's console
+        counts rows and columns from 1: read off its own code (its header's
+        example still says 0,0), consoleSetWindow clamps x and y to at
+        least 1 and homes the cursor to 1,1, and a character is drawn at
+        ((cursor + window) - 2) * 8 pixels -- so 0 is off the screen.
+        Modelled that way here: every window fits, none overlap, the foot
+        and the help sit on the last row, and no cursor is set below 1."""
+        code = self.code("main.c")
+        defs = {m.group(1): int(m.group(2)) for m in
+                re.finditer(r"(?m)^#define (\w+)\s+(\d+)\b", code)}
+        self.assertEqual(defs.get("HOME"), 1, "libctru's first row is 1")
+        homes = re.findall(r"cursor[XY]\s*=\s*(?:\w+(?:\.|->)cursor[XY]\s*=\s*)?"
+                           r"(\w+)\s*;", code)
+        self.assertTrue(homes, "nothing homes the cursor")
+        for value in homes:
+            self.assertIn(value, ("HOME", "1"),
+                          "a cursor set to %s: libctru draws that off the "
+                          "screen" % value)
+        screen = {name: s for s, name in
+                  re.findall(r"consoleInit\((GFX_TOP|GFX_BOTTOM), &(\w+)\)", code)}
+        size = {"GFX_TOP": (50, 30), "GFX_BOTTOM": (40, 30)}
+
+        def val(expr):
+            return eval(re.sub(r"[A-Z_]+", lambda m: str(defs[m.group(0)]),
+                               expr), {"__builtins__": {}})
+
+        cells = {"GFX_TOP": {}, "GFX_BOTTOM": {}}
+        where = {}
+        for name, x, y, w, h in re.findall(
+                r"consoleSetWindow\(&(\w+),\s*([^,]+),\s*([^,]+),\s*([^,]+),"
+                r"\s*([^)]+)\)", code):
+            x, y, w, h = val(x), val(y), val(w), val(h)
+            s = screen[name]
+            cols, rows = size[s]
+            self.assertGreaterEqual(x, 1, "%s starts at column %d: libctru "
+                                    "counts from 1" % (name, x))
+            self.assertGreaterEqual(y, 1, "%s starts at row %d" % (name, y))
+            self.assertLessEqual(x + w - 1, cols, name + " runs off the side")
+            self.assertLessEqual(y + h - 1, rows, name + " runs off the bottom")
+            for r in range(y, y + h):
+                for c in range(x, x + w):
+                    self.assertNotIn((r, c), cells[s],
+                                     "%s draws over %s" % (name,
+                                                           cells[s].get((r, c))))
+                    cells[s][(r, c)] = name
+            where[name] = (y, y + h - 1)
+        self.assertEqual(set(where), set(screen), "a console with no window")
+        self.assertEqual(where["top_foot"][1], 30, "the foot is not the last row")
+        self.assertEqual(where["bot_help"][1], 30, "the help is not the last row")
+        self.assertEqual(where["bot_status"][0], where["bot_log"][1] + 1,
+                         "the status line is not right under the log")
+
     def test_the_app_holds_NO_LIST_of_the_girls(self):
         """The roster decides who is on the 3DS -- the hardcoded-cast rule.
         A girl added to the board is on the 3DS with nothing rebuilt but
