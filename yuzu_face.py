@@ -40,6 +40,10 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UI_DIR = os.path.join(HERE, "ui")
+# The 3DS app as GitHub built it (.github/workflows/3ds.yml), and the only
+# two files of it the board will hand out.
+THREEDS_BUILT = os.path.join(HERE, "3ds", "built")
+THREEDS_FILES = {"/yuzu3ds.cia": "yuzu3ds.cia", "/yuzu3ds.3dsx": "yuzu3ds.3dsx"}
 SPRITE_DIR = os.path.join(UI_DIR, "sprites")
 
 # PNG first because that is what he exports. SVG works identically --
@@ -3011,6 +3015,13 @@ class _Handler(SimpleHTTPRequestHandler):
         if self.path.split("?")[0].rstrip("/") == "/boot.json":
             self._json({"boot": BOOT})
             return
+        # THE 3DS APP, handed to FBI on his 3DS over WiFi: FBI > Remote
+        # Install > Enter URL > http://10.42.0.1:8081/yuzu3ds.cia. GitHub
+        # builds it and commits it to 3ds/built/, Update brings it here.
+        # TWO FIXED NAMES: nothing from the request picks a file.
+        if self.path.split("?")[0] in THREEDS_FILES:
+            self._threeds(THREEDS_FILES[self.path.split("?")[0]])
+            return
         # SAVE MY STUFF -- see save_plan(). TWO ROUTES AND NEITHER READS
         # THE QUERY STRING: what is saved is decided on the board, never
         # by the request, the same discipline as /pull and /launch/. The
@@ -3073,6 +3084,27 @@ class _Handler(SimpleHTTPRequestHandler):
         `/launch/` being an allowlist of NAMES."""
         self.send_error(404, "File not found")
         return None
+
+    def _threeds(self, name):
+        path = os.path.join(THREEDS_BUILT, name)
+        try:
+            with open(path, "rb") as fh:
+                data = fh.read()
+        except OSError:
+            # A sentence with a real status, never an empty 200 that FBI
+            # would try to install.
+            self._json({"ok": False, "said": "The 3DS app is not on the "
+                        "board yet. GitHub builds it; tap Update in a few "
+                        "minutes and try again."}, 404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Disposition",
+                         'attachment; filename="%s"' % name)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
 
     def _json(self, obj, code=200):
         # `code` so a route can say 503 and mean it. /voice.wav needs

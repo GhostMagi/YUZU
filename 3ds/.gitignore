@@ -4,3 +4,6 @@ build/
 *.elf
 *.smdh
 *.map
+# What GitHub built, which the board hands to FBI on the 3DS.
+!built/yuzu3ds.cia
+!built/yuzu3ds.3dsx

@@ -1,0 +1,104 @@
+# The 3DS app, built on GitHub's computers so nothing has to be installed
+# anywhere of his. Ghost, Nov 4: "1 lets do github".
+#
+#   build    devkitPro's own image compiles 3ds/ into yuzu3ds.elf/.3dsx
+#   package  a plain Ubuntu machine builds makerom and bannertool from
+#            PINNED source, runs 3ds/package.sh (the one copy of the
+#            recipe `make cia` runs too), and commits the results to
+#            3ds/built/ -- where Update brings them to the board, and the
+#            board hands them to FBI on his 3DS over WiFi.
+#
+# The two packaging tools are built here rather than downloaded: their
+# source is pinned to a tag and a commit, and they need a newer system
+# than devkitPro's image has (bannertool asks for CMake 3.28).
+name: 3DS app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "3ds/**"
+      - "!3ds/built/**"
+      - ".github/workflows/3ds.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: 3ds-app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile the app
+        run: make -C 3ds
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yuzu3ds-program
+          path: |
+            3ds/yuzu3ds.elf
+            3ds/yuzu3ds.3dsx
+          if-no-files-found: error
+
+  package:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: yuzu3ds-program
+          path: 3ds
+      - name: Build makerom and bannertool from pinned source
+        run: |
+          set -e
+          git clone --depth 1 --branch makerom-v0.18.4 \
+              https://github.com/3DSGuy/Project_CTR.git "$RUNNER_TEMP/ctr"
+          make -C "$RUNNER_TEMP/ctr/makerom" deps
+          make -C "$RUNNER_TEMP/ctr/makerom"
+          git clone https://github.com/diasurgical/bannertool.git "$RUNNER_TEMP/bannertool"
+          git -C "$RUNNER_TEMP/bannertool" checkout --detach 734d33be79fd3f8c29c6296158f06ac7c5ca9dcb
+          cmake -S "$RUNNER_TEMP/bannertool" -B "$RUNNER_TEMP/bannertool/out" \
+              -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/bannertool/out" -j 4
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp "$RUNNER_TEMP/ctr/makerom/bin/makerom" \
+             "$RUNNER_TEMP/bannertool/out/bannertool" "$RUNNER_TEMP/bin/"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Package the .cia
+        run: sh 3ds/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yuzu3ds
+          path: |
+            3ds/yuzu3ds.cia
+            3ds/yuzu3ds.3dsx
+          if-no-files-found: error
+      - name: Put it where the board can hand it to the 3DS
+        run: |
+          set -e
+          mkdir -p 3ds/built
+          cp 3ds/yuzu3ds.cia 3ds/yuzu3ds.3dsx 3ds/built/
+          git add 3ds/built/yuzu3ds.cia 3ds/built/yuzu3ds.3dsx
+          if git diff --cached --quiet; then
+              echo "The app did not change."
+              exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "3DS app built from ${GITHUB_SHA::7}"
+          for i in 1 2 3 4; do
+              if git pull -q --rebase origin "$GITHUB_REF_NAME" \
+                 && git push -q origin "HEAD:$GITHUB_REF_NAME"; then
+                  exit 0
+              fi
+              sleep $((i * 5))
+          done
+          echo "Could not push the built app."
+          exit 1

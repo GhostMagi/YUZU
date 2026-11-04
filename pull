@@ -154,6 +154,15 @@ else
         echo "  YOUR CUBE STILL HAS THE OLD ONE. Plug it into the board"
         echo "  and run ~/YUZU/cube to put the new one on it."
     fi
+    # THE 3DS APP GITHUB BUILT (3ds/built/) is on the board now, and the
+    # 3DS takes it over WiFi with FBI. FBI cannot look up a .local name,
+    # so the NUMBERS: the board's own WiFi is always 10.42.0.1, and at
+    # home the routing table says which address is the real one.
+    if printf '%s\n' "$files" | grep -q '^3ds/built/'; then
+        at=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+        echo "  YOUR 3DS APP IS NEW. On the 3DS: FBI > Remote Install >"
+        echo "  Enter URL > http://${at:-10.42.0.1}:8081/yuzu3ds.cia"
+    fi
     echo
     git log --oneline "$before..$after" 2>/dev/null | head -6 | sed 's/^/    /'
     echo

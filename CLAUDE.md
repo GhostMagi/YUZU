@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1072 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1076 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,7 +49,7 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## THE GIRLS ON HIS 3DS -- WRITTEN, NOT YET COMPILED (Nov 4)
+## THE GIRLS ON HIS 3DS -- BUILT ON GITHUB, NOT YET ON HIS 3DS (Nov 4)
 
 *"Could we make an app or .cia for my 3ds that is a way to see and talk
 to the board and her girls? But i want it to be able to connect to the
@@ -108,16 +108,34 @@ after one stayed GREEN twice: the voice-pieces text never needed the
 space-cut fallback, then its no-punctuation run was 24 characters a
 phrase, so a blind cut at 120 landed on a word boundary by luck. And two
 breaks of mine came back as ERRORs (they tripped `-Werror`, not the
-tests); redone cleanly. **1055 -> 1072.**
+tests); redone cleanly. **1055 -> 1072.** The GitHub round added four
+(the workflow, package.sh driven with stand-ins, the board's two fixed
+names, pull's notice); twelve breaks, all red as failures. **1072 ->
+1076.**
 
-**NOT COMPILED FOR THE 3DS.** devkitPro's toolchain was fetched into
-the scratchpad (pkg.devkitpro.org is behind a bot wall; the
-`devkitpro/devkitarm` image came from mirror.gcr.io), but **running it
-here, and building makerom/bannertool from source, were refused by this
-session's safety rules** ("code from external"). So the build route is
-HIS CALL, asked, not assumed: a GitHub Actions workflow on the
-`devkitpro/devkitarm` container (nothing for him to do but download),
-a permission for this session, or a build script on the board.
+**IT BUILDS ON GITHUB, his pick** (*"1 lets do github"*), because this
+session's safety rules refused to run devkitPro's toolchain here.
+`.github/workflows/3ds.yml`, on any push to main that touches `3ds/`:
+
+- **build**: devkitPro's own `devkitpro/devkitarm` image runs `make -C
+  3ds` -> `yuzu3ds.elf` and `.3dsx`.
+- **package**: a plain Ubuntu 24.04 machine builds **makerom (tag
+  makerom-v0.18.4) and bannertool (diasurgical's, one pinned commit)
+  from source** -- bannertool wants CMake 3.28, newer than that image --
+  then runs `3ds/package.sh`, **the one copy of the recipe** (`make cia`
+  runs it too; a test holds that the workflow has none of its own), and
+  **commits the results to `3ds/built/`** ("3DS app built from <sha>").
+  Ignoring `3ds/built/` in the trigger keeps that commit from setting off
+  another build.
+- **The board hands it to FBI**: `GET /yuzu3ds.cia` and `/yuzu3ds.3dsx`,
+  two FIXED names read from `3ds/built/`, a 404 sentence while nothing is
+  built. **pull says `YOUR 3DS APP IS NEW`** under UPDATED with the
+  address in NUMBERS (FBI has no mDNS): 10.42.0.1 on ghostnano, the
+  routing table's address at home.
+
+**On the 3DS, once**: FBI > Remote Install > Enter URL >
+`http://10.42.0.1:8081/yuzu3ds.cia` (on ghostnano). After that it is on
+the HOME menu; a new build is the same three taps.
 
 UNVERIFIED, all of it on his 3DS: that it builds at all; that the 3DS
 keeps a saved connection to a WiFi with no internet (its connection

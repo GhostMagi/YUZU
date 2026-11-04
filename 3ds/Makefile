@@ -189,18 +189,11 @@ $(DEPSDIR):
 endif
 
 #---------------------------------------------------------------------------------
-# The HOME menu's copy: the same program as the .3dsx, with its icon, its
-# banner (the girls side by side, and a chime) and yuzu.rsf. Needs
-# bannertool and makerom on the PATH.
+# The HOME menu's copy: the same program as the .3dsx, wrapped by
+# package.sh -- the one copy of that recipe, which GitHub runs too.
 #---------------------------------------------------------------------------------
 cia: all
-	@bannertool makebanner -i banner.png -a banner.wav -o $(BUILD)/banner.bnr
-	@bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_DESCRIPTION)" \
-		-p "$(APP_AUTHOR)" -i icon.png -o $(BUILD)/icon.icn
-	@makerom -f cia -o $(TARGET).cia -target t -exefslogo \
-		-elf $(TARGET).elf -rsf yuzu.rsf \
-		-icon $(BUILD)/icon.icn -banner $(BUILD)/banner.bnr
-	@echo built $(TARGET).cia
+	@sh package.sh
 
 #---------------------------------------------------------------------------------
 clean:

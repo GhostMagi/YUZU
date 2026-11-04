@@ -17743,6 +17743,22 @@ class TestPull(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_a_NEW_3DS_APP_says_how_to_put_it_on_the_3DS(self):
+        """GitHub commits the built app to 3ds/built/ and Update brings it
+        to the board -- but not to the 3DS. So pull says what to do, with
+        the board's NUMBERS: FBI cannot look up a .local name."""
+        done, _ = self._restart_run(["3ds/built/yuzu3ds.cia"], server_up=False)
+        head = done.stdout[:done.stdout.index("files changed")]
+        self.assertIn("YOUR 3DS APP IS NEW", head,
+                      "said under the commit list, where nobody sees it")
+        self.assertIn("FBI > Remote Install", head)
+        self.assertRegex(head, r"http://\d+\.\d+\.\d+\.\d+:8081/yuzu3ds\.cia")
+        self.assertNotIn(".local:8081/yuzu3ds", head)
+        done, _ = self._restart_run(["3ds/source/main.c", "ui/home.html"],
+                                    server_up=False)
+        self.assertNotIn("3DS APP", done.stdout,
+                         "said about a change that is not the built app")
+
     def test_a_pull_that_RE_RUNS_itself_never_hands_the_marker_on(self):
         """Sept 24, his board: every Update said "UPDATED. fc6ca29" and
         nothing new arrived for an hour. A terminal pull re-ran itself
@@ -21175,11 +21191,11 @@ class TestThe3DS(unittest.TestCase):
                              made.convert("RGB").tobytes(), name)
 
     def test_the_HOME_MENU_copy_is_wired(self):
-        """The .cia is what puts her on his home screen: makerom builds it
-        from yuzu.rsf with an icon, a banner and its chime."""
+        """The .cia is what puts her on his home screen: package.sh has
+        makerom build it from yuzu.rsf with an icon, a banner and its
+        chime."""
         import wave
-        make = (self.HERE / "Makefile").read_text()
-        cia = make[make.index("\ncia:"):make.index("\nclean:")]
+        cia = (self.HERE / "package.sh").read_text()
         for need in ("yuzu.rsf", "icon.png", "banner.png", "banner.wav"):
             self.assertIn(need, cia)
             self.assertTrue((self.HERE / need).exists(), need)
@@ -21203,6 +21219,123 @@ class TestThe3DS(unittest.TestCase):
         for need in ("soc:U", "ac:u", "mic:u", "dsp::DSP", "hid:USER",
                      "gsp::Gpu", "APT:U", "fs:USER"):
             self.assertIn(need, services)
+
+    # ---- built on GitHub, handed over by the board -----------------------
+
+    def test_GITHUB_builds_it_with_the_ONE_recipe(self):
+        """Ghost, Nov 4: "1 lets do github". The program is compiled in
+        devkitPro's own image; the .cia is wrapped by 3ds/package.sh, the
+        SAME script `make cia` runs, so the two can never drift; and the
+        two packaging tools are built from pinned source, never "latest"."""
+        try:
+            import yaml
+        except ImportError:
+            self.skipTest("PyYAML is not here")
+        root = Path(__file__).resolve().parent
+        text = (root / ".github" / "workflows" / "3ds.yml").read_text()
+        wf = yaml.safe_load(text)
+        on = wf.get(True) or wf.get("on")
+        self.assertEqual(on["push"]["branches"], ["main"])
+        self.assertIn("3ds/**", on["push"]["paths"])
+        self.assertIn("!3ds/built/**", on["push"]["paths"],
+                      "its own built app would set off another build")
+        build, pack = wf["jobs"]["build"], wf["jobs"]["package"]
+        self.assertTrue(build["container"].startswith("devkitpro/devkitarm"))
+        self.assertIn("make -C 3ds",
+                      "\n".join(st.get("run", "") for st in build["steps"]))
+        self.assertEqual(pack["needs"], "build")
+        self.assertEqual(pack["permissions"], {"contents": "write"})
+        runs = "\n".join(st.get("run", "") for st in pack["steps"])
+        self.assertIn("sh 3ds/package.sh", runs)
+        for recipe in ("makerom -f", "makebanner", "makesmdh"):
+            self.assertNotIn(recipe, text, "a second copy of the recipe")
+        self.assertRegex(runs, r"--branch makerom-v\d+\.\d+\.\d+")
+        self.assertRegex(runs, r'checkout --detach [0-9a-f]{40}\b')
+        self.assertIn("3ds/built/", runs)
+        make = (self.HERE / "Makefile").read_text()
+        cia = make[make.index("\ncia:"):make.index("\nclean:")]
+        self.assertIn("@sh package.sh", cia)
+        self.assertNotIn("makerom", cia, "make cia kept its own copy")
+
+    def test_package_sh_wraps_the_program_with_the_MAKEFILES_names(self):
+        """Driven with stand-ins for bannertool and makerom, which are not
+        here: the names the HOME menu shows come off the Makefile, so the
+        .3dsx and the .cia agree about what she is called."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        for f in ("Makefile", "package.sh", "icon.png", "banner.png",
+                  "banner.wav", "yuzu.rsf"):
+            shutil.copy(self.HERE / f, tmp / f)
+        (tmp / "yuzu3ds.elf").write_bytes(b"\x7fELF")
+        binv = tmp / "bin"
+        binv.mkdir()
+        log = tmp / "calls"
+        for tool in ("bannertool", "makerom"):
+            (binv / tool).write_text(
+                '#!/bin/sh\n{ echo "%s"; printf "[%%s]\\n" "$@"; } >> %s\n'
+                % (tool, log))
+            (binv / tool).chmod(0o755)
+        env = dict(os.environ, PATH="%s:/usr/bin:/bin" % binv)
+        done = subprocess.run(["sh", str(tmp / "package.sh")], env=env,
+                              capture_output=True, text=True, timeout=30)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        calls = log.read_text()
+        self.assertIn("[makesmdh]\n[-s]\n[YUZU]\n[-l]\n"
+                      "[Talk to the girls on your board]\n[-p]\n[Ghost]", calls)
+        self.assertIn("[makebanner]\n[-i]\n[banner.png]\n[-a]\n[banner.wav]",
+                      calls)
+        mk = calls[calls.index("makerom"):]
+        for pair in ("[-f]\n[cia]", "[-elf]\n[yuzu3ds.elf]", "[-rsf]\n[yuzu.rsf]",
+                     "[-icon]\n[build/icon.icn]", "[-banner]\n[build/banner.bnr]",
+                     "[-o]\n[yuzu3ds.cia]"):
+            self.assertIn(pair, mk)
+        (binv / "makerom").unlink()
+        done = subprocess.run(["sh", str(tmp / "package.sh")], env=env,
+                              capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(done.returncode, 0)
+        self.assertIn("makerom is not on the PATH", done.stdout)
+        (tmp / "yuzu3ds.elf").unlink()
+        done = subprocess.run(["sh", str(tmp / "package.sh")], env=env,
+                              capture_output=True, text=True, timeout=30)
+        self.assertIn("Run make first", done.stdout)
+
+    def test_the_BOARD_hands_the_app_to_FBI_and_nothing_else(self):
+        """FBI on the 3DS takes a URL: http://10.42.0.1:8081/yuzu3ds.cia.
+        Two fixed names, and nothing from the request picks a file."""
+        import http.client
+        self.assertEqual(self.face.THREEDS_FILES,
+                         {"/yuzu3ds.cia": "yuzu3ds.cia",
+                          "/yuzu3ds.3dsx": "yuzu3ds.3dsx"})
+        built = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, built, True)
+        app = b"CIA!" * 3000
+        (built / "yuzu3ds.cia").write_bytes(app)
+        (built / "other.cia").write_bytes(b"not his")
+
+        def get(path):
+            c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=20)
+            c.request("GET", path)
+            r = c.getresponse()
+            body = r.read()
+            c.close()
+            return r, body
+
+        with mock.patch.object(self.face, "THREEDS_BUILT", str(built)):
+            r, body = get("/yuzu3ds.cia?from=fbi")
+            self.assertEqual((r.status, body), (200, app))
+            self.assertEqual(r.getheader("Content-Type"),
+                             "application/octet-stream")
+            self.assertEqual(int(r.getheader("Content-Length")), len(app))
+            for path in ("/other.cia", "/3ds/built/yuzu3ds.cia",
+                         "/yuzu3ds.cia/../other.cia", "/YUZU3DS.CIA"):
+                r, body = get(path)
+                self.assertNotEqual(body, b"not his", path)
+                self.assertNotEqual(body, app, path)
+            (built / "yuzu3ds.cia").unlink()
+            r, body = get("/yuzu3ds.cia")
+            self.assertEqual(r.status, 404,
+                             "FBI would try to install an empty answer")
+            self.assertIn("not on the board yet", json.loads(body)["said"])
 
 
 def _shuffled(seed=None):
