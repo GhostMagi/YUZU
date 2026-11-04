@@ -49,7 +49,7 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## THE GIRLS ON HIS 3DS -- BUILT ON GITHUB, NOT YET ON HIS 3DS (Nov 4)
+## THE GIRLS ON HIS 3DS -- BUILT ON GITHUB, NOT YET RUN ON HIS 3DS (Nov 4)
 
 *"Could we make an app or .cia for my 3ds that is a way to see and talk
 to the board and her girls? But i want it to be able to connect to the
@@ -132,6 +132,17 @@ session's safety rules refused to run devkitPro's toolchain here.
   built. **pull says `YOUR 3DS APP IS NEW`** under UPDATED with the
   address in NUMBERS (FBI has no mDNS): 10.42.0.1 on ghostnano, the
   routing table's address at home.
+
+**IT BUILT, Nov 4, second run.** The first stopped at "unable to read
+tree": the workflow cloned diasurgical/bannertool, but the copy read
+here (and the pinned commit) was carstene1ns/3ds-bannertool, the
+maintained fork. Fixed by naming the right repo. **The real devkitARM
+compile was clean apart from four format-truncation warnings** on text
+cut to the screen on purpose (buffers widened); board.c had none. The
+bot committed `3ds/built/yuzu3ds.cia` (526 KB) and `.3dsx` (1.16 MB).
+Read back here: a well-formed CIA (header 0x2020, title id
+000400000F5C1D00, its SMDH says YUZU by Ghost), a `3DSX` magic, and the
+face server hands both out byte for byte. **Nothing has run on a 3DS.**
 
 **On the 3DS, once**: FBI > Remote Install > Enter URL >
 `http://10.42.0.1:8081/yuzu3ds.cia` (on ghostnano). After that it is on
