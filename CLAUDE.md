@@ -284,11 +284,21 @@ unused and `-Werror` stopped the build; redone with `has_peer` itself
 asking SO_ERROR). main.c and board.c pass the host check against
 libctru's and newlib's headers at -O2 with no warnings. **1085 -> 1089.**
 
-UNVERIFIED, all of it on his 3DS: that this is the WHOLE of it (the fix
-rests on two issue threads, read, not measured); that UDP broadcast
-leaves a 3DS; that the 3DS keeps a saved connection to a WiFi with no
-internet; that the mic and ndsp answer as a .cia; and whether his 3DS
-has `dspfirm.cdc`.
+**CONFIRMED ON HIS 3DS, same night, at home -- IT REACHES THE BOARD.**
+His photo: "(Found the board at 192.168.4.163 -- asked.)" on the first
+open, with nothing typed. So the socket fix holds on real hardware, and
+**UDP broadcast DOES leave a 3DS** (the "asked" way, the cube's
+question). The top screen showed FOUR, her blurb, `< 2/5 >` (the
+roster came back, five girls, Four first as `front`), her baked picture
+drawn whole, and the foot `board 192.168.4.163  MAXN 48C 4.4W` -- so
+/stats answers too. Then *"how do i switch between Ais?"*: left/right
+on the D-pad or the circle pad (the help line's `<>` and the top's
+`< 2/5 >` were the only hint, and they were not enough for him). Not
+yet reported: a turn, her voice, the mic.
+
+UNVERIFIED, all of it on his 3DS: a turn and its reply; that the mic
+and ndsp answer as a .cia; whether his 3DS has `dspfirm.cdc`; and that
+the 3DS keeps a saved connection to a WiFi with no internet.
 
 ## WAVESHARE ANSWERED HIS EMAIL (Nov 3)
 
