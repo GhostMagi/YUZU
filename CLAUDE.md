@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1085 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1089 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -49,7 +49,7 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
-## THE GIRLS ON HIS 3DS -- INSTALLED ON HIS 3DS; THE FIRST OPEN CRASHED, FIXED (Nov 4)
+## THE GIRLS ON HIS 3DS -- IT OPENS; IT COULD NOT REACH THE BOARD, FIXED (Nov 4)
 
 *"Could we make an app or .cia for my 3ds that is a way to see and talk
 to the board and her girls? But i want it to be able to connect to the
@@ -232,14 +232,63 @@ test models libctru's own rules and holds every window inside its
 screen, none overlapping, the foot and the help on the last row, and no
 cursor set below 1. Seven breaks, all red as failures. main.c passes
 the host syntax check against libctru's and newlib's headers again.
-**1084 -> 1085.** Not on his 3DS until GitHub rebuilds it, he taps
-Update on the board, and FBI installs it again (the same QR).
+**1084 -> 1085.**
 
-UNVERIFIED, all of it on his 3DS: that it builds at all; that the 3DS
-keeps a saved connection to a WiFi with no internet (its connection
-test fails on ghostnano); that UDP broadcast leaves a 3DS; that the
-mic and ndsp answer under the Homebrew Launcher and as a .cia; and
-whether his 3DS has `dspfirm.cdc`.
+**CONFIRMED, same evening: IT OPENS.** His photo: "YUZU for 3DS" in
+magenta top left, "YUZU" mid-screen, the foot on the last row, the help
+on the bottom's last two rows -- the 1-based windows exactly as laid
+out. **And it could not reach the board**: "(Can't find the board...)"
+three times, at home, X and Y both tried -- although FBI had just
+fetched the CIA from that same board.
+
+**IT HAD BEEN THROWING AWAY EVERY CONNECTION THAT WORKED.** Read off
+libctru's own issue tracker (its source cloned into the scratchpad;
+3dbrew.org is blocked here): **a 3DS reports a socket ready to send
+with 0x08 AS WELL AS 0x10** (PR #542, open; mtheall: "0x08 and 0x10 are
+both set when the socket is writable"), and libctru's header names 0x08
+`POLLERR` ("probably"). `open_to` rejected on `POLLERR`, so every
+connect that landed was closed. Behind it a second wall: **SO_ERROR
+answers -26, the 3DS's own "still connecting", after it has connected**
+(issue #412, open since 2018), and `open_to` rejected that too. **The
+suite was green because Linux's sockets do neither.**
+
+- **The PEER decides now** (`has_peer`): `getpeername()` answers only
+  for a socket that has one, on both machines, and else a second
+  `connect()` answering `EISCONN` (what #412 found on a 3DS). poll() only
+  says that something happened. Neither POLLERR nor SO_ERROR is read.
+- **The wait is 100ms slices to a deadline**, ftpd's way: a 3DS's poll is
+  reported never to wake for a connect that FAILED.
+- **recv decides the end of a reply, never poll** (a 3DS may not flag the
+  hang-up; nothing reports that, it costs nothing), and a reply with all
+  of its Content-Length is whole without waiting for the close.
+- **A failure names what failed** (`board_why`): "nothing answered at
+  192.168.4.163:8081 in 3 seconds", "turned it away", "is not an
+  address", "answered, but it is not the board (HTTP 404)" -- and after a
+  failed search, the address HE named, not the last guess.
+- **Y starts at THIS WiFi's first three numbers** (`192.168.4.`, so he
+  types only `163`), 10.42.0.1 on ghostnano, or the board it has. It
+  started at 10.42.0.1 everywhere, which at home is wrong. And
+  `http://192.168.4.163:8081/` typed whole works, since that is what the
+  QR and the board's screen show.
+
+**`tests/like_a_3ds.c` makes Linux's sockets act like a 3DS's** (0x08
+beside POLLOUT, SO_ERROR -26, and a poll that never flags a hang-up),
+and TestThe3DS builds the harness a second time with it
+(`-Dpoll=yuzu_3ds_poll -Dgetsockopt=yuzu_3ds_getsockopt`). **Checked
+before it was trusted**: the OLD board.c under it gives `ALIVE 0` and a
+roster of -1 against the real face server -- his screen -- and on
+Linux `ALIVE 1`, the green suite. A whole session runs through it: find,
+roster, a turn, her voice, his mic. Four tests; nine breaks, all red as
+failures -- after one came back as an ERROR (the break left `has_peer`
+unused and `-Werror` stopped the build; redone with `has_peer` itself
+asking SO_ERROR). main.c and board.c pass the host check against
+libctru's and newlib's headers at -O2 with no warnings. **1085 -> 1089.**
+
+UNVERIFIED, all of it on his 3DS: that this is the WHOLE of it (the fix
+rests on two issue threads, read, not measured); that UDP broadcast
+leaves a 3DS; that the 3DS keeps a saved connection to a WiFi with no
+internet; that the mic and ndsp answer as a .cia; and whether his 3DS
+has `dspfirm.cdc`.
 
 ## WAVESHARE ANSWERED HIS EMAIL (Nov 3)
 

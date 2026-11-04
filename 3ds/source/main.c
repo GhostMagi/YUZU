@@ -349,6 +349,24 @@ static void own_address(char *out, size_t n)
         snprintf(out, n, "%s", inet_ntoa(a));
 }
 
+/* What Y's keyboard starts with: the board he has, or the board's own
+ * WiFi address on ghostnano, or THIS WiFi's first three numbers, so at
+ * home he types only the last one (192.168.4. -> 163). */
+static const char *address_to_start(void)
+{
+    static char start[32];
+    char self[24];
+    if (have_board)
+        return board.host;
+    own_address(self, sizeof self);
+    char *dot = strrchr(self, '.');
+    if (!self[0] || !strncmp(self, "10.42.0.", 8) || !dot)
+        return BOARD_OWN_WIFI_HOST;
+    dot[1] = 0;
+    snprintf(start, sizeof start, "%s", self);
+    return start;
+}
+
 static void remember(const Board *b)
 {
     FILE *f = fopen(REMEMBER, "w");
@@ -402,10 +420,15 @@ static void do_find(void)
     if (!board_find(last, self, BOARD_PORT, &cancel, &found, how,
                     sizeof how)) {
         set_status("");
-        if (!cancel)
-            note("(Can't find the board. Is it on, and is this 3DS on "
-                 "ghostnano or the same WiFi? X looks again, Y types its "
-                 "address.)");
+        if (!cancel) {
+            /* WHAT FAILED, not only that it did: his first try on the
+             * 3DS said "can't find" three times and nothing else. */
+            char line[256];
+            snprintf(line, sizeof line, "(Can't reach the board: %s. Is it "
+                     "on, and this 3DS on ghostnano or the same WiFi? X "
+                     "looks again, Y types its address.)", board_why());
+            note(line);
+        }
         return;
     }
     Girl got[BOARD_MAX_GIRLS];
@@ -835,9 +858,8 @@ int main(int argc, char **argv)
         if (down & KEY_Y) {
             if (!refuse_busy()) {
                 char at[64];
-                if (keyboard("The board's address, like 10.42.0.1",
-                             have_board ? board.host : BOARD_OWN_WIFI_HOST,
-                             at, sizeof at)) {
+                if (keyboard("The board's number, from ~/YUZU/face",
+                             address_to_start(), at, sizeof at)) {
                     snprintf(typed_at, sizeof typed_at, "%s", at);
                     order(T_FIND);
                 }

@@ -20995,7 +20995,7 @@ class TestThe3DS(unittest.TestCase):
         import yuzu_face, yuzu_ears
         cls.face = yuzu_face
         cls.tmp = tempfile.mkdtemp()
-        cls.h = None
+        cls.h = cls.h3 = None
         if shutil.which("gcc"):
             out = os.path.join(cls.tmp, "h")
             built = subprocess.run(
@@ -21007,6 +21007,22 @@ class TestThe3DS(unittest.TestCase):
             if built.returncode != 0:
                 raise AssertionError("board.c did not build:\n" + built.stderr)
             cls.h = out
+            # AND AGAIN WITH A REAL 3DS'S SOCKETS (tests/like_a_3ds.c).
+            # On Nov 4 every connection on his 3DS was thrown away while
+            # every test here, on Linux's sockets, was green.
+            out3 = os.path.join(cls.tmp, "h3ds")
+            built = subprocess.run(
+                ["gcc", "-std=gnu99", "-Wall", "-Wextra",
+                 "-Wno-unused-parameter", "-Werror",
+                 "-Dpoll=yuzu_3ds_poll", "-Dgetsockopt=yuzu_3ds_getsockopt",
+                 str(cls.HERE / "source" / "board.c"),
+                 str(cls.HERE / "tests" / "harness.c"),
+                 str(cls.HERE / "tests" / "like_a_3ds.c"), "-lm", "-o", out3],
+                capture_output=True, text=True)
+            if built.returncode != 0:
+                raise AssertionError("board.c did not build as a 3DS:\n"
+                                     + built.stderr)
+            cls.h3 = out3
 
         cls.asked = []
 
@@ -21060,11 +21076,17 @@ class TestThe3DS(unittest.TestCase):
             one.stop()
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def run_h(self, *args):
+    def run_h(self, *args, like_a_3ds=False, timeout=60):
         if not self.h:
             self.skipTest("no gcc to build board.c with")
-        got = subprocess.run([self.h] + [str(a) for a in args],
-                             capture_output=True, text=True, timeout=60)
+        try:
+            got = subprocess.run([self.h3 if like_a_3ds else self.h]
+                                 + [str(a) for a in args],
+                                 capture_output=True, text=True,
+                                 timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.fail("board.c was still waiting after %ds: %s"
+                      % (timeout, " ".join(map(str, args))))
         self.assertEqual(got.returncode, 0, got.stderr)
         return got.stdout
 
@@ -21126,13 +21148,85 @@ class TestThe3DS(unittest.TestCase):
         self.addCleanup(other.server_close)
         self.addCleanup(other.shutdown)
         threading.Thread(target=other.serve_forever, daemon=True).start()
-        self.assertEqual(self.run_h("alive", "127.0.0.1",
-                                    other.server_address[1]).split(),
-                         ["ALIVE", "0"])
+        out = self.run_h("alive", "127.0.0.1", other.server_address[1])
+        self.assertEqual(out.split()[:2], ["ALIVE", "0"])
+        self.assertIn("answered, but it is not the board", out)
         self.assertEqual(self.run_h("alive", "127.0.0.1", self.port).split(),
                          ["ALIVE", "1"])
-        self.assertEqual(self.run_h("alive", "127.0.0.1", 1).split(),
+        self.assertEqual(self.run_h("alive", "127.0.0.1", 1).split()[:2],
                          ["ALIVE", "0"], "a dead port read as the board")
+
+    def test_on_a_REAL_3DSs_sockets_a_connection_that_WORKED_counts(self):
+        """HIS FIRST TRY THAT OPENED: "Can't find the board", three times,
+        with the right address typed in. A 3DS reports a socket ready to
+        send with 0x08 too -- libctru's POLLERR -- and answers SO_ERROR
+        with -26 after it has connected (libctru #542, #412), so the old
+        check turned away every connection that worked. The whole
+        session, driven through a 3DS's sockets."""
+        h3 = dict(like_a_3ds=True)
+        self.assertEqual(self.run_h("alive", "127.0.0.1", self.port,
+                                    **h3).split(), ["ALIVE", "1"],
+                         "a 3DS threw away a connection to the board")
+        out = self.run_h("find", "127.0.0.1:%d" % self.port, "-", 1, **h3)
+        self.assertEqual(out.split(), ["FOUND", "127.0.0.1", str(self.port),
+                                       "remembered"])
+        self.assertEqual(self.run_h("roster", "127.0.0.1", self.port, **h3),
+                         self.run_h("roster", "127.0.0.1", self.port))
+        # Her reply has no length up front: only its end says it is whole.
+        out = self.run_h("turn", "127.0.0.1", self.port, "four", "hi",
+                         timeout=20, **h3)
+        self.assertIn("GOT 1 OK 1 REACHED 1", out)
+        out = self.run_h("voice", "127.0.0.1", self.port, "four", "Hello.",
+                         **h3)
+        self.assertEqual(out.split()[:4], ["WAV", "1", "24000", "1"])
+        out = self.run_h("listen", "127.0.0.1", self.port, 16364, 1.0, **h3)
+        self.assertEqual(out.strip(), "HEARD hello four")
+        # And a 3DS still tells a dead port from the board.
+        out = self.run_h("alive", "127.0.0.1", 1, **h3)
+        self.assertEqual(out.split()[:2], ["ALIVE", "0"],
+                         "a dead port read as the board on a 3DS")
+
+    def test_a_board_that_cannot_be_reached_says_WHAT_went_wrong(self):
+        """"Can't find the board" three times told him nothing. Now the
+        screen names the address and what it did, and after a failed
+        search the address HE named, not the last guess."""
+        out = self.run_h("alive", "127.0.0.1", 1)
+        self.assertIn("127.0.0.1:1 turned it away", out)
+        self.assertIn('"no.where" is not an address',
+                      self.run_h("alive", "no.where", 1))
+        out = self.run_h("find", "127.0.0.1:1", "-", 1)
+        self.assertTrue(out.startswith("NONE 127.0.0.1:1 "), out)
+        self.assertIn("nobody on this WiFi answered",
+                      self.run_h("find", "-", "-", 1))
+        main = self.code("main.c")
+        start = main.index("static void do_find")
+        body = main[start:main.index("Girl got[", start)]
+        self.assertIn("board_why()", body, "the screen does not say why")
+
+    def test_the_address_off_the_boards_screen_works_as_TYPED(self):
+        """The QR and the board's screen say http://192.168.4.163:8081/,
+        so that is what he has to type from."""
+        for typed in ("http://127.0.0.1:%d/" % self.port,
+                      "HTTP://127.0.0.1:%d/yuzu3ds.cia" % self.port,
+                      " 127.0.0.1:%d" % self.port):
+            out = self.run_h("find", typed, "-", 1)
+            self.assertEqual(out.split()[:3],
+                             ["FOUND", "127.0.0.1", str(self.port)], typed)
+
+    def test_Y_starts_with_what_he_would_type_ANYWAY(self):
+        """At home the keyboard starts at THIS WiFi's first three numbers
+        (192.168.4.), so he types only the last; on ghostnano, 10.42.0.1;
+        with a board already found, that board."""
+        main = self.code("main.c")
+        start = main.index("static const char *address_to_start")
+        body = main[start:main.index("\n}\n", start)]
+        self.assertIn("if (have_board)\n        return board.host;", body)
+        self.assertIn('"10.42.0."', body)
+        self.assertIn("return BOARD_OWN_WIFI_HOST;", body)
+        self.assertIn("strrchr(self, '.')", body)
+        self.assertIn("dot[1] = 0;", body)
+        y = main[main.index("if (down & KEY_Y)"):]
+        self.assertIn("address_to_start()", y[:y.index("order(T_FIND)")])
 
     def test_on_the_boards_own_WIFI_it_looks_there_before_asking(self):
         """On ghostnano the board is always 10.42.0.1, so the 3DS goes

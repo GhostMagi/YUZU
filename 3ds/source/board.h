@@ -74,6 +74,11 @@ int  board_ask(const char *to, int port, int wait_ms, Board *found);
 /* 1 when the face server answers /boot.json at that address. */
 int  board_alive(const Board *b, int ms);
 
+/* Why the last try failed, in words for the screen ("nothing answered at
+ * 192.168.4.163:8081 in 3 seconds"). After a failed board_find it is the
+ * address he named, when he named one. "" before anything has failed. */
+const char *board_why(void);
+
 /* Where the board is, cheapest first, the cube's order:
  *   1. `remembered`, "host" or "host:port" from last time ("" for none)
  *   2. the board's own WiFi, when `self` (the 3DS's address) is on it

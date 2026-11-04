@@ -50,39 +50,83 @@ static int would_block(void)
         || errno == EALREADY;
 }
 
+/* WHY THE LAST TRY FAILED, in words for his screen. Only the worker
+ * thread talks to the board, so one buffer is enough. */
+static char why[112];
+
+const char *board_why(void) { return why; }
+
+/* HOW A 3DS SAYS "CONNECTED" IS NOT HOW LINUX SAYS IT, and the two
+ * obvious checks both turned away every connection that worked on his
+ * 3DS (libctru issues #542 and #412):
+ *   - a socket ready to send reports 0x08 as well as 0x10, and libctru's
+ *     header names 0x08 POLLERR ("probably");
+ *   - SO_ERROR answers -26, the 3DS's own "still connecting", after the
+ *     connection has landed.
+ * So poll() only says that something happened, and the PEER decides:
+ * getpeername() answers only for a socket that has one, on both
+ * machines, and a 3DS answers a second connect() with EISCONN once the
+ * first has landed. A 3DS's poll is also reported never to wake for a
+ * connect that failed, so the wait is short slices up to a deadline. */
+static int has_peer(int fd, const struct sockaddr_in *a)
+{
+    struct sockaddr_in peer;
+    socklen_t pl = sizeof peer;
+    if (getpeername(fd, (struct sockaddr *)&peer, &pl) == 0)
+        return 1;
+    return connect(fd, (const struct sockaddr *)a, sizeof *a) < 0
+        && errno == EISCONN;
+}
+
 static int open_to(const char *host, int port, int ms)
 {
     struct sockaddr_in a;
     memset(&a, 0, sizeof a);
     a.sin_family = AF_INET;
     a.sin_port = htons((unsigned short)port);
-    if (!inet_aton(host, &a.sin_addr))
+    if (!inet_aton(host, &a.sin_addr)) {
+        snprintf(why, sizeof why, "\"%s\" is not an address", host);
         return -1;
+    }
     int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0)
+    if (fd < 0) {
+        snprintf(why, sizeof why, "the 3DS would not open a connection");
         return -1;
+    }
     int fl = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, (fl < 0 ? 0 : fl) | O_NONBLOCK);
     if (connect(fd, (struct sockaddr *)&a, sizeof a) == 0)
         return fd;
     if (!would_block()) {
+        snprintf(why, sizeof why, "%s:%d %s", host, port,
+                 errno == ECONNREFUSED ? "turned it away"
+                 : "is not reachable from this WiFi");
         close(fd);
         return -1;
     }
-    struct pollfd p = { fd, POLLOUT, 0 };
-    if (poll(&p, 1, ms) <= 0 || !(p.revents & POLLOUT)
-        || (p.revents & POLLERR)) {
-        close(fd);
-        return -1;
+    unsigned long long until = now_ms() + (unsigned long long)ms;
+    for (;;) {
+        struct pollfd p = { fd, POLLOUT, 0 };
+        int r = poll(&p, 1, 100);
+        if (r > 0 && p.revents) {
+            if (has_peer(fd, &a))
+                return fd;
+            snprintf(why, sizeof why, "%s:%d turned it away", host, port);
+            break;
+        }
+        if (r < 0 && errno != EINTR) {
+            snprintf(why, sizeof why, "the 3DS could not wait for %s:%d",
+                     host, port);
+            break;
+        }
+        if (now_ms() >= until) {
+            snprintf(why, sizeof why, "nothing answered at %s:%d in %d "
+                     "seconds", host, port, (ms + 999) / 1000);
+            break;
+        }
     }
-    /* Writable is not connected: a refused connect is writable too. */
-    int err = 0;
-    socklen_t el = sizeof err;
-    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &el) == 0 && err) {
-        close(fd);
-        return -1;
-    }
-    return fd;
+    close(fd);
+    return -1;
 }
 
 static int stopped(volatile int *cancel, unsigned long long until)
@@ -176,6 +220,8 @@ int board_http(const Board *b, const char *method, const char *path,
     if (hl <= 0 || hl >= (int)sizeof head
         || !send_all(fd, head, (size_t)hl, until, cancel)
         || (body && len && !send_all(fd, body, len, until, cancel))) {
+        snprintf(why, sizeof why, "%s:%d took the connection but not the "
+                 "question", b->host, b->port);
         close(fd);
         return 0;
     }
@@ -187,6 +233,7 @@ int board_http(const Board *b, const char *method, const char *path,
         return 0;
     }
     int ok = 0;
+    long want = -1;             /* the whole reply's size, once it is known */
     for (;;) {
         if (stopped(cancel, until))
             break;
@@ -200,12 +247,30 @@ int board_http(const Board *b, const char *method, const char *path,
             buf = grown;
             cap = bigger;
         }
+        /* recv decides, never poll's answer: a 3DS may not say that the
+         * board hung up, and a recv on a non-blocking socket only waits
+         * as long as the poll before it. */
         struct pollfd q = { fd, POLLIN, 0 };
-        if (poll(&q, 1, 250) <= 0)
-            continue;
+        poll(&q, 1, 250);
         ssize_t n = recv(fd, buf + got, cap - got, 0);
         if (n > 0) {
             got += (size_t)n;
+            buf[got] = 0;
+            if (want < 0) {
+                char *end = strstr(buf, "\r\n\r\n");
+                if (end) {
+                    Reply tmp;
+                    long cl;
+                    read_headers(buf, end, &tmp, &cl);
+                    if (cl >= 0)
+                        want = (long)(end + 4 - buf) + cl;
+                }
+            }
+            /* A reply that has all of its Content-Length is whole. */
+            if (want >= 0 && (long)got >= want) {
+                ok = 1;
+                break;
+            }
             continue;
         }
         if (n == 0) {           /* the board closed it: the reply is whole */
@@ -221,6 +286,10 @@ int board_http(const Board *b, const char *method, const char *path,
 
     char *split = strstr(buf, "\r\n\r\n");
     if (!ok || !split || strncmp(buf, "HTTP/", 5) != 0) {
+        snprintf(why, sizeof why, "%s:%d %s", b->host, b->port,
+                 !got ? "took the question and said nothing"
+                 : !ok ? "stopped partway through its answer"
+                 : "answered, but not like a web server");
         free(buf);
         return 0;
     }
@@ -233,6 +302,8 @@ int board_http(const Board *b, const char *method, const char *path,
     /* SHORT IS NOT WHOLE. A voice piece cut off halfway would play as
      * half a sentence that looks like the whole one. */
     if (length >= 0 && (size_t)length > blen) {
+        snprintf(why, sizeof why, "%s:%d stopped partway through its answer",
+                 b->host, b->port);
         free(buf);
         memset(out, 0, sizeof *out);
         return 0;
@@ -311,18 +382,31 @@ int board_alive(const Board *b, int ms)
         return 0;
     /* Something answering on 8081 is not enough: it has to be HER server. */
     int yes = r.status == 200 && json_find(r.body, "boot") != NULL;
+    if (!yes)
+        snprintf(why, sizeof why, "%s:%d answered, but it is not the "
+                 "board (HTTP %d)", b->host, b->port, r.status);
     board_reply_free(&r);
     return yes;
 }
 
 /* ---- JSON: only what the board's replies need ------------------------ */
 
-/* A remembered "host" or "host:port". 0 when it is not one. */
+/* A remembered or typed "host" or "host:port" -- or the whole address
+ * off the board's screen, "http://192.168.4.163:8081/", since that is
+ * what he has in front of him. 0 when it is not one. */
 static int parse_at(const char *at, int port, Board *b)
 {
-    if (!at || !*at)
+    if (!at)
         return 0;
-    size_t n = strcspn(at, ": \t\r\n");
+    while (*at == ' ' || *at == '\t')
+        at++;
+    if (lower_starts(at, "http://"))
+        at += 7;
+    else if (lower_starts(at, "https://"))
+        at += 8;
+    if (!*at)
+        return 0;
+    size_t n = strcspn(at, ":/ \t\r\n");
     if (n == 0 || n >= sizeof b->host)
         return 0;
     memcpy(b->host, at, n);
@@ -351,8 +435,15 @@ int board_find(const char *remembered, const char *self, int port,
 {
     Board b;
     int tried_own = 0;
-    if (parse_at(remembered, port, &b) && found_at(&b, out, how, hn, "remembered"))
-        return 1;
+    /* What went wrong at the address HE named is the news; the guesses
+     * after it failing too is not. Kept, and put back at the end. */
+    char named[sizeof why];
+    named[0] = why[0] = 0;
+    if (parse_at(remembered, port, &b)) {
+        if (found_at(&b, out, how, hn, "remembered"))
+            return 1;
+        snprintf(named, sizeof named, "%s", why);
+    }
     if (cancel && *cancel)
         return 0;
     if (self && !strncmp(self, "10.42.0.", 8)) {
@@ -387,6 +478,11 @@ int board_find(const char *remembered, const char *self, int port,
         if (found_at(&b, out, how, hn, "its own WiFi"))
             return 1;
     }
+    if (named[0])
+        snprintf(why, sizeof why, "%s", named);
+    else
+        snprintf(why, sizeof why, "nobody on this WiFi answered when it "
+                 "asked");
     return 0;
 }
 

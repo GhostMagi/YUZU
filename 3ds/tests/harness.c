@@ -40,7 +40,7 @@ int main(int argc, char **argv)
         if (board_find(last, self, atoi(argv[4]), NULL, &f, how, sizeof how))
             printf("FOUND %s %d %s\n", f.host, f.port, how);
         else
-            printf("NONE\n");
+            printf("NONE %s\n", board_why());
         return 0;
     }
     if (!strcmp(verb, "wav") && argc == 5) {
@@ -64,7 +64,8 @@ int main(int argc, char **argv)
     }
     if (!strcmp(verb, "alive") && argc == 4) {
         Board b = at(argv);
-        printf("ALIVE %d\n", board_alive(&b, 1500));
+        int yes = board_alive(&b, 1500);
+        printf("ALIVE %d %s\n", yes, yes ? "" : board_why());
         return 0;
     }
     if (!strcmp(verb, "roster") && argc == 4) {
