@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1076 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1084 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -147,6 +147,57 @@ face server hands both out byte for byte. **Nothing has run on a 3DS.**
 **On the 3DS, once**: FBI > Remote Install > Enter URL >
 `http://10.42.0.1:8081/yuzu3ds.cia` (on ghostnano). After that it is on
 the HOME menu; a new build is the same three taps.
+
+**FIRST TRY, Nov 4, at a friend's: "Not Connected".** Board and 3DS
+both on ghostnano (his words, after I first guessed he was at home --
+the board makes ghostnano only away from a WiFi it knows). FBI: *"Failed
+to connect to 10.42.0.1 port 8081 after 0 ms"*, and its bar said Not
+Connected. **A 3DS will not USE a WiFi until Nintendo's check page
+answers**: before anything runs, its connection manager (user agent
+"CTR AC/02") asks `http://conntest.nintendowifi.net/` and wants a 200
+with `X-Organization: Nintendo`. Online play closed in 2024; that page
+did not, which is why the 3DS works on his home WiFi. ghostnano has no
+internet, so nothing answered. Ningandi (GitHub, a flask server) exists
+for exactly this, a 3DS on a hotspot with no internet. **He asked "Idk if
+it uses nintendo servers" -- the check page is the one it still uses.**
+
+**FIXED IN CODE, the board answers it, and Update is all it takes:**
+
+- `own_wifi.sh`'s boot branch (root, run straight from the repo by the
+  boot service) writes `address=/conntest.nintendowifi.net/10.42.0.1`
+  into `/etc/NetworkManager/dnsmasq-shared.d/yuzu-3ds.conf` BEFORE it
+  brings ghostnano up (the shared dnsmasq reads the folder as it
+  starts). Not in `--setup`, so he never needs `face --boot` for it.
+- Two NAT rules, in memory, made again each fallback and never added
+  twice (`-C` then `-A`): DNS from 10.42.0.0/24 to anywhere else goes to
+  the board's dnsmasq (a CFW 3DS often has a DNS server typed in, out
+  of reach with no internet), and **tcp 80 at 10.42.0.1 only** goes to
+  8081. Not all web traffic: a phone's own check would then get the
+  girls' page and Android's CONFIRMED "No internet, stay connected"
+  could become a sign-in prompt.
+- `yuzu_face.py` answers that NAME (Host header, or the whole URL on
+  the request line) with 200, `X-Organization: Nintendo`, and Nintendo's
+  page text **minus its doctype**: the offline guard refused the
+  doctype's w3.org address in a module her turn runs through -- a
+  string, not a request, and the guard was right to make me drop it.
+- Checked here: both rules parse with `iptables-restore --test` (a
+  broken control is refused); **real dnsmasq 2.91** given the line
+  answers the name with 10.42.0.1 and refuses other names; and
+  **NetworkManager 1.46's own binary** passes
+  `--conf-dir=/etc/NetworkManager/dnsmasq-shared.d` to the shared
+  dnsmasq. His board's NetworkManager is older: very likely the same,
+  UNVERIFIED. The suite's iptables is a stand-in ALWAYS -- this
+  container has a real one and the suite runs as root.
+- **Until his board has the Update** (it needs internet): Luma's
+  Rosalina has a force-the-WiFi-slot option, per forum posts read
+  through search (L+Down+Select, System configuration). UNVERIFIED on
+  his 3DS; told to him as a maybe.
+
+Eight tests; fourteen breaks, all red as failures -- after one stayed
+GREEN: http.client fills the Host from a whole URL by itself, so the
+proxy-form case never tested the request line until its Host was
+something else. And a bare-built handler (no `headers`) made `/boot.json`
+fall through: no headers at all is not the 3DS now. **1076 -> 1084.**
 
 UNVERIFIED, all of it on his 3DS: that it builds at all; that the 3DS
 keeps a saved connection to a WiFi with no internet (its connection

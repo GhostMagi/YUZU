@@ -20107,6 +20107,8 @@ class TestOwnWifi(unittest.TestCase):
         self.home.mkdir()
         self.log = self.tmp / "calls.log"
         self.unit = self.tmp / "yuzu-own-wifi.service"
+        self.dns = self.tmp / "dnsmasq-shared.d" / "yuzu-3ds.conf"
+        self.no_iptables = False
         self.keep = self.home / ".yuzu" / "own-wifi"
         # What `nmcli device status` says on each look, the last repeating.
         self.looks = ["wlan0:wifi:disconnected"]
@@ -20150,6 +20152,7 @@ case "$*" in
   *"wireless.ssid connection show"*) cat $st/ssid ;;
   *"security.psk connection show"*) cat $st/psk ;;
   *"connection up yuzu-own-wifi"*)
+    [ -n "$STUB_DNS" ] && [ -s "$STUB_DNS" ] && echo "dnsmasq has the 3DS name" >> %(log)s
     [ -n "$STUB_UP_FAILS" ] && { echo "$STUB_UP_FAILS" >&2; exit 4; } ;;
   *"connection modify yuzu-own-wifi"*)
     a=("$@")
@@ -20167,10 +20170,30 @@ exit 0
                   '[ "$1" = -f ] && shift\nexec "$@"\n' % log)
         self.stub("sleep", "exit 0\n")
         self.stub("hostname", 'case "$1" in -s) echo ghostnano ;; esac\n')
+        # ALWAYS stood in for: this container has a real iptables and the
+        # suite runs as root, so a missing stand-in would put real rules
+        # into this machine. -C answers from what -A has added.
+        if not self.no_iptables:
+            self.stub("iptables", r"""
+echo "iptables $*" >> %(log)s
+all="$*"; spec="${all#*PREROUTING }"
+case " $* " in
+  *" -C "*) grep -qxF -- "$spec" %(st)s/rules 2>/dev/null; exit $? ;;
+  *" -A "*) echo "$spec" >> %(st)s/rules ;;
+esac
+exit 0
+""" % {"log": log, "st": st})
+        path = "%s:%s" % (self.bin, os.environ.get("PATH", ""))
+        if self.no_iptables:
+            # A board with none: only folders that hold no iptables.
+            keep = [d for d in os.environ.get("PATH", "").split(":")
+                    if d and not os.path.exists(os.path.join(d, "iptables"))]
+            path = ":".join([str(self.bin)] + keep)
         env = dict(os.environ,
-                   PATH="%s:%s" % (self.bin, os.environ.get("PATH", "")),
+                   PATH=path,
                    HOME=str(self.home),
                    YUZU_OWN_WIFI_UNIT=str(self.unit),
+                   YUZU_OWN_WIFI_DNS=str(self.dns), STUB_DNS=str(self.dns),
                    YUZU_OWN_WIFI_WAIT="20", YUZU_OWN_WIFI_STEP="5",
                    YUZU_FACE_PORT="8081",
                    STUB_UP_FAILS=self.up_fails)
@@ -20452,6 +20475,95 @@ exit 0
         verified = boot[boot.index("    if up; then"):]
         self.assertIn('own_wifi.sh" --setup', verified,
                       "face --boot never makes the board's own WiFi")
+
+    # ---- a 3DS on it, Nov 4 ---------------------------------------------
+    # His photo from a friend's house, board and 3DS both on ghostnano:
+    # FBI "Not Connected", "Failed to connect to 10.42.0.1 port 8081
+    # after 0 ms". A 3DS asks Nintendo's check page before it uses a
+    # WiFi, and the board's own has no internet to reach it on.
+
+    def nat(self):
+        rules = self.state / "rules"
+        return rules.read_text().splitlines() if rules.exists() else []
+
+    def test_on_its_OWN_WiFi_the_3DSs_check_NAME_is_the_board(self):
+        """Written by the BOOT service (root, straight from the repo), so
+        Update is all it takes -- no `face --boot` for him to remember."""
+        self.names = "yuzu-own-wifi\n"
+        got = self.run_it()
+        self.assertTrue(self.switched_on(), got.stdout + got.stderr)
+        self.assertTrue(self.dns.exists(),
+                        "nothing tells the board's own WiFi where the "
+                        "3DS's check page is")
+        lines = [ln for ln in self.dns.read_text().splitlines()
+                 if not ln.startswith("#")]
+        self.assertEqual(lines,
+                         ["address=/conntest.nintendowifi.net/10.42.0.1"])
+        self.assertIn("/etc/NetworkManager/dnsmasq-shared.d/",
+                      self.SCRIPT.read_text(),
+                      "the one folder NetworkManager's shared dnsmasq reads")
+        self.assertIn("dnsmasq has the 3DS name", self.calls,
+                      "written after the network came up: its dnsmasq "
+                      "had already read the folder")
+
+    def test_at_home_the_3DSs_name_is_NOT_written(self):
+        self.names = "yuzu-own-wifi\n"
+        self.looks = ["wlan0:wifi:connected"]
+        self.run_it()
+        self.assertFalse(self.dns.exists())
+
+    def test_making_its_own_WiFi_brings_the_3DSs_check_to_the_PAGES(self):
+        self.names = "yuzu-own-wifi\n"
+        self.run_it()
+        self.assertTrue(self.switched_on())
+        self.assertIn("-s 10.42.0.0/24 -d 10.42.0.1 -p tcp --dport 80 "
+                      "-j REDIRECT --to-ports 8081", self.nat(),
+                      "the 3DS asks port 80 and nothing answers there")
+        self.assertIn("-s 10.42.0.0/24 ! -d 10.42.0.1 -p udp --dport 53 "
+                      "-j REDIRECT --to-ports 53", self.nat(),
+                      "a 3DS with its own DNS typed in never gets the name")
+        self.assertLess(self.calls.index("iptables -w -t nat -A"),
+                        self.calls.index("nmcli connection up yuzu-own-wifi"),
+                        "a 3DS joining in the first second finds nothing")
+        # The next boot without home: the same two, never four.
+        (self.state / "seen").unlink()
+        self.run_it()
+        self.assertEqual(len(self.nat()), 2, self.nat())
+
+    def test_only_the_BOARDS_address_is_taken_so_phones_see_no_change(self):
+        """A phone's own 'am I online' check asks names the board does not
+        answer. Redirecting ALL web traffic would hand it the girls' pages
+        and turn 'No internet, stay connected' (CONFIRMED working, Oct
+        29) into a sign-in prompt."""
+        self.names = "yuzu-own-wifi\n"
+        self.run_it()
+        web = [r for r in self.nat() if "--dport 80" in r]
+        self.assertEqual(len(web), 1)
+        self.assertIn(" -d 10.42.0.1 ", " %s " % web[0])
+        self.assertNotIn("!", web[0])
+
+    def test_at_HOME_nothing_is_redirected(self):
+        self.names = "yuzu-own-wifi\n"
+        self.looks = ["wlan0:wifi:connected"]
+        self.run_it()
+        self.assertEqual(self.nat(), [])
+        self.assertNotIn("iptables", self.calls)
+
+    def test_a_board_with_NO_iptables_still_makes_its_own_WiFi(self):
+        self.names = "yuzu-own-wifi\n"
+        self.no_iptables = True
+        got = self.run_it()
+        self.assertTrue(self.switched_on(), got.stdout + got.stderr)
+        self.assertIn("No iptables", got.stdout)
+
+    def test_off_takes_the_3DSs_name_away_too(self):
+        self.names = "yuzu-own-wifi\n"
+        self.run_it()
+        self.assertTrue(self.dns.exists())
+        self.run_it("--off")
+        self.assertFalse(self.dns.exists(),
+                         "face --boot --off left the board answering for "
+                         "Nintendo's check page")
 
 
 class TestFaceServer(unittest.TestCase):
@@ -20983,8 +21095,9 @@ class TestThe3DS(unittest.TestCase):
                          inspect.signature(self.face.serve).parameters["port"].default)
         own = self.define("BOARD_OWN_WIFI_HOST").strip('"')
         wifi = (Path(__file__).resolve().parent / "own_wifi.sh").read_text()
-        self.assertIn("http://%s:$PORT/" % own, wifi,
-                      "the 3DS looks for the board's own WiFi somewhere else")
+        self.assertRegex(wifi, r"(?m)^AT=%s$" % re.escape(own),
+                         "the 3DS looks for the board's own WiFi somewhere else")
+        self.assertIn("http://$AT:$PORT/", wifi)
 
     def test_it_FINDS_the_board_by_asking(self):
         if self.cube is None:
@@ -21336,6 +21449,42 @@ class TestThe3DS(unittest.TestCase):
             self.assertEqual(r.status, 404,
                              "FBI would try to install an empty answer")
             self.assertIn("not on the board yet", json.loads(body)["said"])
+
+    def test_the_board_answers_the_3DSs_check_so_it_USES_ghostnano(self):
+        """Nov 4, board and 3DS on ghostnano at a friend's: FBI said "Not
+        Connected". A 3DS will not use a WiFi until Nintendo's check page
+        answers 200 with X-Organization: Nintendo, and there is no
+        internet there to reach it on. own_wifi.sh sends the asking here;
+        this is the answer, asked the ways a 3DS asks."""
+        import http.client
+
+        def ask(path, host=None):
+            c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=20)
+            c.request("GET", path, headers={"Host": host} if host else {})
+            r = c.getresponse()
+            body = r.read()
+            c.close()
+            return r, body
+
+        for path, host in (("/", "conntest.nintendowifi.net"),
+                           ("/", "Conntest.Nintendowifi.net:80"),
+                           # The whole URL on the line, as through a
+                           # proxy: the Host is not the check's name.
+                           ("http://conntest.nintendowifi.net/", "10.42.0.1")):
+            r, body = ask(path, host)
+            self.assertEqual(r.status, 200, (path, host))
+            self.assertEqual(r.getheader("X-Organization"), "Nintendo",
+                             "the 3DS reads this as no WiFi: %r" % host)
+            self.assertIn(b"This is test.html page", body)
+            self.assertEqual(int(r.getheader("Content-Length")), len(body))
+        # Everything else is the pages, exactly as before.
+        r, body = ask("/")
+        self.assertIsNone(r.getheader("X-Organization"))
+        self.assertIn(b"<!doctype html", body.lower())
+        self.assertNotIn(b"test.html page", body)
+        r, body = ask("/generate_204", "connectivitycheck.gstatic.com")
+        self.assertIsNone(r.getheader("X-Organization"),
+                          "a phone's own check got Nintendo's answer")
 
 
 def _shuffled(seed=None):

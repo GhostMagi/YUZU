@@ -44,6 +44,28 @@ UI_DIR = os.path.join(HERE, "ui")
 # two files of it the board will hand out.
 THREEDS_BUILT = os.path.join(HERE, "3ds", "built")
 THREEDS_FILES = {"/yuzu3ds.cia": "yuzu3ds.cia", "/yuzu3ds.3dsx": "yuzu3ds.3dsx"}
+
+# A 3DS WILL NOT USE A WIFI UNTIL NINTENDO'S CHECK PAGE ANSWERS. Nov 4,
+# his photo from a friend's house, board and 3DS both on ghostnano: FBI
+# said "Not Connected" and "Failed to connect to 10.42.0.1 port 8081
+# after 0 ms". Before anything is allowed to use the WiFi, the 3DS asks
+# http://conntest.nintendowifi.net/ (user agent "CTR AC/02") and wants
+# a 200 carrying "X-Organization: Nintendo". On the board's own WiFi
+# there is no internet, so nothing answered and the 3DS acted as if
+# there were no WiFi at all. That page is still up on the internet
+# (online play closed; this did not), which is why it works at home.
+#
+# So on ghostnano the board answers it: own_wifi.sh points the name at
+# 10.42.0.1 and sends port 80 here, and this is the reply. The shape
+# Ningandi uses for exactly this case (a 3DS on a hotspot with no
+# internet). Only that name, so nothing else on the WiFi sees a change.
+CONNTEST_HOST = "conntest.nintendowifi.net"
+# Nintendo's own page, minus its doctype: what the 3DS reads is the 200
+# and the header, and the doctype's w3.org address is one the offline
+# guard rightly refuses in a module her turn runs through.
+CONNTEST_PAGE = (b'<html>\n<head>\n<title>HTML Page</title>\n</head>\n'
+                 b'<body bgcolor="#FFFFFF">\nThis is test.html page\n'
+                 b'</body>\n</html>\n')
 SPRITE_DIR = os.path.join(UI_DIR, "sprites")
 
 # PNG first because that is what he exports. SVG works identically --
@@ -2998,6 +3020,9 @@ class _Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
+        if self._the_3ds_is_checking():
+            self._conntest()
+            return
         if self.path.split("?")[0] in ("/", "/index.html"):
             self.path = "/" + self.LANDING
         if self.path.split("?")[0].rstrip("/") == "/state":
@@ -3084,6 +3109,29 @@ class _Handler(SimpleHTTPRequestHandler):
         `/launch/` being an allowlist of NAMES."""
         self.send_error(404, "File not found")
         return None
+
+    def _the_3ds_is_checking(self):
+        """Asked for Nintendo's check page BY NAME -- see CONNTEST_HOST.
+        The Host header, or the whole URL on the request line (the form
+        a 3DS behind a proxy sends). The pages are asked for by number
+        or by ghostnano.local, so they never land here."""
+        # No headers at all is not the 3DS: a route driven bare must
+        # still get its own answer.
+        headers = getattr(self, "headers", None)
+        host = ((headers.get("Host") if headers is not None else None)
+                or "").split(":")[0].strip().lower()
+        line = self.path.lower()
+        return (host == CONNTEST_HOST or
+                line.startswith("http://" + CONNTEST_HOST + "/") or
+                line == "http://" + CONNTEST_HOST)
+
+    def _conntest(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("X-Organization", "Nintendo")
+        self.send_header("Content-Length", str(len(CONNTEST_PAGE)))
+        self.end_headers()
+        self.wfile.write(CONNTEST_PAGE)
 
     def _threeds(self, name):
         path = os.path.join(THREEDS_BUILT, name)

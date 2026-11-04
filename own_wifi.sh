@@ -37,6 +37,13 @@ WAIT=${YUZU_OWN_WIFI_WAIT:-120}
 STEP=${YUZU_OWN_WIFI_STEP:-5}
 PORT=${YUZU_FACE_PORT:-8081}
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# The board's address on its own WiFi: NetworkManager's `shared` gives
+# the first shared network 10.42.0.1. His phone, the cube and the 3DS
+# all look for it there.
+AT=10.42.0.1
+# What the board's own WiFi says a name is. NetworkManager's dnsmasq for
+# a shared network reads this folder; nothing else on the board does.
+DNS=${YUZU_OWN_WIFI_DNS:-/etc/NetworkManager/dnsmasq-shared.d/yuzu-3ds.conf}
 
 has_con() {
     nmcli -t -f NAME connection show 2>/dev/null | grep -qxF "$CON"
@@ -93,8 +100,49 @@ boot() {
         waited=$((waited + STEP))
     done
     echo "No network it knows after ${WAIT}s, so the board makes its own."
+    answer_the_3ds
     nmcli radio wifi on >/dev/null 2>&1
     nmcli connection up "$CON"
+}
+
+# A 3DS WILL NOT USE A WIFI UNTIL NINTENDO'S CHECK PAGE ANSWERS (Nov 4:
+# board and 3DS on ghostnano, FBI "Not Connected"). See CONNTEST_HOST in
+# yuzu_face.py. So, as the board makes its own WiFi:
+#
+#   The check's NAME is the board: a line NetworkManager's dnsmasq for a
+#   shared network reads. At home it does nothing, because the board is
+#   not handing out addresses there. Written HERE, at boot, as root --
+#   not in --setup -- so an Update is all it takes: this script runs
+#   straight from the repo, and he never needs `face --boot` again.
+#
+#   DNS any device on its own WiFi sends elsewhere goes to the board's.
+#   A CFW 3DS often has a DNS server typed in by hand, and with no
+#   internet that server is out of reach, so the name would never come
+#   back. The board's dnsmasq answers instead.
+#
+#   The web port AT THE BOARD'S OWN ADDRESS goes to the pages' port,
+#   where the face server answers the check. Only that address, and
+#   only the check's name resolves to it, so a phone's own "am I
+#   online" asks for names the board does not answer, exactly as before.
+#
+# In the board's memory only, made again each time it makes its own
+# WiFi (a restart forgets them), and never added twice.
+answer_the_3ds() {
+    mkdir -p "$(dirname "$DNS")"
+    printf '%s\n' "# YUZU own_wifi.sh: a 3DS asks for this before it uses a WiFi." \
+        "address=/conntest.nintendowifi.net/$AT" > "$DNS"
+    if ! command -v iptables >/dev/null 2>&1; then
+        echo "No iptables here, so a 3DS will not stay on its WiFi."
+        return 0
+    fi
+    local net="${AT%.*}.0/24"
+    nat_rule -s "$net" ! -d "$AT" -p udp --dport 53 -j REDIRECT --to-ports 53
+    nat_rule -s "$net" -d "$AT" -p tcp --dport 80 -j REDIRECT --to-ports "$PORT"
+}
+
+nat_rule() {
+    iptables -w -t nat -C PREROUTING "$@" 2>/dev/null ||
+        iptables -w -t nat -A PREROUTING "$@"
 }
 
 # ---- the check, run DETACHED as root ---------------------------------------
@@ -230,7 +278,7 @@ show() {
     echo "  NO WIFI AROUND? Two minutes after power on, the board makes"
     echo "  its own. Join it on your phone (or the cube) as:"
     echo "      $name   password: $pass"
-    echo "  then open  http://10.42.0.1:$PORT/"
+    echo "  then open  http://$AT:$PORT/"
     [ -n "$host" ] && echo "         or  http://$host.local:$PORT/"
     echo "  If your phone says it has no internet, tap to stay connected."
     return 0
@@ -279,7 +327,7 @@ password() {
 
 off() {
     sudo systemctl disable yuzu-own-wifi.service >/dev/null 2>&1
-    sudo rm -f "$UNIT"
+    sudo rm -f "$UNIT" "$DNS"
     sudo systemctl daemon-reload >/dev/null 2>&1
     echo "  It will no longer make its own WiFi at boot."
 }
