@@ -49,6 +49,40 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## "ONLY CPU OR ONLY GPU?" AND "CAN 8B RUN?" -- ANSWERED, NOT CHANGED (Nov 6)
+
+*"Another chat noticed the board uses cpu only (or gpu only?) ... is
+there a reason we are only usin one? Robot reason maybe?"* and *"can
+8b parameter models run and fit on board rn?"* Read here, nothing run:
+
+- **It uses BOTH, by job.** Her BRAIN is Ollama on the GPU: nothing in
+  the repo sets `num_gpu` or hides CUDA, and 19.4 t/s for the 3B (Oct
+  29, at his friend's) is GPU speed. Her EARS are on the CPU on
+  purpose (`yuzu_ears.py`: `device="cpu"`, int8), and so is her VOICE
+  (kokoro-onnx on onnxruntime's default provider). The pip wheels for
+  CTranslate2 and onnxruntime on aarch64 are CPU builds; GPU ones on a
+  Jetson mean NVIDIA's own wheels or a source build (UNVERIFIED for
+  his JetPack). They take turns with the model anyway (he talks, she
+  thinks, she speaks). **NOT a robot reason.**
+- **The CPU and GPU share ONE 8GB on a Jetson**, so moving the ears or
+  voice to the GPU frees no memory. The one possible gain is her voice
+  STARTING sooner (Kokoro's speed on the Orin's CPU is UNMEASURED).
+  Offered, not built. The check, if a chat ever says CPU again:
+  `ollama ps` while a girl is loaded; PROCESSOR should say `100% GPU`.
+- **8B: it loads, barely, at about half the speed.** Arithmetic, not
+  measured: Llama 3.1 8B Q4_K_M is ~4.9GB, its KV cache at our 8192
+  window is 1GiB at fp16 (32 layers x 8 KV heads x 128 x 2 x 2 bytes =
+  128KiB a token), ~0.5GiB at q8_0, plus compute buffers: ~5.7-6.3GB.
+  The board showed 6.4Gi available with the desktop up and NO model
+  (Sept 9), before Kokoro and Whisper existed. So an 8B pushes the
+  voice, the ears or the desktop into the 15Gi NVMe swap, where
+  reports put it under 2 t/s. Speed estimates for Ollama Q4_K_M on the
+  Super range ~4-15 t/s, against her measured 19.4 on the 3B. **The
+  robot argues for staying small**: ROS, the tank's software or the
+  dog's video all share the same 8GB. Rei's 4B (3.3GB, 9216 window)
+  is the biggest model PROVEN on his board. Not tried; a heretic 8B
+  tag would be found and checked before he pulls anything.
+
 ## THE GIRLS ON HIS 3DS -- IT OPENS; IT COULD NOT REACH THE BOARD, FIXED (Nov 4)
 
 *"Could we make an app or .cia for my 3ds that is a way to see and talk
