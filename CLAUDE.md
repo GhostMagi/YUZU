@@ -49,6 +49,36 @@ This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
 
+## "WHATS UP WITH DEEPSEEK VARIANTS?" -- ANSWERED, NOTHING PULLED (Nov 6)
+
+*"Whats up with deepseek variants? Any similar to my abliterated
+girls?"* Read on ollama.com and by web search, nothing run:
+
+- **They exist, by the same maker as Rei's model**:
+  `huihui_ai/deepseek-r1-abliterated`, every tag last updated about a
+  year ago (the 2025 R1 generation). Sizes from ollama.com's own tag
+  list: 1.5b 1.1GB, 7b 4.7GB, 8b 5.0GB (`8b-0528-qwen3`, the default),
+  `8b-llama-distill` 4.9GB, 14b 9.0GB, then 20GB and 43GB.
+- **The small ones are NOT a DeepSeek brain.** They are Qwen and Llama
+  models TRAINED TO THINK LIKE DeepSeek's R1 (distills). The 8b is
+  Qwen3 8B underneath, the llama one is Llama 3.1 8B. So: Zero's and
+  Four's families with a thinking habit added.
+- **They think out loud, every turn.** The page's only capability tag is
+  "thinking", and its readme talks about `<think>`. That is Gemma's Sept
+  26 "Thinking Process" problem and the reason Zero is on the
+  NON-thinking Instruct-2507. The brain would hide it (`_words` reads
+  Ollama's `thinking` field, `strip_thought`), but the time is spent
+  anyway: hundreds of her 600 tokens before she says a word. Whether
+  `think: false` switches it off for these is UNVERIFIED.
+- **Sizes that suit her are the wrong ones**: 1.5b fits easily and is
+  too small for a character; 7b/8b are the 8B case just above (fits
+  barely, about half speed).
+- **Real DeepSeek is out of reach**: V4-Flash (July 2026) is ~284B
+  total, ~13B active, ~160GB of weights (secondary sources).
+
+Told him: stay put; Zero (Qwen3-4B heretic) is already the brainy one
+that fits. Offered, not done: a quick 1.5b try if he is curious.
+
 ## "ONLY CPU OR ONLY GPU?" AND "CAN 8B RUN?" -- ANSWERED, NOT CHANGED (Nov 6)
 
 *"Another chat noticed the board uses cpu only (or gpu only?) ... is
