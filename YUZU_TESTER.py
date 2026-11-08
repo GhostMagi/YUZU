@@ -3701,9 +3701,13 @@ class TestStackChanCube(unittest.TestCase):
 
     # The page turns that are NOT true of a cube, and only those, are
     # rewritten. Everything else is the measured girl word for word.
+    # "What do you see?" since Nov 8: her page's answer asks him to tap
+    # HIS PHONE'S camera (borrowed eyes); the cube's own camera is not
+    # hooked up, and the cube's answer says so -- Yuzu's case exactly.
     REWRITTEN = {"Status.", "What do you look like?",
                  "What's it like in there?",
-                 "Is this deck actually any good?", "Introduce yourself."}
+                 "Is this deck actually any good?", "Introduce yourself.",
+                 "What do you see?"}
 
     def test_every_page_example_still_true_of_a_cube_is_kept_WORD_FOR_WORD(self):
         """Her persona's own header promises it, so it is checked rather
@@ -6554,14 +6558,17 @@ class TestReiSees(BrainTestCase):
         vision model, or a photo for her is an error at best."""
         import yuzu_face
         seeing = {c["who"] for c in yuzu_face.roster() if c["sees"]}
-        self.assertEqual(seeing, {"rei", "yuzu"})
+        # FOUR SINCE NOV 8: "Can we do the same for Four?"
+        self.assertEqual(seeing, {"rei", "yuzu", "four"})
         self.assertTrue(yuzu_personas.load("rei").sees)
         self.assertFalse(yuzu_personas.load("zero").sees)
-        self.assertFalse(yuzu_personas.load("yuzu_avatar").sees,
-                         "Yuzu's own Llama has no eyes")
-        self.assertEqual(yuzu_personas.load("yuzu_avatar").eyes,
-                         yuzu_personas.load("rei").settings["model"],
-                         "Yuzu should borrow the eyes already on his board")
+        for key in ("yuzu_avatar", "four"):
+            self.assertFalse(yuzu_personas.load(key).sees,
+                             "%s's own Llama has no eyes" % key)
+            self.assertEqual(yuzu_personas.load(key).eyes,
+                             yuzu_personas.load("rei").settings["model"],
+                             "%s should borrow the eyes already on his "
+                             "board" % key)
         for key in yuzu_personas.available():
             persona = yuzu_personas.load(key)
             if persona.sees:
@@ -6790,6 +6797,7 @@ class TestReiSees(BrainTestCase):
                        or c["sees"]})
         self.assertIn("rei.html", logs)
         self.assertIn("yuzu.html", logs)
+        self.assertIn("four.html", logs)
         for name in logs:
             with self.subTest(page=name):
                 page = self.page(name)
@@ -6800,9 +6808,20 @@ class TestReiSees(BrainTestCase):
                     self.assertIn('type="button"', tag.group(0))
                     self.assertRegex(page, r"#%s\[hidden\][^{]*\{\s*display:\s*none"
                                      % button)
-                self.assertRegex(page, r"if \(here && c\.sees\)\s*"
+                # `here && c` in a rail loop, or `mine && mine` on Four's
+                # page, which finds her own entry before its front-door
+                # return (Nov 8) -- the property is the roster's `sees`.
+                self.assertRegex(page, r"if \((here && c|mine && mine)\.sees\)\s*"
                                        r"\['cam', 'pic'\]\.forEach\(id => "
                                        r"\{ document\.getElementById\(id\)\.hidden = false; \}\)")
+                # THE FRONT DOOR RETURNS EARLY (her rail stays empty), so
+                # a camera shown AFTER that return never shows on her --
+                # the girl it was built for would have a dead feature.
+                front = re.search(r"if \(\w+ && \w+\.front\) return;", page)
+                if front:
+                    self.assertLess(page.index(".sees)"), front.start(),
+                                    "%s shows the camera after the front "
+                                    "door has already returned" % name)
                 edge = re.search(r"const IMAGE_EDGE = (\d+);", page)
                 self.assertTrue(edge, "the page does not shrink his photo")
                 self.assertEqual(int(edge.group(1)), yuzu_face.IMAGE_EDGE)
@@ -7099,6 +7118,39 @@ class TestBorrowedEyes(BrainTestCase):
                          yuzu_face.EYES_NOTE % "A cat asleep on a keyboard.")
         self.assertTrue(all("images" not in m for m in sent[1]["messages"]))
 
+    def test_FOUR_borrows_them_too_on_the_DECK_DRIVEN(self):
+        """Ghost, Nov 8: "Can we do the same for Four?" The same two
+        requests through the real answer(), on the DECK path -- the
+        /wiki grounding, the board line -- so nothing a deck girl's turn
+        adds gets between his photo and the eyes: the eyes get the
+        photo and nothing of hers, Four's own model gets his words and
+        what the eyes said and no photo, and her memory keeps the short
+        note. The front door can see now."""
+        import yuzu_face, yuzu_brain
+        MockOllama.replies = itertools.cycle([
+            "A man in a dark green jacket taking a mirror selfie.",
+            "Good. The green does the work."])
+        photo = self.b64(tiny_jpeg(8, 8))
+        (reply,), sent, kept = self.drive((("How do I look?", "four"),
+                                           {"image": photo}))
+        self.assertEqual(reply, ("Good. The green does the work.", None))
+        self.assertEqual(len(sent), 2, "one photo, one look, one answer")
+        eyes, hers = sent
+        self.assertEqual(eyes["model"], self.EYES)
+        self.assertEqual(eyes["messages"], [{
+            "role": "user", "content": yuzu_brain.EYES_ASK, "images": [photo]}])
+        self.assertNotEqual(hers["model"], self.EYES,
+                            "Four answered on the eyes' model")
+        self.assertTrue(all("images" not in m for m in hers["messages"]),
+                        "the photo reached a model with no eyes")
+        self.assertIn("You are Four", hers["messages"][0]["content"])
+        self.assertEqual(hers["messages"][-1]["content"],
+                         "How do I look? " + yuzu_face.EYES_NOTE
+                         % "A man in a dark green jacket taking a mirror selfie.")
+        self.assertEqual(kept[-1][-2]["content"],
+                         "How do I look? " + yuzu_face.PAST_PHOTO_NOTE,
+                         "the description stayed in her memory")
+
     def test_eyes_that_FAIL_are_said_plainly_and_she_is_never_asked(self):
         """Not pulled, timed out, or said nothing: the bubble says so in
         words, and she is not handed a photo she cannot see -- she would
@@ -7177,29 +7229,50 @@ class TestBorrowedEyes(BrainTestCase):
         And nothing tells her the photo was DESCRIBED: she is looking at
         it with him, and a girl told a stranger described it says so."""
         import yuzu_face
-        persona = yuzu_personas.load("yuzu_avatar")
+        # EVERY GIRL WHO BORROWS THEM, found by the setting: Yuzu (Oct
+        # 29) and Four (Nov 8) today, and the next one has to answer for
+        # it the day her `eyes:` line lands.
+        borrowers = [k for k in yuzu_personas.available()
+                     if yuzu_personas.load(k).eyes]
+        self.assertTrue({"yuzu_avatar", "four"} <= set(borrowers), borrowers)
         before, after = yuzu_face.EYES_NOTE.split("%s")
         shape = re.compile(re.escape(before) + r"[A-Z][^()]+[.!?]"
                            + re.escape(after) + "$")
-        me = persona.name + ":"
-        lines = persona.prompt.splitlines()
-        shown = [(a, b) for a, b in zip(lines, lines[1:])
-                 if shape.search(a) and not a.startswith(me)]
-        self.assertGreaterEqual(len(shown), 3, "too few photo turns shown")
-        self.assertTrue(all(b.startswith(me) for _a, b in shown))
-        self.assertTrue(any(shape.match(a.split(":", 1)[1].strip())
-                            for a, _b in shown),
-                        "nothing shows a photo with no words")
-        self.assertTrue(any("blurry" in a and "again" in b for a, b in shown),
-                        "nothing shows her asking for a photo she can't make out")
-        see = [b for a, b in zip(lines, lines[1:]) if a.endswith("What do you see?")]
-        self.assertTrue(see and "camera" in see[0],
-                        "with no photo she does not ask for one")
-        # "describe", "described" AND "description": the first version
-        # of this check looked for "describ", which "description" does
-        # not contain -- its own break-check stayed green.
-        self.assertNotRegex(persona.prompt.lower(), r"descri(b|p)",
-                            "her prompt tells her the photo was described")
+        for key in borrowers:
+            with self.subTest(persona=key):
+                persona = yuzu_personas.load(key)
+                me = persona.name + ":"
+                lines = persona.prompt.splitlines()
+                shown = [(a, b) for a, b in zip(lines, lines[1:])
+                         if shape.search(a) and not a.startswith(me)]
+                self.assertGreaterEqual(len(shown), 3, "too few photo turns shown")
+                self.assertTrue(all(b.startswith(me) for _a, b in shown))
+                self.assertTrue(any(shape.match(a.split(":", 1)[1].strip())
+                                    for a, _b in shown),
+                                "nothing shows a photo with no words")
+                self.assertTrue(any("blurry" in a and "again" in b
+                                    for a, b in shown),
+                                "nothing shows her asking for a photo she "
+                                "can't make out")
+                see = [b for a, b in zip(lines, lines[1:])
+                       if a.endswith("What do you see?")]
+                self.assertTrue(see and "camera" in see[0],
+                                "with no photo she does not ask for one")
+                # "describe", "described" AND "description": the first
+                # version of this check looked for "describ", which
+                # "description" does not contain -- its own break-check
+                # stayed green.
+                self.assertNotRegex(persona.prompt.lower(), r"descri(b|p)",
+                                    "her prompt tells her the photo was "
+                                    "described")
+                # A DECK girl is told she has "no camera" by her body's
+                # default sentence, and denies the photo in front of her.
+                # Rei's sentence is the fix: no camera of her OWN.
+                if persona.hardware == "cyberdeck":
+                    self.assertNotIn("no camera and no face", persona.prompt,
+                                     "she is told she has no camera")
+                    self.assertIn("photos he sends you from his phone",
+                                  persona.prompt)
 
     def test_every_page_that_shows_her_something_does_it_with_the_SAME_code(self):
         """No build step, so each page carries its own copy of the camera
@@ -7214,6 +7287,15 @@ class TestBorrowedEyes(BrainTestCase):
         pages = sorted(n.name for n in (Path(__file__).parent / "ui").glob("*.html")
                        if block(n.name))
         self.assertIn("yuzu.html", pages)
+        # And every page whose girl the roster says sees HAS the block:
+        # a girl who sees on a page with no camera code is a feature
+        # nobody can reach (Four, Nov 8).
+        import yuzu_face
+        for c in yuzu_face.roster():
+            if c["sees"]:
+                self.assertIn(c["page"], pages,
+                              "%s sees and her page cannot take a photo"
+                              % c["who"])
         for name in pages:
             with self.subTest(page=name):
                 self.assertEqual(block(name), block("rei.html"),
@@ -7224,14 +7306,28 @@ class TestBorrowedEyes(BrainTestCase):
         so while the eyes look -- a photo is the slow kind of turn. The
         line comes back from the ONE copy of his() every bubble page
         shares, so the photo hangs on his own line."""
-        code = self.page("yuzu.html")
-        send = code[code.index("form.onsubmit"):]
-        send = send[:send.index("\n};")]
-        self.assertIn("if (!asked && !image) return;", send)
-        self.assertIn("const mine = his(asked);", send)
-        self.assertIn("mine.appendChild(snap);", send)
-        self.assertIn("waiting.textContent = 'looking...';", send)
-        self.assertIn("who: 'yuzu', image: image", send)
+        # Every BUBBLE page whose girl borrows eyes (Yuzu, and Four since
+        # Nov 8), read off the roster. Four's request goes out through
+        # her own `plain()`, so the photo is held to reach THAT call.
+        import yuzu_face
+        borrow = {c["page"]: c["who"] for c in yuzu_face.roster()
+                  if c["sees"] and yuzu_face.borrowed_eyes(
+                      yuzu_face.persona_for(c["who"]))}
+        self.assertEqual(set(borrow), {"yuzu.html", "four.html"})
+        for name, who in sorted(borrow.items()):
+            with self.subTest(page=name):
+                code = self.page(name)
+                send = code[code.index("form.onsubmit"):]
+                send = send[:send.index("\n};")]
+                self.assertIn("if (!asked && !image) return;", send)
+                self.assertIn("const mine = his(asked);", send)
+                self.assertIn("mine.appendChild(snap);", send)
+                self.assertIn("waiting.textContent = 'looking...';", send)
+                self.assertIn("unattach();", send)
+                self.assertTrue("who: '%s', image: image" % who in send
+                                or ("plain(asked, image)" in send and
+                                    "who: '%s', image: image" % who in code),
+                                "%s never sends his photo" % name)
         for name in ("four.html", "face.html", "yuzu.html"):
             with self.subTest(page=name):
                 body = self.page(name)
@@ -7753,9 +7849,11 @@ class TestHisWordsOnScreen(unittest.TestCase):
                 send = code[code.index("form.onsubmit"):]
                 send = send[:send.index("\n};")]
                 self.assertIn("his(asked)", send, "his words never reach the bubble")
+                # `plain(` and not `plain(asked)`: Four's sends his
+                # photo too since Nov 8 (`plain(asked, image)`).
                 self.assertLess(send.index("his(asked)"),
                                 send.index("fetch(") if "fetch(" in send
-                                else send.index("plain(asked)"),
+                                else send.index("plain("),
                                 "his line waits for her reply")
                 self.assertRegex(code, r"HIM = (mine|c)\.user",
                                  "his label is not read from the roster")
@@ -13245,14 +13343,24 @@ class TestTheSisters(BrainTestCase):
         deck character who does not fill them is unchanged to the byte,
         and no measured prompt moved. Verified across all twenty composed
         prompts when it was done; this keeps the defaults from drifting."""
+        # TOKEN BY TOKEN, because a girl may fill one and keep the rest:
+        # Four (Nov 8, borrowed eyes) says "no camera of your OWN" and
+        # keeps the other two sentences word for word. Asked of the
+        # whole body at once, filling one sentence took her out of the
+        # check for all three.
+        tokens = ("DECK_BODY", "DECK_BODY_EASE", "DECK_BODY_LIMIT")
         on_deck = [k for k in yuzu_personas.available()
-                   if self.persona(k).hardware == "cyberdeck"
-                   and "DECK_BODY" not in self.persona(k).settings]
-        self.assertIn("four", on_deck)
+                   if self.persona(k).hardware == "cyberdeck"]
+        checked = set()
         for key in on_deck:
-            for sentence in self.OLD_DECK_BODY:
+            for token, sentence in zip(tokens, self.OLD_DECK_BODY):
+                if token in self.persona(key).settings:
+                    continue
+                checked.add((key, token))
                 self.assertIn(sentence, self.persona(key).prompt,
-                              "%s's deck body changed under her" % key)
+                              "%s's %s changed under her" % (key, token))
+        self.assertIn(("zero", "DECK_BODY"), checked)
+        self.assertIn(("four", "DECK_BODY_LIMIT"), checked)
 
     def test_a_sister_is_never_told_she_has_no_legs(self):
         """The whole ask: she knows she has six legs. And the rest of

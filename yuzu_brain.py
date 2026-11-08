@@ -113,10 +113,24 @@ def _keep_alive(raw):
 #                    ceiling so one rambling turn can't stall the robot.
 #                    A persona's own SETTINGS block overrides it and
 #                    every deck character sets 600 -- see below.
-#   num_ctx 8192     RAISED FROM 4096, Sept 21, and it is the ceiling
-#                    that actually binds. num_predict is free in memory
-#                    and this is not: it sizes the KV cache, which
-#                    Ollama allocates when the model loads.
+#   num_ctx 9216     RAISED FROM 4096, Sept 21 (to 8192), and it is the
+#                    ceiling that actually binds. num_predict is free in
+#                    memory and this is not: it sizes the KV cache,
+#                    which Ollama allocates when the model loads.
+#
+#                    8192 -> 9216, Nov 8, for Four's borrowed eyes
+#                    ("Can we do the same for Four?"). She had ~169
+#                    tokens spare, and what the eyes say about a photo
+#                    rides in his turn -- the guard went red. EVERYONE
+#                    moved, not just her: Four, Yuzu and Saya share one
+#                    Llama, and Ollama RELOADS a model when the window
+#                    size changes between requests, so one girl on her
+#                    own number would cost a reload on every switch --
+#                    the page, the cube's swipe -- undoing "switching
+#                    girls swaps a prompt, never the weights". The
+#                    board's worst case does not move: Rei already ran
+#                    9216 on a bigger model, on his board. About +115MB
+#                    of KV cache on the Llama at fp16, half at q8_0.
 #
 #                    THE TWO NUMBERS ARE ONE SETTING. History is
 #                    `history_turns` REPLIES plus the turn being
@@ -136,7 +150,7 @@ DEFAULT_OPTIONS = {
     "min_p": 0.05,
     "repeat_penalty": 1.1,
     "num_predict": 150,
-    "num_ctx": 8192,
+    "num_ctx": 9216,
 }
 
 

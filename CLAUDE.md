@@ -16,7 +16,7 @@
 - **Ghost works from a phone** (Z Flip 6, Pydroid + PocketPal). Anything
   requiring typed commands, file paths, or arguments is a dead end.
   Prefer: text he can paste, or a no-argument script he can tap Run on.
-- Run `python YUZU_TESTER.py` before committing. 1089 tests, ~19 seconds.
+- Run `python YUZU_TESTER.py` before committing. 1090 tests, ~19 seconds.
 
 **Ghost has to remember `sudo nvpmodel -m 0`.** The Orin ships
 throttled and forgetting it makes everything slow with no visible cause.
@@ -48,6 +48,54 @@ the LED work -- see "LEDs are removed" below.)
 This does NOT mean stripping pink from Yuzu. Her liking hot pink is
 character, it lives in the persona files, and removing it would gut
 her. The rule is about the CHASSIS FINISH, not her taste.
+
+## FOUR SEES WITH BORROWED EYES TOO -- BUILT (Nov 8)
+
+*"Yooo uk how we gave Yuzu 'Borrowed Eyes'? Can we do the same for
+Four?"* Yuzu's Oct 29 build, the same way, nothing new invented.
+**Built, driven, UNMEASURED: no model has looked at a photo for her.**
+
+- **`eyes: huihui_ai/qwen3-vl-abliterated:4b-instruct`** in
+  `four.persona`, Rei's model, already on his board: **nothing new to
+  pull.** The server side needed nothing (`borrowed_eyes()` reads the
+  setting; the roster's `sees` turns true by itself).
+- **Her body sentence is Rei's**: the deck default says "no camera", and
+  a girl told that denies the photo in front of her. `DECK_BODY: ... no
+  camera of your own ... eyes for the photos he sends you from his
+  phone.` Rule 11 and four examples in `EYES_NOTE`'s exact words: a
+  selfie with a question, a meme with no words, a blurry one she asks
+  him to retake, and "What do you see?" asking for the camera. Nothing
+  says "described". **four_bot (LIVE_PERSONA) and four_cube are
+  untouched**: the eyes are PHONE_ONLY, so **nothing to paste**.
+- **Her page**: Rei's camera code character for character (held equal),
+  the two buttons in her own ink so they follow every colour she is
+  tapped into, the photo in the bubble beside his line, `remember that`
+  hidden on a photo with no words. **The front-door trap**: her page
+  returns early from the roster callback because she IS the front door,
+  so a camera shown after that return never shows -- it sits before it,
+  and a test holds that order on any page with a front-door return.
+- **The window moved: `num_ctx` 8192 -> 9216 for EVERYONE.** Four had
+  169 tokens spare and the eyes' words alone cost ~157. Not Four alone:
+  Four, Yuzu and Saya share one Llama, and Ollama reloads a model when
+  the window size changes between requests (Ollama's behaviour, not
+  measured on his board), so one girl on her own number would cost a
+  reload on every switch and every cube swipe. The board's worst case
+  does not move -- Rei already ran 9216 on a bigger model, on his board.
+  ~+115MB KV cache on the Llama at fp16. Four now has 679 spare.
+- **Driven in real Chromium** against the real server with only her
+  answer stood in: the buttons show on her front-door page, a 1200px
+  picture arrives as 640, his words and the photo reach `/say`, the snap
+  sits in the bubble. Rendered at 1024, 412 and 360: no sideways scroll,
+  the exit in its corner. And a driven test through the real `answer()`
+  on the deck path: eyes get only the photo, her model gets the note and
+  no photo, her memory keeps `PAST_PHOTO_NOTE`.
+
+**Each photo is still two model swaps** (her Llama out, the eyes in, and
+back), tens of seconds, UNMEASURED -- Yuzu's cost, said to him. One new
+test; the Yuzu-only ones now read every girl who borrows eyes off the
+setting. The deck-body test checks token by token now (filling one
+sentence took her out of the check for all three). Eight breaks, all
+red as failures. **1089 -> 1090.**
 
 ## "WHATS UP WITH DEEPSEEK VARIANTS?" -- ANSWERED, NOTHING PULLED (Nov 6)
 
