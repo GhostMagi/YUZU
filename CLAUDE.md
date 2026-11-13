@@ -145,8 +145,8 @@ tap on Rei takes a photo with a Send/Retry preview; pocket lines with
 no board), and his original 3DS running the YUZU app (`3ds/`; finds
 the board; typed turns and Saya's voice confirmed).
 
-**Robot plans**: leaning to the Waveshare UGV Beast PT (Acce, no
-Jetson), driven by JSON over serial to its ESP32 (`T:1` drive, `T:0`
+**Robot plans**: **CONFIRMED (Nov 13), after a look at dogs and
+hexapods**: the Waveshare UGV Beast PT (Acce, no Jetson), driven by JSON over serial to its ESP32 (`T:1` drive, `T:0`
 stop, `T:136` heartbeat) from his EXISTING system, no reflash; saving
 for a Unitree Go2 Pro (driven over WiFi). **Nothing robot-side is
 built until one is ordered.** Before the tank powers the Orin: a

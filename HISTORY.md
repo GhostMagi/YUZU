@@ -10,6 +10,38 @@ New entries go at the top, under this header, as `## TITLE (Mon D)`.
 The "Conventions" block below is the old one and is kept as the
 record; CLAUDE.md's is the live one.
 
+## THE BEAST IS CONFIRMED, AFTER A LOOK AT LEGS (Nov 13)
+
+A GPT screenshot said the Orin can stay on the desk as the brain while
+a Pi robot is the body. *"This might change the game. Again ... WHATS
+THE COOLEST QUADRAPEDS UNDER 5 OR 600 PI INCLUDED AND CAN SPEAK"*. It
+is true and it was not new: Sept 26 already had the Bittle X that way.
+The catch said to him: it only works in WiFi range.
+
+Prices are retailer listings found by search on Nov 13, NOT confirmed
+on the makers' own pages:
+
+- **Dogs.** SunFounder PiDog: kit ~$150-180, or ~$185-215 with a Pi
+  Zero 2 W. Camera, mic, speaker and touch sensor are built in; its
+  listing names Ollama. XGO-Lite2: ~$555 US, CM4 inside, 2 mics, 3W
+  speaker, arm; the screen is UNVERIFIED (wiki.elecfreaks.com is
+  blocked here). Bittle X: $299-319, ESP32, speaker. PuppyPi's talking
+  kit is $1,100+. DOGZILLA S1 is $660 with no Pi. Freenove's dog has a
+  buzzer, no speaker.
+- **Hexapods.** *"Muto s2 may be back baybay"*: the desk brain removes
+  the old "no Orin" blocker, but the Muto S2 with a Pi 5 8GB is now
+  ~$1,040-1,130, and no speaker was confirmed. Freenove Big Hexapod
+  ~$183-258 with no Pi or battery. SpiderPi Advanced $699.99 with a
+  Pi 5 4GB. miniHexa $204-249, brain unknown. 18 servos is why six
+  legs cost more.
+
+*"Wut da hecky for these prices i may as well stick witch ugv beast
+huh"*. Yes: $369.99 (Oct 29), speaker and mic built in, 2 servos, the
+Orin rides along, and the heartbeat stops it by itself. It gives up
+stairs. **"Beast is confirmed. (Again....) But now i feel confident in
+the purchase"**. Order status not stated, so nothing robot-side is
+built yet. Only CLAUDE.md's robot line changed.
+
 ## CLAUDE.md SPLIT: RULES THERE, THIS RECORD HERE (Nov 13)
 
 *"Sooooo claude.md is like a million lines long ... that prolly uses
