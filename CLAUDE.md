@@ -462,6 +462,29 @@ Still UNVERIFIED for robot day: which serial port the ESP32 is on
 (their software uses the 40-pin UART, likely `/dev/ttyTHS1`) and
 whether `nvgetty` holds it. Still a lean, not an order: nothing built.
 
+**A GPT-written handoff, Nov 13** ("ORIN BEAST", pasted by him, *"Only
+take what you need"*). Mostly what is already here. Kept from it:
+
+- **It says his board is Jetson Linux R39.2.1 / JetPack 7.2.1**, as
+  his report. This file says JetPack 6. Still UNRESOLVED;
+  `cat /etc/nv_tegra_release` on the board settles it (R36 is
+  JetPack 6). It only matters for Waveshare's own image and ROS stack,
+  which we do not plan to use: the JSON-over-serial bridge runs on
+  either.
+- **Nobody has said what is inside the Jetson power lead** (XH2.54 to
+  DC5525): straight off the 3S battery, or through a regulator, and
+  its current rating. On robot day, **before the Orin is plugged in**:
+  a multimeter on the barrel, centre positive, inside 9-20V. Then the
+  first drives in a LOWER power mode, MAXN only once it has not
+  rebooted under the motors.
+- **Motors off until told, and a dropped link stops them**: the ESP32's
+  own `T:136` heartbeat already does the second half.
+
+Left out on purpose: its `PROJECT_STATUS.md` (this file is the record;
+a second one goes stale), its electronic-load bench test, and its
+research task list (a purchase-readiness report), which he did not ask
+for.
+
 ## CHEAP UPGRADES WHILE HE SAVES -- OFFERED, NOT PICKED (Oct 31)
 
 *"what would be some cool upgrades tenporarily? I was thinking an
