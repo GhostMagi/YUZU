@@ -16747,6 +16747,48 @@ class TestNextSession(unittest.TestCase):
                             % name)
 
 
+class TestClaudeMdStaysShort(unittest.TestCase):
+    """CLAUDE.md loads into EVERY session, whole. Nov 13, Ghost: "claude.md
+    is like a million lines long ... that prolly uses up alot of our
+    context anytime i load ya right?" It was 12,936 lines, ~693KB, about
+    170k tokens spent before a word of his was read -- because every
+    round appended a dated entry to it and nothing ever pushed back.
+
+    So the record moved, whole, to HISTORY.md (which does not load by
+    itself), and CLAUDE.md is the rules and the current state. What is
+    pinned is the property that stops it growing back: a cap on its
+    size, and that it still points at where the history lives. A cap
+    is a number that has to be argued with, which is the point -- the
+    next dated entry belongs in HISTORY.md, and this test says so."""
+
+    CAP = 20000          # characters; it was 693,000 when this was written
+
+    def setUp(self):
+        here = Path(__file__).parent
+        self.doc = (here / "CLAUDE.md").read_text()
+        self.history = here / "HISTORY.md"
+
+    def test_it_stays_SHORT(self):
+        self.assertLess(len(self.doc), self.CAP,
+                        "CLAUDE.md is %d characters and loads into every "
+                        "session. Dated entries go at the top of HISTORY.md; "
+                        "this file holds only rules and where things stand."
+                        % len(self.doc))
+
+    def test_the_history_is_KEPT_and_it_says_where(self):
+        self.assertIn("HISTORY.md", self.doc,
+                      "CLAUDE.md must say where the full record is, or the "
+                      "next session re-researches what is already written")
+        self.assertTrue(self.history.exists(), "HISTORY.md is gone")
+        text = self.history.read_text()
+        # The record is the point: every dated round since Sept 1, not a
+        # summary of them. 175 sections when it moved.
+        self.assertGreater(text.count("\n## "), 150,
+                           "HISTORY.md has lost its dated entries")
+        self.assertGreater(len(text), 20 * len(self.doc),
+                           "HISTORY.md is no longer the long record")
+
+
 class TestDayOneRunbook(unittest.TestCase):
     """NANO_DAY_ONE.md is the one page Ghost reads at the board, off a
     phone, with the box open. A stale command there costs an evening,

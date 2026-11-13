@@ -2,9 +2,9 @@
 
 **This file expires.** It is a snapshot of where the project is
 standing RIGHT NOW, written so a fresh session can be useful in five
-minutes instead of forty. **`CLAUDE.md` is the real record** — every
-finding, every measurement, every thing that went wrong and why, is in
-there, and where the two disagree, CLAUDE.md wins.
+minutes instead of forty. **`CLAUDE.md` (rules and where things stand)
+and `HISTORY.md` (every finding, dated) are the real record**, and
+where they disagree with this file, they win.
 
 **Sept 29: the handheld deck is ABANDONED for the JetHexa2027 robot.**
 Read the top of CLAUDE.md first; anything below that calls this a
@@ -16,7 +16,7 @@ Do not grow this file. A second long doc that goes stale is the exact
 fault this repo keeps deleting (`--show shiro_deck` sat wrong in a doc
 for eleven days; a hardcoded cast in a doc is worse than one in a page,
 because a page has a test). If something here is worth keeping, it
-belongs in CLAUDE.md under a dated heading.
+belongs in HISTORY.md under a dated heading.
 
 **`HANDOFF.md` is a different file for a different reader.** That one
 is what GHOST pastes into a fresh DESIGN chat that has nothing —
