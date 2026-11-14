@@ -10,6 +10,33 @@ New entries go at the top, under this header, as `## TITLE (Mon D)`.
 The "Conventions" block below is the old one and is kept as the
 record; CLAUDE.md's is the live one.
 
+## WHAT THE BEAST DOES OUT OF THE BOX, AND CAN WE PULL THIS OFF (Nov 14)
+
+*"how does the tank ugv beast work out of box with its own nano? No
+llms "piloting" i suppose? ... i guess im just wondering how well we
+can pull this project off"*
+
+- **Out of the box nothing AI drives it.** Their Flask app (port 5000,
+  in a browser) is driving like an RC car with a camera feed. It also
+  has OpenCV/MediaPipe tricks: face detection that takes a photo,
+  gestures that move the pan-tilt and lights, colour tracking, motion
+  detection and line following (their product page and the
+  `waveshareteam/ugv_jetson` README, via search).
+- **Their ROS2 tutorial 8 has an LLM "pilot"**, read here: the
+  `ugv_chat_ai` page takes TYPED text, and Ollama with **Gemma2:9B on a
+  separate Windows PC (16GB RAM)** returns
+  `{"T":1,"type":drive_on_heading|back_up|spin|stop,"data":<m or deg>}`
+  for `ugv_tools behavior_ctrl`. There is no voice, no character and no
+  eyes, and it is the ROS2 path.
+- **Told him: the hard half is already built.** On the board, offline,
+  the girls have their characters, a voice (Kokoro), ears (whisper),
+  eyes (Rei), memory and the wiki. The bracket-move format was MEASURED
+  on Llama (80-100%). Left to build: the serial bridge, the tank body
+  file, and a frame from the tank's camera instead of the phone.
+- **Not with the Acce:** driving around the house on her own. That is
+  mapping and avoidance, the ROS2 kit's LiDAR. She drives in short
+  moves when asked, and the heartbeat stops her.
+
 ## A GEMMA FOR A NEW GIRL, NOT FOR YUZU (Nov 14)
 
 *"sum1 said gemmas are good for "roleplay" ... Preferably a fitting
