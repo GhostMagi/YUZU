@@ -149,9 +149,12 @@ the board; typed turns and Saya's voice confirmed).
 hexapods**: the Waveshare UGV Beast PT (Acce, no Jetson), driven by JSON over serial to its ESP32 (`T:1` drive, `T:0`
 stop, `T:136` heartbeat) from his EXISTING system, no reflash; saving
 for a Unitree Go2 Pro (driven over WiFi). **Wandering on her own is
-"really important" (Nov 14)**: that is the ROS2 Kit Acce (LiDAR +
-depth camera, from $759.99, per-variant UNVERIFIED), and its ROS2
-Humble needs JetPack 6. Settle his JetPack before he orders. **Nothing robot-side is
+"really important" (Nov 14), budget ~$600**: the PLAN is the AI Kit
+Acce ($369.99) + Waveshare's D500 LiDAR kit ($95.99; the Beast's
+plate has M2.5 holes, screws, cables and a LiDAR port for it, read on
+waveshare.com) + 3x 18650. No depth camera. Mapping is their ROS2
+Humble stack, which needs JetPack 6: settle his JetPack before he
+orders. A 2D LiDAR cannot see a cat lying flat. **Nothing robot-side is
 built until one is ordered.** Before the tank powers the Orin: a
 multimeter on its lead (centre positive, 9-20V), and the first drives
 in a lower power mode.

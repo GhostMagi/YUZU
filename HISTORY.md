@@ -10,6 +10,46 @@ New entries go at the top, under this header, as `## TITLE (Mon D)`.
 The "Conventions" block below is the old one and is kept as the
 record; CLAUDE.md's is the live one.
 
+## THE $600 BUILD: THE AI KIT PLUS A D500 LIDAR (Nov 14)
+
+He brought screenshots from another Claude chat: *"Another u solved my
+issue with having a 600$ budget for the project"*. Its cart:
+
+- the AI Kit Acce at $369.99;
+- the D500 LiDAR kit at $95.99;
+- 3x Molicel P28A 18650 at ~$18;
+- a 7" touch screen at $47.99, optional;
+- about $532 in all.
+
+It skipped the OAK-D Lite, which it said went from $169 to $269 in
+July (not checked here). It noted that a 2D LiDAR misses a cat lying
+flat.
+
+**Checked here on waveshare.com, and it holds:**
+
+- The AI Kit page: *"Reserved space on the mounting plate with M2.5
+  mounting holes, for installing D500 / STL27L LIDAR"*, *"Comes with
+  screws and cables for installing the D500 LIDAR"*. The driver board
+  has a *"Lidar USB connector"* and a *"Lidar UART interface"*.
+- The D500 kit is $95.99 (SKU 25978), 0.03-12m, 10Hz, UART at 230400.
+  Its page names neither ROS2 nor the UGVs, but it is the LiDAR their
+  ROS2 kits ship.
+
+**Caught and told him:**
+
+- The devkit's only video out is DisplayPort, so the 7" screen needs a
+  DP-to-HDMI adapter. It was called skippable: the girls' pages live
+  on his phone.
+- The JetPack check still gates the order, because the mapping is
+  their ROS2 Humble stack.
+- Exploring on her own is our project on top of their mapping and
+  navigation.
+- The 18650s should be genuine, from a real battery seller.
+- His old reminder: a right-angle barrel adapter if the Orin's lead
+  sticks out.
+
+The plan replaces "the ROS2 Kit Acce" in CLAUDE.md. Not ordered.
+
 ## WANDERING ON HER OWN IS "REALLY IMPORTANT" (Nov 14)
 
 *"Ahhh see wandering on her own is really important..."* That changes
