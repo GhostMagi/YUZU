@@ -10,6 +10,54 @@ New entries go at the top, under this header, as `## TITLE (Mon D)`.
 The "Conventions" block below is the old one and is kept as the
 record; CLAUDE.md's is the live one.
 
+## A GEMMA FOR A NEW GIRL, NOT FOR YUZU (Nov 14)
+
+*"sum1 said gemmas are good for "roleplay" ... Preferably a fitting
+uncensored heretic abliterated one"*. Then: *"I dont neccesarily want
+to make Yuzu a gemma. Im thinking new persona entirely. But id like to
+nab that one u picked either way."* The character is not picked yet.
+
+**THE PICK: `hf.co/mradermacher/gemma-3-4b-it-heretic-GGUF:Q4_K_M`**,
+2.49GB, not gated. It is mradermacher's quant of
+`coder3101/gemma-3-4b-it-heretic` (Heretic v1.0.1, the same tool as
+Zero's): 1/100 refusals against the original's 98, with a KL
+divergence of 0.26. DavidAU's "Extreme" build of the same model scores
+2/100 and 0.38, so it is worse on both numbers. Gemma 3 has no thinking
+mode, so the Sept 26 Gemma 4 E2B thought-leak should not recur
+(UNVERIFIED). Ollama should not load the separate vision file, so
+treat it as text-only. A girl on it can borrow Rei's eyes.
+
+- **Rejected: Gemma 4 E4B**, 5.34GB at Q4_K_M (read off Hugging Face),
+  too heavy next to everything else on 8GB.
+- **A girl on her own model means a load when switching to her**
+  (`OLLAMA_MAX_LOADED_MODELS=1`). Four, Yuzu and Saya share one Llama.
+- He was told he'd said Sept 27 that the gemmas did not hold his
+  attention; that was the E2B.
+- He pulls the model by pasting one `ollama pull` line. `pull` does not
+  fetch Ollama models. Nothing in the repo changed besides these notes.
+- UNMEASURED: how it plays, on the board or in PocketPal.
+
+**Same day: "whats the available models like these thatd be ideal for
+the tank setup."** Sizes are read off ollama.com's tag pages. On a
+robot that moves, the camera is always there, so the tank girl should
+SEE on the model she talks on. Borrowed eyes cost two model swaps per
+look, and swaps are the suspected cause of the after-photo dropouts.
+
+- **Pick: `huihui_ai/qwen3-vl-abliterated:4b-instruct`, 3.3GB.** It is
+  Rei's model, already on the board, seen working, and non-thinking.
+- **Lighter fallback: `huihui_ai/qwen3-vl-abliterated:2b-instruct`,
+  1.9GB**, in case the battery or the memory needs it. UNMEASURED.
+- **Not yet: `huihui_ai/qwen3.5-abliterated` 2B (1.9GB) and 4B
+  (3.3GB).** Vision works because they are Ollama-packaged, but they
+  think by default. `think: no` is UNVERIFIED on them.
+- **Not for the tank:** the Gemma 3 heretic (blind in Ollama) and
+  `moondream` (1.7GB, eyes only, a second model).
+  `huihui_ai/gemma3-abliterated:4b` is 8.6GB.
+- **The model never drives.** Bracket moves go through the whitelist to
+  the ESP32's `T:1` with the `T:136` heartbeat. Llama 3B is the only
+  model the move format was MEASURED on (80-100%), so a Qwen-VL driver
+  needs that measured first, and the girl is picked when it is ordered.
+
 ## THE BEAST IS CONFIRMED, AFTER A LOOK AT LEGS (Nov 13)
 
 A GPT screenshot said the Orin can stay on the desk as the brain while

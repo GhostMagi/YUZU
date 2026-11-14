@@ -202,4 +202,6 @@ in a lower power mode.
   power-mode tile (needs a careful sudo rule), `/wiki` across every
   archive, and the cube's LED base in each girl's colour ("later").
 - On hold, his call: the ghost page's text RPG; a D&D DM persona.
+- A NEW girl (not Yuzu) on `hf.co/mradermacher/gemma-3-4b-it-heretic-
+  GGUF:Q4_K_M` (Nov 14): the model is picked, the character is not yet.
 - The 8BitDo never worked in a game (the kernel saw it over USB).
