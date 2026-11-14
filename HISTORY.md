@@ -10,6 +10,36 @@ New entries go at the top, under this header, as `## TITLE (Mon D)`.
 The "Conventions" block below is the old one and is kept as the
 record; CLAUDE.md's is the live one.
 
+## WANDERING ON HER OWN IS "REALLY IMPORTANT" (Nov 14)
+
+*"Ahhh see wandering on her own is really important..."* That changes
+which Beast to buy, not the Beast itself.
+
+- **The ROS2 Kit is the AI Kit plus a 360° LiDAR and a depth camera**
+  (Waveshare's selection table says D500 and OAK-D Lite, but the Beast
+  page itself names no models). It has an Acce version with no host.
+  The page, read here: **"$759.99 - $1,302.99"**, with no price per
+  variant. The low end is PROBABLY the Acce (UNVERIFIED), about $390
+  over the AI Kit Acce's $369.99. Its software lists Gmapping,
+  Cartographer and RTAB-Map mapping, SLAM Toolbox "mapping and
+  navigation ... in unknown environments", and navigating to a point.
+  Obstacle avoidance and auto-exploration are NOT named. Whether the
+  AI Kit can take the LiDAR later is not said.
+- **Recommended: the ROS2 Kit Acce if wandering matters.** The LiDAR
+  is what makes it real, and the kit's mount, cables and software
+  match. Camera-only roaming was told to him as unreliable: no
+  distance, chair legs, the cat.
+- **Check before ordering it:** their stack is ROS2 HUMBLE, which is
+  Ubuntu 22.04, i.e. JetPack 6. His JetPack is UNRESOLVED (notes say 6,
+  he has said 7.2.1). He was asked to paste `cat /etc/nv_tegra_release`
+  (R36 = JetPack 6).
+- **The split, the same as ever:** she decides where ("go look in the
+  kitchen"), the navigation stack drives, and the heartbeat stops it.
+  Wandering into unknown rooms by itself (frontier exploration on top
+  of their nav) is a real project of ours, NOT in the box.
+- UNMEASURED: whether ROS2 mapping and a girl's model fit in 8GB
+  together. Their kit runs that stack on a 4GB Orin with no LLM.
+
 ## WHAT THE BEAST DOES OUT OF THE BOX, AND CAN WE PULL THIS OFF (Nov 14)
 
 *"how does the tank ugv beast work out of box with its own nano? No

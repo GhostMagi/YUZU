@@ -148,7 +148,10 @@ the board; typed turns and Saya's voice confirmed).
 **Robot plans**: **CONFIRMED (Nov 13), after a look at dogs and
 hexapods**: the Waveshare UGV Beast PT (Acce, no Jetson), driven by JSON over serial to its ESP32 (`T:1` drive, `T:0`
 stop, `T:136` heartbeat) from his EXISTING system, no reflash; saving
-for a Unitree Go2 Pro (driven over WiFi). **Nothing robot-side is
+for a Unitree Go2 Pro (driven over WiFi). **Wandering on her own is
+"really important" (Nov 14)**: that is the ROS2 Kit Acce (LiDAR +
+depth camera, from $759.99, per-variant UNVERIFIED), and its ROS2
+Humble needs JetPack 6. Settle his JetPack before he orders. **Nothing robot-side is
 built until one is ordered.** Before the tank powers the Orin: a
 multimeter on its lead (centre positive, 9-20V), and the first drives
 in a lower power mode.
